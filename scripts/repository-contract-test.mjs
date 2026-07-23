@@ -10,6 +10,11 @@ const packageDirectories = (await readdir(packagesDirectory, { withFileTypes: tr
 const readme = await readFile(join(root, "README.md"), "utf8");
 const releaseConfig = JSON.parse(await readFile(join(root, "release-please-config.json"), "utf8"));
 const expectedFiles = ["src", "README.md", "CHANGELOG.md", "LICENSE"];
+const synchronizedInfrastructurePairs = [
+  ["packages/pi-web-fetch/src/cache.ts", "packages/pi-web-search/src/cache.ts"],
+  ["packages/pi-web-fetch/src/inflight.ts", "packages/pi-web-search/src/inflight.ts"],
+  ["packages/pi-web-fetch/src/render.ts", "packages/pi-web-search/src/render.ts"],
+];
 
 function sameValues(actual, expected) {
   const compare = (left, right) => left.localeCompare(right);
@@ -36,6 +41,16 @@ if (!sameValues(configuredPackages, packageDirectories)) {
   fail(
     `Release Please package catalog does not match packages/: configured=${configuredPackages.join(",")} actual=${packageDirectories.join(",")}`,
   );
+}
+
+for (const [left, right] of synchronizedInfrastructurePairs) {
+  const [leftContents, rightContents] = await Promise.all([
+    readFile(join(root, left)),
+    readFile(join(root, right)),
+  ]);
+  if (!leftContents.equals(rightContents)) {
+    fail(`${left} and ${right} must remain byte-for-byte identical; update both intentionally`);
+  }
 }
 
 for (const directory of packageDirectories) {

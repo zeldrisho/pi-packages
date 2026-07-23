@@ -8,7 +8,12 @@ import { formatCollapsibleOutput } from "./render";
 export { ExpiringLruCache } from "./cache";
 export type { FetchResult } from "./content";
 export { fetchRemoteContent, type FetchRemoteDependencies } from "./fetch";
-export { executeWebFetch, type WebFetchParameters } from "./service";
+export {
+  executeWebFetch,
+  type WebFetchDetails,
+  type WebFetchParameters,
+  type WebFetchTruncationDetails,
+} from "./service";
 export {
   isPrivateAddress,
   requestPinned,

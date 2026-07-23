@@ -1,8 +1,9 @@
 import { readFile, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Check } from "typebox/value";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import registerWebSearch from "../src/index";
+import registerWebSearch, { webSearchParameters } from "../src/index";
 
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@earendil-works/pi-coding-agent")>();
@@ -26,6 +27,15 @@ interface SearchExecutionResult {
     results: Array<{ title: string; url: string; snippet: string }>;
     truncated: boolean;
     fullOutputPath?: string;
+    truncation: {
+      truncated: boolean;
+      strategy: "temporary-file" | "none";
+      fullOutputPath?: string;
+      outputBytes: number;
+      totalBytes: number;
+      outputLines: number;
+      totalLines: number;
+    };
   };
 }
 
@@ -104,6 +114,13 @@ afterEach(() => {
 });
 
 describe("web_search", () => {
+  it("enforces mode-aware query limits in the public schema", () => {
+    expect(Check(webSearchParameters, { query: "x".repeat(400), mode: "context" })).toBe(true);
+    expect(Check(webSearchParameters, { query: "x".repeat(401), mode: "context" })).toBe(false);
+    expect(Check(webSearchParameters, { query: "x".repeat(450), mode: "web" })).toBe(true);
+    expect(Check(webSearchParameters, { query: "x".repeat(450) })).toBe(true);
+  });
+
   it("fails clearly when the API key is missing", async () => {
     delete process.env.BRAVE_SEARCH_API_KEY;
     const tool = createSearchTool();
@@ -161,6 +178,10 @@ describe("web_search", () => {
       snippet: "A useful snippet",
     });
     expect(result.content[0].text).toContain("untrusted external data");
+    expect(result.details.truncation).toMatchObject({
+      truncated: false,
+      strategy: "none",
+    });
   });
 
   it("shows a Pi-style result preview until tool output is expanded", async () => {
@@ -283,6 +304,41 @@ describe("web_search", () => {
     expect(sharedSignal?.aborted).toBe(false);
   });
 
+  it("uses only Brave's context endpoint without fetching result URLs", async () => {
+    process.env.BRAVE_SEARCH_API_KEY = "context-only-secret";
+    const resultUrl = "https://example.com/provider-result";
+    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) =>
+      jsonResponse({
+        grounding: {
+          generic: [{ title: "Provider context", url: resultUrl, snippets: ["Extracted"] }],
+        },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createSearchTool().execute(
+      "call",
+      {
+        query: "provider-only context",
+        mode: "context",
+        freshness: "day",
+        language: "en",
+      },
+      undefined,
+      undefined,
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const input = fetchMock.mock.calls[0][0];
+    const requestedUrl = new URL(input instanceof Request ? input.url : input.toString());
+    expect(requestedUrl.origin + requestedUrl.pathname).toBe(
+      "https://api.search.brave.com/res/v1/llm/context",
+    );
+    expect(requestedUrl.searchParams.get("freshness")).toBe("pd");
+    expect(requestedUrl.searchParams.get("search_lang")).toBe("en");
+    expect(requestedUrl.toString()).not.toContain(resultUrl);
+  });
+
   it("escapes forged untrusted-content delimiters in context snippets", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "context-secret";
     vi.stubGlobal(
@@ -336,7 +392,23 @@ describe("web_search", () => {
     const fullOutputPath = result.details.fullOutputPath!;
     const tempDirectory = dirname(fullOutputPath);
     try {
-      expect((await readFile(fullOutputPath, "utf8")).length).toBeGreaterThan(50_000);
+      const fullOutput = await readFile(fullOutputPath, "utf8");
+      expect(fullOutput.length).toBeGreaterThan(50_000);
+      expect(result.details.truncation).toEqual({
+        truncated: true,
+        strategy: "temporary-file",
+        fullOutputPath,
+        outputBytes: expect.any(Number),
+        totalBytes: new TextEncoder().encode(fullOutput).byteLength,
+        outputLines: expect.any(Number),
+        totalLines: fullOutput.split("\n").length,
+      });
+      expect(result.details.truncation.outputBytes).toBeLessThan(
+        result.details.truncation.totalBytes,
+      );
+      expect(result.details.truncation.outputLines).toBeLessThanOrEqual(
+        result.details.truncation.totalLines,
+      );
       const shutdown = harness.getShutdownHandler();
       expect(shutdown).toBeDefined();
       await shutdown!();

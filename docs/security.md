@@ -31,6 +31,8 @@ Changes to `pi-web-fetch` must preserve:
 - byte-bounded caching, safe request coalescing, and per-caller cancellation; and
 - untrusted-content wrappers and closing-tag escaping.
 
+Keep the complete validate–resolve–pin–redirect boundary inside `pi-web-fetch` until either a second arbitrary-URL consumer appears or equivalent DNS-pinning logic is duplicated elsewhere. At that point, extract the whole boundary rather than sharing only part of the policy or transport flow.
+
 ## Web search
 
 Changes to `pi-web-search` must preserve:

@@ -1,22 +1,18 @@
 import type { IncomingMessage } from "node:http";
 import { sliceCompleteDocument, type CompleteDocument, type FetchResult } from "./content";
 import { extractHtmlToMarkdown } from "./extract";
+import { requestFollowingRedirects, type RedirectDependencies } from "./network-redirects";
+import type { ValidatedTarget } from "./network-policy";
 import {
   decodeResponse,
   FETCH_MAX_BYTES,
   readResponseBytes,
-  requestPinned,
   responseHeader,
-  validateRemoteUrl,
-  type ValidatedTarget,
-} from "./network";
+} from "./network-transport";
 
 const REQUEST_TIMEOUT_MS = 20_000;
-const FETCH_MAX_REDIRECTS = 5;
 
-export interface FetchRemoteDependencies {
-  validateUrl?: (value: string | URL) => Promise<ValidatedTarget>;
-  request?: (target: ValidatedTarget, signal: AbortSignal) => Promise<IncomingMessage>;
+export interface FetchRemoteDependencies extends RedirectDependencies {
   extractHtml?: typeof extractHtmlToMarkdown;
   timeoutMs?: number;
 }
@@ -45,6 +41,60 @@ function awaitWithAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise<
   });
 }
 
+async function documentFromResponse(
+  target: ValidatedTarget,
+  response: IncomingMessage,
+  signal: AbortSignal,
+  extractHtml: typeof extractHtmlToMarkdown,
+): Promise<CompleteDocument> {
+  const status = response.statusCode ?? 0;
+  if (status < 200 || status >= 300) {
+    response.resume();
+    throw new Error(`web_fetch returned HTTP ${status}.`);
+  }
+
+  const contentTypeHeader = responseHeader(response, "content-type") ?? "text/plain";
+  const contentType = contentTypeHeader.split(";", 1)[0].trim().toLowerCase();
+  const allowed =
+    contentType.startsWith("text/") ||
+    [
+      "application/json",
+      "application/markdown",
+      "application/x-markdown",
+      "application/xml",
+      "application/xhtml+xml",
+    ].includes(contentType);
+  if (!allowed) {
+    response.destroy();
+    throw new Error(`web_fetch does not support ${contentType || "this content type"}.`);
+  }
+
+  const raw = decodeResponse(await readResponseBytes(response, FETCH_MAX_BYTES), contentTypeHeader);
+  let markdown: string;
+  let title: string | undefined;
+  let extractor: CompleteDocument["extractor"] = "raw";
+  if (contentType === "text/html" || contentType === "application/xhtml+xml") {
+    const extracted = await awaitWithAbort(extractHtml(raw, target.url), signal);
+    markdown = extracted.markdown;
+    title = extracted.title;
+    extractor = extracted.extractor;
+  } else if (contentType === "application/json") {
+    try {
+      markdown = `\`\`\`json\n${JSON.stringify(JSON.parse(raw), null, 2)}\n\`\`\``;
+    } catch {
+      markdown = raw;
+    }
+  } else markdown = raw.trim();
+
+  return {
+    url: target.url.toString(),
+    contentType,
+    markdown: markdown.replace(/<\/untrusted_web_content>/gi, "&lt;/untrusted_web_content&gt;"),
+    title,
+    extractor,
+  };
+}
+
 export async function fetchCompleteDocument(
   rawUrl: string,
   signal: AbortSignal | undefined,
@@ -52,8 +102,6 @@ export async function fetchCompleteDocument(
 ): Promise<CompleteDocument> {
   const controller = new AbortController();
   const timeoutMs = dependencies.timeoutMs ?? REQUEST_TIMEOUT_MS;
-  const validateUrl = dependencies.validateUrl ?? validateRemoteUrl;
-  const request = dependencies.request ?? requestPinned;
   const extractHtml = dependencies.extractHtml ?? extractHtmlToMarkdown;
   let timedOut = false;
   const timeout = setTimeout(() => {
@@ -64,72 +112,11 @@ export async function fetchCompleteDocument(
   signal?.addEventListener("abort", cancel, { once: true });
 
   try {
-    let target = await awaitWithAbort(validateUrl(rawUrl), controller.signal);
-    for (let redirects = 0; redirects <= FETCH_MAX_REDIRECTS; redirects += 1) {
-      const response = await request(target, controller.signal);
-      const status = response.statusCode ?? 0;
-      if ([301, 302, 303, 307, 308].includes(status)) {
-        const location = responseHeader(response, "location");
-        if (!location) throw new Error("web_fetch received a redirect without a Location header.");
-        if (redirects === FETCH_MAX_REDIRECTS)
-          throw new Error("web_fetch followed too many redirects.");
-        response.resume();
-        target = await awaitWithAbort(
-          validateUrl(new URL(location, target.url)),
-          controller.signal,
-        );
-        continue;
-      }
-      if (status < 200 || status >= 300) {
-        response.resume();
-        throw new Error(`web_fetch returned HTTP ${status}.`);
-      }
-
-      const contentTypeHeader = responseHeader(response, "content-type") ?? "text/plain";
-      const contentType = contentTypeHeader.split(";", 1)[0].trim().toLowerCase();
-      const allowed =
-        contentType.startsWith("text/") ||
-        [
-          "application/json",
-          "application/markdown",
-          "application/x-markdown",
-          "application/xml",
-          "application/xhtml+xml",
-        ].includes(contentType);
-      if (!allowed) {
-        response.destroy();
-        throw new Error(`web_fetch does not support ${contentType || "this content type"}.`);
-      }
-
-      const raw = decodeResponse(
-        await readResponseBytes(response, FETCH_MAX_BYTES),
-        contentTypeHeader,
-      );
-      let markdown: string;
-      let title: string | undefined;
-      let extractor: CompleteDocument["extractor"] = "raw";
-      if (contentType === "text/html" || contentType === "application/xhtml+xml") {
-        const extracted = await awaitWithAbort(extractHtml(raw, target.url), controller.signal);
-        markdown = extracted.markdown;
-        title = extracted.title;
-        extractor = extracted.extractor;
-      } else if (contentType === "application/json") {
-        try {
-          markdown = `\`\`\`json\n${JSON.stringify(JSON.parse(raw), null, 2)}\n\`\`\``;
-        } catch {
-          markdown = raw;
-        }
-      } else markdown = raw.trim();
-
-      return {
-        url: target.url.toString(),
-        contentType,
-        markdown: markdown.replace(/<\/untrusted_web_content>/gi, "&lt;/untrusted_web_content&gt;"),
-        title,
-        extractor,
-      };
-    }
-    throw new Error("web_fetch followed too many redirects.");
+    const { target, response } = await requestFollowingRedirects(rawUrl, controller.signal, {
+      validateUrl: dependencies.validateUrl,
+      request: dependencies.request,
+    });
+    return await documentFromResponse(target, response, controller.signal, extractHtml);
   } catch (error) {
     if (timedOut) throw new Error(`web_fetch timed out after ${timeoutMs / 1000} seconds.`);
     if (signal?.aborted) throw new Error("web_fetch was cancelled.");
