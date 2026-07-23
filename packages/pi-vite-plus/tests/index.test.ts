@@ -25,17 +25,20 @@ describe("Vite+ guidance", () => {
     }) as { systemPrompt: string };
 
     expect(result.systemPrompt).toBe(`base prompt\n\n${VITE_PLUS_GUIDANCE}`);
-    expect(result.systemPrompt).toContain("<!--VITE PLUS START-->");
-    expect(result.systemPrompt).toContain("# Using Vite+, the Unified Toolchain for the Web");
-    expect(result.systemPrompt).toContain("a single global CLI called `vp`");
+    expect(result.systemPrompt).toContain("Use `vp`");
     expect(result.systemPrompt).toContain("`vp help`");
-    expect(result.systemPrompt).toContain("https://viteplus.dev/guide/");
-    expect(result.systemPrompt).toContain("## Review Checklist");
-    expect(result.systemPrompt).toContain("Run `vp install` after pulling remote changes");
-    expect(result.systemPrompt).toContain("Run `vp check` and `vp test`");
-    expect(result.systemPrompt).toContain("run via `vp run <script>`");
-    expect(result.systemPrompt).toContain("run `vp env doctor`");
-    expect(result.systemPrompt).toContain("<!--VITE PLUS END-->");
+    expect(result.systemPrompt).toContain("`node_modules/vite-plus/docs`");
+  });
+
+  it("does not duplicate guidance already present in the system prompt", () => {
+    const systemPrompt = `base prompt\n\n${VITE_PLUS_GUIDANCE}`;
+
+    expect(
+      registerHandler()({
+        systemPrompt,
+        systemPromptOptions: { selectedTools: ["bash"] },
+      }),
+    ).toBeUndefined();
   });
 
   it("does not add command guidance when bash is inactive", () => {
