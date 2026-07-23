@@ -12,8 +12,7 @@ pi install npm:@zeldrisho/pi-file-remove
 
 When Pi's `bash` tool is active, the extension:
 
-- guides agents to use `gomi` instead of `rm` for files and directories;
-- avoids silently falling back to `rm` when `gomi` is unavailable;
+- guides agents to use `gomi` for recoverable file and directory removal;
 - asks the user to approve detected `rm` commands before they run; and
 - blocks detected `rm` commands when confirmation is declined or unavailable.
 

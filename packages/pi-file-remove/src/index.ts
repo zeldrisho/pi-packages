@@ -2,9 +2,7 @@ import { isToolCallEventType, type ExtensionAPI } from "@earendil-works/pi-codin
 
 export const FILE_REMOVE_GUIDANCE = `## File removal
 
-- Use \`gomi\` instead of \`rm\` to move files and directories to recoverable trash.
-- If \`gomi\` is unavailable, stop and tell the user how to install it; never silently fall back to \`rm\`.
-- Use \`rm\` only for user-approved permanent deletion.`;
+- Use \`gomi\` to move files and directories to recoverable trash.`;
 
 const RM_INVOCATION =
   /(?:^|[\n;&|({])\s*(?:(?:command|exec|sudo)\s+(?:-[^\s]+\s+)*)*(?:rm|\/(?:[^\s/;&|()]+\/)*rm)(?=\s|$)/;
@@ -17,7 +15,12 @@ export function containsRmInvocation(command: string): boolean {
 /** Prefer recoverable file removal with gomi and gate permanent deletion. */
 export default function fileRemove(pi: ExtensionAPI): void {
   pi.on("before_agent_start", (event) => {
-    if (!event.systemPromptOptions.selectedTools?.includes("bash")) return;
+    if (
+      !event.systemPromptOptions.selectedTools?.includes("bash") ||
+      event.systemPrompt.includes(FILE_REMOVE_GUIDANCE)
+    ) {
+      return;
+    }
 
     return {
       systemPrompt: `${event.systemPrompt}\n\n${FILE_REMOVE_GUIDANCE}`,

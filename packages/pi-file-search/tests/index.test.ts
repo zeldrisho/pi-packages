@@ -25,8 +25,20 @@ describe("file search guidance", () => {
     }) as { systemPrompt: string };
 
     expect(result.systemPrompt).toBe(`base prompt\n\n${FILE_SEARCH_GUIDANCE}`);
-    expect(result.systemPrompt).toContain("instead of `find` by default");
-    expect(result.systemPrompt).toContain("`fd --glob`");
+    expect(result.systemPrompt).toContain("Use `fd` via `bash`");
+    expect(FILE_SEARCH_GUIDANCE).not.toContain("`find`");
+    expect(FILE_SEARCH_GUIDANCE).not.toContain("fallback");
+  });
+
+  it("does not duplicate guidance already present in the system prompt", () => {
+    const systemPrompt = `base prompt\n\n${FILE_SEARCH_GUIDANCE}`;
+
+    expect(
+      registerHandler()({
+        systemPrompt,
+        systemPromptOptions: { selectedTools: ["bash"] },
+      }),
+    ).toBeUndefined();
   });
 
   it("does not add shell guidance when bash is inactive", () => {

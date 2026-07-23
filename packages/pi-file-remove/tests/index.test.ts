@@ -44,9 +44,19 @@ describe("file removal guidance", () => {
 
     expect(result.systemPrompt).toBe(`base prompt\n\n${FILE_REMOVE_GUIDANCE}`);
     expect(result.systemPrompt).toContain("Use `gomi`");
-    expect(result.systemPrompt).toContain("instead of `rm`");
-    expect(result.systemPrompt).toContain("never silently fall back to `rm`");
-    expect(result.systemPrompt).toContain("user-approved permanent deletion");
+    expect(FILE_REMOVE_GUIDANCE).not.toContain("`rm`");
+    expect(FILE_REMOVE_GUIDANCE).not.toContain("fallback");
+  });
+
+  it("does not duplicate guidance already present in the system prompt", () => {
+    const systemPrompt = `base prompt\n\n${FILE_REMOVE_GUIDANCE}`;
+
+    expect(
+      registerHandlers().beforeAgentStart({
+        systemPrompt,
+        systemPromptOptions: { selectedTools: ["bash"] },
+      }),
+    ).toBeUndefined();
   });
 
   it("does not add shell guidance when bash is inactive", () => {
