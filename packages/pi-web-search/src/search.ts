@@ -36,6 +36,16 @@ export interface SearchParameters {
   language?: string;
 }
 
+export interface SearchTruncationDetails {
+  truncated: boolean;
+  strategy: "temporary-file" | "none";
+  fullOutputPath?: string;
+  outputBytes: number;
+  totalBytes: number;
+  outputLines: number;
+  totalLines: number;
+}
+
 export interface SearchDetails {
   query: string;
   provider: Provider;
@@ -45,6 +55,7 @@ export interface SearchDetails {
   cached: boolean;
   truncated: boolean;
   fullOutputPath?: string;
+  truncation: SearchTruncationDetails;
 }
 
 interface SearchUpdate {
@@ -78,9 +89,12 @@ export class SearchRuntime {
     const query = params.query.trim();
     if (!query) throw new Error("Search query cannot be empty.");
 
-    const provider = configuredProvider();
     const count = params.count ?? DEFAULT_RESULT_COUNT;
     const mode = params.mode ?? "web";
+    if (mode === "context" && query.length > 400) {
+      throw new Error("Brave LLM Context queries cannot exceed 400 characters.");
+    }
+    const provider = configuredProvider();
     const cacheKey = JSON.stringify({
       provider,
       mode,
@@ -162,6 +176,15 @@ export class SearchRuntime {
         cached,
         truncated: truncation.truncated,
         fullOutputPath,
+        truncation: {
+          truncated: truncation.truncated,
+          strategy: truncation.truncated ? "temporary-file" : "none",
+          fullOutputPath,
+          outputBytes: truncation.outputBytes,
+          totalBytes: truncation.totalBytes,
+          outputLines: truncation.outputLines,
+          totalLines: truncation.totalLines,
+        },
       } satisfies SearchDetails,
     };
   }

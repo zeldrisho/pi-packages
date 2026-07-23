@@ -48,6 +48,10 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
       response.writeHead(302, { location: "/redirect-loop" });
       response.end();
       return;
+    case "/redirect-blocked":
+      response.writeHead(302, { location: "http://127.0.0.1/private" });
+      response.end();
+      return;
     case "/binary":
       response.setHeader("content-type", "application/octet-stream");
       response.end("binary");
@@ -149,6 +153,19 @@ describe("web_fetch network boundaries", () => {
     ).rejects.toThrow("private or reserved");
   });
 
+  it("pins transport requests to the validated address", async () => {
+    const response = await requestPinned(
+      {
+        url: new URL(`${origin}/html`),
+        address: "127.0.0.1",
+        family: 4,
+      },
+      new AbortController().signal,
+    );
+    expect(response.statusCode).toBe(200);
+    response.resume();
+  });
+
   it("extracts HTML while removing executable content", async () => {
     const result = await fetchRemoteContent(`${origin}/html`, 0, 6_000, undefined, dependencies);
     expect(result.markdown).toContain("Hello");
@@ -157,18 +174,44 @@ describe("web_fetch network boundaries", () => {
     expect(result.title).toBe("Fixture");
   });
 
-  it("revalidates and follows redirects", async () => {
+  it("revalidates and repins every redirect", async () => {
     const validated: string[] = [];
+    const requested: ValidatedTarget[] = [];
     const result = await fetchRemoteContent(`${origin}/redirect`, 0, 6_000, undefined, {
-      ...dependencies,
       validateUrl: async (value) => {
         const url = value instanceof URL ? value : new URL(value);
         validated.push(url.pathname);
         return { url, address: "127.0.0.1", family: 4 };
       },
+      request: async (target, signal) => {
+        requested.push(target);
+        return await requestPinned(target, signal);
+      },
     });
     expect(validated).toEqual(["/redirect", "/html"]);
+    expect(requested.map((target) => target.url.pathname)).toEqual(["/redirect", "/html"]);
+    expect(requested[1]).not.toBe(requested[0]);
     expect(result.url).toBe(`${origin}/html`);
+  });
+
+  it("rejects a redirect to a blocked target before requesting it", async () => {
+    const requested: string[] = [];
+    await expect(
+      fetchRemoteContent(`${origin}/redirect-blocked`, 0, 6_000, undefined, {
+        validateUrl: async (value) => {
+          const url = value instanceof URL ? value : new URL(value);
+          if (url.pathname === "/redirect-blocked") {
+            return { url, address: "127.0.0.1", family: 4 };
+          }
+          return await validateRemoteUrl(url);
+        },
+        request: async (target, signal) => {
+          requested.push(target.url.pathname);
+          return await requestPinned(target, signal);
+        },
+      }),
+    ).rejects.toThrow("private or reserved");
+    expect(requested).toEqual(["/redirect-blocked"]);
   });
 
   it("enforces redirect limits", async () => {
@@ -234,6 +277,11 @@ describe("web_fetch network boundaries", () => {
     );
     expect(first.details.cached).toBe(false);
     expect(first.details.nextOffset).toBe(1_000);
+    expect(first.details.truncation).toEqual({
+      truncated: true,
+      strategy: "continuation",
+      nextOffset: 1_000,
+    });
     expect(versionedContinuationRequests).toBe(1);
 
     const continuation = { url, offset: first.details.nextOffset, maxCharacters: 2_000 };
@@ -288,6 +336,11 @@ describe("web_fetch network boundaries", () => {
     expect(second.details.cached).toBe(true);
     expect(first.content[0].text).toContain("<untrusted_web_content");
     expect(first.content[0].text).toContain("</untrusted_web_content>");
+    expect(first.details.truncation).toEqual({
+      truncated: false,
+      strategy: "none",
+      nextOffset: undefined,
+    });
     expect(updates).toEqual([`Fetching ${params.url}…`, `Using cached content for ${params.url}…`]);
   });
 

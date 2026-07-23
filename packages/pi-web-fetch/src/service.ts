@@ -20,6 +20,26 @@ export interface WebFetchParameters {
   maxCharacters?: number;
 }
 
+export interface WebFetchTruncationDetails {
+  truncated: boolean;
+  strategy: "continuation" | "none";
+  nextOffset?: number;
+}
+
+export interface WebFetchDetails {
+  url: string;
+  contentType: string;
+  title?: string;
+  extractor: CompleteDocument["extractor"];
+  cached: boolean;
+  truncated: boolean;
+  offset: number;
+  nextOffset?: number;
+  totalCharacters: number;
+  characterCount: number;
+  truncation: WebFetchTruncationDetails;
+}
+
 interface WebFetchUpdate {
   content: Array<{ type: "text"; text: string }>;
   details: Record<string, never>;
@@ -71,23 +91,29 @@ export async function executeWebFetch(
     result.markdown || "[The page contained no readable text.]",
     "</untrusted_web_content>",
   ].join("\n");
-  const truncation = truncateHead(output, {
+  const outputTruncation = truncateHead(output, {
     maxLines: DEFAULT_MAX_LINES,
     maxBytes: DEFAULT_MAX_BYTES,
   });
+  const truncated = result.truncated || outputTruncation.truncated;
   return {
-    content: [{ type: "text" as const, text: truncation.content }],
+    content: [{ type: "text" as const, text: outputTruncation.content }],
     details: {
       url: result.url,
       contentType: result.contentType,
       title: result.title,
       extractor: result.extractor,
       cached,
-      truncated: result.truncated || truncation.truncated,
+      truncated,
       offset: result.offset,
       nextOffset: result.nextOffset,
       totalCharacters: result.totalCharacters,
       characterCount: result.markdown.length,
-    },
+      truncation: {
+        truncated,
+        strategy: truncated ? "continuation" : "none",
+        nextOffset: result.nextOffset,
+      },
+    } satisfies WebFetchDetails,
   };
 }
