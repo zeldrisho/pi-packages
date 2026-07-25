@@ -10,7 +10,9 @@ Install `fd` and ensure it is available on your `PATH`, then install the package
 pi install npm:@zeldrisho/pi-file-search
 ```
 
-The extension adds concise `fd` file-search guidance when Pi's `bash` tool is active.
+When Pi's `bash` tool is active, the extension adds concise `fd` guidance. The extension asks the user to approve the built-in `find` tool and detected direct `find` shell commands before they run, including benign searches. Calls are blocked when confirmation is declined or unavailable.
+
+Command detection is a best-effort confirmation guard, not a shell sandbox.
 
 ## Update
 

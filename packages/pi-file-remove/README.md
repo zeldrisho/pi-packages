@@ -1,6 +1,6 @@
 # @zeldrisho/pi-file-remove
 
-Pi extension that guides coding agents to use [`gomi`](https://github.com/b4b4r07/gomi) for recoverable removal and asks for confirmation before `rm` commands run.
+Pi extension that guides coding agents to use [`gomi`](https://github.com/b4b4r07/gomi) for recoverable file and directory removal.
 
 ## Install
 

@@ -1,11 +1,18 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { isToolCallEventType, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export const VITE_PLUS_GUIDANCE = `## Vite+
 
-- Use \`vp\` for package management and development workflows.
-- Use \`vp help\` or local docs in \`node_modules/vite-plus/docs\` when needed.`;
+- Use \`vp\` for package management and development workflows.`;
 
-/** Prefer Vite+ for development workflows when shell commands are available. */
+const PACKAGE_MANAGER_INVOCATION =
+  /(?:^|[\n;&|({])\s*(?:(?:command|exec|sudo)\s+(?:-[^\s]+\s+)*)*(?:npm|npx|pnpm|pnpx|bun|bunx|\/(?:[^\s/;&|()]+\/)*(?:npm|npx|pnpm|pnpx|bun|bunx))(?=\s|$)/;
+
+/** Detect direct npm, pnpm, and Bun invocations that should run through Vite+. */
+export function containsPackageManagerInvocation(command: string): boolean {
+  return PACKAGE_MANAGER_INVOCATION.test(command.replaceAll(/\\\r?\n/g, " "));
+}
+
+/** Prefer Vite+ workflows and gate selected package-manager commands. */
 export default function vitePlus(pi: ExtensionAPI): void {
   pi.on("before_agent_start", (event) => {
     if (
@@ -18,5 +25,30 @@ export default function vitePlus(pi: ExtensionAPI): void {
     return {
       systemPrompt: `${event.systemPrompt}\n\n${VITE_PLUS_GUIDANCE}`,
     };
+  });
+
+  pi.on("tool_call", async (event, ctx) => {
+    if (
+      !isToolCallEventType("bash", event) ||
+      !containsPackageManagerInvocation(event.input.command)
+    ) {
+      return;
+    }
+
+    if (!ctx.hasUI) {
+      return {
+        block: true,
+        reason: "Package-manager command blocked without user confirmation. Use vp instead.",
+      };
+    }
+
+    const allowed = await ctx.ui.confirm(
+      "Direct package-manager command",
+      `Allow this command?\n\n${event.input.command}`,
+    );
+
+    if (!allowed) {
+      return { block: true, reason: "Package-manager command was not approved." };
+    }
   });
 }
