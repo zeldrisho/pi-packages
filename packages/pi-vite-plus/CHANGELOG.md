@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/zeldrisho/pi-packages/compare/pi-vite-plus-v0.4.0...pi-vite-plus-v0.5.0) (2026-07-25)
+
+
+### Features
+
+* **extensions:** confirm alternative tool calls ([0f6b23c](https://github.com/zeldrisho/pi-packages/commit/0f6b23c4b18514249cc2580955cd63293d9b3788))
+
 ## [0.4.0](https://github.com/zeldrisho/pi-packages/compare/pi-vite-plus-v0.3.0...pi-vite-plus-v0.4.0) (2026-07-21)
 
 

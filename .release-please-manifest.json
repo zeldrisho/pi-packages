@@ -1,8 +1,8 @@
 {
-  "packages/pi-file-search": "0.3.0",
+  "packages/pi-file-search": "0.4.0",
   "packages/pi-nested-agent-md": "0.2.2",
-  "packages/pi-vite-plus": "0.4.0",
-  "packages/pi-web-fetch": "0.3.1",
-  "packages/pi-web-search": "0.3.1",
-  "packages/pi-file-remove": "0.2.0"
+  "packages/pi-vite-plus": "0.5.0",
+  "packages/pi-web-fetch": "0.4.0",
+  "packages/pi-web-search": "0.4.0",
+  "packages/pi-file-remove": "0.3.0"
 }
