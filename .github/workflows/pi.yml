@@ -33,12 +33,12 @@ jobs:
         run: vp install --frozen-lockfile --ignore-scripts
 
       - id: pi
-        uses: zeldrisho/pi-code-assist@32e52539145d08582ee7e6fb2ecb7f8595c93e57 # v2.0.0
+        uses: zeldrisho/pi-code-assist@5efdccb6a56b6df0a9a4faf185ca2a5a08212c87 # v2.0.2
         with:
           api-key: ${{ secrets.OPENCODE_API_KEY }}
           provider: opencode
           model: deepseek-v4-flash-free
-          pi-version: 0.80.10
+          pi-version: 0.82.0
           github-tools: read
           tools: all
           project-trust: true
