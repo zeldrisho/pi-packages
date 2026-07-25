@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.3.1...pi-web-fetch-v0.4.0) (2026-07-25)
+
+
+### Features
+
+* **web-tools:** strengthen independent tool boundaries ([71aba47](https://github.com/zeldrisho/pi-packages/commit/71aba47db47483b6a75935796a1747603850aa96))
+
 ## [0.3.1](https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.3.0...pi-web-fetch-v0.3.1) (2026-07-21)
 
 
