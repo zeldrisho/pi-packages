@@ -6,7 +6,7 @@ Monorepo for my personal Pi extensions.
 
 | Package                                                        | Purpose                                     | Install                                        |
 | -------------------------------------------------------------- | ------------------------------------------- | ---------------------------------------------- |
-| [`@zeldrisho/pi-file-remove`](packages/pi-file-remove)         | Prefer `gomi` for recoverable file removal  | `pi install npm:@zeldrisho/pi-file-remove`     |
+| [`@zeldrisho/pi-file-remove`](packages/pi-file-remove)         | Prefer `gomi` for personal local removal    | `pi install npm:@zeldrisho/pi-file-remove`     |
 | [`@zeldrisho/pi-file-search`](packages/pi-file-search)         | Prefer `fd` for file discovery              | `pi install npm:@zeldrisho/pi-file-search`     |
 | [`@zeldrisho/pi-nested-agent-md`](packages/pi-nested-agent-md) | Load scoped nested `AGENTS.md` instructions | `pi install npm:@zeldrisho/pi-nested-agent-md` |
 | [`@zeldrisho/pi-vite-plus`](packages/pi-vite-plus)             | Guide agents to use Vite+ workflows         | `pi install npm:@zeldrisho/pi-vite-plus`       |

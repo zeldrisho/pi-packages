@@ -1,54 +1,29 @@
-import { isToolCallEventType, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-export const VITE_PLUS_GUIDANCE = `## Vite+
+export const VITE_PLUS_GUIDANCE = `<!--VITE PLUS START-->
 
-- Use \`vp\` for package management and development workflows.`;
+# Using Vite+, the Unified Toolchain for the Web
 
-const PACKAGE_MANAGER_INVOCATION =
-  /(?:^|[\n;&|({])\s*(?:(?:command|exec|sudo)\s+(?:-[^\s]+\s+)*)*(?:npm|npx|pnpm|pnpx|bun|bunx|\/(?:[^\s/;&|()]+\/)*(?:npm|npx|pnpm|pnpx|bun|bunx))(?=\s|$)/;
+This project is using Vite+, a unified toolchain built on top of Vite, Rolldown, Vitest, tsdown, Oxlint, Oxfmt, and Vite Task. Vite+ wraps runtime management, package management, and frontend tooling in a single global CLI called \`vp\`. Vite+ is distinct from Vite, and it invokes Vite through \`vp dev\` and \`vp build\`. Run \`vp help\` to print a list of commands and \`vp <command> --help\` for information about a specific command.
 
-/** Detect direct npm, pnpm, and Bun invocations that should run through Vite+. */
-export function containsPackageManagerInvocation(command: string): boolean {
-  return PACKAGE_MANAGER_INVOCATION.test(command.replaceAll(/\\\r?\n/g, " "));
-}
+Docs are local at \`node_modules/vite-plus/docs\` or online at https://viteplus.dev/guide/.
 
-/** Prefer Vite+ workflows and gate selected package-manager commands. */
+## Review Checklist
+
+- [ ] Run \`vp install\` after pulling remote changes and before getting started.
+- [ ] Run \`vp check\` and \`vp test\` to format, lint, type check and test changes.
+- [ ] Check if there are \`vite.config.ts\` tasks or \`package.json\` scripts necessary for validation, run via \`vp run <script>\`.
+- [ ] If setup, runtime, or package-manager behavior looks wrong, run \`vp env doctor\` and include its output when asking for help.
+
+<!--VITE PLUS END-->`;
+
+/** Prefer Vite+ for development workflows when shell commands are available. */
 export default function vitePlus(pi: ExtensionAPI): void {
   pi.on("before_agent_start", (event) => {
-    if (
-      !event.systemPromptOptions.selectedTools?.includes("bash") ||
-      event.systemPrompt.includes(VITE_PLUS_GUIDANCE)
-    ) {
-      return;
-    }
+    if (!event.systemPromptOptions.selectedTools?.includes("bash")) return;
 
     return {
       systemPrompt: `${event.systemPrompt}\n\n${VITE_PLUS_GUIDANCE}`,
     };
-  });
-
-  pi.on("tool_call", async (event, ctx) => {
-    if (
-      !isToolCallEventType("bash", event) ||
-      !containsPackageManagerInvocation(event.input.command)
-    ) {
-      return;
-    }
-
-    if (!ctx.hasUI) {
-      return {
-        block: true,
-        reason: "Package-manager command blocked without user confirmation. Use vp instead.",
-      };
-    }
-
-    const allowed = await ctx.ui.confirm(
-      "Direct package-manager command",
-      `Allow this command?\n\n${event.input.command}`,
-    );
-
-    if (!allowed) {
-      return { block: true, reason: "Package-manager command was not approved." };
-    }
   });
 }

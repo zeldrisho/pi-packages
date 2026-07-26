@@ -1,6 +1,6 @@
 # @zeldrisho/pi-vite-plus
 
-Pi extension that guides coding agents to use the [Vite+](https://viteplus.dev/) unified toolchain.
+Pi extension that guides coding agents to use [Vite+](https://viteplus.dev/), a unified toolchain built on Vite, Rolldown, Vitest, tsdown, Oxlint, Oxfmt, and Vite Task.
 
 ## Install
 
@@ -14,9 +14,9 @@ To try it for one session without installing it:
 pi -e npm:@zeldrisho/pi-vite-plus
 ```
 
-When Pi's `bash` tool is active, the extension adds concise guidance to use the `vp` CLI.
+When Pi's `bash` tool is active, the extension injects complete Vite+ CLI agent guidance. It explains the unified `vp` CLI, points agents to the Vite+ documentation, and provides a review checklist covering installation, checks, tests, project tasks, and environment diagnostics.
 
-The extension asks the user to approve detected direct npm, pnpm, and Bun commands before they run, including benign commands. Calls are blocked when confirmation is declined or unavailable. Yarn and direct development-tool commands remain available. Detection is a best-effort confirmation guard, not a shell sandbox.
+The extension provides prompt guidance only. It does not intercept or block tool calls.
 
 ## Update
 

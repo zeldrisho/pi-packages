@@ -25,7 +25,7 @@ Set `BRAVE_SEARCH_API_KEY` only when manually exercising `pi-web-search`. Never 
 
 ## Security invariants
 
-Read [`security.md`](security.md) before changing extension runtime behavior, tool schemas, network access, filesystem access, credentials, caching, or output rendering.
+Read [`security-invariants.md`](security-invariants.md) before changing extension runtime behavior, tool schemas, network access, filesystem access, credentials, caching, or output rendering.
 
 ## Verification
 

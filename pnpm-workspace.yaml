@@ -19,6 +19,7 @@ catalog:
   vitest: "4.1.10"
 
 overrides:
+  brace-expansion: "5.0.8"
   vite: "catalog:"
   vitest: "catalog:"
 

@@ -1,172 +1,88 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vite-plus/test";
-import registerVitePlus, {
-  containsPackageManagerInvocation,
-  VITE_PLUS_GUIDANCE,
-} from "../src/index";
+import registerVitePlus, { VITE_PLUS_GUIDANCE } from "../src/index";
 
 type BeforeAgentStartHandler = (event: {
   systemPrompt: string;
   systemPromptOptions: { selectedTools?: string[] };
-}) => object | undefined;
+}) => { systemPrompt: string } | undefined;
 
-type ToolCallHandler = (
-  event: { toolName: string; input: { command: string } },
-  ctx: {
-    hasUI: boolean;
-    ui: { confirm(title: string, message: string): Promise<boolean> };
-  },
-) => Promise<{ block: true; reason: string } | undefined>;
+function registerExtension(): { events: string[]; handler: BeforeAgentStartHandler } {
+  const events: string[] = [];
+  let handler: BeforeAgentStartHandler | undefined;
 
-function registerHandlers(): {
-  beforeAgentStart: BeforeAgentStartHandler;
-  toolCall: ToolCallHandler;
-} {
-  let beforeAgentStart: BeforeAgentStartHandler | undefined;
-  let toolCall: ToolCallHandler | undefined;
   registerVitePlus({
-    on(name: string, handler: BeforeAgentStartHandler | ToolCallHandler) {
-      if (name === "before_agent_start") {
-        beforeAgentStart = handler as BeforeAgentStartHandler;
-      } else if (name === "tool_call") {
-        toolCall = handler as ToolCallHandler;
-      }
+    on(name: string, registeredHandler: BeforeAgentStartHandler) {
+      events.push(name);
+      if (name === "before_agent_start") handler = registeredHandler;
     },
   } as unknown as ExtensionAPI);
-  return { beforeAgentStart: beforeAgentStart!, toolCall: toolCall! };
+
+  if (!handler) throw new Error("before_agent_start handler was not registered");
+  return { events, handler };
 }
 
-const noUI = {
-  hasUI: false,
-  ui: { confirm: async () => false },
-};
-
 describe("Vite+ guidance", () => {
-  it("tells the agent to prefer vp when bash is active", () => {
-    const result = registerHandlers().beforeAgentStart({
-      systemPrompt: "base prompt",
-      systemPromptOptions: { selectedTools: ["read", "bash"] },
-    }) as { systemPrompt: string };
-
-    expect(result.systemPrompt).toBe(`base prompt\n\n${VITE_PLUS_GUIDANCE}`);
-    expect(result.systemPrompt).toContain(
-      "Use `vp` for package management and development workflows",
-    );
+  it("registers prompt guidance without a tool-call gate", () => {
+    expect(registerExtension().events).toEqual(["before_agent_start"]);
   });
 
-  it("does not duplicate guidance already present in the system prompt", () => {
-    const systemPrompt = `base prompt\n\n${VITE_PLUS_GUIDANCE}`;
-
+  it.each([
+    ["bash only", ["bash"]],
+    ["bash first", ["bash", "read", "edit"]],
+    ["bash last", ["read", "write", "bash"]],
+  ])("adds guidance when bash is active: %s", (_label, selectedTools) => {
     expect(
-      registerHandlers().beforeAgentStart({
-        systemPrompt,
-        systemPromptOptions: { selectedTools: ["bash"] },
-      }),
-    ).toBeUndefined();
-  });
-
-  it("does not add command guidance when bash is inactive", () => {
-    expect(
-      registerHandlers().beforeAgentStart({
+      registerExtension().handler({
         systemPrompt: "base prompt",
-        systemPromptOptions: { selectedTools: ["read"] },
+        systemPromptOptions: { selectedTools },
+      }),
+    ).toEqual({ systemPrompt: `base prompt\n\n${VITE_PLUS_GUIDANCE}` });
+  });
+
+  it.each([
+    ["missing selection", undefined],
+    ["empty selection", []],
+    ["other tools", ["read", "edit"]],
+    ["case mismatch", ["BASH"]],
+  ])("does not add guidance when bash is inactive: %s", (_label, selectedTools) => {
+    expect(
+      registerExtension().handler({
+        systemPrompt: "base prompt",
+        systemPromptOptions: { selectedTools },
       }),
     ).toBeUndefined();
   });
-});
 
-describe("package-manager invocation detection", () => {
-  it.each([
-    "npm install",
-    "npx vitest",
-    "pnpm test",
-    "pnpx vite",
-    "bun test",
-    "bunx vite",
-    "command npm test",
-    "sudo pnpm install",
-    "echo done && bun test",
-    "npm \\\n      test",
-  ])("detects %j", (command) => {
-    expect(containsPackageManagerInvocation(command)).toBe(true);
-  });
+  it.each(["", "line one\nline two", "prompt with unicode: 検証"])(
+    "preserves the existing prompt before appending guidance: %j",
+    (systemPrompt) => {
+      expect(
+        registerExtension().handler({
+          systemPrompt,
+          systemPromptOptions: { selectedTools: ["bash"] },
+        }),
+      ).toEqual({ systemPrompt: `${systemPrompt}\n\n${VITE_PLUS_GUIDANCE}` });
+    },
+  );
 
   it.each([
-    "vp install",
-    "vp test",
-    "vp exec vitest",
-    "vp env exec --node lts npm i",
-    "yarn test",
-    "yarnpkg lint",
-    "vite build",
-    "vitest run",
-    "/usr/local/bin/vitest run",
-    "tsdown",
-    "oxlint src",
-    "oxfmt .",
-    "git test",
-  ])("ignores %j", (command) => {
-    expect(containsPackageManagerInvocation(command)).toBe(false);
-  });
-});
-
-describe("package-manager confirmation gate", () => {
-  it("blocks matching commands when UI is unavailable", async () => {
-    expect(
-      await registerHandlers().toolCall(
-        { toolName: "bash", input: { command: "pnpm test" } },
-        noUI,
-      ),
-    ).toEqual({
-      block: true,
-      reason: "Package-manager command blocked without user confirmation. Use vp instead.",
-    });
-  });
-
-  it("blocks matching commands when the user declines", async () => {
-    expect(
-      await registerHandlers().toolCall(
-        { toolName: "bash", input: { command: "npm install" } },
-        { hasUI: true, ui: { confirm: async () => false } },
-      ),
-    ).toEqual({ block: true, reason: "Package-manager command was not approved." });
-  });
-
-  it("allows matching commands when the user approves", async () => {
-    let prompt: [string, string] | undefined;
-    const result = await registerHandlers().toolCall(
-      { toolName: "bash", input: { command: "bun test" } },
-      {
-        hasUI: true,
-        ui: {
-          confirm: async (title, message) => {
-            prompt = [title, message];
-            return true;
-          },
-        },
-      },
-    );
-
-    expect(result).toBeUndefined();
-    expect(prompt).toEqual(["Direct package-manager command", "Allow this command?\n\nbun test"]);
-  });
-
-  it("allows vp without requesting confirmation", async () => {
-    let confirmationRequested = false;
-    const result = await registerHandlers().toolCall(
-      { toolName: "bash", input: { command: "vp test" } },
-      {
-        hasUI: true,
-        ui: {
-          confirm: async () => {
-            confirmationRequested = true;
-            return false;
-          },
-        },
-      },
-    );
-
-    expect(result).toBeUndefined();
-    expect(confirmationRequested).toBe(false);
+    "<!--VITE PLUS START-->",
+    "# Using Vite+, the Unified Toolchain for the Web",
+    "a single global CLI called `vp`",
+    "Vite+ is distinct from Vite",
+    "`vp dev` and `vp build`",
+    "`vp help`",
+    "`vp <command> --help`",
+    "`node_modules/vite-plus/docs`",
+    "https://viteplus.dev/guide/",
+    "## Review Checklist",
+    "`vp install` after pulling remote changes",
+    "`vp check` and `vp test`",
+    "`vp run <script>`",
+    "`vp env doctor`",
+    "<!--VITE PLUS END-->",
+  ])("includes the complete instruction: %s", (instruction) => {
+    expect(VITE_PLUS_GUIDANCE).toContain(instruction);
   });
 });
