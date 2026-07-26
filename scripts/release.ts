@@ -164,7 +164,12 @@ function isPublished(pkg: PackageInfo): boolean {
   } catch {
     throw new Error(`Unable to check npm for ${pkg.name}@${pkg.version}: ${result.stderr}`);
   }
-  if (response?.error?.code === "ERR_PNPM_PACKAGE_NOT_FOUND") return false;
+  if (
+    response?.error?.code === "ERR_PNPM_PACKAGE_NOT_FOUND" ||
+    response?.error?.code === "ERR_PNPM_NO_MATCHING_VERSION"
+  ) {
+    return false;
+  }
   throw new Error(
     `Unable to check npm for ${pkg.name}@${pkg.version}: ${response?.error?.message ?? result.stderr}`,
   );
