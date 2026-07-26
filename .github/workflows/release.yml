@@ -16,9 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@v6
 
-      - uses: voidzero-dev/setup-vp@8a7496fd44e8a1b0a88a7459e36213b2fefc1d15 # v1
+      - uses: voidzero-dev/setup-vp@v1
         with:
           node-version: "24"
           cache: true
@@ -26,45 +26,134 @@ jobs:
       - run: vp install
       - run: vp run validate
 
-  release:
+  plan:
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
     outputs:
-      releases_created: ${{ steps.release.outputs.releases_created }}
-      paths_released: ${{ steps.release.outputs.paths_released }}
+      matrix: ${{ steps.status.outputs.matrix }}
     steps:
-      - uses: googleapis/release-please-action@8b8fd2cc23b2e18957157a9d923d75aa0c6f6ad5 # v4
-        id: release
+      - uses: actions/checkout@v6
         with:
-          token: ${{ github.token }}
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
+          fetch-depth: 0
 
-  publish:
-    needs: release
-    if: ${{ needs.release.outputs.releases_created == 'true' }}
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "24"
+          cache: true
+
+      - run: vp install
+      - id: status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "matrix=$(vp exec node scripts/release.ts status)" >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: plan
+    if: needs.plan.outputs.matrix != '{"include":[]}'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: publish
     permissions:
-      contents: read
+      contents: write
       id-token: write
     strategy:
       fail-fast: false
-      matrix:
-        package: ${{ fromJSON(needs.release.outputs.paths_released) }}
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-      - uses: voidzero-dev/setup-vp@8a7496fd44e8a1b0a88a7459e36213b2fefc1d15 # v1
+      - uses: voidzero-dev/setup-vp@v1
         with:
           node-version: "24"
           cache: false
 
+      - uses: orhun/git-cliff-action@v4
+        with:
+          version: v2.13.1
+          args: --version
+
       - run: vp install
-      - run: vp pm publish -- --access public
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: vp exec node scripts/release.ts ensure-github-release '${{ matrix.package }}'
+
+      - name: Publish package
+        if: matrix.publish
         working-directory: ${{ matrix.package }}
+        run: vp pm publish -- --access public
+
+  prepare:
+    needs: [plan, release]
+    if: >-
+      always() && needs.plan.result == 'success' &&
+      (needs.release.result == 'success' || needs.release.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "24"
+          cache: true
+
+      - uses: orhun/git-cliff-action@v4
+        with:
+          version: v2.13.1
+          args: --version
+
+      - run: vp install
+      - name: Prepare release changes
+        env:
+          RELEASE_PR_BODY: ${{ runner.temp }}/git-cliff-release-pr.md
+        run: vp exec node scripts/release.ts prepare
+
+      - name: Validate and update release pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PR_BODY: ${{ runner.temp }}/git-cliff-release-pr.md
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+
+          vp run validate
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          branch='git-cliff/release'
+          remote_sha=$(git ls-remote --heads origin "refs/heads/$branch" | cut -f1)
+          if [ -n "$remote_sha" ]; then
+            git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch"
+          fi
+
+          git checkout -B "$branch"
+          git add packages/*/package.json packages/*/CHANGELOG.md
+          git commit -m 'chore: release packages'
+          if [ -n "$remote_sha" ]; then
+            git push --force-with-lease="refs/heads/$branch:$remote_sha" origin "$branch"
+          else
+            git push --set-upstream origin "$branch"
+          fi
+
+          pr=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$pr" ]; then
+            gh pr edit "$pr" --body-file "$RELEASE_PR_BODY"
+          else
+            gh pr create \
+              --base main \
+              --head "$branch" \
+              --title 'chore: release packages' \
+              --body-file "$RELEASE_PR_BODY"
+          fi

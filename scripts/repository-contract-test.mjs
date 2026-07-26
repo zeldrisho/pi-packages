@@ -8,7 +8,6 @@ const packageDirectories = (await readdir(packagesDirectory, { withFileTypes: tr
   .map((entry) => entry.name)
   .sort();
 const readme = await readFile(join(root, "README.md"), "utf8");
-const releaseConfig = JSON.parse(await readFile(join(root, "release-please-config.json"), "utf8"));
 const expectedFiles = ["src", "README.md", "CHANGELOG.md", "LICENSE"];
 const synchronizedInfrastructurePairs = [
   ["packages/pi-web-fetch/src/cache.ts", "packages/pi-web-search/src/cache.ts"],
@@ -31,15 +30,6 @@ const documentedDirectories = [...readme.matchAll(/\]\(packages\/([A-Za-z0-9._-]
 if (!sameValues(documentedDirectories, packageDirectories)) {
   fail(
     `README package catalog does not match packages/: documented=${documentedDirectories.sort().join(",")} actual=${packageDirectories.join(",")}`,
-  );
-}
-
-const configuredPackages = Object.keys(releaseConfig.packages ?? {})
-  .map((path) => path.replace(/^packages\//, ""))
-  .sort();
-if (!sameValues(configuredPackages, packageDirectories)) {
-  fail(
-    `Release Please package catalog does not match packages/: configured=${configuredPackages.join(",")} actual=${packageDirectories.join(",")}`,
   );
 }
 

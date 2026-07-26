@@ -14,14 +14,14 @@
 
 ## Sources of Truth
 
-| Need                       | Source                                                           |
-| -------------------------- | ---------------------------------------------------------------- |
-| Package catalog            | `README.md`                                                      |
-| Development                | `docs/development.md`                                            |
-| Security invariants        | `docs/security-invariants.md`                                    |
-| Package behavior and setup | `packages/*/README.md`                                           |
-| Release process            | `docs/releases.md`                                               |
-| Release configuration      | `release-please-config.json` and `.github/workflows/release.yml` |
+| Need                       | Source                                                                  |
+| -------------------------- | ----------------------------------------------------------------------- |
+| Package catalog            | `README.md`                                                             |
+| Development                | `docs/development.md`                                                   |
+| Security invariants        | `docs/security-invariants.md`                                           |
+| Package behavior and setup | `packages/*/README.md`                                                  |
+| Release process            | `docs/releases.md`                                                      |
+| Release configuration      | `cliff.toml`, `scripts/release.ts`, and `.github/workflows/release.yml` |
 
 ## Package Constraints
 
@@ -43,6 +43,6 @@
 
 - When asked to push changes, push the work branch and create a pull request.
 - Agents must never merge pull requests; leave merging to the user.
-- Do not hand-edit Release Please branches or generated release artifacts to force a release through checks.
+- Do not hand-edit the `git-cliff/release` branch or generated release artifacts to force a release through checks.
 - Do not publish npm packages, create tags or GitHub releases, or approve protected-environment deployments unless explicitly requested for the specific package and version.
-- Let Release Please manage versions; keep release metadata synchronized with package manifests and npm.
+- Let the git-cliff workflow manage versions; keep package manifests, component tags, GitHub releases, and npm synchronized.
