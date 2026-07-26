@@ -18,7 +18,7 @@
 | -------------------------- | ---------------------------------------------------------------- |
 | Package catalog            | `README.md`                                                      |
 | Development                | `docs/development.md`                                            |
-| Security invariants        | `docs/security.md`                                               |
+| Security invariants        | `docs/security-invariants.md`                                    |
 | Package behavior and setup | `packages/*/README.md`                                           |
 | Release process            | `docs/releases.md`                                               |
 | Release configuration      | `release-please-config.json` and `.github/workflows/release.yml` |

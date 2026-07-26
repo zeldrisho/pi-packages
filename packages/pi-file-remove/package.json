@@ -1,7 +1,7 @@
 {
   "name": "@zeldrisho/pi-file-remove",
   "version": "0.3.0",
-  "description": "Pi extension that prefers gomi and confirms permanent file removal",
+  "description": "Pi extension that prefers gomi for personal local file removal",
   "keywords": [
     "file-removal",
     "gomi",

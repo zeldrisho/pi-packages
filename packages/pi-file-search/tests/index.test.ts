@@ -1,148 +1,72 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vite-plus/test";
-import registerFileSearch, { containsFindInvocation, FILE_SEARCH_GUIDANCE } from "../src/index";
+import registerFileSearch, { FILE_SEARCH_GUIDANCE } from "../src/index";
 
 type BeforeAgentStartHandler = (event: {
   systemPrompt: string;
   systemPromptOptions: { selectedTools?: string[] };
-}) => object | undefined;
+}) => { systemPrompt: string } | undefined;
 
-type ToolCallHandler = (
-  event: { toolName: string; input: { command: string } },
-  ctx: {
-    hasUI: boolean;
-    ui: { confirm(title: string, message: string): Promise<boolean> };
-  },
-) => Promise<{ block: true; reason: string } | undefined>;
+function registerExtension(): { events: string[]; handler: BeforeAgentStartHandler } {
+  const events: string[] = [];
+  let handler: BeforeAgentStartHandler | undefined;
 
-function registerHandlers(): {
-  beforeAgentStart: BeforeAgentStartHandler;
-  toolCall: ToolCallHandler;
-} {
-  let beforeAgentStart: BeforeAgentStartHandler | undefined;
-  let toolCall: ToolCallHandler | undefined;
   registerFileSearch({
-    on(name: string, handler: BeforeAgentStartHandler | ToolCallHandler) {
-      if (name === "before_agent_start") {
-        beforeAgentStart = handler as BeforeAgentStartHandler;
-      } else if (name === "tool_call") {
-        toolCall = handler as ToolCallHandler;
-      }
+    on(name: string, registeredHandler: BeforeAgentStartHandler) {
+      events.push(name);
+      if (name === "before_agent_start") handler = registeredHandler;
     },
   } as unknown as ExtensionAPI);
-  return { beforeAgentStart: beforeAgentStart!, toolCall: toolCall! };
+
+  if (!handler) throw new Error("before_agent_start handler was not registered");
+  return { events, handler };
 }
 
-const noUI = {
-  hasUI: false,
-  ui: { confirm: async () => false },
-};
-
 describe("file search guidance", () => {
-  it("tells the agent to prefer fd when bash is active", () => {
-    const result = registerHandlers().beforeAgentStart({
-      systemPrompt: "base prompt",
-      systemPromptOptions: { selectedTools: ["read", "bash"] },
-    }) as { systemPrompt: string };
-
-    expect(result.systemPrompt).toBe(`base prompt\n\n${FILE_SEARCH_GUIDANCE}`);
-    expect(result.systemPrompt).toContain("Use `fd` for file and directory searches");
-    expect(FILE_SEARCH_GUIDANCE).not.toContain("`find`");
-    expect(FILE_SEARCH_GUIDANCE).not.toContain("fallback");
+  it("registers prompt guidance without a tool-call gate", () => {
+    expect(registerExtension().events).toEqual(["before_agent_start"]);
   });
 
-  it("does not duplicate guidance already present in the system prompt", () => {
-    const systemPrompt = `base prompt\n\n${FILE_SEARCH_GUIDANCE}`;
-
-    expect(
-      registerHandlers().beforeAgentStart({
-        systemPrompt,
-        systemPromptOptions: { selectedTools: ["bash"] },
-      }),
-    ).toBeUndefined();
-  });
-
-  it("does not add shell guidance when bash is inactive", () => {
-    expect(
-      registerHandlers().beforeAgentStart({
-        systemPrompt: "base prompt",
-        systemPromptOptions: { selectedTools: ["read"] },
-      }),
-    ).toBeUndefined();
-  });
-});
-
-describe("find invocation detection", () => {
   it.each([
-    "find . -name '*.ts'",
-    "command find src",
-    "sudo find /tmp",
-    "/usr/bin/find .",
-    "echo done && find .",
-    "find \\\n      . -type f",
-  ])("detects %j", (command) => {
-    expect(containsFindInvocation(command)).toBe(true);
-  });
-
-  it.each(["fd .", "echo find .", "printf 'find .'"])("ignores %j", (command) => {
-    expect(containsFindInvocation(command)).toBe(false);
-  });
-});
-
-describe("find confirmation gate", () => {
-  it("blocks find when UI is unavailable", async () => {
-    expect(
-      await registerHandlers().toolCall({ toolName: "bash", input: { command: "find src" } }, noUI),
-    ).toEqual({
-      block: true,
-      reason: "find blocked without user confirmation. Use fd instead.",
+    ["bash only", ["bash"]],
+    ["bash first", ["bash", "read", "edit"]],
+    ["bash last", ["read", "write", "bash"]],
+  ])("adds guidance when bash is active: %s", (_label, selectedTools) => {
+    const result = registerExtension().handler({
+      systemPrompt: "base prompt",
+      systemPromptOptions: { selectedTools },
     });
+
+    expect(result).toEqual({ systemPrompt: `base prompt\n\n${FILE_SEARCH_GUIDANCE}` });
   });
 
-  it("blocks find when the user declines", async () => {
+  it.each([
+    ["missing selection", undefined],
+    ["empty selection", []],
+    ["other tools", ["read", "edit"]],
+    ["case mismatch", ["BASH"]],
+  ])("does not add guidance when bash is inactive: %s", (_label, selectedTools) => {
     expect(
-      await registerHandlers().toolCall(
-        { toolName: "find", input: { command: "" } },
-        { hasUI: true, ui: { confirm: async () => false } },
-      ),
-    ).toEqual({ block: true, reason: "find was not approved." });
+      registerExtension().handler({
+        systemPrompt: "base prompt",
+        systemPromptOptions: { selectedTools },
+      }),
+    ).toBeUndefined();
   });
 
-  it("allows find when the user approves", async () => {
-    let prompt: [string, string] | undefined;
-    const result = await registerHandlers().toolCall(
-      { toolName: "bash", input: { command: "find src" } },
-      {
-        hasUI: true,
-        ui: {
-          confirm: async (title, message) => {
-            prompt = [title, message];
-            return true;
-          },
-        },
-      },
-    );
+  it.each(["", "line one\nline two", "prompt with unicode: 検索"])(
+    "preserves the existing prompt before appending guidance: %j",
+    (systemPrompt) => {
+      expect(
+        registerExtension().handler({
+          systemPrompt,
+          systemPromptOptions: { selectedTools: ["bash"] },
+        }),
+      ).toEqual({ systemPrompt: `${systemPrompt}\n\n${FILE_SEARCH_GUIDANCE}` });
+    },
+  );
 
-    expect(result).toBeUndefined();
-    expect(prompt).toEqual(["Alternative file search", "Allow this command?\n\nfind src"]);
-  });
-
-  it("allows fd without requesting confirmation", async () => {
-    let confirmationRequested = false;
-    const result = await registerHandlers().toolCall(
-      { toolName: "bash", input: { command: "fd . src" } },
-      {
-        hasUI: true,
-        ui: {
-          confirm: async () => {
-            confirmationRequested = true;
-            return false;
-          },
-        },
-      },
-    );
-
-    expect(result).toBeUndefined();
-    expect(confirmationRequested).toBe(false);
+  it("concisely prefers fd over find", () => {
+    expect(FILE_SEARCH_GUIDANCE).toBe("## File search\n\n- Use `fd` instead of `find` by default.");
   });
 });

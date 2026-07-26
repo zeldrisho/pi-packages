@@ -1,6 +1,6 @@
 # @zeldrisho/pi-file-search
 
-Pi extension that guides coding agents to use [`fd`](https://github.com/sharkdp/fd) for file and directory discovery.
+Pi extension that guides coding agents to use [`fd`](https://github.com/sharkdp/fd) for file and directory discovery instead of `find` by default.
 
 ## Install
 
@@ -10,9 +10,9 @@ Install `fd` and ensure it is available on your `PATH`, then install the package
 pi install npm:@zeldrisho/pi-file-search
 ```
 
-When Pi's `bash` tool is active, the extension adds concise `fd` guidance. The extension asks the user to approve the built-in `find` tool and detected direct `find` shell commands before they run, including benign searches. Calls are blocked when confirmation is declined or unavailable.
+When Pi's `bash` tool is active, the extension adds concise guidance to use `fd` instead of `find` by default.
 
-Command detection is a best-effort confirmation guard, not a shell sandbox.
+The extension provides prompt guidance only. It does not intercept or block tool calls.
 
 ## Update
 
