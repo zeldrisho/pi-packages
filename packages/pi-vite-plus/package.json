@@ -1,6 +1,6 @@
 {
   "name": "@zeldrisho/pi-vite-plus",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Pi extension that guides agents to use Vite+ development workflows",
   "keywords": [
     "package-management",
