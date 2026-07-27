@@ -52,7 +52,8 @@ jobs:
 
   release:
     needs: plan
-    if: needs.plan.outputs.matrix != '{"include":[]}'
+    # scripts/release.ts status must emit only valid JSON; inspect its matrix structurally.
+    if: fromJSON(needs.plan.outputs.matrix).include[0] != null
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: publish
@@ -72,10 +73,9 @@ jobs:
           node-version: "24"
           cache: false
 
-      - uses: orhun/git-cliff-action@v4
+      - uses: taiki-e/install-action@v2
         with:
-          version: v2.13.1
-          args: --version
+          tool: git-cliff@2.13.1
 
       - run: vp install
       - name: Create GitHub release
@@ -108,10 +108,9 @@ jobs:
           node-version: "24"
           cache: true
 
-      - uses: orhun/git-cliff-action@v4
+      - uses: taiki-e/install-action@v2
         with:
-          version: v2.13.1
-          args: --version
+          tool: git-cliff@2.13.1
 
       - run: vp install
       - name: Prepare release changes
