@@ -1,4 +1,11 @@
 # Changelog
+## [0.4.1](https://github.com/zeldrisho/pi-packages/compare/pi-file-search-v0.4.0...pi-file-search-v0.4.1) (2026-07-27)
+
+
+### Bug fixes
+
+- **extensions:** Simplify agent guidance ([e3c2ded](https://github.com/zeldrisho/pi-packages/commit/e3c2ded8fe52c2ea0d0832af17c083abb55ebad4))
+
 
 ## [0.4.0](https://github.com/zeldrisho/pi-packages/compare/pi-file-search-v0.3.0...pi-file-search-v0.4.0) (2026-07-25)
 

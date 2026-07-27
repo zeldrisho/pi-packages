@@ -1,4 +1,11 @@
 # Changelog
+## [0.5.1](https://github.com/zeldrisho/pi-packages/compare/pi-vite-plus-v0.5.0...pi-vite-plus-v0.5.1) (2026-07-27)
+
+
+### Bug fixes
+
+- **extensions:** Simplify agent guidance ([e3c2ded](https://github.com/zeldrisho/pi-packages/commit/e3c2ded8fe52c2ea0d0832af17c083abb55ebad4))
+
 
 ## [0.5.0](https://github.com/zeldrisho/pi-packages/compare/pi-vite-plus-v0.4.0...pi-vite-plus-v0.5.0) (2026-07-25)
 
