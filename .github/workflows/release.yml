@@ -73,10 +73,6 @@ jobs:
           node-version: "24"
           cache: false
 
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: git-cliff@2.13.1
-
       - run: vp install
       - name: Create GitHub release
         env:
@@ -107,10 +103,6 @@ jobs:
         with:
           node-version: "24"
           cache: true
-
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: git-cliff@2.13.1
 
       - run: vp install
       - name: Prepare release changes
