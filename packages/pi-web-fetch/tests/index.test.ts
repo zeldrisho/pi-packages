@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vite-plus/test";
 import {
   executeWebFetch,
+  FETCH_MAX_BYTES,
   fetchRemoteContent,
   isPrivateAddress,
   requestPinned,
@@ -56,14 +57,19 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
       response.setHeader("content-type", "application/octet-stream");
       response.end("binary");
       return;
+    case "/documentation-sized":
+      response.setHeader("content-type", "text/plain");
+      response.end("x".repeat(1_500_000));
+      return;
     case "/declared-large":
       response.setHeader("content-type", "text/plain");
-      response.setHeader("content-length", "1000001");
+      response.setHeader("content-length", String(FETCH_MAX_BYTES + 1));
       response.end("small");
       return;
     case "/streamed-large":
       response.setHeader("content-type", "text/plain");
-      response.end("x".repeat(1_000_001));
+      response.write("x".repeat(FETCH_MAX_BYTES));
+      response.end("x");
       return;
     case "/untrusted":
       response.setHeader("content-type", "text/plain");
@@ -220,16 +226,36 @@ describe("web_fetch network boundaries", () => {
     ).rejects.toThrow("too many redirects");
   });
 
+  it("accepts documentation-sized responses while keeping returned content bounded", async () => {
+    const result = await fetchRemoteContent(
+      `${origin}/documentation-sized`,
+      0,
+      6_000,
+      undefined,
+      dependencies,
+    );
+    expect(result.nextOffset).toBe(6_000);
+    expect(result.markdown).toContain("[Content truncated.");
+    expect(result.totalCharacters).toBe(1_500_000);
+  });
+
   it.each([
     ["/binary", "does not support application/octet-stream"],
-    ["/declared-large", "response exceeds"],
-    ["/streamed-large", "response exceeds"],
     ["/status", "HTTP 418"],
   ])("rejects invalid response from %s", async (path, message) => {
     await expect(
       fetchRemoteContent(`${origin}${path}`, 0, 6_000, undefined, dependencies),
     ).rejects.toThrow(message);
   });
+
+  it.each(["/declared-large", "/streamed-large"])(
+    "reports the raw response limit and explains maxCharacters for %s",
+    async (path) => {
+      await expect(
+        fetchRemoteContent(`${origin}${path}`, 0, 6_000, undefined, dependencies),
+      ).rejects.toThrow(/raw download limit.*maxCharacters only controls returned output/);
+    },
+  );
 
   it("escapes untrusted-content closing tags", async () => {
     const result = await fetchRemoteContent(
