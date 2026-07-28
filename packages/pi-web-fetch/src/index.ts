@@ -2,7 +2,6 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { executeWebFetch } from "./service";
-import { FETCH_MAX_BYTES } from "./network";
 import { formatCollapsibleOutput } from "./render";
 
 export { ExpiringLruCache } from "./cache";
@@ -15,6 +14,7 @@ export {
   type WebFetchTruncationDetails,
 } from "./service";
 export {
+  FETCH_MAX_BYTES,
   isPrivateAddress,
   requestPinned,
   validateRemoteUrl,
@@ -22,6 +22,7 @@ export {
 } from "./network";
 
 const FETCH_DEFAULT_MAX_CHARACTERS = 6_000;
+const FETCH_MAX_OFFSET_CHARACTERS = 20_000_000;
 
 export default function (pi: ExtensionAPI) {
   pi.registerTool({
@@ -44,9 +45,9 @@ export default function (pi: ExtensionAPI) {
       offset: Type.Optional(
         Type.Integer({
           minimum: 0,
-          maximum: FETCH_MAX_BYTES,
+          maximum: FETCH_MAX_OFFSET_CHARACTERS,
           description:
-            "Character offset to start reading from (default: 0; use nextOffset to continue)",
+            "Extracted-content character offset to start reading from (default: 0; use nextOffset to continue)",
         }),
       ),
       maxCharacters: Type.Optional(

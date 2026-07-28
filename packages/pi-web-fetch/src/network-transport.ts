@@ -4,9 +4,23 @@ import type { LookupFunction } from "node:net";
 import { formatSize } from "@earendil-works/pi-coding-agent";
 import type { ValidatedTarget } from "./network-policy";
 
-export const FETCH_MAX_BYTES = 1_000_000;
+export const FETCH_MAX_BYTES = 5 * 1_024 * 1_024;
 
 const encoder = new TextEncoder();
+
+function responseTooLargeMessage(
+  receivedBytes: number,
+  maxBytes: number,
+  sizeIsExact: boolean,
+): string {
+  const size = sizeIsExact
+    ? `is ${formatSize(receivedBytes)}`
+    : `has reached at least ${formatSize(receivedBytes)}`;
+  return [
+    `web_fetch response ${size}, exceeding the ${formatSize(maxBytes)} raw download limit.`,
+    "maxCharacters only controls returned output.",
+  ].join(" ");
+}
 
 export async function requestPinned(
   target: ValidatedTarget,
@@ -46,7 +60,7 @@ export async function readResponseBytes(
 ): Promise<Uint8Array> {
   const declared = Number(responseHeader(response, "content-length"));
   if (Number.isFinite(declared) && declared > maxBytes)
-    throw new Error(`web_fetch response exceeds ${formatSize(maxBytes)}.`);
+    throw new Error(responseTooLargeMessage(declared, maxBytes, true));
   const chunks: Uint8Array[] = [];
   let total = 0;
   for await (const value of response) {
@@ -54,7 +68,7 @@ export async function readResponseBytes(
     total += chunk.byteLength;
     if (total > maxBytes) {
       response.destroy();
-      throw new Error(`web_fetch response exceeds ${formatSize(maxBytes)}.`);
+      throw new Error(responseTooLargeMessage(total, maxBytes, false));
     }
     chunks.push(chunk);
   }
