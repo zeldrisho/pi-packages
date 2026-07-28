@@ -59,8 +59,10 @@ export async function readResponseBytes(
   maxBytes: number,
 ): Promise<Uint8Array> {
   const declared = Number(responseHeader(response, "content-length"));
-  if (Number.isFinite(declared) && declared > maxBytes)
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    response.destroy();
     throw new Error(responseTooLargeMessage(declared, maxBytes, true));
+  }
   const chunks: Uint8Array[] = [];
   let total = 0;
   for await (const value of response) {
