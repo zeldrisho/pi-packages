@@ -1,4 +1,16 @@
 # Changelog
+## [0.5.0](https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.4.0...pi-web-fetch-v0.5.0) (2026-07-28)
+
+
+### Bug fixes
+
+- Apply CodeRabbit auto-fixes ([b9149ac](https://github.com/zeldrisho/pi-packages/commit/b9149ac91016bb25b49806af5c99b8486420dd74))
+
+
+### Features
+
+- **web-fetch:** Support larger documentation pages ([39cdb32](https://github.com/zeldrisho/pi-packages/commit/39cdb3213a9eee9e0c905319631ef3228e31c8d8))
+
 
 ## [0.4.0](https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.3.1...pi-web-fetch-v0.4.0) (2026-07-25)
 
