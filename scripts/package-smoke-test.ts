@@ -65,7 +65,7 @@ try {
     `import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { discoverAndLoadExtensions } from "@earendil-works/pi-coding-agent";
-import * as childProcess from "node:child_process";
+import childProcess from "node:child_process";
 
 const packageNames = ${JSON.stringify(packageNames)};
 for (const packageName of packageNames) {
