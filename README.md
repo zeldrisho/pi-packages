@@ -15,19 +15,18 @@ Monorepo for my personal Pi extensions.
 
 Install only the extensions you need using the commands above. See each package README for configuration, behavior, and usage.
 
-## Manage extensions
+## Project-local installation
 
-Update all installed extensions:
+Add `-l` to install a package only for the current project:
 
 ```bash
-pi update --extensions
+pi install -l npm:@zeldrisho/pi-file-search
 ```
 
-To update or remove one extension, use its npm package name:
+Remove the project-local package with the same source:
 
 ```bash
-pi update npm:@zeldrisho/pi-file-search
-pi remove npm:@zeldrisho/pi-file-search
+pi remove -l npm:@zeldrisho/pi-file-search
 ```
 
 ## Development
