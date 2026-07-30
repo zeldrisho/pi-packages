@@ -13,8 +13,8 @@
     "format": "vp fmt --write",
     "typecheck": "vp check --no-fmt --no-lint",
     "pack:dry-run": "for package in packages/*; do (cd \"$package\" && vp pm pack -- --dry-run) || exit; done",
-    "test:contracts": "vp exec node scripts/repository-contract-test.mjs",
-    "test:packages": "vp exec node scripts/package-smoke-test.mjs",
+    "test:contracts": "vp exec node scripts/repository-contract-test.ts",
+    "test:packages": "vp exec node scripts/package-smoke-test.ts",
     "prepare": "vp config"
   },
   "devDependencies": {
