@@ -15,12 +15,12 @@ const synchronizedInfrastructurePairs = [
   ["packages/pi-web-fetch/src/render.ts", "packages/pi-web-search/src/render.ts"],
 ];
 
-function sameValues(actual, expected) {
-  const compare = (left, right) => left.localeCompare(right);
+function sameValues(actual: string[], expected: string[]) {
+  const compare = (left: string, right: string) => left.localeCompare(right);
   return JSON.stringify([...actual].sort(compare)) === JSON.stringify([...expected].sort(compare));
 }
 
-function fail(message) {
+function fail(message: string): never {
   throw new Error(`Repository contract violation: ${message}`);
 }
 
@@ -29,7 +29,7 @@ const documentedDirectories = [...readme.matchAll(/\]\(packages\/([A-Za-z0-9._-]
 );
 if (!sameValues(documentedDirectories, packageDirectories)) {
   fail(
-    `README package catalog does not match packages/: documented=${documentedDirectories.sort().join(",")} actual=${packageDirectories.join(",")}`,
+    `README package catalog does not match packages/: documented=${documentedDirectories.sort((left, right) => left.localeCompare(right)).join(",")} actual=${packageDirectories.join(",")}`,
   );
 }
 
