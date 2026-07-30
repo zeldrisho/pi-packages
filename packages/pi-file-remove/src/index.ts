@@ -2,9 +2,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export const FILE_REMOVE_GUIDANCE = `## File removal
 
-- On the user's local development machine: use \`gomi\`, not \`rm\`.
-- In CI, containers, or production: use the existing removal workflow.
-- Use \`rm\` only for user-approved permanent deletion.`;
+- Use \`gomi\` instead of \`rm\` on the user's local development machine.
+- In CI, containers, or production, use the existing removal workflow.`;
 
 /** Prefer recoverable file removal during personal local development. */
 export default function fileRemove(pi: ExtensionAPI): void {

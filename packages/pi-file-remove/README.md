@@ -10,26 +10,28 @@ On the user's local development machine, install `gomi` and ensure it is availab
 pi install npm:@zeldrisho/pi-file-remove
 ```
 
-When Pi's `bash` tool is active, the extension guides agents to:
-
-- use `gomi`, not `rm`, on the user's local development machine;
-- use the existing removal workflow in CI, containers, or production; and
-- use `rm` only for user-approved permanent deletion.
-
-`gomi` accepts file and directory paths similarly to `rm`, but moves removed items to trash so they can be restored.
-
-The extension provides prompt guidance only. It does not intercept or block tool calls.
-
-## Update
+Install only for the current project:
 
 ```bash
-pi update npm:@zeldrisho/pi-file-remove
+pi install -l npm:@zeldrisho/pi-file-remove
 ```
+
+When Pi's `bash` tool is active, the extension adds concise guidance to use `gomi` instead of `rm` locally and the existing removal workflow in CI, containers, or production.
+
+`gomi` moves removed files and directories to trash so they can be restored.
+
+The extension provides prompt guidance only. It does not intercept or block tool calls.
 
 ## Uninstall
 
 ```bash
 pi remove npm:@zeldrisho/pi-file-remove
+```
+
+For a project-local installation:
+
+```bash
+pi remove -l npm:@zeldrisho/pi-file-remove
 ```
 
 ## License

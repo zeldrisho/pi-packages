@@ -66,11 +66,10 @@ describe("file removal guidance", () => {
     },
   );
 
-  it("uses concise environment-specific removal guidance", () => {
+  it("concisely prefers recoverable local removal", () => {
     expect(FILE_REMOVE_GUIDANCE).toBe(`## File removal
 
-- On the user's local development machine: use \`gomi\`, not \`rm\`.
-- In CI, containers, or production: use the existing removal workflow.
-- Use \`rm\` only for user-approved permanent deletion.`);
+- Use \`gomi\` instead of \`rm\` on the user's local development machine.
+- In CI, containers, or production, use the existing removal workflow.`);
   });
 });
