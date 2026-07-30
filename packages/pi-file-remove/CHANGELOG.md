@@ -1,4 +1,11 @@
 # Changelog
+## [0.3.2](https://github.com/zeldrisho/pi-packages/compare/pi-file-remove-v0.3.1...pi-file-remove-v0.3.2) (2026-07-30)
+
+
+### Bug fixes
+
+- **file-remove:** Simplify removal guidance ([ecf201c](https://github.com/zeldrisho/pi-packages/commit/ecf201c60a400af2952aecb0364986808fe9d49c))
+
 ## [0.3.1](https://github.com/zeldrisho/pi-packages/compare/pi-file-remove-v0.3.0...pi-file-remove-v0.3.1) (2026-07-27)
 
 

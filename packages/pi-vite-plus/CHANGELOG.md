@@ -1,4 +1,11 @@
 # Changelog
+## [0.5.2](https://github.com/zeldrisho/pi-packages/compare/pi-vite-plus-v0.5.1...pi-vite-plus-v0.5.2) (2026-07-30)
+
+
+### Bug fixes
+
+- **vite-plus:** Sync upstream agent guidance ([f3ca011](https://github.com/zeldrisho/pi-packages/commit/f3ca0115cfffdca1cd9d116d4de7e30e3d2868e4))
+
 ## [0.5.1](https://github.com/zeldrisho/pi-packages/compare/pi-vite-plus-v0.5.0...pi-vite-plus-v0.5.1) (2026-07-27)
 
 
