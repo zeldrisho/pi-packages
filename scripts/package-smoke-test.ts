@@ -65,46 +65,93 @@ try {
     `import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { discoverAndLoadExtensions } from "@earendil-works/pi-coding-agent";
+import * as childProcess from "node:child_process";
 
 const packageNames = ${JSON.stringify(packageNames)};
-const childProcessIds = () =>
-  new Set(
-    process
-      ._getActiveHandles()
-      .filter((handle) => handle?.constructor?.name === "ChildProcess")
-      .map((handle) => handle.pid)
-      .filter((pid) => typeof pid === "number"),
-  );
 for (const packageName of packageNames) {
-  const childrenBeforeLoad = childProcessIds();
-  const packageDirectory = join(process.cwd(), "node_modules", ...packageName.split("/"));
-  const manifest = JSON.parse(await readFile(join(packageDirectory, "package.json"), "utf8"));
-  if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(["./src/index.ts"])) {
-    throw new Error(\`Invalid Pi extension manifest for \${packageName}\`);
-  }
-  const extensionPath = join(packageDirectory, manifest.pi.extensions[0]);
-  const loaded = await discoverAndLoadExtensions(
-    [extensionPath],
-    process.cwd(),
-    join(process.cwd(), ".agent"),
-  );
-  if (loaded.errors.length > 0) {
-    throw new Error(\`Failed to load \${packageName}: \${JSON.stringify(loaded.errors)}\`);
-  }
-  const extension = loaded.extensions.find((entry) => entry.resolvedPath === extensionPath);
-  const registrations =
-    (extension?.handlers.size ?? 0) +
-    (extension?.tools.size ?? 0) +
-    (extension?.commands.size ?? 0);
-  if (!extension || registrations === 0) {
-    throw new Error(\`\${packageName} did not register a Pi extension\`);
-  }
-  await new Promise((resolve) => setImmediate(resolve));
-  const unexpectedChildren = [...childProcessIds()].filter((pid) => !childrenBeforeLoad.has(pid));
-  if (unexpectedChildren.length > 0) {
-    throw new Error(
-      \`\${packageName} started child processes while loading: \${unexpectedChildren.join(", ")}\`,
+  const createdProcesses = new Set<number>();
+  const originalSpawn = childProcess.spawn;
+  const originalSpawnSync = childProcess.spawnSync;
+  const originalExec = childProcess.exec;
+  const originalExecSync = childProcess.execSync;
+  const originalExecFile = childProcess.execFile;
+  const originalExecFileSync = childProcess.execFileSync;
+  const originalFork = childProcess.fork;
+
+  try {
+    childProcess.spawn = function (...args: any[]) {
+      const child = originalSpawn.apply(this, args as any);
+      if (child.pid) createdProcesses.add(child.pid);
+      return child;
+    } as any;
+    childProcess.spawnSync = function (...args: any[]) {
+      const result = originalSpawnSync.apply(this, args as any);
+      if (result.pid) createdProcesses.add(result.pid);
+      return result;
+    } as any;
+    childProcess.exec = function (...args: any[]) {
+      const child = originalExec.apply(this, args as any);
+      if (child.pid) createdProcesses.add(child.pid);
+      return child;
+    } as any;
+    childProcess.execSync = function (...args: any[]) {
+      const result = originalExecSync.apply(this, args as any);
+      if ((result as any).pid) createdProcesses.add((result as any).pid);
+      return result;
+    } as any;
+    childProcess.execFile = function (...args: any[]) {
+      const child = originalExecFile.apply(this, args as any);
+      if (child.pid) createdProcesses.add(child.pid);
+      return child;
+    } as any;
+    childProcess.execFileSync = function (...args: any[]) {
+      const result = originalExecFileSync.apply(this, args as any);
+      if ((result as any).pid) createdProcesses.add((result as any).pid);
+      return result;
+    } as any;
+    childProcess.fork = function (...args: any[]) {
+      const child = originalFork.apply(this, args as any);
+      if (child.pid) createdProcesses.add(child.pid);
+      return child;
+    } as any;
+
+    const packageDirectory = join(process.cwd(), "node_modules", ...packageName.split("/"));
+    const manifest = JSON.parse(await readFile(join(packageDirectory, "package.json"), "utf8"));
+    if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(["./src/index.ts"])) {
+      throw new Error(\`Invalid Pi extension manifest for \${packageName}\`);
+    }
+    const extensionPath = join(packageDirectory, manifest.pi.extensions[0]);
+    const loaded = await discoverAndLoadExtensions(
+      [extensionPath],
+      process.cwd(),
+      join(process.cwd(), ".agent"),
     );
+    if (loaded.errors.length > 0) {
+      throw new Error(\`Failed to load \${packageName}: \${JSON.stringify(loaded.errors)}\`);
+    }
+    const extension = loaded.extensions.find((entry) => entry.resolvedPath === extensionPath);
+    const registrations =
+      (extension?.handlers.size ?? 0) +
+      (extension?.tools.size ?? 0) +
+      (extension?.commands.size ?? 0);
+    if (!extension || registrations === 0) {
+      throw new Error(\`\${packageName} did not register a Pi extension\`);
+    }
+    await new Promise((resolve) => setImmediate(resolve));
+
+    if (createdProcesses.size > 0) {
+      throw new Error(
+        \`\${packageName} started child processes while loading: \${[...createdProcesses].join(", ")}\`,
+      );
+    }
+  } finally {
+    childProcess.spawn = originalSpawn;
+    childProcess.spawnSync = originalSpawnSync;
+    childProcess.exec = originalExec;
+    childProcess.execSync = originalExecSync;
+    childProcess.execFile = originalExecFile;
+    childProcess.execFileSync = originalExecFileSync;
+    childProcess.fork = originalFork;
   }
 }
 `,
