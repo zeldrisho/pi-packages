@@ -64,47 +64,90 @@ try {
     join(fixtureDirectory, "smoke.ts"),
     `import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { syncBuiltinESMExports } from "node:module";
 import { discoverAndLoadExtensions } from "@earendil-works/pi-coding-agent";
+import childProcess from "node:child_process";
 
 const packageNames = ${JSON.stringify(packageNames)};
-const childProcessIds = () =>
-  new Set(
-    process
-      ._getActiveHandles()
-      .filter((handle) => handle?.constructor?.name === "ChildProcess")
-      .map((handle) => handle.pid)
-      .filter((pid) => typeof pid === "number"),
-  );
 for (const packageName of packageNames) {
-  const childrenBeforeLoad = childProcessIds();
-  const packageDirectory = join(process.cwd(), "node_modules", ...packageName.split("/"));
-  const manifest = JSON.parse(await readFile(join(packageDirectory, "package.json"), "utf8"));
-  if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(["./src/index.ts"])) {
-    throw new Error(\`Invalid Pi extension manifest for \${packageName}\`);
-  }
-  const extensionPath = join(packageDirectory, manifest.pi.extensions[0]);
-  const loaded = await discoverAndLoadExtensions(
-    [extensionPath],
-    process.cwd(),
-    join(process.cwd(), ".agent"),
-  );
-  if (loaded.errors.length > 0) {
-    throw new Error(\`Failed to load \${packageName}: \${JSON.stringify(loaded.errors)}\`);
-  }
-  const extension = loaded.extensions.find((entry) => entry.resolvedPath === extensionPath);
-  const registrations =
-    (extension?.handlers.size ?? 0) +
-    (extension?.tools.size ?? 0) +
-    (extension?.commands.size ?? 0);
-  if (!extension || registrations === 0) {
-    throw new Error(\`\${packageName} did not register a Pi extension\`);
-  }
-  await new Promise((resolve) => setImmediate(resolve));
-  const unexpectedChildren = [...childProcessIds()].filter((pid) => !childrenBeforeLoad.has(pid));
-  if (unexpectedChildren.length > 0) {
-    throw new Error(
-      \`\${packageName} started child processes while loading: \${unexpectedChildren.join(", ")}\`,
+  const createdProcesses = new Set<string>();
+  const originalSpawn = childProcess.spawn;
+  const originalSpawnSync = childProcess.spawnSync;
+  const originalExec = childProcess.exec;
+  const originalExecSync = childProcess.execSync;
+  const originalExecFile = childProcess.execFile;
+  const originalExecFileSync = childProcess.execFileSync;
+  const originalFork = childProcess.fork;
+
+  try {
+    childProcess.spawn = function (...args: any[]) {
+      createdProcesses.add("spawn");
+      return originalSpawn.apply(this, args as any);
+    } as any;
+    childProcess.spawnSync = function (...args: any[]) {
+      createdProcesses.add("spawnSync");
+      return originalSpawnSync.apply(this, args as any);
+    } as any;
+    childProcess.exec = function (...args: any[]) {
+      createdProcesses.add("exec");
+      return originalExec.apply(this, args as any);
+    } as any;
+    childProcess.execSync = function (...args: any[]) {
+      createdProcesses.add("execSync");
+      return originalExecSync.apply(this, args as any);
+    } as any;
+    childProcess.execFile = function (...args: any[]) {
+      createdProcesses.add("execFile");
+      return originalExecFile.apply(this, args as any);
+    } as any;
+    childProcess.execFileSync = function (...args: any[]) {
+      createdProcesses.add("execFileSync");
+      return originalExecFileSync.apply(this, args as any);
+    } as any;
+    childProcess.fork = function (...args: any[]) {
+      createdProcesses.add("fork");
+      return originalFork.apply(this, args as any);
+    } as any;
+    syncBuiltinESMExports();
+
+    const packageDirectory = join(process.cwd(), "node_modules", ...packageName.split("/"));
+    const manifest = JSON.parse(await readFile(join(packageDirectory, "package.json"), "utf8"));
+    if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(["./src/index.ts"])) {
+      throw new Error(\`Invalid Pi extension manifest for \${packageName}\`);
+    }
+    const extensionPath = join(packageDirectory, manifest.pi.extensions[0]);
+    const loaded = await discoverAndLoadExtensions(
+      [extensionPath],
+      process.cwd(),
+      join(process.cwd(), ".agent"),
     );
+    if (loaded.errors.length > 0) {
+      throw new Error(\`Failed to load \${packageName}: \${JSON.stringify(loaded.errors)}\`);
+    }
+    const extension = loaded.extensions.find((entry) => entry.resolvedPath === extensionPath);
+    const registrations =
+      (extension?.handlers.size ?? 0) +
+      (extension?.tools.size ?? 0) +
+      (extension?.commands.size ?? 0);
+    if (!extension || registrations === 0) {
+      throw new Error(\`\${packageName} did not register a Pi extension\`);
+    }
+    await new Promise((resolve) => setImmediate(resolve));
+
+    if (createdProcesses.size > 0) {
+      throw new Error(
+        \`\${packageName} started child processes while loading: \${[...createdProcesses].join(", ")}\`,
+      );
+    }
+  } finally {
+    childProcess.spawn = originalSpawn;
+    childProcess.spawnSync = originalSpawnSync;
+    childProcess.exec = originalExec;
+    childProcess.execSync = originalExecSync;
+    childProcess.execFile = originalExecFile;
+    childProcess.execFileSync = originalExecFileSync;
+    childProcess.fork = originalFork;
+    syncBuiltinESMExports();
   }
 }
 `,
