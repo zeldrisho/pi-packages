@@ -10,20 +10,26 @@ Install `fd` and ensure it is available on your `PATH`, then install the package
 pi install npm:@zeldrisho/pi-file-search
 ```
 
+Install only for the current project:
+
+```bash
+pi install -l npm:@zeldrisho/pi-file-search
+```
+
 When Pi's `bash` tool is active, the extension adds concise guidance to use `fd` instead of `find` by default.
 
 The extension provides prompt guidance only. It does not intercept or block tool calls.
-
-## Update
-
-```bash
-pi update npm:@zeldrisho/pi-file-search
-```
 
 ## Uninstall
 
 ```bash
 pi remove npm:@zeldrisho/pi-file-search
+```
+
+For a project-local installation:
+
+```bash
+pi remove -l npm:@zeldrisho/pi-file-search
 ```
 
 ## License
