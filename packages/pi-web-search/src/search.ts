@@ -11,6 +11,7 @@ import {
 import {
   searchBraveContext,
   searchBraveWeb,
+  validateProviderRequest,
   type Freshness,
   type Provider,
   type SearchMode,
@@ -19,9 +20,9 @@ import {
 import { ExpiringLruCache } from "./cache";
 import { formatResults } from "./format-results";
 import { InflightCoalescer } from "./inflight";
+import { SEARCH_DEFAULT_RESULT_COUNT } from "./limits";
 import { configuredProvider } from "./provider";
 
-const DEFAULT_RESULT_COUNT = 5;
 const CACHE_TTL_MS = 10 * 60 * 1_000;
 const CACHE_MAX_ENTRIES = 100;
 const CACHE_MAX_RESULT_BYTES = 20 * 1_024 * 1_024;
@@ -89,11 +90,9 @@ export class SearchRuntime {
     const query = params.query.trim();
     if (!query) throw new Error("Search query cannot be empty.");
 
-    const count = params.count ?? DEFAULT_RESULT_COUNT;
+    const count = params.count ?? SEARCH_DEFAULT_RESULT_COUNT;
     const mode = params.mode ?? "web";
-    if (mode === "context" && query.length > 400) {
-      throw new Error("Brave LLM Context queries cannot exceed 400 characters.");
-    }
+    validateProviderRequest(query, count, mode);
     const provider = configuredProvider();
     const cacheKey = JSON.stringify({
       provider,

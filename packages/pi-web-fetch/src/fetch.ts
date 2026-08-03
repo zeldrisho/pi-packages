@@ -1,4 +1,5 @@
 import type { IncomingMessage } from "node:http";
+import { awaitWithAbort } from "./abort";
 import { sliceCompleteDocument, type CompleteDocument, type FetchResult } from "./content";
 import { extractHtmlToMarkdown } from "./extract";
 import { requestFollowingRedirects, type RedirectDependencies } from "./network-redirects";
@@ -17,30 +18,17 @@ export interface FetchRemoteDependencies extends RedirectDependencies {
   timeoutMs?: number;
 }
 
-function awaitWithAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const finish = (callback: () => void): void => {
-      if (settled) return;
-      settled = true;
-      signal.removeEventListener("abort", abort);
-      callback();
-    };
-    const abort = (): void => {
-      const error = new Error("Operation aborted.");
-      error.name = "AbortError";
-      finish(() => reject(error));
-    };
-
-    operation.then(
-      (value) => finish(() => resolve(value)),
-      (error: unknown) => finish(() => reject(error)),
-    );
-    if (signal.aborted) abort();
-    else signal.addEventListener("abort", abort, { once: true });
-  });
-}
-
+/**
+ * Converts a successful HTTP response into a complete document.
+ *
+ * HTML content is extracted to Markdown, JSON is pretty-printed when valid, and other supported content is returned as trimmed text.
+ *
+ * @param target - The validated target associated with the response
+ * @param response - The HTTP response to process
+ * @param signal - Signal used to cancel HTML extraction
+ * @returns The document URL, content type, content, optional title, and extractor type
+ * @throws If the response has an unsuccessful status or an unsupported content type
+ */
 async function documentFromResponse(
   target: ValidatedTarget,
   response: IncomingMessage,
@@ -50,7 +38,10 @@ async function documentFromResponse(
   const status = response.statusCode ?? 0;
   if (status < 200 || status >= 300) {
     response.resume();
-    throw new Error(`web_fetch returned HTTP ${status}.`);
+    const authenticationHint = [401, 403, 404].includes(status)
+      ? " The page may be missing, private, or require authentication."
+      : "";
+    throw new Error(`web_fetch returned HTTP ${status}.${authenticationHint}`);
   }
 
   const contentTypeHeader = responseHeader(response, "content-type") ?? "text/plain";

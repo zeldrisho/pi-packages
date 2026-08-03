@@ -1,0 +1,36 @@
+name: Pi compatibility
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pi-compatibility-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: ${{ matrix.dependencies }} dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        dependencies: [locked, latest]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: "24"
+          cache: true
+      - run: vp install
+      - name: Smoke-test packed extensions
+        env:
+          PI_SMOKE_DEPENDENCIES: ${{ matrix.dependencies }}
+        run: vp run test:packages

@@ -2,6 +2,15 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+import {
+  SEARCH_CONTEXT_MAX_QUERY_CHARACTERS,
+  SEARCH_DEFAULT_RESULT_COUNT,
+  SEARCH_MAX_LANGUAGE_CHARACTERS,
+  SEARCH_MAX_RESULT_COUNT,
+  SEARCH_MIN_LANGUAGE_CHARACTERS,
+  SEARCH_MIN_RESULT_COUNT,
+  SEARCH_WEB_MAX_QUERY_CHARACTERS,
+} from "./limits";
 import { formatCollapsibleOutput } from "./render";
 import { SearchRuntime } from "./search";
 
@@ -15,7 +24,11 @@ export {
 
 const commonSearchParameters = Type.Object({
   count: Type.Optional(
-    Type.Integer({ minimum: 1, maximum: 20, description: "Number of results (default: 5)" }),
+    Type.Integer({
+      minimum: SEARCH_MIN_RESULT_COUNT,
+      maximum: SEARCH_MAX_RESULT_COUNT,
+      description: `Number of results (default: ${SEARCH_DEFAULT_RESULT_COUNT})`,
+    }),
   ),
   freshness: Type.Optional(
     StringEnum(["day", "week", "month", "year"] as const, {
@@ -24,8 +37,8 @@ const commonSearchParameters = Type.Object({
   ),
   language: Type.Optional(
     Type.String({
-      minLength: 2,
-      maxLength: 20,
+      minLength: SEARCH_MIN_LANGUAGE_CHARACTERS,
+      maxLength: SEARCH_MAX_LANGUAGE_CHARACTERS,
       description: "Optional language code, such as en or en-US",
     }),
   ),
@@ -37,15 +50,19 @@ export const webSearchParameters = Type.Intersect([
     Type.Object({
       query: Type.String({
         minLength: 1,
-        maxLength: 400,
-        description: "The Brave LLM Context query (maximum 400 characters)",
+        maxLength: SEARCH_CONTEXT_MAX_QUERY_CHARACTERS,
+        description: `The Brave LLM Context query (maximum ${SEARCH_CONTEXT_MAX_QUERY_CHARACTERS} characters)`,
       }),
       mode: Type.Literal("context", {
         description: "Return provider-extracted Brave LLM context",
       }),
     }),
     Type.Object({
-      query: Type.String({ minLength: 1, maxLength: 500, description: "The web search query" }),
+      query: Type.String({
+        minLength: 1,
+        maxLength: SEARCH_WEB_MAX_QUERY_CHARACTERS,
+        description: `The web search query (maximum ${SEARCH_WEB_MAX_QUERY_CHARACTERS} characters)`,
+      }),
       mode: Type.Optional(
         Type.Literal("web", { description: "Return compact Brave web results (default)" }),
       ),

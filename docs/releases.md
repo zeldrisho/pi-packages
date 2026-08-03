@@ -16,7 +16,7 @@ Packages are versioned independently. On each push to `main`, git-cliff evaluate
 
 Release behavior is defined by:
 
-- [`cliff.toml`](../cliff.toml), which parses conventional commits, calculates semantic versions, and renders changelogs;
+- [`cliff.toml`](../cliff.toml), configured using [git-cliff](https://git-cliff.org), which parses conventional commits, calculates semantic versions, and renders changelogs;
 - [`scripts/release.ts`](../scripts/release.ts), which discovers packages, prepares release files, checks npm and GitHub state, and creates GitHub releases; and
 - [`.github/workflows/release.yml`](../.github/workflows/release.yml), which validates, opens the generated release pull request, and publishes through npm trusted publishing.
 

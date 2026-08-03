@@ -1,3 +1,9 @@
+import {
+  SEARCH_CONTEXT_MAX_QUERY_CHARACTERS,
+  SEARCH_MAX_RESULT_COUNT,
+  SEARCH_MIN_RESULT_COUNT,
+  SEARCH_WEB_MAX_QUERY_CHARACTERS,
+} from "./limits";
 import { normalizeText, requestJson } from "./provider";
 
 export type Provider = "brave";
@@ -15,6 +21,37 @@ const BRAVE_MAX_SNIPPETS = 15;
 const BRAVE_MAX_TOKENS_PER_URL = 1_024;
 const BRAVE_MAX_SNIPPETS_PER_URL = 3;
 
+/**
+ * Validates a search query and requested result count against the provider limits.
+ *
+ * @param query - The search query to validate
+ * @param count - The requested number of results
+ * @param mode - The search mode whose query limit applies
+ * @throws If the query exceeds the mode limit or the result count is outside the allowed range
+ */
+export function validateProviderRequest(query: string, count: number, mode: SearchMode): void {
+  const maximumQueryCharacters =
+    mode === "context" ? SEARCH_CONTEXT_MAX_QUERY_CHARACTERS : SEARCH_WEB_MAX_QUERY_CHARACTERS;
+  if (query.length > maximumQueryCharacters) {
+    throw new Error(`Search queries cannot exceed ${maximumQueryCharacters} characters.`);
+  }
+  if (
+    !Number.isInteger(count) ||
+    count < SEARCH_MIN_RESULT_COUNT ||
+    count > SEARCH_MAX_RESULT_COUNT
+  ) {
+    throw new Error(
+      `Search result count must be an integer between ${SEARCH_MIN_RESULT_COUNT} and ${SEARCH_MAX_RESULT_COUNT}.`,
+    );
+  }
+}
+
+/**
+ * Normalizes an HTTP or HTTPS URL and limits the result to 2,048 characters.
+ *
+ * @param value - The value to normalize
+ * @returns The normalized URL, or an empty string for invalid values or unsupported protocols
+ */
 function normalizeUrl(value: unknown): string {
   if (typeof value !== "string") return "";
   try {
@@ -86,6 +123,13 @@ function braveSnippetToMarkdown(value: unknown): string {
   }
 }
 
+/**
+ * Searches the Brave web index for matching results.
+ *
+ * @param query - The search query
+ * @param count - The requested number of results
+ * @returns Normalized web search results
+ */
 export async function searchBraveWeb(
   query: string,
   count: number,
@@ -93,6 +137,7 @@ export async function searchBraveWeb(
   language: string | undefined,
   signal: AbortSignal | undefined,
 ): Promise<SearchResult[]> {
+  validateProviderRequest(query, count, "web");
   const url = new URL("https://api.search.brave.com/res/v1/web/search");
   url.searchParams.set("q", query);
   url.searchParams.set("count", String(count));
@@ -123,6 +168,11 @@ export async function searchBraveWeb(
   }));
 }
 
+/**
+ * Searches Brave's context API and maps grounding results to normalized search results.
+ *
+ * @returns Search results containing normalized titles and URLs with deduplicated Markdown snippets.
+ */
 export async function searchBraveContext(
   query: string,
   count: number,
@@ -130,8 +180,7 @@ export async function searchBraveContext(
   language: string | undefined,
   signal: AbortSignal | undefined,
 ): Promise<SearchResult[]> {
-  if (query.length > 400)
-    throw new Error("Brave LLM Context queries cannot exceed 400 characters.");
+  validateProviderRequest(query, count, "context");
 
   const url = new URL("https://api.search.brave.com/res/v1/llm/context");
   url.searchParams.set("q", query);

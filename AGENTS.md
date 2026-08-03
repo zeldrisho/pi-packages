@@ -1,29 +1,32 @@
 # Agent Instructions
 
+## Module layout
+
+- `packages/*/`: independently published Pi extensions with runtime code in `src/` and package tests in `tests/`.
+- `scripts/`: repository contracts, packaged-extension smoke tests, and release automation.
+- `tests/`: cross-package contract tests.
+
 ## Commands
 
-| Task                      | Command                              |
-| ------------------------- | ------------------------------------ |
-| Complete validation       | `vp run validate`                    |
-| Fix check failures        | `vp check --fix`                     |
-| Run one package's tests   | `vp run '@zeldrisho/<package>#test'` |
-| Inspect every npm tarball | `vp run pack:dry-run`                |
+| Task                      | Command                                        |
+| ------------------------- | ---------------------------------------------- |
+| Complete validation       | `vp run validate`                              |
+| Fix check failures        | `vp check --fix`                               |
+| Run one test file         | `vp test packages/<name>/tests/<file>.test.ts` |
+| Run one package's tests   | `vp run '@zeldrisho/<package>#test'`           |
+| Inspect every npm tarball | `vp run pack:dry-run`                          |
 
-## Sources of Truth
+## Constraints
 
-| Need                        | Source                                                                  |
-| --------------------------- | ----------------------------------------------------------------------- |
-| Package catalog             | `README.md`                                                             |
-| Development and conventions | `docs/development.md`                                                   |
-| Security invariants         | `docs/security-invariants.md`                                           |
-| Package behavior and setup  | `packages/*/README.md`                                                  |
-| Releases                    | `docs/releases.md`                                                      |
-| Release configuration       | `cliff.toml`, `scripts/release.ts`, and `.github/workflows/release.yml` |
+- Keep `cache.ts`, `inflight.ts`, and `render.ts` byte-for-byte synchronized between `pi-web-fetch` and `pi-web-search`.
+- Before implementation, run `git fetch --prune`, inspect local and upstream state, and start from the latest target branch without discarding uncommitted work.
+- Delete a completed local branch only when it is merged into its target and its upstream branch is gone.
 
-## Git Workflow
+## References
 
-- Before starting work, fetch and prune remote refs, reconcile local and remote state, and remove completed local branches.
-- Keep only `main` and one active work branch locally; do not create a second work branch.
-- Rebase the active work branch onto its target branch; do not merge the target branch into it.
-- Never rewrite commits that are merged, tagged, released, or published.
-- When asked to push, push the work branch and create a pull request; never merge it.
+- Package catalog: `README.md`
+- Development and conventions: `docs/development.md`
+- Security invariants: `docs/security-invariants.md`
+- Package behavior and setup: `packages/*/README.md`
+- Releases: `docs/releases.md`
+- Release configuration: `cliff.toml`, `scripts/release.ts`, `.github/workflows/release.yml`
