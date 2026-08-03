@@ -14,6 +14,8 @@ Set `BRAVE_SEARCH_API_KEY` only when manually exercising `pi-web-search`. Never 
 
 ## Package conventions
 
+Browse the [Pi package directory](https://pi.dev/packages) for examples of published Pi extensions and package conventions.
+
 - Keep each extension independent under `packages/<name>/`.
 - Put runtime TypeScript in `src/` and tests in `tests/`; Pi loads TypeScript directly, so do not add a JavaScript build step.
 - Use `Type.Object()` from `typebox` for tool parameter schemas and `StringEnum` from `@earendil-works/pi-ai` for string enums.
