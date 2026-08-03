@@ -2,6 +2,11 @@ import { parseHTML } from "linkedom";
 
 const RAW_ID_SELECTOR_SAFE = /^-?[_a-zA-Z][-_a-zA-Z0-9]*$/;
 
+/**
+ * Replaces element IDs that are unsafe for CSS selectors and updates matching fragment links.
+ *
+ * @param document - The document whose element IDs and same-document links are normalized
+ */
 function normalizeSelectorUnsafeIds(document: Document): void {
   const replacements = new Map<string, string>();
   let replacementIndex = 0;
@@ -24,6 +29,12 @@ function normalizeSelectorUnsafeIds(document: Document): void {
   }
 }
 
+/**
+ * Extracts normalized plain text from HTML when structured Markdown extraction is unavailable.
+ *
+ * @param html - The HTML content to convert
+ * @returns The trimmed text content with excluded elements and excessive whitespace removed
+ */
 export function htmlToMarkdownFallback(html: string): string {
   const { document } = parseHTML(html);
   for (const element of document.querySelectorAll(
@@ -39,6 +50,13 @@ export function htmlToMarkdownFallback(html: string): string {
     .trim();
 }
 
+/**
+ * Extracts readable Markdown and an optional title from HTML.
+ *
+ * @param html - The HTML document to convert
+ * @param baseUrl - The base URL used to resolve document-relative links
+ * @returns The extracted Markdown, optional title, and extractor used
+ */
 export async function extractHtmlToMarkdown(
   html: string,
   baseUrl: URL,

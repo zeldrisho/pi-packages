@@ -70,6 +70,12 @@ export interface ReleaseAutomation {
   ensureGithubRelease(packagePath: string): Promise<void>;
 }
 
+/**
+ * Creates a command runner rooted at the specified directory.
+ *
+ * @param root - Working directory for executed commands
+ * @returns A runner whose commands return trimmed output or captured execution results
+ */
 function defaultRunner(root: string): CommandRunner {
   return {
     run(command, args, options = {}) {
@@ -97,6 +103,13 @@ function defaultRunner(root: string): CommandRunner {
   };
 }
 
+/**
+ * Compares two dot-separated version strings numerically.
+ *
+ * @param left - The first version to compare
+ * @param right - The second version to compare
+ * @returns A negative number if `left` is lower, a positive number if `left` is higher, or `0` if they are equal
+ */
 function compareVersions(left: string, right: string): number {
   const leftParts = left.split(".").map(Number);
   const rightParts = right.split(".").map(Number);
@@ -106,6 +119,12 @@ function compareVersions(left: string, right: string): number {
   return 0;
 }
 
+/**
+ * Creates release automation operations configured for a repository.
+ *
+ * @param options - Optional repository, command runner, environment, output, logging, and temporary-directory settings
+ * @returns Release automation operations for discovering, preparing, inspecting, and publishing package releases
+ */
 export function createReleaseAutomation(options: ReleaseAutomationOptions = {}): ReleaseAutomation {
   const root = resolve(options.root ?? defaultRoot);
   const packagesRoot = join(root, "packages");
@@ -386,6 +405,11 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
   };
 }
 
+/**
+ * Runs the release automation command selected by the provided arguments.
+ *
+ * @param args - Command-line arguments specifying the release operation and, when required, its package path
+ */
 export async function runReleaseCli(args = process.argv.slice(2)): Promise<void> {
   const [command, argument] = args;
   const automation = createReleaseAutomation();

@@ -11,6 +11,12 @@ import {
 let versionedContinuationRequests = 0;
 let coalescedRequests = 0;
 
+/**
+ * Serves the HTTP fixture response associated with the requested URL.
+ *
+ * Handles normal content, redirects, oversized and streamed bodies, status errors,
+ * slow requests, and request-counted continuation fixtures.
+ */
 function fixtureResponse(request: IncomingMessage, response: ServerResponse): void {
   if (request.url?.startsWith("/coalesced?")) {
     coalescedRequests += 1;
@@ -86,6 +92,11 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
   }
 }
 
+/**
+ * Creates a local HTTP fixture harness for testing remote-fetch behavior.
+ *
+ * @returns An object for managing the fixture server, accessing fetch dependencies, and tracking request counts.
+ */
 export function createFetchHarness(): {
   start(): Promise<void>;
   stop(): Promise<void>;

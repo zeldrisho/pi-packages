@@ -18,6 +18,17 @@ export interface FetchRemoteDependencies extends RedirectDependencies {
   timeoutMs?: number;
 }
 
+/**
+ * Converts a successful HTTP response into a complete document.
+ *
+ * HTML content is extracted to Markdown, JSON is pretty-printed when valid, and other supported content is returned as trimmed text.
+ *
+ * @param target - The validated target associated with the response
+ * @param response - The HTTP response to process
+ * @param signal - Signal used to cancel HTML extraction
+ * @returns The document URL, content type, content, optional title, and extractor type
+ * @throws If the response has an unsuccessful status or an unsupported content type
+ */
 async function documentFromResponse(
   target: ValidatedTarget,
   response: IncomingMessage,

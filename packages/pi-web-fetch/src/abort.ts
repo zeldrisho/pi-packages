@@ -1,3 +1,10 @@
+/**
+ * Races an operation against an abort signal.
+ *
+ * @param operation - The promise to await
+ * @param signal - The signal that can abort the operation
+ * @returns The operation's fulfilled value, or rejects with an `AbortError` if the signal aborts first
+ */
 export function awaitWithAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise((resolve, reject) => {
     let settled = false;

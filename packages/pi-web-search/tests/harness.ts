@@ -64,6 +64,11 @@ export interface SearchTool {
 
 export type ShutdownHandler = () => Promise<void> | void;
 
+/**
+ * Registers the web-search extension and captures its tool and session shutdown handler.
+ *
+ * @returns The registered search tool and a getter for the session shutdown handler.
+ */
 export function createSearchHarness(): {
   tool: SearchTool;
   getShutdownHandler: () => ShutdownHandler | undefined;
@@ -85,10 +90,22 @@ export function createSearchHarness(): {
   };
 }
 
+/**
+ * Creates a registered web-search tool for testing.
+ *
+ * @returns The registered search tool
+ */
 export function createSearchTool(): SearchTool {
   return createSearchHarness().tool;
 }
 
+/**
+ * Creates an HTTP response containing a JSON-encoded value.
+ *
+ * @param value - The value to serialize as JSON
+ * @param status - The HTTP status code for the response
+ * @returns A response with a JSON body and content type
+ */
 export function jsonResponse(value: unknown, status = 200): Response {
   return new Response(JSON.stringify(value), {
     status,

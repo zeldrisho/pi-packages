@@ -21,6 +21,14 @@ const BRAVE_MAX_SNIPPETS = 15;
 const BRAVE_MAX_TOKENS_PER_URL = 1_024;
 const BRAVE_MAX_SNIPPETS_PER_URL = 3;
 
+/**
+ * Validates a search query and requested result count against the provider limits.
+ *
+ * @param query - The search query to validate
+ * @param count - The requested number of results
+ * @param maximumQueryCharacters - The maximum permitted query length
+ * @throws If the query exceeds the maximum length or the result count is outside the allowed range
+ */
 function validateProviderRequest(
   query: string,
   count: number,
@@ -40,6 +48,12 @@ function validateProviderRequest(
   }
 }
 
+/**
+ * Normalizes an HTTP or HTTPS URL and limits the result to 2,048 characters.
+ *
+ * @param value - The value to normalize
+ * @returns The normalized URL, or an empty string for invalid values or unsupported protocols
+ */
 function normalizeUrl(value: unknown): string {
   if (typeof value !== "string") return "";
   try {
@@ -111,6 +125,13 @@ function braveSnippetToMarkdown(value: unknown): string {
   }
 }
 
+/**
+ * Searches the Brave web index for matching results.
+ *
+ * @param query - The search query
+ * @param count - The requested number of results
+ * @returns Normalized web search results
+ */
 export async function searchBraveWeb(
   query: string,
   count: number,
@@ -149,6 +170,11 @@ export async function searchBraveWeb(
   }));
 }
 
+/**
+ * Searches Brave's context API and maps grounding results to normalized search results.
+ *
+ * @returns Search results containing normalized titles and URLs with deduplicated Markdown snippets.
+ */
 export async function searchBraveContext(
   query: string,
   count: number,

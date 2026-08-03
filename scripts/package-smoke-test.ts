@@ -18,6 +18,13 @@ const piEcosystemDependencies = [
 ] as const;
 const smokeDependencies = [...piEcosystemDependencies, "typebox"] as const;
 
+/**
+ * Resolves the dependency version used by the smoke-test fixture.
+ *
+ * @param packageName - The dependency package name
+ * @returns The dependency version, or `latest` for configured Pi ecosystem dependencies
+ * @throws If a package manifest cannot be read or no valid installed version is found
+ */
 async function smokeDependencyVersion(packageName: string): Promise<string> {
   if (
     process.env.PI_SMOKE_DEPENDENCIES === "latest" &&
@@ -44,6 +51,15 @@ async function smokeDependencyVersion(packageName: string): Promise<string> {
   throw new Error(`Unable to derive the installed version for ${packageName}`);
 }
 
+/**
+ * Executes a command synchronously in the specified working directory.
+ *
+ * Writes captured output and throws an error when the command exits unsuccessfully.
+ *
+ * @param command - The command to execute
+ * @param args - Arguments passed to the command
+ * @param cwd - Working directory for the command
+ */
 function run(command: string, args: string[], cwd: string) {
   const result = spawnSync(command, args, { cwd, encoding: "utf8", stdio: "pipe" });
   if (result.status !== 0) {

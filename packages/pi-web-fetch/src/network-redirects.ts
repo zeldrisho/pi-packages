@@ -10,6 +10,15 @@ export interface RedirectDependencies {
   request?: (target: ValidatedTarget, signal: AbortSignal) => Promise<IncomingMessage>;
 }
 
+/**
+ * Requests a URL and follows supported HTTP redirects.
+ *
+ * @param value - The initial URL to request
+ * @param signal - Signal used to cancel validation and requests
+ * @param dependencies - Optional URL-validation and request implementations
+ * @returns The final validated target and its HTTP response
+ * @throws If a redirect lacks a `Location` header or the redirect limit is exceeded
+ */
 export async function requestFollowingRedirects(
   value: string | URL,
   signal: AbortSignal,

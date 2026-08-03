@@ -59,6 +59,14 @@ const fetchCache = new ExpiringLruCache<string, CompleteDocument>(
 );
 const inflightFetches = new InflightCoalescer<string, CompleteDocument>(MAX_INFLIGHT_REQUESTS);
 
+/**
+ * Fetches a web page and returns formatted content with pagination and truncation metadata.
+ *
+ * @param params - The page URL and content range to retrieve.
+ * @returns The formatted page content and fetch metadata, including cache status and continuation information.
+ * @throws If `offset` or `maxCharacters` is outside the allowed range or not an integer.
+ * @throws If the fetch is cancelled.
+ */
 export async function executeWebFetch(
   params: WebFetchParameters,
   signal: AbortSignal | undefined,
