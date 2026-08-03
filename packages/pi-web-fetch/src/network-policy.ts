@@ -44,7 +44,15 @@ export const BLOCKED_IPV6_RANGES = [
   ["ff00::", 8, "ff00::", "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", "multicast"],
 ] as const;
 
-const GLOBALLY_REACHABLE_IPV6_EXCEPTIONS = ["2001:1::1", "2001:1::2", "2001:1::3"];
+const GLOBALLY_REACHABLE_IPV6_EXCEPTIONS = [
+  ["2001:1::1", 128],
+  ["2001:1::2", 128],
+  ["2001:1::3", 128],
+  ["2001:3::", 32],
+  ["2001:4:112::", 48],
+  ["2001:20::", 28],
+  ["2001:30::", 28],
+] as const;
 
 const blockedIPv4Addresses = new BlockList();
 const blockedIPv6Addresses = new BlockList();
@@ -56,8 +64,8 @@ for (const [network, prefix] of BLOCKED_IPV4_RANGES) {
 for (const [network, prefix] of BLOCKED_IPV6_RANGES) {
   blockedIPv6Addresses.addSubnet(network, prefix, "ipv6");
 }
-for (const address of GLOBALLY_REACHABLE_IPV6_EXCEPTIONS) {
-  allowedIPv6Addresses.addAddress(address, "ipv6");
+for (const [network, prefix] of GLOBALLY_REACHABLE_IPV6_EXCEPTIONS) {
+  allowedIPv6Addresses.addSubnet(network, prefix, "ipv6");
 }
 
 export interface ValidatedTarget {

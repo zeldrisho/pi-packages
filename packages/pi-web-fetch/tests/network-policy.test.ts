@@ -59,12 +59,29 @@ describe("web_fetch address policy", () => {
     },
   );
 
-  it.each(["2001:1:ffff:ffff:ffff:ffff:ffff:ffff", "2001:3::"])(
-    "blocks non-global addresses inside 2001::/23 (%s)",
-    (address) => {
-      expect(isPrivateAddress(address)).toBe(true);
-    },
-  );
+  it.each([
+    ["2001:3::/32 first", "2001:3::"],
+    ["2001:3::/32 last", "2001:3:ffff:ffff:ffff:ffff:ffff:ffff"],
+    ["2001:4:112::/48 first", "2001:4:112::"],
+    ["2001:4:112::/48 last", "2001:4:112:ffff:ffff:ffff:ffff:ffff"],
+    ["2001:20::/28 first", "2001:20::"],
+    ["2001:20::/28 last", "2001:2f:ffff:ffff:ffff:ffff:ffff:ffff"],
+    ["2001:30::/28 first", "2001:30::"],
+    ["2001:30::/28 last", "2001:3f:ffff:ffff:ffff:ffff:ffff:ffff"],
+  ])("accepts the globally reachable %s boundary", async (_boundary, address) => {
+    await expect(validateRemoteUrl(`https://[${address}]`)).resolves.toMatchObject({ address });
+  });
+
+  it.each([
+    "2001:1:ffff:ffff:ffff:ffff:ffff:ffff",
+    "2001:2:ffff:ffff:ffff:ffff:ffff:ffff",
+    "2001:4::",
+    "2001:4:111:ffff:ffff:ffff:ffff:ffff",
+    "2001:4:113::",
+    "2001:40::",
+  ])("rejects non-global addresses outside the exceptions (%s)", async (address) => {
+    await expect(validateRemoteUrl(`https://[${address}]`)).rejects.toThrow("private or reserved");
+  });
 
   it.each(["https://example.com", "http://example.com"])(
     "accepts public target %s",
