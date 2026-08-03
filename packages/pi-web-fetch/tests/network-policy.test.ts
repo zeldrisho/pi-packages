@@ -42,8 +42,8 @@ describe("web_fetch address policy", () => {
     "198.20.0.0",
     "203.0.112.255",
     "203.0.114.0",
-    "2001:1:ffff:ffff:ffff:ffff:ffff:ffff",
-    "2001:3::",
+    "2000:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
+    "2001:200::",
     "2001:db7:ffff:ffff:ffff:ffff:ffff:ffff",
     "2001:db9::",
     "fe7f:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
@@ -51,6 +51,20 @@ describe("web_fetch address policy", () => {
   ])("does not block the adjacent policy address %s", (address) => {
     expect(isPrivateAddress(address)).toBe(false);
   });
+
+  it.each(["2001:1::1", "2001:1::2", "2001:1::3"])(
+    "permits the globally reachable special-purpose exception %s",
+    (address) => {
+      expect(isPrivateAddress(address)).toBe(false);
+    },
+  );
+
+  it.each(["2001:1:ffff:ffff:ffff:ffff:ffff:ffff", "2001:3::"])(
+    "blocks non-global addresses inside 2001::/23 (%s)",
+    (address) => {
+      expect(isPrivateAddress(address)).toBe(true);
+    },
+  );
 
   it.each(["https://example.com", "http://example.com"])(
     "accepts public target %s",

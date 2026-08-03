@@ -1,40 +1,15 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { afterEach, vi } from "vite-plus/test";
 import registerWebSearch from "../src/index";
+import type { SearchParameters, SearchRuntime } from "../src/search";
 
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@earendil-works/pi-coding-agent")>();
   return { ...actual, keyHint: () => "Ctrl+O to expand" };
 });
 
-export interface SearchParameters {
-  query: string;
-  count?: number;
-  freshness?: "day" | "week" | "month" | "year";
-  mode?: "web" | "context";
-  language?: string;
-}
-
-export interface SearchExecutionResult {
-  content: Array<{ type: "text"; text: string }>;
-  details: {
-    cached: boolean;
-    mode: "web" | "context";
-    resultCount: number;
-    results: Array<{ title: string; url: string; snippet: string }>;
-    truncated: boolean;
-    fullOutputPath?: string;
-    truncation: {
-      truncated: boolean;
-      strategy: "temporary-file" | "none";
-      fullOutputPath?: string;
-      outputBytes: number;
-      totalBytes: number;
-      outputLines: number;
-      totalLines: number;
-    };
-  };
-}
+export type { SearchParameters } from "../src/search";
+export type SearchExecutionResult = Awaited<ReturnType<SearchRuntime["execute"]>>;
 
 export interface RenderedComponent {
   render(width: number): string[];

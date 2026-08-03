@@ -11,6 +11,7 @@ import {
 import {
   searchBraveContext,
   searchBraveWeb,
+  validateProviderRequest,
   type Freshness,
   type Provider,
   type SearchMode,
@@ -19,13 +20,7 @@ import {
 import { ExpiringLruCache } from "./cache";
 import { formatResults } from "./format-results";
 import { InflightCoalescer } from "./inflight";
-import {
-  SEARCH_CONTEXT_MAX_QUERY_CHARACTERS,
-  SEARCH_DEFAULT_RESULT_COUNT,
-  SEARCH_MAX_RESULT_COUNT,
-  SEARCH_MIN_RESULT_COUNT,
-  SEARCH_WEB_MAX_QUERY_CHARACTERS,
-} from "./limits";
+import { SEARCH_DEFAULT_RESULT_COUNT } from "./limits";
 import { configuredProvider } from "./provider";
 
 const CACHE_TTL_MS = 10 * 60 * 1_000;
@@ -97,24 +92,7 @@ export class SearchRuntime {
 
     const count = params.count ?? SEARCH_DEFAULT_RESULT_COUNT;
     const mode = params.mode ?? "web";
-    if (
-      !Number.isInteger(count) ||
-      count < SEARCH_MIN_RESULT_COUNT ||
-      count > SEARCH_MAX_RESULT_COUNT
-    ) {
-      throw new Error(
-        `Search result count must be an integer between ${SEARCH_MIN_RESULT_COUNT} and ${SEARCH_MAX_RESULT_COUNT}.`,
-      );
-    }
-    const maximumQueryCharacters =
-      mode === "context" ? SEARCH_CONTEXT_MAX_QUERY_CHARACTERS : SEARCH_WEB_MAX_QUERY_CHARACTERS;
-    if (query.length > maximumQueryCharacters) {
-      throw new Error(
-        mode === "context"
-          ? `Brave LLM Context queries cannot exceed ${maximumQueryCharacters} characters.`
-          : `Web search queries cannot exceed ${maximumQueryCharacters} characters.`,
-      );
-    }
+    validateProviderRequest(query, count, mode);
     const provider = configuredProvider();
     const cacheKey = JSON.stringify({
       provider,

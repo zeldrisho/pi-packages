@@ -43,9 +43,12 @@ Timeout and caller cancellation cover resolution, transport, and extraction. The
 complete extracted document so continuation offsets remain stable; each caller still has independent
 cancellation through the in-flight coalescer.
 
-The blocked-address table is maintained in `network-policy.ts` against the linked IANA special-purpose
-registries. Boundary tests exercise every range endpoint. Review the registries at least quarterly and
-record the review date beside the table even when no range changes. Registry changes require a security
+The blocked-address table is maintained in `packages/pi-web-fetch/src/network-policy.ts` against the
+[IANA IPv4](https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml)
+and [IANA IPv6](https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml)
+special-purpose registries; its table comment records the latest review date (2026-08-03). Boundary
+tests exercise every range endpoint. Review the registries at least quarterly and record the review
+date beside the table even when no range changes. Registry changes require a security
 review that preserves DNS-answer validation, address pinning, and redirect revalidation; update the
 explicit endpoint fixtures from the registry data rather than accepting generated ranges without
 review.
@@ -66,7 +69,7 @@ flowchart LR
   J --> K[Delete on session shutdown]
 ```
 
-The API key is read only at request time and is excluded from cache keys, output, and errors. Web mode
+The API key is read at request time only and is excluded from cache keys, output, and errors. Web mode
 returns normalized provider links and snippets. Context mode uses only Brave's context endpoint; it
 does not fetch result URLs. Identical requests coalesce, but cancellation remains per caller. Large
 formatted results are written under a package-owned temporary directory and removed after write

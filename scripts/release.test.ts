@@ -1,9 +1,16 @@
 import { execFileSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vite-plus/test";
-import { createReleaseAutomation, type CommandAttempt, type CommandRunner } from "./release";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import {
+  createReleaseAutomation,
+  runReleaseCli,
+  type CommandAttempt,
+  type CommandRunner,
+  type ReleaseAutomation,
+} from "./release";
 
 const temporaryDirectories: string[] = [];
 
@@ -29,9 +36,9 @@ async function createRepository(version = "1.0.0"): Promise<string> {
   return root;
 }
 
-function commit(root: string, subject: string, body?: string): void {
+async function commit(root: string, subject: string, body?: string): Promise<void> {
   const marker = join(root, "packages", "alpha", "marker.txt");
-  execFileSync("node", ["-e", `require('fs').writeFileSync(${JSON.stringify(marker)}, 'x')`]);
+  await writeFile(marker, `${subject}\n${body ?? ""}\n${crypto.randomUUID()}\n`);
   git(root, "add", ".");
   const args = ["commit", "--quiet", "-m", subject];
   if (body) args.push("-m", body);
@@ -43,6 +50,7 @@ interface FakeServices {
   github?: CommandAttempt;
   nextTag?: string;
   failCreate?: boolean;
+  failPrepend?: boolean;
   calls: Array<{ command: string; args: string[] }>;
 }
 
@@ -55,10 +63,8 @@ function runnerFor(root: string, services: FakeServices): CommandRunner {
         if (args.includes("--bumped-version")) return services.nextTag ?? "alpha-v1.0.1";
         const prependIndex = args.indexOf("--prepend");
         if (prependIndex >= 0) {
-          execFileSync("node", [
-            "-e",
-            `require('fs').writeFileSync(${JSON.stringify(args[prependIndex + 1])}, '# Changelog\\n\\n## generated\\n')`,
-          ]);
+          if (services.failPrepend) throw new Error("Changelog generation failed");
+          writeFileSync(args[prependIndex + 1], "# Changelog\n\n## generated\n");
           return "";
         }
         return "Generated release notes";
@@ -127,6 +133,25 @@ describe("release planning", () => {
     );
   });
 
+  it("treats package directories literally in component tag patterns", () => {
+    const runner: CommandRunner = {
+      run: () => "a.b-v1.2.0\naxb-v1.3.0",
+      attempt: () => ({ status: 1, stdout: "", stderr: "" }),
+    };
+    const automation = createReleaseAutomation({ runner });
+    const pkg = {
+      directory: "a.b",
+      path: "packages/a.b",
+      manifestPath: "packages/a.b/package.json",
+      changelogPath: "packages/a.b/CHANGELOG.md",
+      name: "@zeldrisho/a.b",
+      version: "1.2.0",
+      tag: "a.b-v1.2.0",
+    };
+
+    expect(automation.componentTags(pkg)).toEqual(["a.b-v1.2.0"]);
+  });
+
   it.each([
     ["docs: explain alpha", undefined, false],
     ["fix: repair alpha", undefined, true],
@@ -134,7 +159,7 @@ describe("release planning", () => {
   ] as const)("classifies %s commits", async (subject, body, expected) => {
     const root = await createRepository();
     git(root, "tag", "alpha-v1.0.0");
-    commit(root, subject, body);
+    await commit(root, subject, body);
     const state = services();
     const automation = createReleaseAutomation({ root, runner: runnerFor(root, state) });
 
@@ -144,7 +169,7 @@ describe("release planning", () => {
   it("generates versions, changelogs, and the release pull-request body", async () => {
     const root = await createRepository();
     git(root, "tag", "alpha-v1.0.0");
-    commit(root, "fix: repair alpha");
+    await commit(root, "fix: repair alpha");
     const bodyPath = join(root, "release-body.md");
     const state = services({ nextTag: "alpha-v1.0.1" });
     const messages: string[] = [];
@@ -174,13 +199,42 @@ describe("release planning", () => {
     async (nextTag) => {
       const root = await createRepository();
       git(root, "tag", "alpha-v1.0.0");
-      commit(root, "feat: add behavior");
+      await commit(root, "feat: add behavior");
       const state = services({ nextTag });
       const automation = createReleaseAutomation({ root, runner: runnerFor(root, state) });
 
       await expect(automation.prepare()).rejects.toThrow(/unexpected tag|invalid version/);
     },
   );
+
+  it("logs when there are no releasable package changes", async () => {
+    const root = await createRepository();
+    git(root, "tag", "alpha-v1.0.0");
+    const messages: string[] = [];
+    const state = services();
+    const automation = createReleaseAutomation({
+      root,
+      runner: runnerFor(root, state),
+      log: (message) => messages.push(message),
+    });
+
+    await automation.prepare();
+
+    expect(messages).toEqual(["No releasable package changes found."]);
+  });
+
+  it("does not bump the manifest when changelog generation fails", async () => {
+    const root = await createRepository();
+    git(root, "tag", "alpha-v1.0.0");
+    await commit(root, "fix: repair alpha");
+    const state = services({ failPrepend: true });
+    const automation = createReleaseAutomation({ root, runner: runnerFor(root, state) });
+
+    await expect(automation.prepare()).rejects.toThrow("Changelog generation failed");
+    expect(
+      JSON.parse(await readFile(join(root, "packages/alpha/package.json"), "utf8")),
+    ).toMatchObject({ version: "1.0.0" });
+  });
 });
 
 describe("partial-release recovery and service errors", () => {
@@ -264,6 +318,27 @@ describe("GitHub release creation", () => {
     );
   });
 
+  it("resolves HEAD before creating an untagged release", async () => {
+    const root = await createRepository();
+    const state = services();
+    const automation = createReleaseAutomation({
+      root,
+      runner: runnerFor(root, state),
+      env: { GITHUB_REPOSITORY: "owner/repository" },
+    });
+
+    await automation.ensureGithubRelease("packages/alpha");
+
+    const head = git(root, "rev-parse", "HEAD");
+    const createCall = state.calls.find(
+      (call) => call.command === "gh" && call.args[0] === "release",
+    );
+    expect(createCall?.args).toContain(head);
+    expect(
+      state.calls.find((call) => call.command === "git-cliff" && call.args.includes(head)),
+    ).toBeDefined();
+  });
+
   it.each([
     ["successful", false],
     ["failed", true],
@@ -283,5 +358,55 @@ describe("GitHub release creation", () => {
     if (failCreate) await expect(operation).rejects.toThrow("GitHub create failed");
     else await expect(operation).resolves.toBeUndefined();
     expect(await readdir(tempRoot)).toEqual([]);
+  });
+});
+
+describe("release CLI", () => {
+  function fakeAutomation(): {
+    automation: ReleaseAutomation;
+    status: ReturnType<typeof vi.fn>;
+    prepare: ReturnType<typeof vi.fn>;
+    ensureGithubRelease: ReturnType<typeof vi.fn>;
+  } {
+    const status = vi.fn();
+    const prepare = vi.fn();
+    const ensureGithubRelease = vi.fn();
+    return {
+      automation: {
+        packageCatalog: vi.fn(),
+        componentTags: vi.fn(),
+        hasReleasableChanges: vi.fn(),
+        assertCurrentVersionIsLatest: vi.fn(),
+        status,
+        prepare,
+        ensureGithubRelease,
+      },
+      status,
+      prepare,
+      ensureGithubRelease,
+    };
+  }
+
+  it.each([
+    ["status", undefined],
+    ["prepare", undefined],
+    ["ensure-github-release", "packages/alpha"],
+  ] as const)("dispatches %s", async (command, argument) => {
+    const fake = fakeAutomation();
+    await runReleaseCli(argument ? [command, argument] : [command], fake.automation);
+
+    if (command === "status") expect(fake.status).toHaveBeenCalledOnce();
+    else if (command === "prepare") expect(fake.prepare).toHaveBeenCalledOnce();
+    else expect(fake.ensureGithubRelease).toHaveBeenCalledWith("packages/alpha");
+  });
+
+  it("rejects a missing package path", async () => {
+    await expect(
+      runReleaseCli(["ensure-github-release"], fakeAutomation().automation),
+    ).rejects.toThrow("A package path is required");
+  });
+
+  it("rejects unknown commands with usage", async () => {
+    await expect(runReleaseCli(["unknown"], fakeAutomation().automation)).rejects.toThrow("Usage:");
   });
 });

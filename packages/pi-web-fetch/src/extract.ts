@@ -9,13 +9,20 @@ const RAW_ID_SELECTOR_SAFE = /^-?[_a-zA-Z][-_a-zA-Z0-9]*$/;
  */
 function normalizeSelectorUnsafeIds(document: Document): void {
   const replacements = new Map<string, string>();
+  const occupiedIds = new Set(
+    [...document.querySelectorAll<HTMLElement>("[id]")].map((element) => element.id),
+  );
   let replacementIndex = 0;
 
   for (const element of document.querySelectorAll<HTMLElement>("[id]")) {
     const id = element.id;
     if (!id || RAW_ID_SELECTOR_SAFE.test(id)) continue;
 
-    const replacement = `defuddle-safe-id-${replacementIndex++}`;
+    let replacement: string;
+    do {
+      replacement = `defuddle-safe-id-${replacementIndex++}`;
+    } while (occupiedIds.has(replacement));
+    occupiedIds.add(replacement);
     if (!replacements.has(id)) replacements.set(id, replacement);
     element.id = replacement;
   }

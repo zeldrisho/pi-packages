@@ -61,7 +61,7 @@ export const webSearchParameters = Type.Intersect([
       query: Type.String({
         minLength: 1,
         maxLength: SEARCH_WEB_MAX_QUERY_CHARACTERS,
-        description: "The web search query",
+        description: `The web search query (maximum ${SEARCH_WEB_MAX_QUERY_CHARACTERS} characters)`,
       }),
       mode: Type.Optional(
         Type.Literal("web", { description: "Return compact Brave web results (default)" }),

@@ -3,6 +3,7 @@ import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
   FETCH_DEFAULT_MAX_CHARACTERS,
+  FETCH_DEFAULT_OFFSET,
   FETCH_MAX_CHARACTERS,
   FETCH_MAX_OFFSET_CHARACTERS,
   FETCH_MAX_URL_CHARACTERS,
@@ -38,8 +39,7 @@ export const webFetchParameters = Type.Object({
     Type.Integer({
       minimum: 0,
       maximum: FETCH_MAX_OFFSET_CHARACTERS,
-      description:
-        "Extracted-content character offset to start reading from (default: 0; use nextOffset to continue)",
+      description: `Extracted-content character offset to start reading from (default: ${FETCH_DEFAULT_OFFSET}; use nextOffset to continue)`,
     }),
   ),
   maxCharacters: Type.Optional(

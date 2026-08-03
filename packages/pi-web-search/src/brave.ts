@@ -26,14 +26,12 @@ const BRAVE_MAX_SNIPPETS_PER_URL = 3;
  *
  * @param query - The search query to validate
  * @param count - The requested number of results
- * @param maximumQueryCharacters - The maximum permitted query length
- * @throws If the query exceeds the maximum length or the result count is outside the allowed range
+ * @param mode - The search mode whose query limit applies
+ * @throws If the query exceeds the mode limit or the result count is outside the allowed range
  */
-function validateProviderRequest(
-  query: string,
-  count: number,
-  maximumQueryCharacters: number,
-): void {
+export function validateProviderRequest(query: string, count: number, mode: SearchMode): void {
+  const maximumQueryCharacters =
+    mode === "context" ? SEARCH_CONTEXT_MAX_QUERY_CHARACTERS : SEARCH_WEB_MAX_QUERY_CHARACTERS;
   if (query.length > maximumQueryCharacters) {
     throw new Error(`Search queries cannot exceed ${maximumQueryCharacters} characters.`);
   }
@@ -139,7 +137,7 @@ export async function searchBraveWeb(
   language: string | undefined,
   signal: AbortSignal | undefined,
 ): Promise<SearchResult[]> {
-  validateProviderRequest(query, count, SEARCH_WEB_MAX_QUERY_CHARACTERS);
+  validateProviderRequest(query, count, "web");
   const url = new URL("https://api.search.brave.com/res/v1/web/search");
   url.searchParams.set("q", query);
   url.searchParams.set("count", String(count));
@@ -182,7 +180,7 @@ export async function searchBraveContext(
   language: string | undefined,
   signal: AbortSignal | undefined,
 ): Promise<SearchResult[]> {
-  validateProviderRequest(query, count, SEARCH_CONTEXT_MAX_QUERY_CHARACTERS);
+  validateProviderRequest(query, count, "context");
 
   const url = new URL("https://api.search.brave.com/res/v1/llm/context");
   url.searchParams.set("q", query);

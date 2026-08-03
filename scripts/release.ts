@@ -97,10 +97,15 @@ function defaultRunner(root: string): CommandRunner {
       return {
         status: result.status,
         stdout: result.stdout ?? "",
-        stderr: result.stderr ?? "",
+        stderr: result.stderr || result.error?.message || "",
       };
     },
   };
+}
+
+/** Escapes a literal value before interpolation into a regular expression. */
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
@@ -172,7 +177,7 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
   }
 
   function componentTags(pkg: PackageInfo): string[] {
-    const pattern = new RegExp(`^${pkg.directory}-v${tagVersionPattern}$`);
+    const pattern = new RegExp(`^${escapeRegExp(pkg.directory)}-v${tagVersionPattern}$`);
     return runner
       .run("git", ["tag", "--list", `${pkg.directory}-v*`, "--sort=-v:refname"])
       .split("\n")
@@ -201,7 +206,7 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
       "--config",
       "cliff.toml",
       "--tag-pattern",
-      `^${pkg.directory}-v${tagVersionPattern}$`,
+      `^${escapeRegExp(pkg.directory)}-v${tagVersionPattern}$`,
       "--include-path",
       `${pkg.path}/**`,
     ];
@@ -320,7 +325,6 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
 
       const manifest = JSON.parse(await readFile(pkg.manifestPath, "utf8")) as PackageManifest;
       manifest.version = version;
-      await writeFile(pkg.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
       runner.run("git-cliff", [
         ...cliffArguments(pkg),
         "--unreleased",
@@ -329,6 +333,7 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
         "--prepend",
         pkg.changelogPath,
       ]);
+      await writeFile(pkg.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
       planned.push({ ...pkg, version, tag: nextTag });
     }
 
@@ -358,7 +363,7 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
     }
 
     const tagged = tagExists(pkg.tag);
-    const target = tagged ? pkg.tag : env.GITHUB_SHA || "HEAD";
+    const target = tagged ? pkg.tag : env.GITHUB_SHA || runner.run("git", ["rev-parse", "HEAD"]);
     const tags = componentTags(pkg).filter((tag) => tag !== pkg.tag);
     const previousTag = tags[0];
     const range = previousTag ? `${previousTag}..${target}` : target;
@@ -409,10 +414,13 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
  * Runs the release automation command selected by the provided arguments.
  *
  * @param args - Command-line arguments specifying the release operation and, when required, its package path
+ * @param automation - Release operations used to dispatch the selected command
  */
-export async function runReleaseCli(args = process.argv.slice(2)): Promise<void> {
+export async function runReleaseCli(
+  args = process.argv.slice(2),
+  automation: ReleaseAutomation = createReleaseAutomation(),
+): Promise<void> {
   const [command, argument] = args;
-  const automation = createReleaseAutomation();
   switch (command) {
     case "status":
       await automation.status();

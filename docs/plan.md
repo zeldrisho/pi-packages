@@ -4,9 +4,9 @@ This plan turns the repository-wide technical debt audit into work that can be c
 
 Use the repository commands and conventions in [development.md](development.md), preserve the invariants in [security-invariants.md](security-invariants.md), and follow [releases.md](releases.md) for publication changes.
 
-## Current baseline
+## Historical baseline
 
-At the time of the audit:
+At the time of the 2026-08-03 audit:
 
 - `vp run validate` passes;
 - all 137 tests pass;
