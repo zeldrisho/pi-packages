@@ -50,7 +50,10 @@ async function documentFromResponse(
   const status = response.statusCode ?? 0;
   if (status < 200 || status >= 300) {
     response.resume();
-    throw new Error(`web_fetch returned HTTP ${status}.`);
+    const authenticationHint = [401, 403, 404].includes(status)
+      ? " The page may be missing, private, or require authentication."
+      : "";
+    throw new Error(`web_fetch returned HTTP ${status}.${authenticationHint}`);
   }
 
   const contentTypeHeader = responseHeader(response, "content-type") ?? "text/plain";

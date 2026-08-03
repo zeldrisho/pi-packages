@@ -248,6 +248,12 @@ describe("web_fetch network boundaries", () => {
     ).rejects.toThrow(message);
   });
 
+  it("explains that a missing page may be private or require authentication", async () => {
+    await expect(
+      fetchRemoteContent(`${origin}/missing`, 0, 6_000, undefined, dependencies),
+    ).rejects.toThrow(/HTTP 404.*page may be missing, private, or require authentication/);
+  });
+
   it.each(["/declared-large", "/streamed-large"])(
     "reports the raw response limit and explains maxCharacters for %s",
     async (path) => {
