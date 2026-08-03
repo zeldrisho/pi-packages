@@ -1,4 +1,23 @@
 # Changelog
+## [0.4.1](https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.4.0...pi-web-search-v0.4.1) (2026-08-03)
+
+
+### Bug fixes
+
+- Address pull request review feedback ([3b05033](https://github.com/zeldrisho/pi-packages/commit/3b05033003d173809134d9e2d2a53e82e45050b6))
+
+
+### Documentation
+
+- Clarify local package management ([f5b420e](https://github.com/zeldrisho/pi-packages/commit/f5b420eba246eb6a372a4b6a9036a060b9db623b))
+
+
+### Refactoring
+
+- Strengthen repository maintenance boundaries ([a44da67](https://github.com/zeldrisho/pi-packages/commit/a44da679b93ae6ea7ebdd77389bf84716b195e33))
+
+- Strengthen maintenance safety ([8a26436](https://github.com/zeldrisho/pi-packages/commit/8a26436780373f21535580224b59bc6dd2a4ad72))
+
 
 ## [0.4.0](https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.3.1...pi-web-search-v0.4.0) (2026-07-25)
 
