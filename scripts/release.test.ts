@@ -1,47 +1,102 @@
-import { chmod, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vite-plus/test";
+import { createReleaseAutomation, type CommandAttempt, type CommandRunner } from "./release";
 
 const temporaryDirectories: string[] = [];
 
-async function releaseNoteDirectories(): Promise<Set<string>> {
-  return new Set(
-    (await readdir(tmpdir())).filter((entry) => entry.startsWith("git-cliff-release-")),
-  );
+function git(root: string, ...args: string[]): string {
+  return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 }
 
-async function runEnsureGithubRelease(failCreate: boolean): Promise<number | null> {
-  const binDirectory = await mkdtemp(join(tmpdir(), "release-test-bin-"));
-  temporaryDirectories.push(binDirectory);
-  const gh = join(binDirectory, "gh");
-  const gitCliff = join(binDirectory, "git-cliff");
+async function createRepository(version = "1.0.0"): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), "release-repository-test-"));
+  temporaryDirectories.push(root);
+  await mkdir(join(root, "packages", "alpha"), { recursive: true });
   await writeFile(
-    gh,
-    `#!/bin/sh
-if [ "$1" = "api" ]; then echo 'HTTP 404' >&2; exit 1; fi
-if [ "${failCreate ? "yes" : "no"}" = "yes" ]; then exit 2; fi
-exit 0
-`,
+    join(root, "packages", "alpha", "package.json"),
+    `${JSON.stringify({ name: "@zeldrisho/alpha", version }, null, 2)}\n`,
   );
-  await writeFile(gitCliff, "#!/bin/sh\nprintf 'Release notes'\n");
-  await Promise.all([chmod(gh, 0o755), chmod(gitCliff, 0o755)]);
+  await writeFile(join(root, "packages", "alpha", "CHANGELOG.md"), "# Changelog\n");
+  await writeFile(join(root, "cliff.toml"), "");
+  git(root, "init", "--quiet");
+  git(root, "config", "user.email", "release-test@example.test");
+  git(root, "config", "user.name", "Release Test");
+  git(root, "add", ".");
+  git(root, "commit", "--quiet", "-m", "feat: initial package");
+  return root;
+}
 
-  const result = spawnSync(
-    process.execPath,
-    [join(import.meta.dirname, "release.ts"), "ensure-github-release", "packages/pi-web-fetch"],
-    {
-      cwd: join(import.meta.dirname, ".."),
-      env: {
-        ...process.env,
-        GITHUB_REPOSITORY: "zeldrisho/pi-packages",
-        PATH: `${binDirectory}${delimiter}${process.env.PATH ?? ""}`,
-      },
-      encoding: "utf8",
+function commit(root: string, subject: string, body?: string): void {
+  const marker = join(root, "packages", "alpha", "marker.txt");
+  execFileSync("node", ["-e", `require('fs').writeFileSync(${JSON.stringify(marker)}, 'x')`]);
+  git(root, "add", ".");
+  const args = ["commit", "--quiet", "-m", subject];
+  if (body) args.push("-m", body);
+  git(root, ...args);
+}
+
+interface FakeServices {
+  npm?: CommandAttempt;
+  github?: CommandAttempt;
+  nextTag?: string;
+  failCreate?: boolean;
+  calls: Array<{ command: string; args: string[] }>;
+}
+
+function runnerFor(root: string, services: FakeServices): CommandRunner {
+  return {
+    run(command, args) {
+      services.calls.push({ command, args });
+      if (command === "git") return git(root, ...args);
+      if (command === "git-cliff") {
+        if (args.includes("--bumped-version")) return services.nextTag ?? "alpha-v1.0.1";
+        const prependIndex = args.indexOf("--prepend");
+        if (prependIndex >= 0) {
+          execFileSync("node", [
+            "-e",
+            `require('fs').writeFileSync(${JSON.stringify(args[prependIndex + 1])}, '# Changelog\\n\\n## generated\\n')`,
+          ]);
+          return "";
+        }
+        return "Generated release notes";
+      }
+      if (command === "gh") {
+        if (services.failCreate) throw new Error("GitHub create failed");
+        return "";
+      }
+      throw new Error(`Unexpected command: ${command}`);
     },
-  );
-  return result.status;
+    attempt(command, args) {
+      services.calls.push({ command, args });
+      if (command === "git") {
+        try {
+          return { status: 0, stdout: git(root, ...args), stderr: "" };
+        } catch {
+          return { status: 1, stdout: "", stderr: "not found" };
+        }
+      }
+      if (command === "vp") {
+        return (
+          services.npm ?? {
+            status: 1,
+            stdout: JSON.stringify({ error: { code: "ERR_PNPM_NO_MATCHING_VERSION" } }),
+            stderr: "",
+          }
+        );
+      }
+      if (command === "gh") {
+        return services.github ?? { status: 1, stdout: "", stderr: "HTTP 404" };
+      }
+      throw new Error(`Unexpected attempted command: ${command}`);
+    },
+  };
+}
+
+function services(overrides: Partial<FakeServices> = {}): FakeServices {
+  return { calls: [], ...overrides };
 }
 
 afterEach(async () => {
@@ -52,19 +107,181 @@ afterEach(async () => {
   );
 });
 
-describe("release note temporary directory cleanup", () => {
-  it.each([
-    ["successful", false, 0],
-    ["failed", true, 1],
-  ] as const)(
-    "cleans notes after a %s GitHub release",
-    async (_label, failCreate, expectedStatus) => {
-      const before = await releaseNoteDirectories();
-      const status = await runEnsureGithubRelease(failCreate);
-      const after = await releaseNoteDirectories();
+describe("release planning", () => {
+  it("orders component tags semantically and rejects manifest/tag inconsistencies", async () => {
+    const root = await createRepository("1.5.0");
+    for (const tag of ["alpha-v1.2.0", "alpha-v1.10.0", "alpha-v1.5.0", "alpha-vbad"]) {
+      git(root, "tag", tag);
+    }
+    const state = services();
+    const automation = createReleaseAutomation({ root, runner: runnerFor(root, state) });
+    const pkg = (await automation.packageCatalog())[0];
 
-      expect(status === 0 ? 0 : 1).toBe(expectedStatus);
-      expect([...after].filter((directory) => !before.has(directory))).toEqual([]);
+    expect(automation.componentTags(pkg)).toEqual([
+      "alpha-v1.10.0",
+      "alpha-v1.5.0",
+      "alpha-v1.2.0",
+    ]);
+    expect(() => automation.assertCurrentVersionIsLatest(pkg)).toThrow(
+      "inconsistent with latest component tag alpha-v1.10.0",
+    );
+  });
+
+  it.each([
+    ["docs: explain alpha", undefined, false],
+    ["fix: repair alpha", undefined, true],
+    ["chore: reorganize alpha", "BREAKING CHANGE: remove old behavior", true],
+  ] as const)("classifies %s commits", async (subject, body, expected) => {
+    const root = await createRepository();
+    git(root, "tag", "alpha-v1.0.0");
+    commit(root, subject, body);
+    const state = services();
+    const automation = createReleaseAutomation({ root, runner: runnerFor(root, state) });
+
+    expect(automation.hasReleasableChanges((await automation.packageCatalog())[0])).toBe(expected);
+  });
+
+  it("generates versions, changelogs, and the release pull-request body", async () => {
+    const root = await createRepository();
+    git(root, "tag", "alpha-v1.0.0");
+    commit(root, "fix: repair alpha");
+    const bodyPath = join(root, "release-body.md");
+    const state = services({ nextTag: "alpha-v1.0.1" });
+    const messages: string[] = [];
+    const automation = createReleaseAutomation({
+      root,
+      runner: runnerFor(root, state),
+      env: { RELEASE_PR_BODY: bodyPath },
+      log: (message) => messages.push(message),
+    });
+
+    await automation.prepare();
+
+    expect(
+      JSON.parse(await readFile(join(root, "packages/alpha/package.json"), "utf8")),
+    ).toMatchObject({
+      version: "1.0.1",
+    });
+    expect(await readFile(join(root, "packages/alpha/CHANGELOG.md"), "utf8")).toContain(
+      "## generated",
+    );
+    expect(await readFile(bodyPath, "utf8")).toContain("`@zeldrisho/alpha` → `1.0.1`");
+    expect(messages).toEqual(["Prepared 1 package release(s): alpha-v1.0.1"]);
+  });
+
+  it.each(["wrong-v1.0.1", "alpha-vnot-semver"])(
+    "rejects malformed git-cliff version output %s",
+    async (nextTag) => {
+      const root = await createRepository();
+      git(root, "tag", "alpha-v1.0.0");
+      commit(root, "feat: add behavior");
+      const state = services({ nextTag });
+      const automation = createReleaseAutomation({ root, runner: runnerFor(root, state) });
+
+      await expect(automation.prepare()).rejects.toThrow(/unexpected tag|invalid version/);
     },
   );
+});
+
+describe("partial-release recovery and service errors", () => {
+  it.each([
+    ["missing tag and npm version", false, false, false, true],
+    ["missing GitHub release", true, true, false, false],
+    ["fully released", true, true, true, undefined],
+  ] as const)("reports %s", async (_label, tagged, published, released, publish) => {
+    const root = await createRepository();
+    if (tagged) git(root, "tag", "alpha-v1.0.0");
+    const state = services({
+      npm: published
+        ? { status: 0, stdout: '"1.0.0"', stderr: "" }
+        : {
+            status: 1,
+            stdout: JSON.stringify({ error: { code: "ERR_PNPM_NO_MATCHING_VERSION" } }),
+            stderr: "",
+          },
+      github: released
+        ? { status: 0, stdout: "", stderr: "" }
+        : { status: 1, stdout: "", stderr: "HTTP 404" },
+    });
+    let output = "";
+    const automation = createReleaseAutomation({
+      root,
+      runner: runnerFor(root, state),
+      env: { GITHUB_REPOSITORY: "owner/repository" },
+      stdout: (value) => {
+        output += value;
+      },
+    });
+
+    await automation.status();
+
+    const result = JSON.parse(output) as { include: Array<{ publish: boolean }> };
+    if (publish === undefined) expect(result.include).toEqual([]);
+    else expect(result.include).toEqual([expect.objectContaining({ publish })]);
+    if (!tagged) expect(state.calls.some((call) => call.command === "gh")).toBe(false);
+  });
+
+  it.each([
+    [
+      "malformed npm output",
+      { npm: { status: 1, stdout: "not-json", stderr: "registry failed" } },
+      "registry failed",
+    ],
+    [
+      "unknown npm error",
+      { npm: { status: 1, stdout: '{"error":{"code":"E500","message":"down"}}', stderr: "" } },
+      "down",
+    ],
+    [
+      "GitHub API failure",
+      {
+        npm: { status: 0, stdout: '"1.0.0"', stderr: "" },
+        github: { status: 1, stdout: "", stderr: "HTTP 500" },
+      },
+      "HTTP 500",
+    ],
+  ] as const)("classifies %s", async (_label, overrides, message) => {
+    const root = await createRepository();
+    git(root, "tag", "alpha-v1.0.0");
+    const state = services(overrides);
+    const automation = createReleaseAutomation({
+      root,
+      runner: runnerFor(root, state),
+      env: { GITHUB_REPOSITORY: "owner/repository" },
+    });
+
+    await expect(automation.status()).rejects.toThrow(message);
+  });
+});
+
+describe("GitHub release creation", () => {
+  it("rejects invalid package paths", async () => {
+    const root = await createRepository();
+    const state = services();
+    const automation = createReleaseAutomation({ root, runner: runnerFor(root, state) });
+    await expect(automation.ensureGithubRelease("packages/missing")).rejects.toThrow(
+      "Unknown package path",
+    );
+  });
+
+  it.each([
+    ["successful", false],
+    ["failed", true],
+  ] as const)("cleans temporary notes after a %s GitHub release", async (_label, failCreate) => {
+    const root = await createRepository();
+    const tempRoot = await mkdtemp(join(tmpdir(), "release-notes-parent-"));
+    temporaryDirectories.push(tempRoot);
+    const state = services({ failCreate });
+    const automation = createReleaseAutomation({
+      root,
+      runner: runnerFor(root, state),
+      env: { GITHUB_REPOSITORY: "owner/repository", GITHUB_SHA: "abc123" },
+      temporaryRoot: tempRoot,
+    });
+
+    const operation = automation.ensureGithubRelease("packages/alpha");
+    if (failCreate) await expect(operation).rejects.toThrow("GitHub create failed");
+    else await expect(operation).resolves.toBeUndefined();
+    expect(await readdir(tempRoot)).toEqual([]);
+  });
 });

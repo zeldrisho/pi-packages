@@ -84,13 +84,13 @@ Schedule this work after Phase 1, reserving maintenance capacity in each feature
 
 Refactor command execution only as much as needed to test behavior without live npm or GitHub operations.
 
-- [ ] Test component-tag ordering and manifest/tag consistency.
-- [ ] Test releasable commits, documentation-only commits, and breaking changes.
-- [ ] Test partial-release recovery for missing tags, GitHub releases, and npm versions.
-- [ ] Test npm and GitHub error classification.
-- [ ] Test invalid package paths and malformed external command output.
-- [ ] Test generated versions, changelogs, and release pull-request bodies.
-- [ ] Use temporary Git repositories and injected command runners rather than live services.
+- [x] Test component-tag ordering and manifest/tag consistency.
+- [x] Test releasable commits, documentation-only commits, and breaking changes.
+- [x] Test partial-release recovery for missing tags, GitHub releases, and npm versions.
+- [x] Test npm and GitHub error classification.
+- [x] Test invalid package paths and malformed external command output.
+- [x] Test generated versions, changelogs, and release pull-request bodies.
+- [x] Use temporary Git repositories and injected command runners rather than live services.
 
 **Done when:** the important state transitions in `scripts/release.ts` are deterministic under test and the live workflow remains retry-safe.
 
@@ -124,19 +124,18 @@ Apply a touch-it rule: complete the relevant item when feature work already modi
 
 ### 8. Split large tests by concern
 
-- [ ] Split `packages/pi-web-fetch/tests/index.test.ts` into network policy, redirects, transport, cancellation, caching, and service-level suites.
-- [ ] Split `packages/pi-web-search/tests/index.test.ts` into schema/rendering, provider transport, context formatting, caching/coalescing, truncation, and lifecycle suites.
-- [ ] Share only stable test harnesses; keep security-boundary fixtures explicit.
-- [ ] Preserve or improve coverage and test execution time.
+- [x] Split `packages/pi-web-fetch/tests/index.test.ts` into network policy, redirects, transport, cancellation, caching, and service-level suites.
+- [x] Split `packages/pi-web-search/tests/index.test.ts` into schema/rendering, provider transport, context formatting, caching/coalescing, truncation, and lifecycle suites.
+- [x] Share only stable test harnesses; keep security-boundary fixtures explicit.
+- [x] Preserve or improve coverage and test execution time.
 
 ### 9. Add architecture documentation
 
-Create `docs/architecture.md` rather than expanding this plan. Cover:
-
-- web-fetch validation, DNS resolution, address pinning, redirects, extraction, caching, and continuation;
-- web-search provider requests, coalescing, truncation, temporary files, and shutdown cleanup;
-- release planning, versioning, tagging, GitHub releases, and npm publication; and
-- package independence and the reasons for intentional source duplication.
+- [x] Create `docs/architecture.md` rather than expanding this plan. It covers:
+  - web-fetch validation, DNS resolution, address pinning, redirects, extraction, caching, and continuation;
+  - web-search provider requests, coalescing, truncation, temporary files, and shutdown cleanup;
+  - release planning, versioning, tagging, GitHub releases, and npm publication; and
+  - package independence and the reasons for intentional source duplication.
 
 Link to existing documentation instead of copying setup, release, or security instructions.
 

@@ -1,6 +1,6 @@
 import { Check } from "typebox/value";
 import { describe, expect, it } from "vite-plus/test";
-import { webFetchParameters } from "../src/index";
+import { executeWebFetch, webFetchParameters } from "../src/index";
 import {
   FETCH_DEFAULT_MAX_CHARACTERS,
   FETCH_MAX_CHARACTERS,
@@ -37,5 +37,20 @@ describe("web_fetch limit contracts", () => {
     expect(JSON.stringify(webFetchParameters)).toContain(
       `default: ${FETCH_DEFAULT_MAX_CHARACTERS}`,
     );
+  });
+
+  it.each([
+    [{ url: "https://example.com", offset: 1.5 }, "offset must be an integer"],
+    [
+      { url: "https://example.com", offset: FETCH_MAX_OFFSET_CHARACTERS + 1 },
+      "offset must be an integer",
+    ],
+    [{ url: "https://example.com", maxCharacters: 1.5 }, "maxCharacters must be an integer"],
+    [
+      { url: "https://example.com", maxCharacters: FETCH_MAX_CHARACTERS + 1 },
+      "maxCharacters must be an integer",
+    ],
+  ])("enforces runtime limits for %j", async (params, message) => {
+    await expect(executeWebFetch(params, undefined, undefined)).rejects.toThrow(message);
   });
 });
