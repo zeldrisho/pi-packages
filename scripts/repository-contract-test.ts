@@ -9,6 +9,19 @@ const packageDirectories = (await readdir(packagesDirectory, { withFileTypes: tr
   .sort();
 const readme = await readFile(join(root, "README.md"), "utf8");
 const expectedFiles = ["src", "README.md", "CHANGELOG.md", "LICENSE"];
+const expectedScripts = {
+  check: "vp check",
+  test: "vp test",
+  "test:watch": "vp test --watch",
+  lint: "vp lint",
+  "lint:fix": "vp lint --fix",
+  format: "vp fmt --write",
+  typecheck: "vp check --no-fmt --no-lint",
+};
+const expectedTypeScriptConfiguration = {
+  extends: "../../tsconfig.base.json",
+  include: ["src", "tests"],
+};
 const synchronizedInfrastructurePairs = [
   ["packages/pi-web-fetch/src/cache.ts", "packages/pi-web-search/src/cache.ts"],
   ["packages/pi-web-fetch/src/inflight.ts", "packages/pi-web-search/src/inflight.ts"],
@@ -44,12 +57,23 @@ for (const [left, right] of synchronizedInfrastructurePairs) {
 }
 
 for (const directory of packageDirectories) {
-  const manifest = JSON.parse(
-    await readFile(join(packagesDirectory, directory, "package.json"), "utf8"),
+  const packageDirectory = join(packagesDirectory, directory);
+  const manifest = JSON.parse(await readFile(join(packageDirectory, "package.json"), "utf8"));
+  const typeScriptConfiguration = JSON.parse(
+    await readFile(join(packageDirectory, "tsconfig.json"), "utf8"),
   );
   const expectedName = `@zeldrisho/${directory}`;
   if (manifest.name !== expectedName) {
     fail(`${directory}/package.json name must be ${expectedName}, received ${manifest.name}`);
+  }
+  if (JSON.stringify(manifest.scripts) !== JSON.stringify(expectedScripts)) {
+    fail(`${manifest.name} scripts must match the uniform package scripts`);
+  }
+  if (JSON.stringify(manifest.engines) !== JSON.stringify({ node: ">=24" })) {
+    fail(`${manifest.name} engines must require Node >=24`);
+  }
+  if (JSON.stringify(typeScriptConfiguration) !== JSON.stringify(expectedTypeScriptConfiguration)) {
+    fail(`${manifest.name} tsconfig.json must extend the base config and include src and tests`);
   }
   if (!sameValues(manifest.files ?? [], expectedFiles)) {
     fail(

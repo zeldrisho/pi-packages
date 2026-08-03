@@ -11,6 +11,38 @@ const packageDirectories = (await readdir(packagesDirectory, { withFileTypes: tr
 const temporaryDirectory = await mkdtemp(join(tmpdir(), "pi-package-smoke-"));
 const tarballDirectory = join(temporaryDirectory, "tarballs");
 const fixtureDirectory = join(temporaryDirectory, "fixture");
+const piEcosystemDependencies = [
+  "@earendil-works/pi-ai",
+  "@earendil-works/pi-coding-agent",
+  "@earendil-works/pi-tui",
+] as const;
+const smokeDependencies = [...piEcosystemDependencies, "typebox"] as const;
+
+async function smokeDependencyVersion(packageName: string): Promise<string> {
+  if (
+    process.env.PI_SMOKE_DEPENDENCIES === "latest" &&
+    piEcosystemDependencies.some((dependency) => dependency === packageName)
+  ) {
+    return "latest";
+  }
+  for (const packageDirectory of packageDirectories) {
+    try {
+      const manifestPath = join(
+        packageDirectory,
+        "node_modules",
+        ...packageName.split("/"),
+        "package.json",
+      );
+      const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as { version?: unknown };
+      if (typeof manifest.version === "string" && /^\d+\.\d+\.\d+/.test(manifest.version)) {
+        return manifest.version;
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+  }
+  throw new Error(`Unable to derive the installed version for ${packageName}`);
+}
 
 function run(command: string, args: string[], cwd: string) {
   const result = spawnSync(command, args, { cwd, encoding: "utf8", stdio: "pipe" });
@@ -41,12 +73,9 @@ try {
     packageNames.push(manifest.name);
   }
 
-  Object.assign(dependencies, {
-    "@earendil-works/pi-ai": "^0.80.10",
-    "@earendil-works/pi-coding-agent": "^0.80.10",
-    "@earendil-works/pi-tui": "^0.80.10",
-    typebox: "^1.1.24",
-  });
+  for (const packageName of smokeDependencies) {
+    dependencies[packageName] = await smokeDependencyVersion(packageName);
+  }
   await writeFile(
     join(fixtureDirectory, "package.json"),
     `${JSON.stringify(

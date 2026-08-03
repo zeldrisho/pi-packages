@@ -1,3 +1,9 @@
+import {
+  SEARCH_CONTEXT_MAX_QUERY_CHARACTERS,
+  SEARCH_MAX_RESULT_COUNT,
+  SEARCH_MIN_RESULT_COUNT,
+  SEARCH_WEB_MAX_QUERY_CHARACTERS,
+} from "./limits";
 import { normalizeText, requestJson } from "./provider";
 
 export type Provider = "brave";
@@ -14,6 +20,25 @@ const BRAVE_MAX_CONTEXT_TOKENS = 2_048;
 const BRAVE_MAX_SNIPPETS = 15;
 const BRAVE_MAX_TOKENS_PER_URL = 1_024;
 const BRAVE_MAX_SNIPPETS_PER_URL = 3;
+
+function validateProviderRequest(
+  query: string,
+  count: number,
+  maximumQueryCharacters: number,
+): void {
+  if (query.length > maximumQueryCharacters) {
+    throw new Error(`Search queries cannot exceed ${maximumQueryCharacters} characters.`);
+  }
+  if (
+    !Number.isInteger(count) ||
+    count < SEARCH_MIN_RESULT_COUNT ||
+    count > SEARCH_MAX_RESULT_COUNT
+  ) {
+    throw new Error(
+      `Search result count must be an integer between ${SEARCH_MIN_RESULT_COUNT} and ${SEARCH_MAX_RESULT_COUNT}.`,
+    );
+  }
+}
 
 function normalizeUrl(value: unknown): string {
   if (typeof value !== "string") return "";
@@ -93,6 +118,7 @@ export async function searchBraveWeb(
   language: string | undefined,
   signal: AbortSignal | undefined,
 ): Promise<SearchResult[]> {
+  validateProviderRequest(query, count, SEARCH_WEB_MAX_QUERY_CHARACTERS);
   const url = new URL("https://api.search.brave.com/res/v1/web/search");
   url.searchParams.set("q", query);
   url.searchParams.set("count", String(count));
@@ -130,8 +156,7 @@ export async function searchBraveContext(
   language: string | undefined,
   signal: AbortSignal | undefined,
 ): Promise<SearchResult[]> {
-  if (query.length > 400)
-    throw new Error("Brave LLM Context queries cannot exceed 400 characters.");
+  validateProviderRequest(query, count, SEARCH_CONTEXT_MAX_QUERY_CHARACTERS);
 
   const url = new URL("https://api.search.brave.com/res/v1/llm/context");
   url.searchParams.set("q", query);

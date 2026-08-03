@@ -7,6 +7,13 @@ import { ExpiringLruCache } from "./cache";
 import { sliceCompleteDocument, type CompleteDocument } from "./content";
 import { fetchCompleteDocument, type FetchRemoteDependencies } from "./fetch";
 import { InflightCoalescer } from "./inflight";
+import {
+  FETCH_DEFAULT_MAX_CHARACTERS,
+  FETCH_DEFAULT_OFFSET,
+  FETCH_MAX_CHARACTERS,
+  FETCH_MAX_OFFSET_CHARACTERS,
+  FETCH_MIN_MAX_CHARACTERS,
+} from "./limits";
 
 const CACHE_TTL_MS = 10 * 60 * 1_000;
 const CACHE_MAX_ENTRIES = 100;
@@ -58,8 +65,22 @@ export async function executeWebFetch(
   onUpdate: ((update: WebFetchUpdate) => void) | undefined,
   dependencies: FetchRemoteDependencies = {},
 ) {
-  const offset = params.offset ?? 0;
-  const maxCharacters = params.maxCharacters ?? 6_000;
+  const offset = params.offset ?? FETCH_DEFAULT_OFFSET;
+  const maxCharacters = params.maxCharacters ?? FETCH_DEFAULT_MAX_CHARACTERS;
+  if (!Number.isInteger(offset) || offset < 0 || offset > FETCH_MAX_OFFSET_CHARACTERS) {
+    throw new Error(
+      `web_fetch offset must be an integer between 0 and ${FETCH_MAX_OFFSET_CHARACTERS}.`,
+    );
+  }
+  if (
+    !Number.isInteger(maxCharacters) ||
+    maxCharacters < FETCH_MIN_MAX_CHARACTERS ||
+    maxCharacters > FETCH_MAX_CHARACTERS
+  ) {
+    throw new Error(
+      `web_fetch maxCharacters must be an integer between ${FETCH_MIN_MAX_CHARACTERS} and ${FETCH_MAX_CHARACTERS}.`,
+    );
+  }
   let document = fetchCache.get(params.url);
   const cached = document !== undefined;
   onUpdate?.({

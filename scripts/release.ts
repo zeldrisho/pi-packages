@@ -4,7 +4,7 @@ import {
   type ExecFileSyncOptions,
   type SpawnSyncOptionsWithStringEncoding,
 } from "node:child_process";
-import { mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import process from "node:process";
@@ -275,29 +275,33 @@ async function ensureGithubRelease(packagePath: string): Promise<void> {
   const previousTag = tags[0];
   const range = previousTag ? `${previousTag}..${target}` : target;
   const temporaryDirectory = await mkdtemp(join(tmpdir(), "git-cliff-release-"));
-  const notesPath = join(temporaryDirectory, `${basename(pkg.path)}.md`);
-  const notes = run("git-cliff", [
-    ...cliffArguments(pkg),
-    "--tag",
-    pkg.tag,
-    "--strip",
-    "header",
-    range,
-  ]);
-  await writeFile(notesPath, `${notes}\n`);
+  try {
+    const notesPath = join(temporaryDirectory, `${basename(pkg.path)}.md`);
+    const notes = run("git-cliff", [
+      ...cliffArguments(pkg),
+      "--tag",
+      pkg.tag,
+      "--strip",
+      "header",
+      range,
+    ]);
+    await writeFile(notesPath, `${notes}\n`);
 
-  const args = [
-    "release",
-    "create",
-    pkg.tag,
-    "--title",
-    `${pkg.name} v${pkg.version}`,
-    "--notes-file",
-    notesPath,
-  ];
-  if (tagged) args.push("--verify-tag");
-  else args.push("--target", target);
-  run("gh", args, { stdio: "inherit" });
+    const args = [
+      "release",
+      "create",
+      pkg.tag,
+      "--title",
+      `${pkg.name} v${pkg.version}`,
+      "--notes-file",
+      notesPath,
+    ];
+    if (tagged) args.push("--verify-tag");
+    else args.push("--target", target);
+    run("gh", args, { stdio: "inherit" });
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
 }
 
 const [command, argument] = process.argv.slice(2);

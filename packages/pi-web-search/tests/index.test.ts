@@ -4,6 +4,10 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Check } from "typebox/value";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import registerWebSearch, { webSearchParameters } from "../src/index";
+import {
+  SEARCH_CONTEXT_MAX_QUERY_CHARACTERS,
+  SEARCH_WEB_MAX_QUERY_CHARACTERS,
+} from "../src/limits";
 
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@earendil-works/pi-coding-agent")>();
@@ -115,10 +119,27 @@ afterEach(() => {
 
 describe("web_search", () => {
   it("enforces mode-aware query limits in the public schema", () => {
-    expect(Check(webSearchParameters, { query: "x".repeat(400), mode: "context" })).toBe(true);
-    expect(Check(webSearchParameters, { query: "x".repeat(401), mode: "context" })).toBe(false);
-    expect(Check(webSearchParameters, { query: "x".repeat(450), mode: "web" })).toBe(true);
-    expect(Check(webSearchParameters, { query: "x".repeat(450) })).toBe(true);
+    expect(
+      Check(webSearchParameters, {
+        query: "x".repeat(SEARCH_CONTEXT_MAX_QUERY_CHARACTERS),
+        mode: "context",
+      }),
+    ).toBe(true);
+    expect(
+      Check(webSearchParameters, {
+        query: "x".repeat(SEARCH_CONTEXT_MAX_QUERY_CHARACTERS + 1),
+        mode: "context",
+      }),
+    ).toBe(false);
+    expect(
+      Check(webSearchParameters, {
+        query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS - 50),
+        mode: "web",
+      }),
+    ).toBe(true);
+    expect(
+      Check(webSearchParameters, { query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS - 50) }),
+    ).toBe(true);
   });
 
   it("fails clearly when the API key is missing", async () => {
@@ -459,11 +480,11 @@ describe("web_search", () => {
     await expect(
       createSearchTool().execute(
         "call",
-        { query: "x".repeat(401), mode: "context" },
+        { query: "x".repeat(SEARCH_CONTEXT_MAX_QUERY_CHARACTERS + 1), mode: "context" },
         undefined,
         undefined,
       ),
-    ).rejects.toThrow("cannot exceed 400 characters");
+    ).rejects.toThrow(`cannot exceed ${SEARCH_CONTEXT_MAX_QUERY_CHARACTERS} characters`);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

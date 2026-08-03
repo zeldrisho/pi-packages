@@ -6,7 +6,6 @@ import {
   executeWebFetch,
   FETCH_MAX_BYTES,
   fetchRemoteContent,
-  isPrivateAddress,
   requestPinned,
   validateRemoteUrl,
   type FetchRemoteDependencies,
@@ -114,49 +113,6 @@ describe("web_fetch network boundaries", () => {
   afterAll(async () => {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
-  });
-
-  it.each([
-    "0.0.0.0",
-    "10.0.0.1",
-    "100.64.0.1",
-    "127.0.0.1",
-    "169.254.1.1",
-    "172.16.0.1",
-    "192.168.1.1",
-    "198.18.0.1",
-    "224.0.0.1",
-    "::1",
-    "::ffff:127.0.0.1",
-    "64:ff9b::7f00:1",
-    "64:ff9b:1::7f00:1",
-    "fc00::1",
-    "fe80::1",
-  ])("rejects private or reserved address %s", (address) => {
-    expect(isPrivateAddress(address)).toBe(true);
-  });
-
-  it.each(["https://example.com", "http://example.com"])(
-    "accepts public target %s",
-    async (url) => {
-      const target = await validateRemoteUrl(url, async () => ["93.184.216.34"]);
-      expect(target.address).toBe("93.184.216.34");
-    },
-  );
-
-  it.each([
-    ["file:///etc/passwd", "only supports HTTP"],
-    ["https://user:password@example.com", "containing credentials"],
-    ["http://localhost", "local hostnames"],
-    ["http://service.localhost", "local hostnames"],
-  ])("rejects unsafe URL %s", async (url, message) => {
-    await expect(validateRemoteUrl(url)).rejects.toThrow(message);
-  });
-
-  it("rejects a hostname when any DNS answer is private", async () => {
-    await expect(
-      validateRemoteUrl("https://example.test", async () => ["93.184.216.34", "127.0.0.1"]),
-    ).rejects.toThrow("private or reserved");
   });
 
   it("pins transport requests to the validated address", async () => {

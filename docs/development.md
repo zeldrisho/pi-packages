@@ -44,3 +44,14 @@ The tests use deterministic local fixtures and mocked Brave responses. Manually 
 - `pi-nested-agent-md`: ancestor ordering, direct reads, deduplication, paths outside the working directory, output bounds, and reinjection after compaction.
 
 To load a local package in an isolated Pi session, run `pi -e ./packages/<name>` and disable globally installed extensions as needed so they cannot interfere with manual verification.
+
+## Dependency reviews
+
+Dependency updates are opened manually. Inspect upstream release notes and the lockfile, confirm GitHub
+Actions use reviewed semantic major tags, and run `vp run validate`. Review Pi ecosystem packages
+together when they share an API release train. Keep Typebox, Vite+, TypeScript, and major toolchain
+updates separate; never combine a TypeScript major migration with routine dependency updates.
+
+The scheduled Pi compatibility workflow remains independent of update automation. It smoke-tests packed
+extensions against both the locked workspace Pi resolution and the latest Pi APIs, while retaining the
+locked Typebox version, so wildcard Pi peer incompatibilities are detected before a catalog update.
