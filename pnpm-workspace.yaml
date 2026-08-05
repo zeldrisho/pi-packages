@@ -7,9 +7,9 @@ allowBuilds:
   protobufjs: false
 
 catalog:
-  "@earendil-works/pi-ai": "^0.80.10"
-  "@earendil-works/pi-coding-agent": "^0.80.10"
-  "@earendil-works/pi-tui": "^0.80.10"
+  "@earendil-works/pi-ai": "^0.83.0"
+  "@earendil-works/pi-coding-agent": "^0.83.0"
+  "@earendil-works/pi-tui": "^0.83.0"
   "@types/node": "^26.1.1"
   "@vitest/coverage-v8": "4.1.10"
   typebox: "^1.1.24"
@@ -19,7 +19,22 @@ catalog:
   vitest: "4.1.10"
 
 overrides:
-  brace-expansion: "5.0.8"
+  # Dependency-override lifecycle, tracked in issue #37
+  # (https://github.com/zeldrisho/pi-packages/issues/37). Re-check the removal
+  # condition on every catalog or lockfile bump and drop the override in the
+  # same change. scripts/repository-contract-test.ts fails when an overridden
+  # package disappears from the dependency graph.
+  #
+  # undici: upstream @earendil-works/pi-coding-agent still pins undici@8.5.0 even
+  # at 0.83.0 (GHSA-4cwx-7wf7-3272, GHSA-8xcm-r25x-g524, GHSA-v3r7-h72x-cjcm,
+  # GHSA-jr45-8vmc-qm54, GHSA-m8rv-5g2x-5cg5).
+  # Removal condition: drop when pi-coding-agent repins undici >= 8.9.0.
+  #
+  # Dropped with the 0.83.0 catalog bump: brace-expansion (GHSA-rgw5-rvv9-x895)
+  # was forced to 5.0.9 because the frozen lockfile resolved minimatch's ^5.0.5
+  # below the fixed version; minimatch now resolves to the latest 5.x (5.0.9),
+  # so the override became a no-op.
+  undici: "8.9.0"
   vite: "catalog:"
   vitest: "catalog:"
 

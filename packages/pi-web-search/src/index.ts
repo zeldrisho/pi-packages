@@ -22,7 +22,19 @@ export {
   type SearchTruncationDetails,
 } from "./search";
 
-const commonSearchParameters = Type.Object({
+export const webSearchParameters = Type.Object({
+  query: Type.String({
+    minLength: 1,
+    maxLength: SEARCH_WEB_MAX_QUERY_CHARACTERS,
+    description: `The search query (maximum ${SEARCH_WEB_MAX_QUERY_CHARACTERS} characters; context mode limited to ${SEARCH_CONTEXT_MAX_QUERY_CHARACTERS})`,
+  }),
+  mode: Type.Optional(
+    StringEnum(["web", "context"] as const, {
+      description:
+        "Search mode: compact Brave web results (default) or Brave LLM context extraction",
+      default: "web",
+    }),
+  ),
   count: Type.Optional(
     Type.Integer({
       minimum: SEARCH_MIN_RESULT_COUNT,
@@ -43,32 +55,6 @@ const commonSearchParameters = Type.Object({
     }),
   ),
 });
-
-export const webSearchParameters = Type.Intersect([
-  commonSearchParameters,
-  Type.Union([
-    Type.Object({
-      query: Type.String({
-        minLength: 1,
-        maxLength: SEARCH_CONTEXT_MAX_QUERY_CHARACTERS,
-        description: `The Brave LLM Context query (maximum ${SEARCH_CONTEXT_MAX_QUERY_CHARACTERS} characters)`,
-      }),
-      mode: Type.Literal("context", {
-        description: "Return provider-extracted Brave LLM context",
-      }),
-    }),
-    Type.Object({
-      query: Type.String({
-        minLength: 1,
-        maxLength: SEARCH_WEB_MAX_QUERY_CHARACTERS,
-        description: `The web search query (maximum ${SEARCH_WEB_MAX_QUERY_CHARACTERS} characters)`,
-      }),
-      mode: Type.Optional(
-        Type.Literal("web", { description: "Return compact Brave web results (default)" }),
-      ),
-    }),
-  ]),
-]);
 
 export default function (pi: ExtensionAPI) {
   const runtime = new SearchRuntime();

@@ -14,6 +14,13 @@ At the time of the 2026-08-03 audit:
 - package contracts, tarball inspection, and packaged-extension smoke tests pass; and
 - the dependency audit reports no known vulnerabilities.
 
+At the 2026-08-05 follow-up audit (PR #36):
+
+- `vp run validate` passes: 266 tests across 23 files pass;
+- line coverage is 94.77%, statements 91.35%, branches 82.94%, and functions 94.11%;
+- package contracts, tarball inspection, and packaged-extension smoke tests pass; and
+- GitHub advisory scanning surfaced six transitive advisories — five in `undici` (pinned at `8.5.0` by `@earendil-works/pi-coding-agent` even at its latest `0.83.0`) and one in `brace-expansion` (arriving via `minimatch`) — resolved in PR #36 with repo-level overrides (`undici 8.9.0`, `brace-expansion 5.0.9`); one moderate dev-only advisory remains (`postcss` via the Vite/Vitest toolchain, GHSA-fxqj-rqcc-2cmp).
+
 The repository is healthy. The work below is preventative and should normally consume 15–20% of maintenance capacity rather than block feature delivery.
 
 ## Prioritization
@@ -33,6 +40,10 @@ Priority is calculated as `(Impact + Risk) × (6 − Effort)`, with each input s
 |        9 | Clean release temporary directories                               | Code                      |      1 |    2 |      1 |    15 |
 |       10 | Detect drift in repeated package configuration                    | Configuration             |      2 |    2 |      3 |    12 |
 |       11 | Reassess synchronized web modules when they gain another consumer | Architecture              |      2 |    3 |      4 |    10 |
+|       12 | Manage the dependency-override lifecycle                          | Dependency/documentation  |      2 |    4 |      1 |    30 |
+|       13 | Gate CI on dependency audits                                      | Infrastructure/dependency |      3 |    3 |      2 |    24 |
+|       14 | Refresh the Pi catalog on a cadence                               | Dependency                |      2 |    3 |      3 |    15 |
+|       15 | Document schema-level limit enforcement                           | Documentation             |      1 |    2 |      1 |    15 |
 
 ## Phase 1: quick safety improvements
 
@@ -76,6 +87,38 @@ The same `awaitWithAbort` behavior currently appears in `packages/pi-web-fetch/s
 
 **Done when:** `ensure-github-release` leaves no `git-cliff-release-*` directory behind.
 
+### 12. Manage the dependency-override lifecycle
+
+The 2026-08-05 audit fixed six transitive advisories with repo-level overrides because upstream still ships vulnerable pins: `undici` is pinned at `8.5.0` by `@earendil-works/pi-coding-agent` (even at its latest `0.83.0`; GHSA-4cwx-7wf7-3272, GHSA-8xcm-r25x-g524, GHSA-v3r7-h72x-cjcm, GHSA-jr45-8vmc-qm54, GHSA-m8rv-5g2x-5cg5), and `brace-expansion` arrives via `minimatch` below the fixed `5.0.9` (GHSA-rgw5-rvv9-x895).
+
+Overrides are forks of upstream dependency decisions. Without a removal condition they persist silently, force versions across every future upstream bump, and can break installs if upstream moves to a semver-incompatible release, because pnpm overrides ignore upstream ranges.
+
+- [x] Annotate each override in `pnpm-workspace.yaml` with the advisory IDs and the removal condition (for example “drop when `pi-coding-agent` repins `undici` ≥ `8.9.0`”).
+- [x] File a tracking issue listing both overrides and link it from the override comment block.
+- [x] Re-check the removal conditions on every catalog or lockfile bump and drop the satisfied override in the same change.
+- [x] Extend `scripts/repository-contract-test.ts` (or a small script) to fail when an overridden package is no longer present in the dependency graph, signaling a removable override.
+
+**Done when:** every override states why it exists and when it can be removed, a tracking issue links them, and a check surfaces stale overrides.
+
+### 13. Gate CI on dependency audits
+
+GitHub advisory scanning surfaces alerts asynchronously as PR comments; the build itself never failed on the six open advisories. A local audit gate turns that into a deterministic failure. This does not reintroduce update automation — item 1's manual-review decision stands; this adds detection only.
+
+- [x] Add `pnpm audit --audit-level high` to `ci.yml` after `vp install`.
+- [x] Define a policy for dev-only advisories: the current `postcss ≤ 8.5.22` finding (GHSA-fxqj-rqcc-2cmp, via the Vite/Vitest toolchain) may be allowlisted only with justification and a tracking issue, or resolved by bumping the toolchain.
+- [x] Keep production-path advisories unallowlisted so the item-12 overrides remain the only escape hatch for transitive runtime dependencies.
+
+**Done when:** a new high-severity advisory fails the build, and the allowlist contains only documented dev-only entries.
+
+### 15. Document schema-level limit enforcement
+
+PR #36 flattened the web-search tool schema from an `Intersect`/`Union` to a provider-compatible object schema because the provider rejects `allOf`/`anyOf`. `mode: "context"` now accepts up to the web-mode query length (500) at the schema level; the tighter 400-character context limit is enforced at runtime and covered by `schema-rendering.test.ts`. The behavior change is easy to rediscover as a bug.
+
+- [x] Add one sentence to `packages/pi-web-search/README.md` stating that context-mode queries are validated at runtime, not in the tool schema, because the provider rejects union schemas.
+- [x] Note the runtime-enforcement test in the schema contract test so the coupling is discoverable.
+
+**Done when:** the README states where each query limit is enforced.
+
 ## Phase 2: strengthen critical boundaries
 
 Schedule this work after Phase 1, reserving maintenance capacity in each feature cycle.
@@ -117,6 +160,16 @@ Packages intentionally declare Pi-provided packages as `"*"` peer dependencies, 
 - [x] Treat TypeScript 7 as a dedicated migration with explicit compatibility validation.
 
 **Done when:** peer compatibility failures are discovered before users encounter them, without sacrificing deterministic validation against the lockfile.
+
+### 14. Refresh the Pi catalog on a cadence
+
+The catalog pins `@earendil-works/*` at `^0.80.10` (a 0.x caret range, so updates to `0.83.0` are manual). The `0.83.0` release still pins vulnerable `undici@8.5.0`, so this is not a security fix today — but staying behind keeps the item-12 overrides in place longer and delays surfacing upstream dependency fixes.
+
+- [x] Bump the catalog to the latest upstream release (currently `0.83.0`) in a small, separately reviewed change per item 7.
+- [x] On each bump, re-check the item-12 removal conditions and drop any satisfied override in the same change.
+- [x] Establish a cadence: at minimum once per release cycle, or a scheduled lane if the repository grows.
+
+**Done when:** the catalog tracks the latest upstream release with a defined cadence and each bump re-evaluates the overrides.
 
 ## Phase 3: ongoing maintainability
 

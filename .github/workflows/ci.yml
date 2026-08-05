@@ -29,4 +29,11 @@ jobs:
           cache: true
 
       - run: vp install
+      - name: Dependency audit
+        # Fails on new high-severity advisories. Production-path advisories are
+        # never allowlisted here; the documented overrides in pnpm-workspace.yaml
+        # are the only escape hatch for transitive runtime dependencies. Dev-only
+        # advisories are resolved by toolchain or lockfile updates, or allowlisted
+        # only with justification and a tracking issue (docs/development.md).
+        run: vp exec pnpm audit --audit-level high
       - run: vp run validate

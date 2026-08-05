@@ -13,28 +13,53 @@ vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
 });
 
 describe("web_search schema rendering", () => {
-  it("enforces mode-aware query limits in the public schema", () => {
+  it("exposes a provider-compatible object schema without allOf or anyOf", () => {
+    expect(webSearchParameters.type).toBe("object");
+    const schema = JSON.stringify(webSearchParameters);
+    expect(schema).not.toContain("allOf");
+    expect(schema).not.toContain("anyOf");
+    expect(Check(webSearchParameters, { query: "x" })).toBe(true);
+    expect(Check(webSearchParameters, { query: "x", mode: "web" })).toBe(true);
+    expect(Check(webSearchParameters, { query: "x", mode: "context" })).toBe(true);
+    expect(Check(webSearchParameters, { query: "x", mode: "other" })).toBe(false);
+  });
+
+  it("accepts up to the web query limit for either mode at the schema level", () => {
     expect(
       Check(webSearchParameters, {
-        query: "x".repeat(SEARCH_CONTEXT_MAX_QUERY_CHARACTERS),
+        query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS),
         mode: "context",
       }),
     ).toBe(true);
     expect(
       Check(webSearchParameters, {
-        query: "x".repeat(SEARCH_CONTEXT_MAX_QUERY_CHARACTERS + 1),
-        mode: "context",
-      }),
-    ).toBe(false);
-    expect(
-      Check(webSearchParameters, {
-        query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS - 50),
+        query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS),
         mode: "web",
       }),
     ).toBe(true);
     expect(
-      Check(webSearchParameters, { query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS - 50) }),
-    ).toBe(true);
+      Check(webSearchParameters, { query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS + 1) }),
+    ).toBe(false);
+  });
+
+  it("enforces the tighter context query limit at runtime", async () => {
+    // The schema accepts up to the web-mode length for context mode because the
+    // provider rejects union schemas; this test is the runtime enforcement
+    // point for the 400-character context limit (see limits.test.ts).
+    process.env.BRAVE_SEARCH_API_KEY = "test-secret";
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(
+      createSearchTool().execute(
+        "call",
+        { query: "x".repeat(SEARCH_CONTEXT_MAX_QUERY_CHARACTERS + 1), mode: "context" },
+        undefined,
+        undefined,
+      ),
+    ).rejects.toThrow(
+      `Search queries cannot exceed ${SEARCH_CONTEXT_MAX_QUERY_CHARACTERS} characters.`,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("fails clearly when the API key is missing", async () => {
