@@ -13,13 +13,13 @@ describe("web_search limit contracts", () => {
   it("keeps schema bounds and descriptions aligned with provider constants", () => {
     expect(
       Check(webSearchParameters, {
-        query: "x".repeat(SEARCH_CONTEXT_MAX_QUERY_CHARACTERS),
+        query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS),
         mode: "context",
       }),
     ).toBe(true);
     expect(
       Check(webSearchParameters, {
-        query: "x".repeat(SEARCH_CONTEXT_MAX_QUERY_CHARACTERS + 1),
+        query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS + 1),
         mode: "context",
       }),
     ).toBe(false);
