@@ -43,6 +43,9 @@ describe("web_search schema rendering", () => {
   });
 
   it("enforces the tighter context query limit at runtime", async () => {
+    // The schema accepts up to the web-mode length for context mode because the
+    // provider rejects union schemas; this test is the runtime enforcement
+    // point for the 400-character context limit (see limits.test.ts).
     process.env.BRAVE_SEARCH_API_KEY = "test-secret";
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);

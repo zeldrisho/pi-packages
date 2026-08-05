@@ -10,6 +10,10 @@ import {
 } from "../src/limits";
 
 describe("web_search limit contracts", () => {
+  // Context-mode queries pass schema validation up to the web-mode length
+  // because the provider rejects union schemas; the tighter context limit is
+  // enforced at runtime in schema-rendering.test.ts ("enforces the tighter
+  // context query limit at runtime"). Keep that coupling discoverable.
   it("keeps schema bounds and descriptions aligned with provider constants", () => {
     expect(
       Check(webSearchParameters, {

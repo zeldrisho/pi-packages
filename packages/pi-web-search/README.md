@@ -27,7 +27,7 @@ If Pi is already running when you set the environment variable, run `/reload` in
 
 ## Usage
 
-The `web_search` tool returns compact web results by default, making it suitable for discovering current sources and URLs. Set `mode` to `context` to call only Brave's LLM Context API and return provider-extracted snippets. Context queries are limited to 400 characters; web-mode queries are limited to 500 characters.
+The `web_search` tool returns compact web results by default, making it suitable for discovering current sources and URLs. Set `mode` to `context` to call only Brave's LLM Context API and return provider-extracted snippets. Context queries are limited to 400 characters; web-mode queries are limited to 500 characters. Because the provider rejects union schemas, the tool schema accepts up to the web-mode query length for either mode; the tighter context-mode limit is enforced at runtime when the request executes, not in the schema.
 
 Context snippets may not reflect the current live page. The tool does not fetch result URLs. When live-page inspection is needed, call `web_fetch` explicitly on the relevant URL.
 
