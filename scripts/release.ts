@@ -212,14 +212,28 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
     ];
   }
 
+  /** Reports whether HEAD is the merge of the generated release pull request. */
+  function isReleaseMergePush(): boolean {
+    const subject = runner.run("git", ["log", "-1", "--format=%s", "HEAD"]);
+    return (
+      /^Merge pull request #\d+ from zeldrisho\/git-cliff\/release$/.test(subject) ||
+      subject === "chore: release packages"
+    );
+  }
+
+  /** Reports whether the tracked changelog already documents the manifest version. */
+  async function changelogContainsVersion(pkg: PackageInfo): Promise<boolean> {
+    try {
+      const changelog = await readFile(pkg.changelogPath, "utf8");
+      return new RegExp(`^##\\s*\\[?${escapeRegExp(pkg.version)}`, "m").test(changelog);
+    } catch {
+      return false;
+    }
+  }
+
   function hasReleasableChanges(pkg: PackageInfo): boolean {
-    const logOutput = runner.run("git", [
-      "log",
-      `${pkg.tag}..HEAD`,
-      "--format=%s%x1f%b%x1e",
-      "--",
-      pkg.path,
-    ]);
+    const range = tagExists(pkg.tag) ? `${pkg.tag}..HEAD` : "HEAD";
+    const logOutput = runner.run("git", ["log", range, "--format=%s%x1f%b%x1e", "--", pkg.path]);
     return logOutput
       .split("\x1e")
       .filter(Boolean)
@@ -276,12 +290,19 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
 
   async function status(): Promise<void> {
     const pending = [];
+    const releaseMerge = isReleaseMergePush();
     for (const pkg of await packageCatalog()) {
       assertCurrentVersionIsLatest(pkg);
       const tagged = tagExists(pkg.tag);
       const published = isPublished(pkg);
       const released = tagged && githubReleaseExists(pkg.tag);
-      if (!tagged || !published || !released) {
+      // Tagged packages that miss a GitHub release or npm version are always retried.
+      // Untagged manifest versions are released only when this push merges the generated
+      // release pull request, or when their changelog entry already landed on main (the
+      // release pull request was merged but the release did not complete).
+      const pendingInitialRelease =
+        !tagged && (releaseMerge || (await changelogContainsVersion(pkg)));
+      if ((tagged && (!published || !released)) || pendingInitialRelease) {
         pending.push({
           package: pkg.path,
           name: pkg.name,
@@ -297,44 +318,53 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
   async function prepare(): Promise<void> {
     const packages = await packageCatalog();
     packages.forEach(assertCurrentVersionIsLatest);
-    const untagged = packages.filter((pkg) => !tagExists(pkg.tag));
-    if (untagged.length > 0) {
-      throw new Error(
-        `Refusing to prepare another release while these manifest versions are untagged: ${untagged.map((pkg) => pkg.tag).join(", ")}`,
-      );
-    }
 
     const planned = [];
     for (const pkg of packages) {
-      if (!hasReleasableChanges(pkg)) continue;
-      const nextTag = runner.run("git-cliff", [
-        ...cliffArguments(pkg),
-        "--unreleased",
-        "--bumped-version",
-      ]);
-      if (nextTag === pkg.tag) continue;
+      if (tagExists(pkg.tag)) {
+        if (!hasReleasableChanges(pkg)) continue;
+        const nextTag = runner.run("git-cliff", [
+          ...cliffArguments(pkg),
+          "--unreleased",
+          "--bumped-version",
+        ]);
+        if (nextTag === pkg.tag) continue;
 
-      const prefix = `${pkg.directory}-v`;
-      if (!nextTag.startsWith(prefix)) {
-        throw new Error(`git-cliff returned an unexpected tag for ${pkg.name}: ${nextTag}`);
-      }
-      const version = nextTag.slice(prefix.length);
-      if (!/^\d+\.\d+\.\d+$/.test(version)) {
-        throw new Error(`git-cliff returned an invalid version for ${pkg.name}: ${version}`);
-      }
+        const prefix = `${pkg.directory}-v`;
+        if (!nextTag.startsWith(prefix)) {
+          throw new Error(`git-cliff returned an unexpected tag for ${pkg.name}: ${nextTag}`);
+        }
+        const version = nextTag.slice(prefix.length);
+        if (!/^\d+\.\d+\.\d+$/.test(version)) {
+          throw new Error(`git-cliff returned an invalid version for ${pkg.name}: ${version}`);
+        }
 
-      const manifest = JSON.parse(await readFile(pkg.manifestPath, "utf8")) as PackageManifest;
-      manifest.version = version;
-      runner.run("git-cliff", [
-        ...cliffArguments(pkg),
-        "--unreleased",
-        "--tag",
-        nextTag,
-        "--prepend",
-        pkg.changelogPath,
-      ]);
-      await writeFile(pkg.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-      planned.push({ ...pkg, version, tag: nextTag });
+        const manifest = JSON.parse(await readFile(pkg.manifestPath, "utf8")) as PackageManifest;
+        manifest.version = version;
+        runner.run("git-cliff", [
+          ...cliffArguments(pkg),
+          "--unreleased",
+          "--tag",
+          nextTag,
+          "--prepend",
+          pkg.changelogPath,
+        ]);
+        await writeFile(pkg.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+        planned.push({ ...pkg, version, tag: nextTag });
+      } else if (!(await changelogContainsVersion(pkg))) {
+        // The untagged manifest version is the pending initial release (for example a newly
+        // bootstrapped package). Add its changelog entry to the generated release pull request
+        // without touching the version; the release itself happens when that pull request merges.
+        runner.run("git-cliff", [
+          ...cliffArguments(pkg),
+          "--unreleased",
+          "--tag",
+          pkg.tag,
+          "--prepend",
+          pkg.changelogPath,
+        ]);
+        planned.push({ ...pkg, version: pkg.version, tag: pkg.tag });
+      }
     }
 
     const bodyPath = env.RELEASE_PR_BODY;

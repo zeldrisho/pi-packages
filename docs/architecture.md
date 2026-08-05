@@ -92,5 +92,8 @@ flowchart LR
 `scripts/release.ts` validates package paths, manifest versions, and component tags before planning or
 publishing. Component tags sort by semantic version and use `<directory>-v<version>`. Release status
 checks tags, GitHub releases, and npm versions independently, making retries safe after partial
-publication. Temporary git-cliff notes are always cleaned after GitHub release creation succeeds or
-fails. Details, approvals, and escalation conditions remain in [releases.md](releases.md).
+publication. The release matrix admits untagged manifest versions only when the push merges the
+generated release pull request or when their changelog entry already landed on `main`; regular feature
+merges only update that pull request. Temporary git-cliff notes are always cleaned after GitHub
+release creation succeeds or fails. Details, approvals, and escalation conditions remain in
+[releases.md](releases.md).
