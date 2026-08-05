@@ -8,6 +8,8 @@ const packageDirectories = (await readdir(packagesDirectory, { withFileTypes: tr
   .map((entry) => entry.name)
   .sort();
 const readme = await readFile(join(root, "README.md"), "utf8");
+const workspace = await readFile(join(root, "pnpm-workspace.yaml"), "utf8");
+const lockfile = await readFile(join(root, "pnpm-lock.yaml"), "utf8");
 const expectedFiles = ["src", "README.md", "CHANGELOG.md", "LICENSE"];
 const expectedScripts = {
   check: "vp check",
@@ -27,6 +29,29 @@ const synchronizedInfrastructurePairs = [
   ["packages/pi-web-fetch/src/inflight.ts", "packages/pi-web-search/src/inflight.ts"],
   ["packages/pi-web-fetch/src/render.ts", "packages/pi-web-search/src/render.ts"],
 ];
+
+/**
+ * Parses the flat version-pinned entries from the workspace overrides section.
+ *
+ * Only the top-level two-space-indented `name: value` entries of the overrides
+ * block are read; comments and blank lines are skipped. The section ends at the
+ * next top-level key. Catalog aliases (`vite` and `vitest`) are returned as
+ * `catalog:` values so callers can skip them.
+ */
+function parseOverrides(yaml: string): Map<string, string> {
+  const overrides = new Map<string, string>();
+  let inOverrides = false;
+  for (const line of yaml.split(/\r?\n/)) {
+    if (!inOverrides) {
+      if (/^overrides:\s*$/.test(line)) inOverrides = true;
+      continue;
+    }
+    if (/^\S/.test(line)) break;
+    const match = line.match(/^ {2}([A-Za-z0-9@._/-]+):\s*(?:"([^"]*)"|(\S+))?/);
+    if (match) overrides.set(match[1], match[2] ?? match[3] ?? "");
+  }
+  return overrides;
+}
 
 function sameValues(actual: string[], expected: string[]) {
   const compare = (left: string, right: string) => left.localeCompare(right);
@@ -53,6 +78,25 @@ for (const [left, right] of synchronizedInfrastructurePairs) {
   ]);
   if (!leftContents.equals(rightContents)) {
     fail(`${left} and ${right} must remain byte-for-byte identical; update both intentionally`);
+  }
+}
+
+for (const [name, version] of parseOverrides(workspace)) {
+  if (version === "catalog:") continue;
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const resolved = lockfile.match(new RegExp(`${escapedName}@[^\\s:]+`, "g")) ?? [];
+  if (resolved.length === 0) {
+    fail(
+      `${name} is overridden to ${version} but is absent from the lockfile; the override is removable`,
+    );
+  }
+  for (const occurrence of resolved) {
+    const resolvedVersion = occurrence.slice(name.length + 1);
+    if (resolvedVersion !== version) {
+      fail(
+        `${name} is overridden to ${version} but the lockfile resolves ${resolvedVersion}; update the lockfile or remove the override`,
+      );
+    }
   }
 }
 

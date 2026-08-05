@@ -54,6 +54,19 @@ Actions use reviewed semantic major tags, and run `vp run validate`. Review Pi e
 together when they share an API release train. Keep Typebox, Vite+, TypeScript, and major toolchain
 updates separate; never combine a TypeScript major migration with routine dependency updates.
 
+Refresh the `@earendil-works/*` catalog at least once per release cycle so the workspace tracks the
+latest upstream Pi release. On every catalog or lockfile bump, re-check the override removal
+conditions annotated in `pnpm-workspace.yaml` (tracked in issue
+[#37](https://github.com/zeldrisho/pi-packages/issues/37)) and drop any satisfied override in the same
+change; `scripts/repository-contract-test.ts` fails when an overridden package disappears from the
+dependency graph.
+
+CI runs `pnpm audit --audit-level high` on every pull request (`.github/workflows/ci.yml`).
+Production-path advisories are never allowlisted; the documented overrides in `pnpm-workspace.yaml`
+remain the only escape hatch for transitive runtime dependencies. Dev-only advisories are resolved by
+updating the toolchain or lockfile; if one cannot be resolved, it may be allowlisted in the audit
+command only with justification and a tracking issue.
+
 The scheduled Pi compatibility workflow remains independent of update automation. It smoke-tests packed
 extensions against both the locked workspace Pi resolution and the latest Pi APIs, while retaining the
 locked Typebox version, so wildcard Pi peer incompatibilities are detected before a catalog update.
