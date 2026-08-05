@@ -48,10 +48,10 @@ Publishing the bootstrap version is irreversible. Stop if any name, version, acc
 
 1. Confirm the package and expected version with the repository owner.
 2. Prepare one coherent change and pull request, then run the checks in [`development.md`](development.md).
-3. The repository owner reviews and rebase-merges the change pull request.
+3. The repository owner reviews and merges the change pull request.
 4. Confirm that `git-cliff/release` proposes exactly the expected packages and versions. Do not edit the generated branch manually.
 5. Approve the bot-triggered CI run and verify that the required `check` passes for the release pull request's exact head commit.
-6. The repository owner reviews and rebase-merges the release pull request.
+6. The repository owner reviews and merges the release pull request.
 7. Approve the protected `publish` deployment only after confirming every package and version in its matrix.
 8. Confirm CI, component tags, GitHub releases, OIDC publication, provenance, npm metadata, and tarball contents.
 
