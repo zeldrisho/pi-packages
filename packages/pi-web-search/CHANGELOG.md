@@ -1,4 +1,16 @@
 # Changelog
+## [0.4.2](https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.4.1...pi-web-search-v0.4.2) (2026-08-05)
+
+
+### Bug fixes
+
+- **web-search:** Emit provider-compatible object schema for tool parameters ([fe81916](https://github.com/zeldrisho/pi-packages/commit/fe819161e9cf61be09a0d68be713b63cb318155e))
+
+
+### Documentation
+
+- **web-search:** Document runtime enforcement of the context query limit ([347b386](https://github.com/zeldrisho/pi-packages/commit/347b386c62f33d489b6be207aff2a96f491eced0))
+
 ## [0.4.1](https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.4.0...pi-web-search-v0.4.1) (2026-08-03)
 
 

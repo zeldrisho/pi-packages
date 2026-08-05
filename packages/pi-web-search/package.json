@@ -1,6 +1,6 @@
 {
   "name": "@zeldrisho/pi-web-search",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Pi extension for bounded Brave web search and LLM context retrieval",
   "keywords": [
     "brave-search",
