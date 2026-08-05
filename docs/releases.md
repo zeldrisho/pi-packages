@@ -4,9 +4,12 @@ This guide describes the release process for maintainers and contributors.
 
 Packages are versioned independently. On each push to `main`, git-cliff evaluates conventional commits that touched each package since its latest component tag. The release workflow updates one generated pull request with the required package versions and changelogs. Merging that pull request creates the component tags and GitHub releases, then publishes only missing package versions to npm.
 
+The release job runs only when the push merges the generated release pull request, or when a release whose changelog entry already landed on `main` is still missing its tag, GitHub release, or npm version (a retry after a partial release). Regular feature merges never create tags, GitHub releases, or npm versions by themselves; they only update the generated release pull request. An untagged manifest version is the _pending initial release_ (for example a newly bootstrapped package): the workflow adds its changelog entry to the generated release pull request, and the release happens only when that pull request merges.
+
 ## Release invariants
 
 - The git-cliff workflow manages existing package versions and changelogs. Keep package manifests, component tags, GitHub releases, npm versions, and changelogs synchronized.
+- The generated release pull request is the only path to tags, GitHub releases, and npm publication. Do not merge feature branches that already carry a bumped `package.json` version; let `prepare` propose the version and changelog.
 - Do not hand-edit the `git-cliff/release` branch or its generated artifacts to bypass checks. Fix the source change or release configuration instead.
 - Only the repository owner merges pull requests. Publication, tags, GitHub releases, and protected-environment deployment require explicit approval for the specific package and expected version.
 - Rebase work branches onto their target; never merge the target branch into them.
@@ -16,7 +19,7 @@ Packages are versioned independently. On each push to `main`, git-cliff evaluate
 
 Release behavior is defined by:
 
-- [`cliff.toml`](../cliff.toml), configured using [git-cliff](https://git-cliff.org), which parses conventional commits, calculates semantic versions, and renders changelogs;
+- [`cliff.toml`](../cliff.toml), configured using [git-cliff](https://git-cliff.org/docs/), which parses conventional commits, calculates semantic versions, and renders changelogs;
 - [`scripts/release.ts`](../scripts/release.ts), which discovers packages, prepares release files, checks npm and GitHub state, and creates GitHub releases; and
 - [`.github/workflows/release.yml`](../.github/workflows/release.yml), which validates, opens the generated release pull request, and publishes through npm trusted publishing.
 
@@ -40,7 +43,7 @@ npm trusted publishing cannot publish a package's first registry version. This i
 4. Configure the package's npm trusted publisher for repository `zeldrisho/pi-packages`, workflow `release.yml`, environment `publish`, and the `npm publish` action.
 5. Verify `0.0.0` and the `bootstrap` dist-tag on npm.
 
-After the package change is merged, the workflow treats the untagged tracked version as its initial release. Approving the protected `publish` deployment creates `0.1.0` and moves npm's `latest` tag to it.
+After the package change is merged, the workflow adds the untagged `0.1.0` entry to the generated release pull request as the initial release. Merging that pull request creates the `<package>-v0.1.0` component tag, its GitHub release, the npm `0.1.0` publication, and moves npm's `latest` tag to it.
 
 Publishing the bootstrap version is irreversible. Stop if any name, version, access level, tarball content, or publisher setting is unexpected.
 

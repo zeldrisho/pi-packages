@@ -223,6 +223,50 @@ describe("release planning", () => {
     expect(messages).toEqual(["No releasable package changes found."]);
   });
 
+  it("prepares a changelog-only initial release for an untagged package", async () => {
+    const root = await createRepository();
+    const bodyPath = join(root, "release-body.md");
+    const state = services();
+    const messages: string[] = [];
+    const automation = createReleaseAutomation({
+      root,
+      runner: runnerFor(root, state),
+      env: { RELEASE_PR_BODY: bodyPath },
+      log: (message) => messages.push(message),
+    });
+
+    await automation.prepare();
+
+    expect(
+      JSON.parse(await readFile(join(root, "packages/alpha/package.json"), "utf8")),
+    ).toMatchObject({ version: "1.0.0" });
+    expect(await readFile(join(root, "packages/alpha/CHANGELOG.md"), "utf8")).toContain(
+      "## generated",
+    );
+    expect(await readFile(bodyPath, "utf8")).toContain("`@zeldrisho/alpha` → `1.0.0`");
+    expect(messages).toEqual(["Prepared 1 package release(s): alpha-v1.0.0"]);
+  });
+
+  it("skips an untagged package whose changelog already documents the version", async () => {
+    const root = await createRepository();
+    await writeFile(
+      join(root, "packages/alpha/CHANGELOG.md"),
+      "# Changelog\n\n## 1.0.0 (2026-08-05)\n",
+    );
+    const messages: string[] = [];
+    const state = services();
+    const automation = createReleaseAutomation({
+      root,
+      runner: runnerFor(root, state),
+      log: (message) => messages.push(message),
+    });
+
+    await automation.prepare();
+
+    expect(messages).toEqual(["No releasable package changes found."]);
+    expect(state.calls.some((call) => call.command === "git-cliff")).toBe(false);
+  });
+
   it("does not bump the manifest when changelog generation fails", async () => {
     const root = await createRepository();
     git(root, "tag", "alpha-v1.0.0");
@@ -239,12 +283,11 @@ describe("release planning", () => {
 
 describe("partial-release recovery and service errors", () => {
   it.each([
-    ["missing tag and npm version", false, false, false, true],
     ["missing GitHub release", true, true, false, false],
     ["fully released", true, true, true, undefined],
   ] as const)("reports %s", async (_label, tagged, published, released, publish) => {
     const root = await createRepository();
-    if (tagged) git(root, "tag", "alpha-v1.0.0");
+    git(root, "tag", "alpha-v1.0.0");
     const state = services({
       npm: published
         ? { status: 0, stdout: '"1.0.0"', stderr: "" }
@@ -272,7 +315,80 @@ describe("partial-release recovery and service errors", () => {
     const result = JSON.parse(output) as { include: Array<{ publish: boolean }> };
     if (publish === undefined) expect(result.include).toEqual([]);
     else expect(result.include).toEqual([expect.objectContaining({ publish })]);
-    if (!tagged) expect(state.calls.some((call) => call.command === "gh")).toBe(false);
+  });
+
+  it("plans the release of an untagged package only on a release-merge push", async () => {
+    const root = await createRepository();
+    git(
+      root,
+      "commit",
+      "--allow-empty",
+      "-m",
+      "Merge pull request #42 from zeldrisho/git-cliff/release",
+    );
+    const state = services();
+    let output = "";
+    const automation = createReleaseAutomation({
+      root,
+      runner: runnerFor(root, state),
+      env: { GITHUB_REPOSITORY: "owner/repository" },
+      stdout: (value) => {
+        output += value;
+      },
+    });
+
+    await automation.status();
+
+    const result = JSON.parse(output) as { include: Array<{ publish: boolean }> };
+    expect(result.include).toEqual([
+      expect.objectContaining({ tag: "alpha-v1.0.0", publish: true }),
+    ]);
+    expect(state.calls.some((call) => call.command === "gh")).toBe(false);
+  });
+
+  it("does not plan an untagged package on a regular feature push", async () => {
+    const root = await createRepository();
+    const state = services();
+    let output = "";
+    const automation = createReleaseAutomation({
+      root,
+      runner: runnerFor(root, state),
+      env: { GITHUB_REPOSITORY: "owner/repository" },
+      stdout: (value) => {
+        output += value;
+      },
+    });
+
+    await automation.status();
+
+    const result = JSON.parse(output) as { include: Array<{ publish: boolean }> };
+    expect(result.include).toEqual([]);
+    expect(state.calls.some((call) => call.command === "gh")).toBe(false);
+  });
+
+  it("retries an untagged package whose changelog entry already landed on main", async () => {
+    const root = await createRepository();
+    await writeFile(
+      join(root, "packages/alpha/CHANGELOG.md"),
+      "# Changelog\n\n## 1.0.0 (2026-08-05)\n",
+    );
+    const state = services();
+    let output = "";
+    const automation = createReleaseAutomation({
+      root,
+      runner: runnerFor(root, state),
+      env: { GITHUB_REPOSITORY: "owner/repository" },
+      stdout: (value) => {
+        output += value;
+      },
+    });
+
+    await automation.status();
+
+    const result = JSON.parse(output) as { include: Array<{ publish: boolean }> };
+    expect(result.include).toEqual([
+      expect.objectContaining({ tag: "alpha-v1.0.0", publish: true }),
+    ]);
   });
 
   it.each([

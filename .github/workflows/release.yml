@@ -55,7 +55,10 @@ jobs:
 
   release:
     needs: plan
-    # scripts/release.ts status must emit only valid JSON; inspect its matrix structurally.
+    # Only a push that merges the generated release pull request, or a retry of a
+    # release whose changelog entry already landed on main but which is not yet
+    # tagged, populates the matrix (scripts/release.ts status). Regular feature
+    # merges only update the release pull request via the prepare job.
     if: fromJSON(needs.plan.outputs.matrix).include[0] != null
     runs-on: ubuntu-latest
     timeout-minutes: 15
