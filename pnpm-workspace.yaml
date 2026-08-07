@@ -7,9 +7,9 @@ allowBuilds:
   protobufjs: false
 
 catalog:
-  "@earendil-works/pi-ai": "^0.83.0"
-  "@earendil-works/pi-coding-agent": "^0.83.0"
-  "@earendil-works/pi-tui": "^0.83.0"
+  "@earendil-works/pi-ai": "^0.84.0"
+  "@earendil-works/pi-coding-agent": "^0.84.0"
+  "@earendil-works/pi-tui": "^0.84.0"
   "@types/node": "^26.1.1"
   "@vitest/coverage-v8": "4.1.10"
   typebox: "^1.1.24"
@@ -18,6 +18,15 @@ catalog:
   vite-plus: "0.2.5"
   vitest: "4.1.10"
 
+minimumReleaseAgeExclude:
+  - "@earendil-works/pi-agent-core@0.84.0"
+  - "@earendil-works/pi-ai@0.84.0"
+  - "@earendil-works/pi-client@0.84.0"
+  - "@earendil-works/pi-coding-agent@0.84.0"
+  - "@earendil-works/pi-protocol@0.84.0"
+  - "@earendil-works/pi-telemetry@0.84.0"
+  - "@earendil-works/pi-tui@0.84.0"
+
 overrides:
   # Dependency-override lifecycle, tracked in issue #37
   # (https://github.com/zeldrisho/pi-packages/issues/37). Re-check the removal
@@ -25,16 +34,11 @@ overrides:
   # same change. scripts/repository-contract-test.ts fails when an overridden
   # package disappears from the dependency graph.
   #
-  # undici: upstream @earendil-works/pi-coding-agent still pins undici@8.5.0 even
-  # at 0.83.0 (GHSA-4cwx-7wf7-3272, GHSA-8xcm-r25x-g524, GHSA-v3r7-h72x-cjcm,
-  # GHSA-jr45-8vmc-qm54, GHSA-m8rv-5g2x-5cg5).
-  # Removal condition: drop when pi-coding-agent repins undici >= 8.9.0.
-  #
-  # Dropped with the 0.83.0 catalog bump: brace-expansion (GHSA-rgw5-rvv9-x895)
-  # was forced to 5.0.9 because the frozen lockfile resolved minimatch's ^5.0.5
-  # below the fixed version; minimatch now resolves to the latest 5.x (5.0.9),
-  # so the override became a no-op.
-  undici: "8.9.0"
+  # Dropped with the 0.84.0 catalog bump: undici (GHSA-4cwx-7wf7-3272,
+  # GHSA-8xcm-r25x-g524, GHSA-v3r7-h72x-cjcm, GHSA-jr45-8vmc-qm54,
+  # GHSA-m8rv-5g2x-5cg5) was forced to 8.9.0 because pi-coding-agent pinned
+  # undici@8.5.0; pi-coding-agent@0.84.0 repins undici@8.9.0, so the override
+  # became a no-op. brace-expansion was dropped earlier with the 0.83.0 bump.
   vite: "catalog:"
   vitest: "catalog:"
 
