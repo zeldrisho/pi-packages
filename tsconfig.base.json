@@ -9,6 +9,9 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    // TypeScript 6/7 default `types` to [] instead of auto-including every
+    // @types package; Node globals (process, Buffer, ...) must be explicit.
+    "types": ["node"]
   }
 }
