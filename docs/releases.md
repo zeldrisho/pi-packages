@@ -25,7 +25,7 @@ Release behavior is defined by:
 
 The automation requires the repository `GITHUB_TOKEN`, a protected `publish` GitHub environment, and one npm trusted publisher per package for repository `zeldrisho/pi-packages`, workflow `release.yml`, environment `publish`, with the `npm publish` action allowed.
 
-The workflow fetches complete tag history, serializes release runs, references reviewed semantic action versions so Dependabot can report security updates, and grants `id-token: write` only to the publishing job. The workflow validates the generated tree before updating `semantic-release/release`. GitHub places CI runs triggered by its `GITHUB_TOKEN` pull request in an approval-required state, so a maintainer must approve that exact-head run before merging.
+The workflow fetches complete tag history, serializes release runs, references reviewed semantic action versions so Dependabot can report security updates, and grants `id-token: write` only to the publishing job. The workflow validates the generated tree before updating `semantic-release/release`. Pull requests created with `GITHUB_TOKEN` do not emit `pull_request` workflow events, so the release workflow explicitly dispatches CI for the generated branch after each update.
 
 ## Version calculation
 
@@ -53,7 +53,7 @@ Publishing the bootstrap version is irreversible. Stop if any name, version, acc
 2. Prepare one coherent change and pull request, then run the checks in [`development.md`](development.md).
 3. The repository owner reviews and merges the change pull request.
 4. Confirm that `semantic-release/release` proposes exactly the expected packages and versions. Do not edit the generated branch manually.
-5. Approve the bot-triggered CI run and verify that the required `check` passes for the release pull request's exact head commit.
+5. Verify that the explicitly dispatched required `check` passes for the release pull request's exact head commit.
 6. The repository owner reviews and merges the release pull request.
 7. Approve the protected `publish` deployment only after confirming every package and version in its matrix.
 8. Confirm CI, component tags, GitHub releases, OIDC publication, provenance, npm metadata, and tarball contents.

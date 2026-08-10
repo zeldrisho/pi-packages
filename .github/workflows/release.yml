@@ -99,6 +99,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
+      actions: write
       contents: write
       pull-requests: write
     steps:
@@ -161,3 +162,7 @@ jobs:
               --title 'chore: release packages' \
               --body-file "$RELEASE_PR_BODY"
           fi
+
+          # Pull requests created with GITHUB_TOKEN do not emit pull_request
+          # workflow events, so explicitly dispatch the required head check.
+          gh workflow run ci.yml --ref "$branch"
