@@ -1,5 +1,4 @@
 import { execFileSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,6 +9,7 @@ import {
   type CommandAttempt,
   type CommandRunner,
   type ReleaseAutomation,
+  type ReleasePlanner,
 } from "./release";
 
 const temporaryDirectories: string[] = [];
@@ -27,7 +27,6 @@ async function createRepository(version = "1.0.0"): Promise<string> {
     `${JSON.stringify({ name: "@zeldrisho/alpha", version }, null, 2)}\n`,
   );
   await writeFile(join(root, "packages", "alpha", "CHANGELOG.md"), "# Changelog\n");
-  await writeFile(join(root, "cliff.toml"), "");
   git(root, "init", "--quiet");
   git(root, "config", "user.email", "release-test@example.test");
   git(root, "config", "user.name", "Release Test");
@@ -50,7 +49,8 @@ interface FakeServices {
   github?: CommandAttempt;
   nextTag?: string;
   failCreate?: boolean;
-  failPrepend?: boolean;
+  failPlan?: boolean;
+  plannerCalls: number;
   calls: Array<{ command: string; args: string[] }>;
 }
 
@@ -59,16 +59,6 @@ function runnerFor(root: string, services: FakeServices): CommandRunner {
     run(command, args) {
       services.calls.push({ command, args });
       if (command === "git") return git(root, ...args);
-      if (command === "git-cliff") {
-        if (args.includes("--bumped-version")) return services.nextTag ?? "alpha-v1.0.1";
-        const prependIndex = args.indexOf("--prepend");
-        if (prependIndex >= 0) {
-          if (services.failPrepend) throw new Error("Changelog generation failed");
-          writeFileSync(args[prependIndex + 1], "# Changelog\n\n## generated\n");
-          return "";
-        }
-        return "Generated release notes";
-      }
       if (command === "gh") {
         if (services.failCreate) throw new Error("GitHub create failed");
         return "";
@@ -102,7 +92,21 @@ function runnerFor(root: string, services: FakeServices): CommandRunner {
 }
 
 function services(overrides: Partial<FakeServices> = {}): FakeServices {
-  return { calls: [], ...overrides };
+  return { calls: [], plannerCalls: 0, ...overrides };
+}
+
+function plannerFor(state: FakeServices): ReleasePlanner {
+  return {
+    async plan(_pkg, requestedVersion) {
+      state.plannerCalls += 1;
+      if (state.failPlan) throw new Error("Changelog generation failed");
+      const tag = requestedVersion
+        ? `alpha-v${requestedVersion}`
+        : (state.nextTag ?? "alpha-v1.0.1");
+      const version = tag.slice("alpha-v".length);
+      return { version, tag, notes: "## generated\n\nGenerated release notes" };
+    },
+  };
 }
 
 afterEach(async () => {
@@ -176,6 +180,7 @@ describe("release planning", () => {
     const automation = createReleaseAutomation({
       root,
       runner: runnerFor(root, state),
+      planner: plannerFor(state),
       env: { RELEASE_PR_BODY: bodyPath },
       log: (message) => messages.push(message),
     });
@@ -194,14 +199,54 @@ describe("release planning", () => {
     expect(messages).toEqual(["Prepared 1 package release(s): alpha-v1.0.1"]);
   });
 
+  it("runs semantic-release against package-local component tags", async () => {
+    const root = await createRepository();
+    git(root, "branch", "-M", "main");
+    git(root, "tag", "alpha-v1.0.0");
+    await commit(root, "fix(alpha): repair behavior");
+    await writeFile(join(root, "unrelated.txt"), "unrelated feature\n");
+    git(root, "add", "unrelated.txt");
+    git(root, "commit", "--quiet", "-m", "feat: unrelated behavior");
+    const remote = await mkdtemp(join(tmpdir(), "release-remote-test-"));
+    temporaryDirectories.push(remote);
+    git(remote, "init", "--bare", "--quiet");
+    git(root, "remote", "add", "origin", remote);
+    git(root, "push", "--quiet", "--set-upstream", "origin", "main", "--tags");
+    git(remote, "symbolic-ref", "HEAD", "refs/heads/main");
+    await mkdir(join(root, "scripts"));
+    await writeFile(
+      join(root, "scripts/semantic-release-plugin.ts"),
+      await readFile(join(process.cwd(), "scripts/semantic-release-plugin.ts"), "utf8"),
+    );
+    const messages: string[] = [];
+    const automation = createReleaseAutomation({
+      root,
+      log: (message) => messages.push(message),
+    });
+
+    await automation.prepare();
+
+    expect(
+      JSON.parse(await readFile(join(root, "packages/alpha/package.json"), "utf8")),
+    ).toMatchObject({ version: "1.0.1" });
+    expect(await readFile(join(root, "packages/alpha/CHANGELOG.md"), "utf8")).toContain(
+      "### Bug fixes",
+    );
+    expect(messages).toEqual(["Prepared 1 package release(s): alpha-v1.0.1"]);
+  });
+
   it.each(["wrong-v1.0.1", "alpha-vnot-semver"])(
-    "rejects malformed git-cliff version output %s",
+    "rejects malformed semantic-release version output %s",
     async (nextTag) => {
       const root = await createRepository();
       git(root, "tag", "alpha-v1.0.0");
       await commit(root, "feat: add behavior");
       const state = services({ nextTag });
-      const automation = createReleaseAutomation({ root, runner: runnerFor(root, state) });
+      const automation = createReleaseAutomation({
+        root,
+        runner: runnerFor(root, state),
+        planner: plannerFor(state),
+      });
 
       await expect(automation.prepare()).rejects.toThrow(/unexpected tag|invalid version/);
     },
@@ -231,6 +276,7 @@ describe("release planning", () => {
     const automation = createReleaseAutomation({
       root,
       runner: runnerFor(root, state),
+      planner: plannerFor(state),
       env: { RELEASE_PR_BODY: bodyPath },
       log: (message) => messages.push(message),
     });
@@ -264,15 +310,19 @@ describe("release planning", () => {
     await automation.prepare();
 
     expect(messages).toEqual(["No releasable package changes found."]);
-    expect(state.calls.some((call) => call.command === "git-cliff")).toBe(false);
+    expect(state.plannerCalls).toBe(0);
   });
 
   it("does not bump the manifest when changelog generation fails", async () => {
     const root = await createRepository();
     git(root, "tag", "alpha-v1.0.0");
     await commit(root, "fix: repair alpha");
-    const state = services({ failPrepend: true });
-    const automation = createReleaseAutomation({ root, runner: runnerFor(root, state) });
+    const state = services({ failPlan: true });
+    const automation = createReleaseAutomation({
+      root,
+      runner: runnerFor(root, state),
+      planner: plannerFor(state),
+    });
 
     await expect(automation.prepare()).rejects.toThrow("Changelog generation failed");
     expect(
@@ -324,7 +374,7 @@ describe("partial-release recovery and service errors", () => {
       "commit",
       "--allow-empty",
       "-m",
-      "Merge pull request #42 from zeldrisho/git-cliff/release",
+      "Merge pull request #42 from zeldrisho/semantic-release/release",
     );
     const state = services();
     let output = "";
@@ -436,6 +486,10 @@ describe("GitHub release creation", () => {
 
   it("resolves HEAD before creating an untagged release", async () => {
     const root = await createRepository();
+    await writeFile(
+      join(root, "packages/alpha/CHANGELOG.md"),
+      "# Changelog\n\n## 1.0.0 (2026-08-05)\n\nInitial release.\n",
+    );
     const state = services();
     const automation = createReleaseAutomation({
       root,
@@ -450,9 +504,7 @@ describe("GitHub release creation", () => {
       (call) => call.command === "gh" && call.args[0] === "release",
     );
     expect(createCall?.args).toContain(head);
-    expect(
-      state.calls.find((call) => call.command === "git-cliff" && call.args.includes(head)),
-    ).toBeDefined();
+    expect(createCall?.args).toContain("--notes-file");
   });
 
   it.each([
@@ -460,6 +512,10 @@ describe("GitHub release creation", () => {
     ["failed", true],
   ] as const)("cleans temporary notes after a %s GitHub release", async (_label, failCreate) => {
     const root = await createRepository();
+    await writeFile(
+      join(root, "packages/alpha/CHANGELOG.md"),
+      "# Changelog\n\n## 1.0.0 (2026-08-05)\n\nInitial release.\n",
+    );
     const tempRoot = await mkdtemp(join(tmpdir(), "release-notes-parent-"));
     temporaryDirectories.push(tempRoot);
     const state = services({ failCreate });

@@ -9,6 +9,8 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import semanticRelease from "semantic-release";
+import { semanticReleaseOptions } from "../release.config";
 
 const defaultRoot = resolve(import.meta.dirname, "..");
 const tagVersionPattern = "[0-9]+\\.[0-9]+\\.[0-9]+";
@@ -51,9 +53,20 @@ export interface CommandRunner {
   ): CommandAttempt;
 }
 
+export interface ReleasePlan {
+  version: string;
+  tag: string;
+  notes: string;
+}
+
+export interface ReleasePlanner {
+  plan(pkg: PackageInfo, requestedVersion?: string): Promise<ReleasePlan | undefined>;
+}
+
 export interface ReleaseAutomationOptions {
   root?: string;
   runner?: CommandRunner;
+  planner?: ReleasePlanner;
   env?: NodeJS.ProcessEnv;
   stdout?: (value: string) => void;
   log?: (value: string) => void;
@@ -103,6 +116,28 @@ function defaultRunner(root: string): CommandRunner {
   };
 }
 
+function defaultReleasePlanner(root: string, env: NodeJS.ProcessEnv): ReleasePlanner {
+  return {
+    async plan(pkg, requestedVersion) {
+      const result = await semanticRelease(semanticReleaseOptions(pkg.directory, pkg.path), {
+        cwd: root,
+        env,
+      });
+      if (!result) return undefined;
+
+      let { version, gitTag: tag } = result.nextRelease;
+      let notes = result.nextRelease.notes ?? "";
+      if (requestedVersion) {
+        const requestedTag = `${pkg.directory}-v${requestedVersion}`;
+        notes = notes.replaceAll(tag, requestedTag).replaceAll(version, requestedVersion);
+        version = requestedVersion;
+        tag = requestedTag;
+      }
+      return { version, tag, notes };
+    },
+  };
+}
+
 /** Escapes a literal value before interpolation into a regular expression. */
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -135,6 +170,7 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
   const packagesRoot = join(root, "packages");
   const runner = options.runner ?? defaultRunner(root);
   const env = options.env ?? process.env;
+  const planner = options.planner ?? defaultReleasePlanner(root, env);
   const stdout = options.stdout ?? ((value: string) => process.stdout.write(value));
   const log = options.log ?? console.log;
 
@@ -200,23 +236,11 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
     }
   }
 
-  function cliffArguments(pkg: PackageInfo): string[] {
-    return [
-      "--no-exec",
-      "--config",
-      "cliff.toml",
-      "--tag-pattern",
-      `^${escapeRegExp(pkg.directory)}-v${tagVersionPattern}$`,
-      "--include-path",
-      `${pkg.path}/**`,
-    ];
-  }
-
   /** Reports whether HEAD is the merge of the generated release pull request. */
   function isReleaseMergePush(): boolean {
     const subject = runner.run("git", ["log", "-1", "--format=%s", "HEAD"]);
     return (
-      /^Merge pull request #\d+ from zeldrisho\/git-cliff\/release$/.test(subject) ||
+      /^Merge pull request #\d+ from zeldrisho\/semantic-release\/release$/.test(subject) ||
       subject === "chore: release packages"
     );
   }
@@ -321,50 +345,41 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
 
     const planned = [];
     for (const pkg of packages) {
-      if (tagExists(pkg.tag)) {
-        if (!hasReleasableChanges(pkg)) continue;
-        const nextTag = runner.run("git-cliff", [
-          ...cliffArguments(pkg),
-          "--unreleased",
-          "--bumped-version",
-        ]);
-        if (nextTag === pkg.tag) continue;
+      const tagged = tagExists(pkg.tag);
+      if (tagged && !hasReleasableChanges(pkg)) continue;
+      if (!tagged && (await changelogContainsVersion(pkg))) continue;
 
-        const prefix = `${pkg.directory}-v`;
-        if (!nextTag.startsWith(prefix)) {
-          throw new Error(`git-cliff returned an unexpected tag for ${pkg.name}: ${nextTag}`);
-        }
-        const version = nextTag.slice(prefix.length);
-        if (!/^\d+\.\d+\.\d+$/.test(version)) {
-          throw new Error(`git-cliff returned an invalid version for ${pkg.name}: ${version}`);
-        }
-
-        const manifest = JSON.parse(await readFile(pkg.manifestPath, "utf8")) as PackageManifest;
-        manifest.version = version;
-        runner.run("git-cliff", [
-          ...cliffArguments(pkg),
-          "--unreleased",
-          "--tag",
-          nextTag,
-          "--prepend",
-          pkg.changelogPath,
-        ]);
-        await writeFile(pkg.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-        planned.push({ ...pkg, version, tag: nextTag });
-      } else if (!(await changelogContainsVersion(pkg))) {
-        // The untagged manifest version is the pending initial release (for example a newly
-        // bootstrapped package). Add its changelog entry to the generated release pull request
-        // without touching the version; the release itself happens when that pull request merges.
-        runner.run("git-cliff", [
-          ...cliffArguments(pkg),
-          "--unreleased",
-          "--tag",
-          pkg.tag,
-          "--prepend",
-          pkg.changelogPath,
-        ]);
-        planned.push({ ...pkg, version: pkg.version, tag: pkg.tag });
+      // Keep initial manifest versions (for example 0.1.0) while still using semantic-release
+      // to analyze package-local commits and generate notes. Later releases use its calculated
+      // version directly.
+      const plan = await planner.plan(pkg, tagged ? undefined : pkg.version);
+      if (!plan) continue;
+      const prefix = `${pkg.directory}-v`;
+      if (!plan.tag.startsWith(prefix)) {
+        throw new Error(`semantic-release returned an unexpected tag for ${pkg.name}: ${plan.tag}`);
       }
+      if (!/^\d+\.\d+\.\d+$/.test(plan.version) || plan.tag !== `${prefix}${plan.version}`) {
+        throw new Error(
+          `semantic-release returned an invalid version for ${pkg.name}: ${plan.version}`,
+        );
+      }
+
+      const changelog = await readFile(pkg.changelogPath, "utf8");
+      const changelogHeader = "# Changelog";
+      if (!changelog.startsWith(changelogHeader)) {
+        throw new Error(`Invalid changelog header for ${pkg.name}`);
+      }
+      const existingNotes = changelog.slice(changelogHeader.length).trim();
+      await writeFile(
+        pkg.changelogPath,
+        `${changelogHeader}\n\n${plan.notes.trim()}${existingNotes ? `\n\n${existingNotes}` : ""}\n`,
+      );
+      if (tagged) {
+        const manifest = JSON.parse(await readFile(pkg.manifestPath, "utf8")) as PackageManifest;
+        manifest.version = plan.version;
+        await writeFile(pkg.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+      }
+      planned.push({ ...pkg, version: plan.version, tag: plan.tag });
     }
 
     const bodyPath = env.RELEASE_PR_BODY;
@@ -372,7 +387,7 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
       const releases = planned.map((pkg) => `- \`${pkg.name}\` → \`${pkg.version}\``).join("\n");
       await writeFile(
         bodyPath,
-        `Automated version and changelog updates generated by git-cliff.\n\n${releases}\n`,
+        `Automated version and changelog updates generated by semantic-release.\n\n${releases}\n`,
       );
     }
 
@@ -394,23 +409,19 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
 
     const tagged = tagExists(pkg.tag);
     const target = tagged ? pkg.tag : env.GITHUB_SHA || runner.run("git", ["rev-parse", "HEAD"]);
-    const tags = componentTags(pkg).filter((tag) => tag !== pkg.tag);
-    const previousTag = tags[0];
-    const range = previousTag ? `${previousTag}..${target}` : target;
     const temporaryDirectory = await mkdtemp(
-      join(options.temporaryRoot ?? tmpdir(), "git-cliff-release-"),
+      join(options.temporaryRoot ?? tmpdir(), "semantic-release-notes-"),
     );
     try {
       const notesPath = join(temporaryDirectory, `${basename(pkg.path)}.md`);
-      const notes = runner.run("git-cliff", [
-        ...cliffArguments(pkg),
-        "--tag",
-        pkg.tag,
-        "--strip",
-        "header",
-        range,
-      ]);
-      await writeFile(notesPath, `${notes}\n`);
+      const changelog = await readFile(pkg.changelogPath, "utf8");
+      const heading = new RegExp(`^##\\s+\\[?${escapeRegExp(pkg.version)}(?:\\]|\\s|$)`, "m");
+      const start = changelog.search(heading);
+      if (start < 0) throw new Error(`Changelog does not contain ${pkg.name}@${pkg.version}`);
+      const remainder = changelog.slice(start);
+      const nextHeading = remainder.slice(1).search(/^##\s+/m);
+      const notes = nextHeading < 0 ? remainder : remainder.slice(0, nextHeading + 1);
+      await writeFile(notesPath, `${notes.trim()}\n`);
 
       const args = [
         "release",

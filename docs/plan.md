@@ -85,7 +85,7 @@ The same `awaitWithAbort` behavior currently appears in `packages/pi-web-fetch/s
 - [x] Wrap the temporary notes directory in `scripts/release.ts` in `try/finally` cleanup.
 - [x] Verify cleanup after both successful and failed GitHub release creation.
 
-**Done when:** `ensure-github-release` leaves no `git-cliff-release-*` directory behind.
+**Done when:** `ensure-github-release` leaves no temporary release-notes directory behind.
 
 ### 12. Manage the dependency-override lifecycle
 

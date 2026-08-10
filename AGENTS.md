@@ -29,4 +29,4 @@
 - Security invariants: `docs/security-invariants.md`
 - Package behavior and setup: `packages/*/README.md`
 - Releases: `docs/releases.md`
-- Release configuration: `cliff.toml`, `scripts/release.ts`, `.github/workflows/release.yml`
+- Release configuration: `release.config.ts`, `scripts/semantic-release-plugin.ts`, `scripts/release.ts`, `.github/workflows/release.yml`
