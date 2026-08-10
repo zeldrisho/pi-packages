@@ -4,7 +4,7 @@ This repository publishes independent Pi extensions from `packages/*`. Each pack
 from TypeScript, owns its runtime dependencies, and can be installed without the rest of the workspace.
 For setup and package behavior, use the package READMEs. For trust-boundary requirements, see
 [security invariants](security-invariants.md); for publishing mechanics, see the
-[release guide](releases.md).
+[release guide](release.md).
 
 ## Package boundaries
 
@@ -96,4 +96,4 @@ publication. The release matrix admits untagged manifest versions only when the 
 generated release pull request or when their changelog entry already landed on `main`; regular feature
 merges only update that pull request. Temporary semantic-release notes are always cleaned after GitHub
 release creation succeeds or fails. Details, approvals, and escalation conditions remain in
-[releases.md](releases.md).
+[release.md](release.md).

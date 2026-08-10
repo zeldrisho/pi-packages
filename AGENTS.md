@@ -4,7 +4,7 @@
 
 - `packages/*/`: independently published Pi extensions with runtime code in `src/` and package tests in `tests/`.
 - `scripts/`: repository contracts, packaged-extension smoke tests, and release automation.
-- `tests/`: cross-package contract tests.
+- `tests/`: repository automation and cross-package contract tests.
 
 ## Commands
 
@@ -28,5 +28,5 @@
 - Development and conventions: `docs/development.md`
 - Security invariants: `docs/security-invariants.md`
 - Package behavior and setup: `packages/*/README.md`
-- Releases: `docs/releases.md`
+- Releases: `docs/release.md`
 - Release configuration: `scripts/semantic-release-options.ts`, `scripts/semantic-release-plugin.ts`, `scripts/release.ts`, `.github/workflows/release.yml`
