@@ -115,6 +115,7 @@ jobs:
       - run: vp install
       - name: Prepare release changes
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           RELEASE_PR_BODY: ${{ runner.temp }}/semantic-release-pr.md
         run: vp exec node scripts/release.ts prepare
 

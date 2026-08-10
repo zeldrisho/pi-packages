@@ -10,6 +10,7 @@ const packageDirectories = (await readdir(packagesDirectory, { withFileTypes: tr
 const readme = await readFile(join(root, "README.md"), "utf8");
 const workspace = await readFile(join(root, "pnpm-workspace.yaml"), "utf8");
 const lockfile = await readFile(join(root, "pnpm-lock.yaml"), "utf8");
+const releaseWorkflow = await readFile(join(root, ".github/workflows/release.yml"), "utf8");
 const expectedFiles = ["src", "README.md", "CHANGELOG.md", "LICENSE"];
 const expectedScripts = {
   check: "vp check",
@@ -60,6 +61,14 @@ function sameValues(actual: string[], expected: string[]) {
 
 function fail(message: string): never {
   throw new Error(`Repository contract violation: ${message}`);
+}
+
+if (
+  !releaseWorkflow.includes(
+    "- name: Prepare release changes\n        env:\n          GITHUB_TOKEN: ${{ github.token }}\n",
+  )
+) {
+  fail("the semantic-release planning step must receive GITHUB_TOKEN for its push check");
 }
 
 const documentedDirectories = [...readme.matchAll(/\]\(packages\/([A-Za-z0-9._-]+)\)/g)].map(
