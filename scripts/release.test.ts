@@ -535,6 +535,16 @@ describe("GitHub release creation", () => {
 });
 
 describe("release CLI", () => {
+  it("loads with Node's native TypeScript support", () => {
+    expect(() =>
+      execFileSync(
+        process.execPath,
+        ["--input-type=module", "--eval", "await import('./scripts/release.ts')"],
+        { cwd: process.cwd() },
+      ),
+    ).not.toThrow();
+  });
+
   function fakeAutomation(): {
     automation: ReleaseAutomation;
     status: ReturnType<typeof vi.fn>;
