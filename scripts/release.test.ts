@@ -221,6 +221,7 @@ describe("release planning", () => {
     const messages: string[] = [];
     const automation = createReleaseAutomation({
       root,
+      env: { ...process.env, GITHUB_REF: "refs/heads/main" },
       log: (message) => messages.push(message),
     });
 
