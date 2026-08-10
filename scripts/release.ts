@@ -10,7 +10,7 @@ import { basename, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import semanticRelease from "semantic-release";
-import { semanticReleaseOptions } from "../release.config";
+import { semanticReleaseOptions } from "../release.config.ts";
 
 const defaultRoot = resolve(import.meta.dirname, "..");
 const tagVersionPattern = "[0-9]+\\.[0-9]+\\.[0-9]+";
