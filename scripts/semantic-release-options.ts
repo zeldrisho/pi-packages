@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 
 const pluginPath = resolve(
   fileURLToPath(new URL(".", import.meta.url)),
-  "scripts/semantic-release-plugin.ts",
+  "semantic-release-plugin.ts",
 );
 
 /** Build the dry-run semantic-release configuration for one independently versioned package. */
@@ -25,10 +25,3 @@ export function semanticReleaseOptions(directory: string, packagePath: string): 
     ],
   };
 }
-
-export default {
-  branches: ["main"],
-  ci: false,
-  dryRun: true,
-  plugins: [],
-} satisfies Options;

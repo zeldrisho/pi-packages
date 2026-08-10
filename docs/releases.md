@@ -19,7 +19,7 @@ The release job runs only when the push merges the generated release pull reques
 
 Release behavior is defined by:
 
-- [`release.config.ts`](../release.config.ts) and [`scripts/semantic-release-plugin.ts`](../scripts/semantic-release-plugin.ts), configured using [semantic-release](https://semantic-release.org/), which parse package-local conventional commits, calculate semantic versions, and render changelogs;
+- [`scripts/semantic-release-options.ts`](../scripts/semantic-release-options.ts) and [`scripts/semantic-release-plugin.ts`](../scripts/semantic-release-plugin.ts), configured using [semantic-release](https://semantic-release.org/), which parse package-local conventional commits, calculate semantic versions, and render changelogs;
 - [`scripts/release.ts`](../scripts/release.ts), which runs semantic-release per package, prepares release files, checks npm and GitHub state, and creates GitHub releases; and
 - [`.github/workflows/release.yml`](../.github/workflows/release.yml), which validates, opens the generated release pull request, and publishes through npm trusted publishing.
 
