@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
@@ -214,18 +214,23 @@ describe("release planning", () => {
     git(root, "push", "--quiet", "--set-upstream", "origin", "main", "--tags");
     git(remote, "symbolic-ref", "HEAD", "refs/heads/main");
     await mkdir(join(root, "scripts"));
-    await writeFile(
-      join(root, "scripts/semantic-release-plugin.ts"),
-      await readFile(join(process.cwd(), "scripts/semantic-release-plugin.ts"), "utf8"),
-    );
-    const messages: string[] = [];
-    const automation = createReleaseAutomation({
-      root,
-      env: { ...process.env, GITHUB_REF: "refs/heads/main" },
-      log: (message) => messages.push(message),
-    });
+    for (const filename of [
+      "release.ts",
+      "semantic-release-options.ts",
+      "semantic-release-plugin.ts",
+    ]) {
+      await writeFile(
+        join(root, "scripts", filename),
+        await readFile(join(process.cwd(), "scripts", filename), "utf8"),
+      );
+    }
+    await symlink(join(process.cwd(), "node_modules"), join(root, "node_modules"), "dir");
 
-    await automation.prepare();
+    const output = execFileSync(process.execPath, ["scripts/release.ts", "prepare"], {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...process.env, GITHUB_REF: "refs/heads/main" },
+    });
 
     expect(
       JSON.parse(await readFile(join(root, "packages/alpha/package.json"), "utf8")),
@@ -233,7 +238,7 @@ describe("release planning", () => {
     expect(await readFile(join(root, "packages/alpha/CHANGELOG.md"), "utf8")).toContain(
       "### Bug fixes",
     );
-    expect(messages).toEqual(["Prepared 1 package release(s): alpha-v1.0.1"]);
+    expect(output).toContain("Prepared 1 package release(s): alpha-v1.0.1");
   }, 30_000);
 
   it.each(["wrong-v1.0.1", "alpha-vnot-semver"])(
