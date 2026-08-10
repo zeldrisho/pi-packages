@@ -225,11 +225,18 @@ describe("release planning", () => {
       );
     }
     await symlink(join(process.cwd(), "node_modules"), join(root, "node_modules"), "dir");
+    const parentReleaseBody = join(root, "parent-release-body.md");
+    await writeFile(parentReleaseBody, "keep parent release metadata\n");
 
     const output = execFileSync(process.execPath, ["scripts/release.ts", "prepare"], {
       cwd: root,
       encoding: "utf8",
-      env: { ...process.env, GITHUB_REF: "refs/heads/main" },
+      env: {
+        ...process.env,
+        GITHUB_REF: "refs/heads/main",
+        // The workflow's RELEASE_PR_BODY must not leak into this nested planner.
+        RELEASE_PR_BODY: "",
+      },
     });
 
     expect(
@@ -239,6 +246,7 @@ describe("release planning", () => {
       "### Bug fixes",
     );
     expect(output).toContain("Prepared 1 package release(s): alpha-v1.0.1");
+    expect(await readFile(parentReleaseBody, "utf8")).toBe("keep parent release metadata\n");
   }, 30_000);
 
   it.each(["wrong-v1.0.1", "alpha-vnot-semver"])(

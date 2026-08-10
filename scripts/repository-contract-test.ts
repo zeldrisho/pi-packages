@@ -70,6 +70,12 @@ if (
 ) {
   fail("the semantic-release planning step must receive GITHUB_TOKEN for its push check");
 }
+if (!releaseWorkflow.includes("actions: write")) {
+  fail("the release PR job must be allowed to dispatch its required CI check");
+}
+if (!releaseWorkflow.includes('gh workflow run ci.yml --ref "$branch"')) {
+  fail("the generated release PR must explicitly dispatch CI for its head branch");
+}
 
 const documentedDirectories = [...readme.matchAll(/\]\(packages\/([A-Za-z0-9._-]+)\)/g)].map(
   (match) => match[1],
