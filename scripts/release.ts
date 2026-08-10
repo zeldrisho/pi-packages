@@ -129,7 +129,15 @@ function defaultReleasePlanner(root: string, env: NodeJS.ProcessEnv): ReleasePla
       let notes = result.nextRelease.notes ?? "";
       if (requestedVersion) {
         const requestedTag = `${pkg.directory}-v${requestedVersion}`;
-        notes = notes.replaceAll(tag, requestedTag).replaceAll(version, requestedVersion);
+        // Only replace version and tag in the first heading line to avoid corrupting
+        // version-like text in commit messages
+        const headingEnd = notes.indexOf("\n");
+        if (headingEnd > 0) {
+          const heading = notes.slice(0, headingEnd);
+          const body = notes.slice(headingEnd);
+          notes =
+            heading.replaceAll(tag, requestedTag).replaceAll(version, requestedVersion) + body;
+        }
         version = requestedVersion;
         tag = requestedTag;
       }
@@ -364,7 +372,17 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
         );
       }
 
-      const changelog = await readFile(pkg.changelogPath, "utf8");
+      let changelog: string;
+      try {
+        changelog = await readFile(pkg.changelogPath, "utf8");
+      } catch (error) {
+        // Treat missing CHANGELOG.md as empty so it reaches the header validation below
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+          changelog = "";
+        } else {
+          throw error;
+        }
+      }
       const changelogHeader = "# Changelog";
       if (!changelog.startsWith(changelogHeader)) {
         throw new Error(`Invalid changelog header for ${pkg.name}`);

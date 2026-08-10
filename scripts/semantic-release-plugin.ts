@@ -52,14 +52,29 @@ function parseCommit(commit: SemanticCommit): ParsedCommit | undefined {
   if (type === "style" || (type === "chore" && match.groups.description === "release packages")) {
     return undefined;
   }
+  // Compute breaking flag before checking groups, so breaking commits with unlisted types
+  // are still detected for major version bumps
+  const breaking = match.groups.breaking === "!" || /^BREAKING[ -]CHANGE:/m.test(commit.body ?? "");
   const group = groups.get(type);
-  if (!group) return undefined;
+  if (!group) {
+    // Return breaking commits even if their type isn't listed, so analyzeCommits can detect them
+    if (!breaking) return undefined;
+    // Use a generic group name for breaking commits with unlisted types
+    return {
+      ...commit,
+      type,
+      scope: match.groups.scope,
+      description: match.groups.description,
+      breaking,
+      group: "Other changes",
+    };
+  }
   return {
     ...commit,
     type,
     scope: match.groups.scope,
     description: match.groups.description,
-    breaking: match.groups.breaking === "!" || /^BREAKING[ -]CHANGE:/m.test(commit.body ?? ""),
+    breaking,
     group,
   };
 }

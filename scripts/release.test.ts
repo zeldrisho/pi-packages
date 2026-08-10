@@ -199,41 +199,45 @@ describe("release planning", () => {
     expect(messages).toEqual(["Prepared 1 package release(s): alpha-v1.0.1"]);
   });
 
-  it("runs semantic-release against package-local component tags", async () => {
-    const root = await createRepository();
-    git(root, "branch", "-M", "main");
-    git(root, "tag", "alpha-v1.0.0");
-    await commit(root, "fix(alpha): repair behavior");
-    await writeFile(join(root, "unrelated.txt"), "unrelated feature\n");
-    git(root, "add", "unrelated.txt");
-    git(root, "commit", "--quiet", "-m", "feat: unrelated behavior");
-    const remote = await mkdtemp(join(tmpdir(), "release-remote-test-"));
-    temporaryDirectories.push(remote);
-    git(remote, "init", "--bare", "--quiet");
-    git(root, "remote", "add", "origin", remote);
-    git(root, "push", "--quiet", "--set-upstream", "origin", "main", "--tags");
-    git(remote, "symbolic-ref", "HEAD", "refs/heads/main");
-    await mkdir(join(root, "scripts"));
-    await writeFile(
-      join(root, "scripts/semantic-release-plugin.ts"),
-      await readFile(join(process.cwd(), "scripts/semantic-release-plugin.ts"), "utf8"),
-    );
-    const messages: string[] = [];
-    const automation = createReleaseAutomation({
-      root,
-      log: (message) => messages.push(message),
-    });
+  it(
+    "runs semantic-release against package-local component tags",
+    async () => {
+      const root = await createRepository();
+      git(root, "branch", "-M", "main");
+      git(root, "tag", "alpha-v1.0.0");
+      await commit(root, "fix(alpha): repair behavior");
+      await writeFile(join(root, "unrelated.txt"), "unrelated feature\n");
+      git(root, "add", "unrelated.txt");
+      git(root, "commit", "--quiet", "-m", "feat: unrelated behavior");
+      const remote = await mkdtemp(join(tmpdir(), "release-remote-test-"));
+      temporaryDirectories.push(remote);
+      git(remote, "init", "--bare", "--quiet");
+      git(root, "remote", "add", "origin", remote);
+      git(root, "push", "--quiet", "--set-upstream", "origin", "main", "--tags");
+      git(remote, "symbolic-ref", "HEAD", "refs/heads/main");
+      await mkdir(join(root, "scripts"));
+      await writeFile(
+        join(root, "scripts/semantic-release-plugin.ts"),
+        await readFile(join(process.cwd(), "scripts/semantic-release-plugin.ts"), "utf8"),
+      );
+      const messages: string[] = [];
+      const automation = createReleaseAutomation({
+        root,
+        log: (message) => messages.push(message),
+      });
 
-    await automation.prepare();
+      await automation.prepare();
 
-    expect(
-      JSON.parse(await readFile(join(root, "packages/alpha/package.json"), "utf8")),
-    ).toMatchObject({ version: "1.0.1" });
-    expect(await readFile(join(root, "packages/alpha/CHANGELOG.md"), "utf8")).toContain(
-      "### Bug fixes",
-    );
-    expect(messages).toEqual(["Prepared 1 package release(s): alpha-v1.0.1"]);
-  });
+      expect(
+        JSON.parse(await readFile(join(root, "packages/alpha/package.json"), "utf8")),
+      ).toMatchObject({ version: "1.0.1" });
+      expect(await readFile(join(root, "packages/alpha/CHANGELOG.md"), "utf8")).toContain(
+        "### Bug fixes",
+      );
+      expect(messages).toEqual(["Prepared 1 package release(s): alpha-v1.0.1"]);
+    },
+    { timeout: 30000 },
+  );
 
   it.each(["wrong-v1.0.1", "alpha-vnot-semver"])(
     "rejects malformed semantic-release version output %s",

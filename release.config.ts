@@ -1,6 +1,11 @@
 import type { Options } from "semantic-release";
+import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
-const pluginPath = "./scripts/semantic-release-plugin.ts";
+const pluginPath = resolve(
+  fileURLToPath(new URL(".", import.meta.url)),
+  "scripts/semantic-release-plugin.ts",
+);
 
 /** Build the dry-run semantic-release configuration for one independently versioned package. */
 export function semanticReleaseOptions(directory: string, packagePath: string): Options {
