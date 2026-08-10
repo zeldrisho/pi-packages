@@ -1,4 +1,11 @@
 # Changelog
+
+## [0.5.2](https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.1...pi-web-fetch-v0.5.2) (2026-08-10)
+
+### Bug fixes
+
+- **web-fetch:** Discard malformed schema metadata ([2ac7b02](https://github.com/zeldrisho/pi-packages/commit/2ac7b02f8952950aa60d4d22f080ab0774cdf50a))
+
 ## [0.5.1](https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.0...pi-web-fetch-v0.5.1) (2026-08-03)
 
 
