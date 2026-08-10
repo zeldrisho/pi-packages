@@ -2,7 +2,7 @@
 
 This plan turns the repository-wide technical debt audit into work that can be completed alongside feature development. It prioritizes release safety, dependency governance, and maintenance of security-sensitive boundaries without requiring a rewrite.
 
-Use the repository commands and conventions in [development.md](development.md), preserve the invariants in [security-invariants.md](security-invariants.md), and follow [releases.md](releases.md) for publication changes.
+Use the repository commands and conventions in [development.md](development.md), preserve the invariants in [security-invariants.md](security-invariants.md), and follow [release.md](release.md) for publication changes.
 
 ## Historical baseline
 

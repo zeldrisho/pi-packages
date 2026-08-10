@@ -10,7 +10,7 @@ import {
   type CommandRunner,
   type ReleaseAutomation,
   type ReleasePlanner,
-} from "./release";
+} from "../scripts/release.ts";
 
 const temporaryDirectories: string[] = [];
 
