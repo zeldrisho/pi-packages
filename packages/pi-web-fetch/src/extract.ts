@@ -2,6 +2,24 @@ import { parseHTML } from "linkedom";
 
 const RAW_ID_SELECTOR_SAFE = /^-?[_a-zA-Z][-_a-zA-Z0-9]*$/;
 
+/** Removes schema.org scripts that Defuddle would report directly to the process console. */
+function removeMalformedSchemaOrgData(document: Document): void {
+  for (const script of document.querySelectorAll<HTMLScriptElement>(
+    'script[type="application/ld+json"]',
+  )) {
+    const jsonContent = (script.textContent || "")
+      .replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, "")
+      .replace(/^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/, "$1")
+      .replace(/^\s*(\*\/|\/\*)\s*|\s*(\*\/|\/\*)\s*$/g, "")
+      .trim();
+    try {
+      if (JSON.parse(jsonContent) === null) script.remove();
+    } catch {
+      script.remove();
+    }
+  }
+}
+
 /**
  * Replaces element IDs that are unsafe for CSS selectors and updates matching fragment links.
  *
@@ -71,8 +89,10 @@ export async function extractHtmlToMarkdown(
   try {
     const { Defuddle } = await import("defuddle/node");
     const { document } = parseHTML(html);
-    normalizeSelectorUnsafeIds(document as unknown as Document);
-    const result = await Defuddle(document as unknown as Document, baseUrl.toString(), {
+    const defuddleDocument = document as unknown as Document;
+    removeMalformedSchemaOrgData(defuddleDocument);
+    normalizeSelectorUnsafeIds(defuddleDocument);
+    const result = await Defuddle(defuddleDocument, baseUrl.toString(), {
       markdown: true,
       useAsync: false,
     });

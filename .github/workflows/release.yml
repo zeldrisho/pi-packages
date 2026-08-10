@@ -20,7 +20,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: voidzero-dev/setup-vp@v1
+      - uses: voidzero-dev/setup-vp@v1.17.0
         with:
           node-version: "24"
           cache: true
@@ -42,7 +42,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: voidzero-dev/setup-vp@v1
+      - uses: voidzero-dev/setup-vp@v1.17.0
         with:
           node-version: "24"
           cache: true
@@ -75,7 +75,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: voidzero-dev/setup-vp@v1
+      - uses: voidzero-dev/setup-vp@v1.17.0
         with:
           node-version: "24"
           cache: false
@@ -107,7 +107,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: voidzero-dev/setup-vp@v1
+      - uses: voidzero-dev/setup-vp@v1.17.0
         with:
           node-version: "24"
           cache: true
@@ -115,13 +115,13 @@ jobs:
       - run: vp install
       - name: Prepare release changes
         env:
-          RELEASE_PR_BODY: ${{ runner.temp }}/git-cliff-release-pr.md
+          RELEASE_PR_BODY: ${{ runner.temp }}/semantic-release-pr.md
         run: vp exec node scripts/release.ts prepare
 
       - name: Validate and update release pull request
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_PR_BODY: ${{ runner.temp }}/git-cliff-release-pr.md
+          RELEASE_PR_BODY: ${{ runner.temp }}/semantic-release-pr.md
         run: |
           if git diff --quiet; then
             exit 0
@@ -131,7 +131,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
-          branch='git-cliff/release'
+          branch='semantic-release/release'
           remote_sha=$(git ls-remote --heads origin "refs/heads/$branch" | cut -f1)
           if [ -n "$remote_sha" ]; then
             git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch"
