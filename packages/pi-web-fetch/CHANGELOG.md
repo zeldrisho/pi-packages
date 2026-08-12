@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.3](https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.2...pi-web-fetch-v0.5.3) (2026-08-12)
+
+### Bug fixes
+
+- **web-fetch:** Fall back across validated addresses before timing out ([32a000b](https://github.com/zeldrisho/pi-packages/commit/32a000bf367268d4ff38e7b45cb73d45ea894f5d))
+- **web-fetch:** Cancel attempts when the caller signal is already aborted ([2f62c95](https://github.com/zeldrisho/pi-packages/commit/2f62c95906e171cc974c9f5cdbd66cf3ecd65b56))
+
+### Maintenance
+
+- **deps:** Upgrade Vite+ toolchain to 0.2.9 ([9921cf3](https://github.com/zeldrisho/pi-packages/commit/9921cf3ffbed29f9c08ca3ab595a5096fadf2be0))
+
 ## [0.5.2](https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.1...pi-web-fetch-v0.5.2) (2026-08-10)
 
 ### Bug fixes
