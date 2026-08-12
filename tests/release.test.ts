@@ -242,8 +242,11 @@ describe("release planning", () => {
     expect(
       JSON.parse(await readFile(join(root, "packages/alpha/package.json"), "utf8")),
     ).toMatchObject({ version: "1.0.1" });
-    expect(await readFile(join(root, "packages/alpha/CHANGELOG.md"), "utf8")).toContain(
-      "### Bug fixes",
+    const changelog = await readFile(join(root, "packages/alpha/CHANGELOG.md"), "utf8");
+    // The conventionalcommits preset renders grouped sections and compare links.
+    expect(changelog).toContain("### Bug Fixes");
+    expect(changelog).toContain(
+      "## [1.0.1](https://github.com/zeldrisho/pi-packages/compare/alpha-v1.0.0...alpha-v1.0.1)",
     );
     expect(output).toContain("Prepared 1 package release(s): alpha-v1.0.1");
     expect(await readFile(parentReleaseBody, "utf8")).toBe("keep parent release metadata\n");

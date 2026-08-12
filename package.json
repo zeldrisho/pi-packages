@@ -18,8 +18,11 @@
     "prepare": "vp config"
   },
   "devDependencies": {
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/release-notes-generator": "^14.1.0",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "conventional-changelog-conventionalcommits": "^9.3.1",
     "semantic-release": "25.0.9",
     "typescript": "catalog:",
     "vite": "catalog:",

@@ -19,9 +19,11 @@ The release job runs only when the push merges the generated release pull reques
 
 Release behavior is defined by:
 
-- [`scripts/semantic-release-options.ts`](../scripts/semantic-release-options.ts) and [`scripts/semantic-release-plugin.ts`](../scripts/semantic-release-plugin.ts), configured using [semantic-release](https://semantic-release.org/), which parse package-local conventional commits, calculate semantic versions, and render changelogs;
-- [`scripts/release.ts`](../scripts/release.ts), which runs semantic-release per package, prepares release files, checks npm and GitHub state, and creates GitHub releases; and
+- [`scripts/semantic-release-options.ts`](../scripts/semantic-release-options.ts) and [`scripts/semantic-release-plugin.ts`](../scripts/semantic-release-plugin.ts), configured using [semantic-release](https://semantic-release.org/). The plugin delegates commit analysis and changelog rendering to the official [`@semantic-release/commit-analyzer`](https://github.com/semantic-release/commit-analyzer) and [`@semantic-release/release-notes-generator`](https://github.com/semantic-release/release-notes-generator) with the `conventionalcommits` preset, restricting them to package-local commits (semantic-release core only analyzes the whole repository range);
+- [`scripts/release.ts`](../scripts/release.ts), which runs semantic-release per package in dry-run planning mode (because `main` is branch-protected, semantic-release never tags or publishes directly), prepares release files, checks npm and GitHub state, and creates GitHub releases; and
 - [`.github/workflows/release.yml`](../.github/workflows/release.yml), which validates, opens the generated release pull request, and publishes through npm trusted publishing.
+
+The `conventionalcommits` preset and the plugin that loads it (`conventional-changelog-conventionalcommits`, `@semantic-release/commit-analyzer`, `@semantic-release/release-notes-generator`) are declared in the root `devDependencies` so the preset resolves from the workspace root under pnpm's strict module layout.
 
 The automation requires the repository `GITHUB_TOKEN`, a protected `publish` GitHub environment, and one npm trusted publisher per package for repository `zeldrisho/pi-packages`, workflow `release.yml`, environment `publish`, with the `npm publish` action allowed.
 
@@ -29,9 +31,9 @@ The workflow fetches complete tag history, serializes release runs, references r
 
 ## Version calculation
 
-Only commits that touch `packages/<name>/**` affect that package. Breaking changes increment the major version, `feat` increments the minor version, and `fix`, `perf`, or `revert` increments the patch version. Documentation, refactoring, test, build, CI, and chore commits appear in release notes when bundled with a release but do not trigger a release by themselves.
+Only commits that touch `packages/<name>/**` affect that package. The `conventionalcommits` preset of `@semantic-release/commit-analyzer` implements the version policy: breaking changes increment the major version, `feat` increments the minor version, and `fix`, `perf`, or `revert` increments the patch version. Documentation, refactoring, test, build, CI, and chore commits appear in release notes when bundled with a release but do not trigger a release by themselves.
 
-Component tags use `<package-directory>-v<version>`, for example `pi-web-search-v0.5.0`.
+Component tags use `<package-directory>-v<version>`, for example `pi-web-search-v0.5.0`. Changelog entries render `## [version](compare) (date)` headings with `###` sections per conventional commit type; entries generated before the switch to the official plugins keep their earlier headings.
 
 ## Bootstrap a new npm package
 
