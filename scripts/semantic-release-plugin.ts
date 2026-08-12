@@ -1,7 +1,27 @@
 import { execFileSync } from "node:child_process";
+import { analyzeCommits as analyzeWithConventionalcommits } from "@semantic-release/commit-analyzer";
+import { generateNotes as generateWithConventionalcommits } from "@semantic-release/release-notes-generator";
+
+/**
+ * Release policy for one independently versioned package.
+ *
+ * Commit analysis and release notes are delegated to the official
+ * `@semantic-release/commit-analyzer` and `@semantic-release/release-notes-generator`
+ * plugins with the `conventionalcommits` preset. This wrapper only restricts those
+ * plugins to the commits that touched the package, because semantic-release core
+ * analyzes the whole repository range.
+ *
+ * The `conventionalcommits` preset enforces the repository's version policy:
+ * breaking changes are `major`, `feat` is `minor`, and `fix`, `perf`, or `revert`
+ * is `patch`; other conventional types (docs, refactor, test, build, ci, chore,
+ * style, ...) never trigger a release on their own but still appear in release
+ * notes when bundled with a release. It also renders the `## [version](compare)
+ * (date)` changelog headings and grouped sections used in this repository.
+ */
 
 interface PluginConfig {
   packagePath: string;
+  /** Canonical `owner/repository` used to render compare and commit links. */
   repository: string;
 }
 
@@ -16,70 +36,28 @@ interface ReleaseContext {
   commits: SemanticCommit[];
   lastRelease: { gitTag?: string };
   nextRelease: { version: string; gitTag: string };
+  options: { repositoryUrl: string };
 }
 
-type ReleaseType = "major" | "minor" | "patch";
-
-const groups = new Map([
-  ["feat", "Features"],
-  ["fix", "Bug fixes"],
-  ["perf", "Performance"],
-  ["revert", "Reverts"],
-  ["doc", "Documentation"],
-  ["docs", "Documentation"],
-  ["refactor", "Refactoring"],
-  ["test", "Tests"],
-  ["build", "Build system"],
-  ["ci", "Continuous integration"],
-  ["chore", "Maintenance"],
-]);
-
-interface ParsedCommit extends SemanticCommit {
-  description: string;
-  group: string;
-  scope?: string;
-  type: string;
-  breaking: boolean;
-}
-
-function parseCommit(commit: SemanticCommit): ParsedCommit | undefined {
-  const match =
-    /^(?<type>[a-z]+)(?:\((?<scope>[^)]+)\))?(?<breaking>!)?:\s+(?<description>.+)$/i.exec(
-      commit.subject,
-    );
-  if (!match?.groups) return undefined;
-  const type = match.groups.type.toLowerCase();
-  if (type === "style" || (type === "chore" && match.groups.description === "release packages")) {
-    return undefined;
-  }
-  // Compute breaking flag before checking groups, so breaking commits with unlisted types
-  // are still detected for major version bumps
-  const breaking = match.groups.breaking === "!" || /^BREAKING[ -]CHANGE:/m.test(commit.body ?? "");
-  const group = groups.get(type);
-  if (!group) {
-    // Return breaking commits even if their type isn't listed, so analyzeCommits can detect them
-    if (!breaking) return undefined;
-    // Use a generic group name for breaking commits with unlisted types
-    return {
-      ...commit,
-      type,
-      scope: match.groups.scope,
-      description: match.groups.description,
-      breaking,
-      group: "Other changes",
-    };
-  }
+/**
+ * Builds the context handed to the official plugins: package-local commits and a
+ * canonical repository URL for link rendering. The URL is injected only here so
+ * semantic-release keeps authenticating and verifying pushes against the actual
+ * git origin (see `getGitAuthUrl`), which would fail against a hardcoded URL in
+ * sandboxed or branch-protected environments.
+ */
+function pluginContext(config: PluginConfig, context: ReleaseContext): ReleaseContext {
   return {
-    ...commit,
-    type,
-    scope: match.groups.scope,
-    description: match.groups.description,
-    breaking,
-    group,
+    ...context,
+    commits: packageCommits(config, context),
+    options: {
+      ...context.options,
+      repositoryUrl: `https://github.com/${config.repository}.git`,
+    },
   };
 }
 
-function packageCommits(config: PluginConfig, context: ReleaseContext): ParsedCommit[] {
+function packageCommits(config: PluginConfig, context: ReleaseContext): SemanticCommit[] {
   if (!/^packages\/[A-Za-z0-9._-]+$/.test(config.packagePath)) {
     throw new Error(`Invalid semantic-release packagePath: ${config.packagePath}`);
   }
@@ -89,52 +67,31 @@ function packageCommits(config: PluginConfig, context: ReleaseContext): ParsedCo
     encoding: "utf8",
   });
   const included = new Set(output.trim().split("\n").filter(Boolean));
-  return context.commits
-    .filter((commit) => included.has(commit.hash))
-    .map(parseCommit)
-    .filter((commit): commit is ParsedCommit => commit !== undefined);
+  return context.commits.filter((commit) => included.has(commit.hash));
 }
 
-/** Determine a package-local release type using the repository's conventional-commit policy. */
+/** Analyze only the commits that touched the package using the conventionalcommits preset. */
 export async function analyzeCommits(
   config: PluginConfig,
   context: ReleaseContext,
-): Promise<ReleaseType | undefined> {
-  let release: ReleaseType | undefined;
-  for (const commit of packageCommits(config, context)) {
-    if (commit.breaking) return "major";
-    if (commit.type === "feat") release = release === "patch" || !release ? "minor" : release;
-    else if (["fix", "perf", "revert"].includes(commit.type) && !release) release = "patch";
-  }
-  return release;
+): Promise<string | undefined> {
+  const result = await analyzeWithConventionalcommits(
+    { preset: "conventionalcommits" },
+    pluginContext(config, context),
+  );
+  return result ?? undefined;
 }
 
-function upperFirst(value: string): string {
-  return value.length === 0 ? value : `${value[0].toUpperCase()}${value.slice(1)}`;
-}
-
-/** Render package-local Markdown release notes. */
+/** Render package-local Markdown release notes using the conventionalcommits preset. */
 export async function generateNotes(
   config: PluginConfig,
   context: ReleaseContext,
 ): Promise<string> {
-  const commits = packageCommits(config, context);
-  const previousTag = context.lastRelease.gitTag;
-  const version = context.nextRelease.version;
-  const heading = previousTag
-    ? `## [${version}](https://github.com/${config.repository}/compare/${previousTag}...${context.nextRelease.gitTag}) (${new Date().toISOString().slice(0, 10)})`
-    : `## ${version} (${new Date().toISOString().slice(0, 10)})`;
-  const sections: string[] = [heading];
-  for (const group of new Set(commits.map((commit) => commit.group))) {
-    const entries = commits
-      .filter((commit) => commit.group === group)
-      .reverse()
-      .map((commit) => {
-        const scope = commit.scope ? `**${commit.scope}:** ` : "";
-        const shortHash = commit.hash.slice(0, 7);
-        return `- ${scope}${upperFirst(commit.description)} ([${shortHash}](https://github.com/${config.repository}/commit/${commit.hash}))`;
-      });
-    sections.push(`### ${group}\n\n${entries.join("\n")}`);
-  }
-  return `${sections.join("\n\n")}\n`;
+  const notes = await generateWithConventionalcommits(
+    { preset: "conventionalcommits" },
+    pluginContext(config, context),
+  );
+  // The preset emits "## [version](compare) (date)" headings that slot under the
+  // "# Changelog" header. Keep that contract explicit regardless of preset.
+  return notes.replace(/^#(?!#)/, "##");
 }

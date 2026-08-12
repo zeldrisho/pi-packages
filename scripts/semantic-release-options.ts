@@ -19,6 +19,8 @@ export function semanticReleaseOptions(directory: string, packagePath: string): 
         pluginPath,
         {
           packagePath,
+          // Only used to render compare and commit links in generated release
+          // notes; semantic-release authenticates against the git origin itself.
           repository: "zeldrisho/pi-packages",
         },
       ],
