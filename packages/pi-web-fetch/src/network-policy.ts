@@ -70,8 +70,14 @@ for (const [network, prefix] of GLOBALLY_REACHABLE_IPV6_EXCEPTIONS) {
 
 export interface ValidatedTarget {
   url: URL;
+  /** The preferred address used for the first connection attempt. */
   address: string;
   family: 4 | 6;
+  /**
+   * Every address resolved for the hostname, ordered for connection attempts.
+   * Absent for single-address targets constructed without DNS resolution.
+   */
+  addresses?: string[];
 }
 
 export type ResolveAddresses = (hostname: string) => Promise<string[]>;
@@ -84,6 +90,16 @@ export function isPrivateAddress(address: string): boolean {
     return blockedIPv6Addresses.check(address, "ipv6");
   }
   return true;
+}
+
+/**
+ * Orders addresses for connection attempts with IPv4 before IPv6, preserving
+ * the resolver's order within a family. Mirrors the default Happy Eyeballs
+ * preference so hosts behind broken IPv6 routes connect over IPv4 first while
+ * IPv6-only hosts remain reachable.
+ */
+export function preferIpv4First(addresses: string[]): string[] {
+  return [...addresses].sort((a, b) => Number(isIP(b) === 4) - Number(isIP(a) === 4));
 }
 
 export async function validateRemoteUrl(
@@ -115,8 +131,9 @@ export async function validateRemoteUrl(
   if (addresses.length === 0 || addresses.some(isPrivateAddress)) {
     throw new Error(`web_fetch blocks private or reserved network targets (${hostname}).`);
   }
-  const address = addresses[0];
+  const ordered = preferIpv4First(addresses);
+  const address = ordered[0];
   const family = isIP(address);
   if (family !== 4 && family !== 6) throw new Error(`web_fetch could not resolve ${hostname}.`);
-  return { url, address, family };
+  return { url, address, family, addresses: ordered };
 }

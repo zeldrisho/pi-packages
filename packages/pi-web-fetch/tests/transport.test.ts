@@ -30,6 +30,38 @@ describe("web_fetch transport", () => {
     response.resume();
   });
 
+  it("falls back to the next validated address when the first is refused", async () => {
+    const response = await requestPinned(
+      {
+        url: new URL(`${origin}/html`),
+        address: "127.0.0.2",
+        family: 4,
+        addresses: ["127.0.0.2", "127.0.0.1"],
+      },
+      new AbortController().signal,
+    );
+    expect(response.statusCode).toBe(200);
+    response.resume();
+  });
+
+  it("abandons a hanging address and falls back inside the connect deadline", async () => {
+    const started = Date.now();
+    const response = await requestPinned(
+      {
+        url: new URL(`${origin}/html`),
+        address: "192.0.2.1",
+        family: 4,
+        addresses: ["192.0.2.1", "127.0.0.1"],
+      },
+      new AbortController().signal,
+      { attemptTimeoutMs: 300 },
+    );
+    expect(response.statusCode).toBe(200);
+    // The first (unroutable TEST-NET-1) address must have burned its deadline.
+    expect(Date.now() - started).toBeGreaterThanOrEqual(300);
+    response.resume();
+  });
+
   it("extracts HTML while removing executable content", async () => {
     const result = await fetchRemoteContent(`${origin}/html`, 0, 6_000, undefined, dependencies);
     expect(result.markdown).toContain("Hello");
