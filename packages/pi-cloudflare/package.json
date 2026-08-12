@@ -45,6 +45,7 @@
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "catalog:",
     "typescript": "catalog:",
+    "vite": "catalog:",
     "vite-plus": "catalog:"
   },
   "peerDependencies": {

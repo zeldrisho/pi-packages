@@ -11,12 +11,12 @@ catalog:
   "@earendil-works/pi-coding-agent": "^0.84.0"
   "@earendil-works/pi-tui": "^0.84.0"
   "@types/node": "^26.1.1"
-  "@vitest/coverage-v8": "4.1.10"
+  "@vitest/coverage-v8": 4.1.10
   typebox: "^1.1.24"
   typescript: "^7.0.0"
-  vite: "npm:@voidzero-dev/vite-plus-core@0.2.5"
-  vite-plus: "0.2.5"
-  vitest: "4.1.10"
+  vite: npm:@voidzero-dev/vite-plus-core@0.2.9
+  vite-plus: 0.2.9
+  vitest: 4.1.10
 
 minimumReleaseAgeExclude:
   - "@earendil-works/pi-agent-core@0.84.0"
@@ -28,6 +28,16 @@ minimumReleaseAgeExclude:
   - "@earendil-works/pi-tui@0.84.0"
   # Newly published security fix; remove after the normal release-age window.
   - nanoid@3.3.17
+  - "@voidzero-dev/vite-plus-core@0.2.9"
+  - "@voidzero-dev/vite-plus-darwin-arm64@0.2.9"
+  - "@voidzero-dev/vite-plus-darwin-x64@0.2.9"
+  - "@voidzero-dev/vite-plus-linux-arm64-gnu@0.2.9"
+  - "@voidzero-dev/vite-plus-linux-arm64-musl@0.2.9"
+  - "@voidzero-dev/vite-plus-linux-x64-gnu@0.2.9"
+  - "@voidzero-dev/vite-plus-linux-x64-musl@0.2.9"
+  - "@voidzero-dev/vite-plus-win32-arm64-msvc@0.2.9"
+  - "@voidzero-dev/vite-plus-win32-x64-msvc@0.2.9"
+  - vite-plus@0.2.9
 
 overrides:
   # Dependency-override lifecycle, tracked in issue #37
