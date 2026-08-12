@@ -82,6 +82,12 @@ export interface ValidatedTarget {
 
 export type ResolveAddresses = (hostname: string) => Promise<string[]>;
 
+/**
+ * Determines whether an IP address belongs to a blocked or reserved address range.
+ *
+ * @param address - The IP address to evaluate
+ * @returns `true` if the address is invalid or blocked, `false` if it is allowed
+ */
 export function isPrivateAddress(address: string): boolean {
   const family = isIP(address);
   if (family === 4) return blockedIPv4Addresses.check(address, "ipv4");
@@ -93,15 +99,22 @@ export function isPrivateAddress(address: string): boolean {
 }
 
 /**
- * Orders addresses for connection attempts with IPv4 before IPv6, preserving
- * the resolver's order within a family. Mirrors the default Happy Eyeballs
- * preference so hosts behind broken IPv6 routes connect over IPv4 first while
- * IPv6-only hosts remain reachable.
+ * Orders addresses with IPv4 addresses before IPv6 addresses while preserving their original order within each family.
+ *
+ * @returns A copy of the addresses ordered with IPv4 addresses first.
  */
 export function preferIpv4First(addresses: string[]): string[] {
   return [...addresses].sort((a, b) => Number(isIP(b) === 4) - Number(isIP(a) === 4));
 }
 
+/**
+ * Validates an HTTP or HTTPS URL and resolves it to an allowed network target.
+ *
+ * @param value - The URL to validate.
+ * @param resolveHostname - Optional hostname resolver.
+ * @returns The validated URL, preferred connection address, address family, and ordered resolved addresses.
+ * @throws If the URL uses an unsupported scheme, contains credentials, targets a local hostname, resolves to a private or reserved address, or cannot be resolved to IPv4 or IPv6.
+ */
 export async function validateRemoteUrl(
   value: string | URL,
   resolveHostname?: ResolveAddresses,

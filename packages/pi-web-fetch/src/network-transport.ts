@@ -15,6 +15,14 @@ export const CONNECT_ATTEMPT_TIMEOUT_MS = 4_000;
 
 const encoder = new TextEncoder();
 
+/**
+ * Formats an error message for a response that exceeds the raw download limit.
+ *
+ * @param receivedBytes - The number of bytes received or reported by the response.
+ * @param maxBytes - The maximum allowed number of bytes.
+ * @param sizeIsExact - Whether `receivedBytes` is the exact response size.
+ * @returns A message describing the response size and configured limit.
+ */
 function responseTooLargeMessage(
   receivedBytes: number,
   maxBytes: number,
@@ -29,6 +37,16 @@ function responseTooLargeMessage(
   ].join(" ");
 }
 
+/**
+ * Sends a request to a specific validated network address.
+ *
+ * @param target - The validated request target.
+ * @param address - The IPv4 or IPv6 address to use for the connection.
+ * @param signal - Signal used to cancel the request.
+ * @param attemptTimeoutMs - Maximum time allowed for the connection attempt.
+ * @returns The received response.
+ * @throws If `address` is not a valid IPv4 or IPv6 address.
+ */
 async function requestOnce(
   target: ValidatedTarget,
   address: string,
@@ -89,12 +107,12 @@ export interface RequestPinnedOptions {
 }
 
 /**
- * Pins a request to one of the target's validated addresses, trying each
- * address in order while the connection phase is still in flight.
+ * Sends a request to the target using its validated addresses in sequence.
  *
- * DNS-to-address pinning is preserved: only addresses resolved and validated
- * by {@link validateRemoteUrl} are ever contacted, and each connection attempt
- * is bounded so a hanging address cannot exhaust the overall request timeout.
+ * @param options - Optional settings for individual connection attempts.
+ * @param options.attemptTimeoutMs - Maximum time allowed for each connection attempt in milliseconds.
+ * @returns The first successful HTTP response.
+ * @throws The final connection error if all addresses fail, or the abort error if the signal is aborted.
  */
 export async function requestPinned(
   target: ValidatedTarget,
@@ -115,6 +133,13 @@ export async function requestPinned(
   throw lastError ?? new Error("web_fetch could not connect.");
 }
 
+/**
+ * Retrieves a response header value by name.
+ *
+ * @param response - The response containing the header
+ * @param name - The header name to retrieve
+ * @returns The first header value, or `undefined` when the header is absent
+ */
 export function responseHeader(response: IncomingMessage, name: string): string | undefined {
   const value = response.headers[name];
   return Array.isArray(value) ? value[0] : value;
