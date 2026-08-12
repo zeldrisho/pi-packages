@@ -60,7 +60,10 @@ async function documentFromResponse(
     throw new Error(`web_fetch does not support ${contentType || "this content type"}.`);
   }
 
-  const raw = decodeResponse(await readResponseBytes(response, FETCH_MAX_BYTES), contentTypeHeader);
+  const raw = decodeResponse(
+    await readResponseBytes(response, FETCH_MAX_BYTES, signal),
+    contentTypeHeader,
+  );
   let markdown: string;
   let title: string | undefined;
   let extractor: CompleteDocument["extractor"] = "raw";

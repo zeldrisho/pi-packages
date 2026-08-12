@@ -86,6 +86,12 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
       return;
     case "/slow":
       return;
+    case "/stalled-body":
+      // Send headers and a partial body, then never finish the response to
+      // simulate a connection that stalls mid-body after headers arrive.
+      response.writeHead(200, { "content-type": "text/plain", "content-length": "1000000" });
+      response.write("partial body...");
+      return;
     default:
       response.writeHead(404);
       response.end();
