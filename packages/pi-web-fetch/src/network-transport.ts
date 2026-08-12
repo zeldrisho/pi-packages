@@ -64,7 +64,8 @@ async function requestOnce(
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), attemptTimeoutMs);
     const forwardAbort = () => controller.abort();
-    signal.addEventListener("abort", forwardAbort, { once: true });
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener("abort", forwardAbort, { once: true });
     let settled = false;
     const finish = (callback: () => void) => {
       if (settled) return;
