@@ -70,12 +70,24 @@ for (const [network, prefix] of GLOBALLY_REACHABLE_IPV6_EXCEPTIONS) {
 
 export interface ValidatedTarget {
   url: URL;
+  /** The preferred address used for the first connection attempt. */
   address: string;
   family: 4 | 6;
+  /**
+   * Every address resolved for the hostname, ordered for connection attempts.
+   * Absent for single-address targets constructed without DNS resolution.
+   */
+  addresses?: string[];
 }
 
 export type ResolveAddresses = (hostname: string) => Promise<string[]>;
 
+/**
+ * Determines whether an IP address belongs to a blocked or reserved address range.
+ *
+ * @param address - The IP address to evaluate
+ * @returns `true` if the address is invalid or blocked, `false` if it is allowed
+ */
 export function isPrivateAddress(address: string): boolean {
   const family = isIP(address);
   if (family === 4) return blockedIPv4Addresses.check(address, "ipv4");
@@ -86,6 +98,23 @@ export function isPrivateAddress(address: string): boolean {
   return true;
 }
 
+/**
+ * Orders addresses with IPv4 addresses before IPv6 addresses while preserving their original order within each family.
+ *
+ * @returns A copy of the addresses ordered with IPv4 addresses first.
+ */
+export function preferIpv4First(addresses: string[]): string[] {
+  return [...addresses].sort((a, b) => Number(isIP(b) === 4) - Number(isIP(a) === 4));
+}
+
+/**
+ * Validates an HTTP or HTTPS URL and resolves it to an allowed network target.
+ *
+ * @param value - The URL to validate.
+ * @param resolveHostname - Optional hostname resolver.
+ * @returns The validated URL, preferred connection address, address family, and ordered resolved addresses.
+ * @throws If the URL uses an unsupported scheme, contains credentials, targets a local hostname, resolves to a private or reserved address, or cannot be resolved to IPv4 or IPv6.
+ */
 export async function validateRemoteUrl(
   value: string | URL,
   resolveHostname?: ResolveAddresses,
@@ -115,8 +144,9 @@ export async function validateRemoteUrl(
   if (addresses.length === 0 || addresses.some(isPrivateAddress)) {
     throw new Error(`web_fetch blocks private or reserved network targets (${hostname}).`);
   }
-  const address = addresses[0];
+  const ordered = preferIpv4First(addresses);
+  const address = ordered[0];
   const family = isIP(address);
   if (family !== 4 && family !== 6) throw new Error(`web_fetch could not resolve ${hostname}.`);
-  return { url, address, family };
+  return { url, address, family, addresses: ordered };
 }

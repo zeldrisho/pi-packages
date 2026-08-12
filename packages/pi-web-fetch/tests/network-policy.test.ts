@@ -88,8 +88,26 @@ describe("web_fetch address policy", () => {
     async (url) => {
       const target = await validateRemoteUrl(url, async () => ["93.184.216.34"]);
       expect(target.address).toBe("93.184.216.34");
+      expect(target.addresses).toEqual(["93.184.216.34"]);
     },
   );
+
+  it("orders addresses IPv4 before IPv6 while preserving resolver order within a family", async () => {
+    const target = await validateRemoteUrl("https://example.test", async () => [
+      "2406:da18:b3d:e201::258",
+      "2406:da18:b3d:e201::259",
+      "13.215.239.219",
+      "52.74.6.109",
+    ]);
+    expect(target.addresses).toEqual([
+      "13.215.239.219",
+      "52.74.6.109",
+      "2406:da18:b3d:e201::258",
+      "2406:da18:b3d:e201::259",
+    ]);
+    expect(target.address).toBe("13.215.239.219");
+    expect(target.family).toBe(4);
+  });
 
   it.each([
     ["file:///etc/passwd", "only supports HTTP"],

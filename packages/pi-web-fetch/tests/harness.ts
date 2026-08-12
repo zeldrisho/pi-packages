@@ -121,6 +121,7 @@ export function createFetchHarness(): {
           url: value instanceof URL ? value : new URL(value),
           address: "127.0.0.1",
           family: 4,
+          addresses: ["127.0.0.1"],
         }),
         request: requestPinned,
       };
