@@ -35,6 +35,28 @@ describe("web_fetch cancellation", () => {
     await expect(pending).rejects.toThrow("cancelled");
   });
 
+  it("times out while the response body is stalled after headers", async () => {
+    const ready = fixture.waitForStalledBody();
+    const pending = fetchRemoteContent(`${origin}/stalled-body`, 0, 6_000, undefined, {
+      ...dependencies,
+      timeoutMs: 100,
+    });
+    await ready;
+    await expect(pending).rejects.toThrow("web_fetch timed out after 0.1 seconds.");
+  });
+
+  it("cancels while the response body is stalled after headers", async () => {
+    const controller = new AbortController();
+    const ready = fixture.waitForStalledBody();
+    const pending = fetchRemoteContent(`${origin}/stalled-body`, 0, 6_000, controller.signal, {
+      ...dependencies,
+      timeoutMs: 10_000,
+    });
+    await ready;
+    controller.abort();
+    await expect(pending).rejects.toThrow("web_fetch was cancelled.");
+  });
+
   it("times out while HTML extraction is stalled", async () => {
     let extractionCount = 0;
     await expect(

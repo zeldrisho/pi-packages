@@ -15,6 +15,13 @@ export const CONNECT_ATTEMPT_TIMEOUT_MS = 4_000;
 
 const encoder = new TextEncoder();
 
+/** Builds an AbortError matching the DOMException name used by the abort signal. */
+function abortedError(): Error {
+  const error = new Error("Operation aborted.");
+  error.name = "AbortError";
+  return error;
+}
+
 /**
  * Formats an error message for a response that exceeds the raw download limit.
  *
@@ -62,7 +69,11 @@ async function requestOnce(
   const request = target.url.protocol === "https:" ? httpsRequest : httpRequest;
   return await new Promise((resolve, reject) => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), attemptTimeoutMs);
+    let attemptExpired = false;
+    const timer = setTimeout(() => {
+      attemptExpired = true;
+      controller.abort();
+    }, attemptTimeoutMs);
     const forwardAbort = () => controller.abort();
     if (signal.aborted) controller.abort();
     else signal.addEventListener("abort", forwardAbort, { once: true });
@@ -74,6 +85,8 @@ async function requestOnce(
       signal.removeEventListener("abort", forwardAbort);
       callback();
     };
+    const unreachableError = () =>
+      new Error(`web_fetch could not reach ${address} within ${attemptTimeoutMs} ms.`);
     const outgoing = request(
       target.url,
       {
@@ -86,18 +99,20 @@ async function requestOnce(
       },
       (response) => {
         if (controller.signal.aborted) {
-          // The attempt deadline fired before response headers: drop the socket
-          // and treat the address as unreachable so the next one is tried.
+          // The attempt deadline or caller cancellation fired before response
+          // headers: drop the socket and report the reason.
           response.destroy();
-          finish(() =>
-            reject(
-              new Error(`web_fetch could not reach ${address} within ${attemptTimeoutMs} ms.`),
-            ),
-          );
+          finish(() => reject(attemptExpired ? unreachableError() : abortedError()));
         } else finish(() => resolve(response));
       },
     );
-    outgoing.once("error", (error) => finish(() => reject(error)));
+    outgoing.once("error", (error) => {
+      // The per-attempt deadline surfaces as a raw AbortError from the HTTP
+      // client; report it as an unreachable address instead so the next
+      // validated address is tried and the final error explains itself.
+      if (attemptExpired) finish(() => reject(unreachableError()));
+      else finish(() => reject(error));
+    });
     outgoing.end();
   });
 }
@@ -149,23 +164,41 @@ export function responseHeader(response: IncomingMessage, name: string): string 
 export async function readResponseBytes(
   response: IncomingMessage,
   maxBytes: number,
+  signal?: AbortSignal,
 ): Promise<Uint8Array> {
   const declared = Number(responseHeader(response, "content-length"));
   if (Number.isFinite(declared) && declared > maxBytes) {
     response.destroy();
     throw new Error(responseTooLargeMessage(declared, maxBytes, true));
   }
+  // Once response headers arrive the connect deadline and caller signal are no
+  // longer wired to the socket, so a stalled body would otherwise hang the
+  // fetch forever. Keep the caller signal attached for the whole body read and
+  // drop the socket when it fires.
+  const forwardAbort = () => response.destroy();
+  if (signal?.aborted) response.destroy();
+  else signal?.addEventListener("abort", forwardAbort, { once: true });
   const chunks: Uint8Array[] = [];
   let total = 0;
-  for await (const value of response) {
-    const chunk = typeof value === "string" ? encoder.encode(value) : new Uint8Array(value);
-    total += chunk.byteLength;
-    if (total > maxBytes) {
-      response.destroy();
-      throw new Error(responseTooLargeMessage(total, maxBytes, false));
+  try {
+    for await (const value of response) {
+      const chunk = typeof value === "string" ? encoder.encode(value) : new Uint8Array(value);
+      total += chunk.byteLength;
+      if (total > maxBytes) {
+        response.destroy();
+        throw new Error(responseTooLargeMessage(total, maxBytes, false));
+      }
+      chunks.push(chunk);
     }
-    chunks.push(chunk);
+  } catch (error) {
+    if (signal?.aborted) throw abortedError();
+    throw error;
+  } finally {
+    signal?.removeEventListener("abort", forwardAbort);
   }
+  // Destroying the socket can end the stream without an error; detect a
+  // mid-read abort here as well so truncated bodies never look complete.
+  if (signal?.aborted) throw abortedError();
   const output = new Uint8Array(total);
   let offset = 0;
   for (const chunk of chunks) {

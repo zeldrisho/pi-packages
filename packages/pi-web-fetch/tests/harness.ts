@@ -10,6 +10,7 @@ import {
 
 let versionedContinuationRequests = 0;
 let coalescedRequests = 0;
+let stalledBodyReady: (() => void) | null = null;
 
 /**
  * Serves the HTTP fixture response associated with the requested URL.
@@ -86,6 +87,14 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
       return;
     case "/slow":
       return;
+    case "/stalled-body":
+      // Send headers and a partial body, then never finish the response to
+      // simulate a connection that stalls mid-body after headers arrive.
+      response.writeHead(200, { "content-type": "text/plain", "content-length": "1000000" });
+      response.write("partial body...", () => {
+        if (stalledBodyReady) stalledBodyReady();
+      });
+      return;
     default:
       response.writeHead(404);
       response.end();
@@ -106,6 +115,7 @@ export function createFetchHarness(): {
   continuationRequests(): number;
   resetCoalescedRequests(): void;
   coalescedRequests(): number;
+  waitForStalledBody(): Promise<void>;
 } {
   const server = createServer(fixtureResponse);
   let fixtureOrigin = "";
@@ -140,5 +150,9 @@ export function createFetchHarness(): {
       coalescedRequests = 0;
     },
     coalescedRequests: () => coalescedRequests,
+    waitForStalledBody: () =>
+      new Promise<void>((resolve) => {
+        stalledBodyReady = resolve;
+      }),
   };
 }
