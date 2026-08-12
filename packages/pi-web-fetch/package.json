@@ -1,6 +1,6 @@
 {
   "name": "@zeldrisho/pi-web-fetch",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Pi extension for secure, bounded public web page fetching and Markdown extraction",
   "keywords": [
     "pi",

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.4](https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.3...pi-web-fetch-v0.5.4) (2026-08-12)
+
+### Bug fixes
+
+- **web-fetch:** Abort stalled response bodies instead of hanging ([0b0a080](https://github.com/zeldrisho/pi-packages/commit/0b0a080b6231944c3d7788af1a4710c3ca0cee78))
+- Apply CodeRabbit auto-fixes ([ddaa177](https://github.com/zeldrisho/pi-packages/commit/ddaa17764aedf0127c4057d3abb6900acfab2b78))
+
 ## [0.5.3](https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.2...pi-web-fetch-v0.5.3) (2026-08-12)
 
 ### Bug fixes
