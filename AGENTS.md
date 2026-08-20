@@ -1,10 +1,17 @@
 # Agent Instructions
 
-## Project Structure
+## Package Manager & Setup
 
-- `packages/*/`: independently published Pi extensions with runtime code in `src/` and package tests in `tests/`.
-- `scripts/`: release tooling (`release.ts` resolves a component tag to its package and reads release notes from the changelog; `format-changelog.ts` normalizes `CHANGELOG.md`; `sync-web-modules.ts` keeps the `pi-web-fetch`/`pi-web-search` shared modules byte-for-byte identical), invoked by the release workflow.
-- `tests/`: repository contracts, packaged-extension smoke tests, and automated tests (unit, cross-package contract, and release automation tests).
+- Use **pnpm**, managed by **Vite+ (`vp`)**: `vp install`
+
+## Project Layout
+
+| Path          | Purpose                                                                                                                                                                                                                                                                                        |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/*/` | Independently published Pi extensions — runtime code in `src/`, package tests in `tests/`.                                                                                                                                                                                                     |
+| `scripts/`    | Release tooling: `release.ts` maps a component tag to its package and reads notes from the changelog; `format-changelog.ts` normalizes `CHANGELOG.md`; `sync-web-modules.ts` keeps the `pi-web-fetch`/`pi-web-search` shared modules byte-for-byte identical. Invoked by the release workflow. |
+| `tests/`      | Repository contracts, packaged-extension smoke tests, and automated tests (unit, cross-package contract, release automation).                                                                                                                                                                  |
+| `docs/`       | Development, security, and release docs (see External References).                                                                                                                                                                                                                             |
 
 ## Commands
 
