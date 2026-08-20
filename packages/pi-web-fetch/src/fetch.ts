@@ -11,6 +11,47 @@ import {
   responseHeader,
 } from "./network-transport";
 
+/**
+ * Rewrites a GitHub `blob` URL to its raw counterpart so file contents are fetched as
+ * clean plain text instead of Defuddle's noisy code-rendering table.
+ *
+ * @param rawUrl - The URL to normalize
+ * @returns The rewritten raw URL, or the input unchanged for non-GitHub and non-blob URLs
+ */
+export function normalizeGitHubBlobUrl(rawUrl: string): string {
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol !== "https:" || url.hostname !== "github.com") return rawUrl;
+    if (!url.pathname.includes("/blob/")) return rawUrl;
+    return `https://raw.githubusercontent.com${url.pathname.replace("/blob/", "/")}${url.search}`;
+  } catch {
+    return rawUrl;
+  }
+}
+
+const APP_SHELL_MARKERS = [
+  /please\s+enable\s+javascript/i,
+  /enable\s+javascript/i,
+  /consent/i,
+  /are\s+you\s+a\s+robot/i,
+  /verify\s+you\s+are\s+human/i,
+  /checking\s+your\s+browser/i,
+  /<title>\s*just\s+a\s+moment/i,
+];
+
+/**
+ * Detects pages that are likely app shells, bot walls, or consent interstitials rather than
+ * readable content.
+ *
+ * @param raw - The raw response body
+ * @param markdown - The extracted Markdown
+ * @returns True when the extracted text is suspiciously sparse relative to the raw page
+ */
+export function detectAppShell(raw: string, markdown: string): boolean {
+  if (APP_SHELL_MARKERS.some((marker) => marker.test(raw))) return true;
+  return raw.length > 4000 && markdown.length < raw.length * 0.015;
+}
+
 const REQUEST_TIMEOUT_MS = 20_000;
 
 export interface FetchRemoteDependencies extends RedirectDependencies {
@@ -80,12 +121,18 @@ async function documentFromResponse(
     }
   } else markdown = raw.trim();
 
+  const shellSuspected =
+    contentType === "text/html" || contentType === "application/xhtml+xml"
+      ? detectAppShell(raw, markdown)
+      : false;
+
   return {
     url: target.url.toString(),
     contentType,
     markdown: markdown.replace(/<\/untrusted_web_content>/gi, "&lt;/untrusted_web_content&gt;"),
     title,
     extractor,
+    shellSuspected,
   };
 }
 
@@ -106,10 +153,14 @@ export async function fetchCompleteDocument(
   signal?.addEventListener("abort", cancel, { once: true });
 
   try {
-    const { target, response } = await requestFollowingRedirects(rawUrl, controller.signal, {
-      validateUrl: dependencies.validateUrl,
-      request: dependencies.request,
-    });
+    const { target, response } = await requestFollowingRedirects(
+      normalizeGitHubBlobUrl(rawUrl),
+      controller.signal,
+      {
+        validateUrl: dependencies.validateUrl,
+        request: dependencies.request,
+      },
+    );
     return await documentFromResponse(target, response, controller.signal, extractHtml);
   } catch (error) {
     if (timedOut) throw new Error(`web_fetch timed out after ${timeoutMs / 1000} seconds.`);

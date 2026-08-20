@@ -101,6 +101,7 @@ describe("web_fetch rendering", () => {
         contentType: "text/plain",
         markdown: "😀".repeat(100_000),
         extractor: "raw",
+        shellSuspected: false,
       },
       0,
       200_000,

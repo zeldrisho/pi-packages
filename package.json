@@ -12,6 +12,7 @@
     "lint:fix": "vp lint --fix",
     "format": "vp fmt --write",
     "format:changelog": "vp exec node scripts/format-changelog.ts",
+    "sync:web-modules": "vp exec node scripts/sync-web-modules.ts sync --from pi-web-fetch",
     "typecheck": "vp check --no-fmt --no-lint",
     "pack:dry-run": "for package in packages/*; do (cd \"$package\" && vp pm pack -- --dry-run) || exit; done",
     "test:contracts": "vp test tests/repository-contract.test.ts",

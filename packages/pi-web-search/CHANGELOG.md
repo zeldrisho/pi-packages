@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **web-search:** Persist search results to a private cross-session disk cache (24h TTL) behind the existing in-memory cache
+- **web-search:** Report honest-evidence metadata (`evidence` summary and per-result `quality`) in `details`
+
 ## [0.4.2] - 2026-08-05
 
 ### Changed

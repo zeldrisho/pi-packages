@@ -1,5 +1,5 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   DEFAULT_MAX_BYTES,
@@ -17,17 +17,34 @@ import {
   type SearchMode,
   type SearchResult,
 } from "./brave";
-import { ExpiringLruCache } from "./cache";
+import { ExpiringLruCache, stableKeyHash, type CachePersistence } from "./cache";
 import { formatResults } from "./format-results";
 import { InflightCoalescer } from "./inflight";
 import { SEARCH_DEFAULT_RESULT_COUNT } from "./limits";
 import { configuredProvider } from "./provider";
 
-const CACHE_TTL_MS = 10 * 60 * 1_000;
+const CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
 const CACHE_MAX_ENTRIES = 100;
 const CACHE_MAX_RESULT_BYTES = 20 * 1_024 * 1_024;
 const MAX_INFLIGHT_REQUESTS = 100;
 const encoder = new TextEncoder();
+
+/** Honest-evidence summary comparing what was requested with what was returned. */
+export interface SearchEvidence {
+  requestedCount: number;
+  returnedCount: number;
+  dropped: number;
+  freshness?: Freshness;
+  truncated: boolean;
+}
+
+/** Resolves the private, cross-session cache directory for a web tool. */
+function resolveCacheDirectory(name: string): string {
+  const base = process.env.XDG_CACHE_HOME
+    ? join(process.env.XDG_CACHE_HOME, name)
+    : join(homedir(), ".cache", name);
+  return base;
+}
 
 export interface SearchParameters {
   query: string;
@@ -53,6 +70,7 @@ export interface SearchDetails {
   mode: SearchMode;
   resultCount: number;
   results: SearchResult[];
+  evidence: SearchEvidence;
   cached: boolean;
   truncated: boolean;
   fullOutputPath?: string;
@@ -64,10 +82,18 @@ interface SearchUpdate {
   details: Record<string, never>;
 }
 
+const searchCachePersistence: CachePersistence<string, SearchResult[]> = {
+  directory: resolveCacheDirectory("pi-web-search"),
+  serialize: (results) => encoder.encode(JSON.stringify(results)),
+  deserialize: (bytes) => JSON.parse(new TextDecoder().decode(bytes)) as SearchResult[],
+  keyToPath: (key) => stableKeyHash(key),
+};
 const searchCache = new ExpiringLruCache<string, SearchResult[]>(
   CACHE_MAX_ENTRIES,
   CACHE_MAX_RESULT_BYTES,
   (results) => encoder.encode(JSON.stringify(results)).byteLength,
+  undefined,
+  searchCachePersistence,
 );
 const inflightSearches = new InflightCoalescer<string, SearchResult[]>(MAX_INFLIGHT_REQUESTS);
 
@@ -145,6 +171,13 @@ export class SearchRuntime {
       maxLines: DEFAULT_MAX_LINES,
       maxBytes: DEFAULT_MAX_BYTES,
     });
+    const evidence: SearchEvidence = {
+      requestedCount: count,
+      returnedCount: results.length,
+      dropped: Math.max(0, results.length - count),
+      freshness: params.freshness,
+      truncated: truncation.truncated,
+    };
     let text = truncation.content;
     let fullOutputPath: string | undefined;
 
@@ -172,6 +205,7 @@ export class SearchRuntime {
         mode,
         resultCount: results.length,
         results,
+        evidence,
         cached,
         truncated: truncation.truncated,
         fullOutputPath,

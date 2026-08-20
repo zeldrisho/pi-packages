@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **web-fetch:** Persist fetched pages to a private cross-session disk cache (24h TTL) behind the existing in-memory cache
+- **web-fetch:** Report honest-evidence metadata (`requestedUrl`, `finalUrl`, `contentKind`, `shellSuspected`, `confidence`) in `details`
+- **web-fetch:** Rewrite GitHub `blob` URLs to their raw `raw.githubusercontent.com` counterpart for clean file fetching
+
 ## [0.5.4] - 2026-08-12
 
 ### Fixed

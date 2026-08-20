@@ -2,6 +2,7 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   test: {
+    setupFiles: ["./tests/cache-env.setup.ts"],
     coverage: {
       provider: "v8",
       reporter: [["text", { skipFull: false }]],
