@@ -96,7 +96,7 @@ Overrides are forks of upstream dependency decisions. Without a removal conditio
 - [x] Annotate each override in `pnpm-workspace.yaml` with the advisory IDs and the removal condition (for example “drop when `pi-coding-agent` repins `undici` ≥ `8.9.0`”).
 - [x] File a tracking issue listing both overrides and link it from the override comment block.
 - [x] Re-check the removal conditions on every catalog or lockfile bump and drop the satisfied override in the same change.
-- [x] Extend `scripts/repository-contract-test.ts` (or a small script) to fail when an overridden package is no longer present in the dependency graph, signaling a removable override.
+- [x] Extend `tests/repository-contract.test.ts` to fail when an overridden package is no longer present in the dependency graph, signaling a removable override.
 
 **Done when:** every override states why it exists and when it can be removed, a tracking issue links them, and a check surfaces stale overrides.
 
@@ -194,7 +194,7 @@ Link to existing documentation instead of copying setup, release, or security in
 
 ### 10. Detect package-configuration drift
 
-- [x] Extend `scripts/repository-contract-test.ts` to verify intentionally uniform scripts, TypeScript configuration, engine constraints, file allowlists, and Pi extension entries.
+- [x] Extend `tests/repository-contract.test.ts` to verify intentionally uniform scripts, TypeScript configuration, engine constraints, file allowlists, and Pi extension entries.
 - [x] Keep package manifests independently publishable.
 - [x] Avoid manifest generation unless package growth makes the maintenance benefit clear.
 

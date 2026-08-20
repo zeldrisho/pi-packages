@@ -1,10 +1,10 @@
 # Agent Instructions
 
-## Module layout
+## Project Structure
 
 - `packages/*/`: independently published Pi extensions with runtime code in `src/` and package tests in `tests/`.
-- `scripts/`: repository contracts, packaged-extension smoke tests, and release automation.
-- `tests/`: repository automation and cross-package contract tests.
+- `scripts/`: release automation (`release.ts`), invoked by the release workflow.
+- `tests/`: repository contracts, packaged-extension smoke tests, and automated tests (unit, cross-package contract, and release automation tests).
 
 ## Commands
 
@@ -16,17 +16,20 @@
 | Run one package's tests   | `vp run '@zeldrisho/<package>#test'`           |
 | Inspect every npm tarball | `vp run pack:dry-run`                          |
 
-## Constraints
+## Key Conventions
 
 - Keep `cache.ts`, `inflight.ts`, and `render.ts` byte-for-byte synchronized between `pi-web-fetch` and `pi-web-search`.
 - Before implementation, run `git fetch --prune`, inspect local and upstream state, and start from the latest target branch without discarding uncommitted work.
 - Delete a completed local branch only when it is merged into its target and its upstream branch is gone.
 
-## References
+## External References
 
-- Package catalog: `README.md`
-- Development and conventions: `docs/development.md`
-- Security invariants: `docs/security-invariants.md`
-- Package behavior and setup: `packages/*/README.md`
-- Releases: `docs/release.md`
-- Release configuration: `scripts/semantic-release-options.ts`, `scripts/semantic-release-plugin.ts`, `scripts/release.ts`, `.github/workflows/release.yml`
+| Need                        | File                            |
+| --------------------------- | ------------------------------- |
+| Package catalog             | `README.md`                     |
+| Development and conventions | `docs/development.md`           |
+| Security invariants         | `docs/security-invariants.md`   |
+| Package behavior and setup  | `packages/*/README.md`          |
+| Releases                    | `docs/release.md`               |
+| Release automation          | `scripts/release.ts`            |
+| Release workflow            | `.github/workflows/release.yml` |

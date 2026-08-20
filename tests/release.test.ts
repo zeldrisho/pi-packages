@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
@@ -149,6 +149,7 @@ describe("release planning", () => {
       manifestPath: "packages/a.b/package.json",
       changelogPath: "packages/a.b/CHANGELOG.md",
       name: "@zeldrisho/a.b",
+      shortName: "a.b",
       version: "1.2.0",
       tag: "a.b-v1.2.0",
     };
@@ -193,13 +194,13 @@ describe("release planning", () => {
       version: "1.0.1",
     });
     expect(await readFile(join(root, "packages/alpha/CHANGELOG.md"), "utf8")).toContain(
-      "## generated",
+      "## [generated]",
     );
     expect(await readFile(bodyPath, "utf8")).toContain("`@zeldrisho/alpha` → `1.0.1`");
     expect(messages).toEqual(["Prepared 1 package release(s): alpha-v1.0.1"]);
   });
 
-  it("runs semantic-release against package-local component tags", async () => {
+  it("plans releases from package-local conventional commits", async () => {
     const root = await createRepository();
     git(root, "branch", "-M", "main");
     git(root, "tag", "alpha-v1.0.0");
@@ -207,24 +208,15 @@ describe("release planning", () => {
     await writeFile(join(root, "unrelated.txt"), "unrelated feature\n");
     git(root, "add", "unrelated.txt");
     git(root, "commit", "--quiet", "-m", "feat: unrelated behavior");
-    const remote = await mkdtemp(join(tmpdir(), "release-remote-test-"));
-    temporaryDirectories.push(remote);
-    git(remote, "init", "--bare", "--quiet");
-    git(root, "remote", "add", "origin", remote);
-    git(root, "push", "--quiet", "--set-upstream", "origin", "main", "--tags");
-    git(remote, "symbolic-ref", "HEAD", "refs/heads/main");
     await mkdir(join(root, "scripts"));
-    for (const filename of [
-      "release.ts",
-      "semantic-release-options.ts",
-      "semantic-release-plugin.ts",
-    ]) {
-      await writeFile(
-        join(root, "scripts", filename),
-        await readFile(join(process.cwd(), "scripts", filename), "utf8"),
-      );
-    }
-    await symlink(join(process.cwd(), "node_modules"), join(root, "node_modules"), "dir");
+    await writeFile(
+      join(root, "scripts", "release.ts"),
+      await readFile(join(process.cwd(), "scripts", "release.ts"), "utf8"),
+    );
+    await writeFile(
+      join(root, "scripts", "format-changelog.ts"),
+      await readFile(join(process.cwd(), "scripts", "format-changelog.ts"), "utf8"),
+    );
     const parentReleaseBody = join(root, "parent-release-body.md");
     await writeFile(parentReleaseBody, "keep parent release metadata\n");
 
@@ -243,17 +235,18 @@ describe("release planning", () => {
       JSON.parse(await readFile(join(root, "packages/alpha/package.json"), "utf8")),
     ).toMatchObject({ version: "1.0.1" });
     const changelog = await readFile(join(root, "packages/alpha/CHANGELOG.md"), "utf8");
-    // The conventionalcommits preset renders grouped sections and compare links.
-    expect(changelog).toContain("### Bug Fixes");
+    expect(changelog).toContain("### Fixed");
+    expect(changelog).toContain("## [1.0.1] - ");
     expect(changelog).toContain(
-      "## [1.0.1](https://github.com/zeldrisho/pi-packages/compare/alpha-v1.0.0...alpha-v1.0.1)",
+      "[1.0.1]: https://github.com/zeldrisho/pi-packages/releases/tag/alpha-v1.0.1",
     );
+    expect(changelog).not.toContain("## [1.0.1](");
     expect(output).toContain("Prepared 1 package release(s): alpha-v1.0.1");
     expect(await readFile(parentReleaseBody, "utf8")).toBe("keep parent release metadata\n");
   }, 30_000);
 
   it.each(["wrong-v1.0.1", "alpha-vnot-semver"])(
-    "rejects malformed semantic-release version output %s",
+    "rejects malformed planner version output %s",
     async (nextTag) => {
       const root = await createRepository();
       git(root, "tag", "alpha-v1.0.0");
@@ -304,7 +297,7 @@ describe("release planning", () => {
       JSON.parse(await readFile(join(root, "packages/alpha/package.json"), "utf8")),
     ).toMatchObject({ version: "1.0.0" });
     expect(await readFile(join(root, "packages/alpha/CHANGELOG.md"), "utf8")).toContain(
-      "## generated",
+      "## [generated]",
     );
     expect(await readFile(bodyPath, "utf8")).toContain("`@zeldrisho/alpha` → `1.0.0`");
     expect(messages).toEqual(["Prepared 1 package release(s): alpha-v1.0.0"]);
@@ -391,7 +384,7 @@ describe("partial-release recovery and service errors", () => {
       "commit",
       "--allow-empty",
       "-m",
-      "Merge pull request #42 from zeldrisho/semantic-release/release",
+      "Merge pull request #42 from zeldrisho/release/prepare",
     );
     const state = services();
     let output = "";
@@ -491,62 +484,35 @@ describe("partial-release recovery and service errors", () => {
   });
 });
 
-describe("GitHub release creation", () => {
+describe("release notes extraction", () => {
   it("rejects invalid package paths", async () => {
     const root = await createRepository();
-    const state = services();
-    const automation = createReleaseAutomation({ root, runner: runnerFor(root, state) });
-    await expect(automation.ensureGithubRelease("packages/missing")).rejects.toThrow(
-      "Unknown package path",
-    );
+    const automation = createReleaseAutomation({ root });
+    await expect(
+      automation.writeReleaseNotes("packages/missing", join(root, "notes.md")),
+    ).rejects.toThrow("Unknown package path");
   });
 
-  it("resolves HEAD before creating an untagged release", async () => {
+  it("extracts the version section from the changelog", async () => {
     const root = await createRepository();
     await writeFile(
       join(root, "packages/alpha/CHANGELOG.md"),
-      "# Changelog\n\n## 1.0.0 (2026-08-05)\n\nInitial release.\n",
+      "# Changelog\n\n## 1.0.0 (2026-08-05)\n\n* Initial release\n\n## 0.0.1\n\n* Bootstrap\n",
     );
-    const state = services();
-    const automation = createReleaseAutomation({
-      root,
-      runner: runnerFor(root, state),
-      env: { GITHUB_REPOSITORY: "owner/repository" },
-    });
-
-    await automation.ensureGithubRelease("packages/alpha");
-
-    const head = git(root, "rev-parse", "HEAD");
-    const createCall = state.calls.find(
-      (call) => call.command === "gh" && call.args[0] === "release",
-    );
-    expect(createCall?.args).toContain(head);
-    expect(createCall?.args).toContain("--notes-file");
+    const automation = createReleaseAutomation({ root });
+    const notesPath = join(root, "notes.md");
+    await automation.writeReleaseNotes("packages/alpha", notesPath);
+    const notes = await readFile(notesPath, "utf8");
+    expect(notes).toContain("## 1.0.0");
+    expect(notes).not.toContain("## 0.0.1");
   });
 
-  it.each([
-    ["successful", false],
-    ["failed", true],
-  ] as const)("cleans temporary notes after a %s GitHub release", async (_label, failCreate) => {
+  it("throws when the changelog lacks the version entry", async () => {
     const root = await createRepository();
-    await writeFile(
-      join(root, "packages/alpha/CHANGELOG.md"),
-      "# Changelog\n\n## 1.0.0 (2026-08-05)\n\nInitial release.\n",
-    );
-    const tempRoot = await mkdtemp(join(tmpdir(), "release-notes-parent-"));
-    temporaryDirectories.push(tempRoot);
-    const state = services({ failCreate });
-    const automation = createReleaseAutomation({
-      root,
-      runner: runnerFor(root, state),
-      env: { GITHUB_REPOSITORY: "owner/repository", GITHUB_SHA: "abc123" },
-      temporaryRoot: tempRoot,
-    });
-
-    const operation = automation.ensureGithubRelease("packages/alpha");
-    if (failCreate) await expect(operation).rejects.toThrow("GitHub create failed");
-    else await expect(operation).resolves.toBeUndefined();
-    expect(await readdir(tempRoot)).toEqual([]);
+    const automation = createReleaseAutomation({ root });
+    await expect(
+      automation.writeReleaseNotes("packages/alpha", join(root, "notes.md")),
+    ).rejects.toThrow("Changelog does not contain @zeldrisho/alpha@1.0.0");
   });
 });
 
@@ -565,11 +531,11 @@ describe("release CLI", () => {
     automation: ReleaseAutomation;
     status: ReturnType<typeof vi.fn>;
     prepare: ReturnType<typeof vi.fn>;
-    ensureGithubRelease: ReturnType<typeof vi.fn>;
+    writeReleaseNotes: ReturnType<typeof vi.fn>;
   } {
     const status = vi.fn();
     const prepare = vi.fn();
-    const ensureGithubRelease = vi.fn();
+    const writeReleaseNotes = vi.fn();
     return {
       automation: {
         packageCatalog: vi.fn(),
@@ -578,31 +544,38 @@ describe("release CLI", () => {
         assertCurrentVersionIsLatest: vi.fn(),
         status,
         prepare,
-        ensureGithubRelease,
+        writeReleaseNotes,
       },
       status,
       prepare,
-      ensureGithubRelease,
+      writeReleaseNotes,
     };
   }
 
   it.each([
-    ["status", undefined],
-    ["prepare", undefined],
-    ["ensure-github-release", "packages/alpha"],
-  ] as const)("dispatches %s", async (command, argument) => {
+    ["status", undefined, undefined],
+    ["prepare", undefined, undefined],
+    ["notes", "packages/alpha", "notes.md"],
+  ] as const)("dispatches %s", async (command, argument, secondArgument) => {
     const fake = fakeAutomation();
-    await runReleaseCli(argument ? [command, argument] : [command], fake.automation);
+    await runReleaseCli(
+      secondArgument
+        ? [command, argument, secondArgument]
+        : argument
+          ? [command, argument]
+          : [command],
+      fake.automation,
+    );
 
     if (command === "status") expect(fake.status).toHaveBeenCalledOnce();
     else if (command === "prepare") expect(fake.prepare).toHaveBeenCalledOnce();
-    else expect(fake.ensureGithubRelease).toHaveBeenCalledWith("packages/alpha");
+    else expect(fake.writeReleaseNotes).toHaveBeenCalledWith("packages/alpha", "notes.md");
   });
 
-  it("rejects a missing package path", async () => {
+  it("rejects a missing output path for notes", async () => {
     await expect(
-      runReleaseCli(["ensure-github-release"], fakeAutomation().automation),
-    ).rejects.toThrow("A package path is required");
+      runReleaseCli(["notes", "packages/alpha"], fakeAutomation().automation),
+    ).rejects.toThrow("A package path and output path are required");
   });
 
   it("rejects unknown commands with usage", async () => {
