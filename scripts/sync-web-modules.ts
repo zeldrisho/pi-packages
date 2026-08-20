@@ -14,6 +14,7 @@
 // fails the build on drift as the source of truth.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(import.meta.dirname ?? process.cwd(), "..");
 const PACKAGES = ["pi-web-fetch", "pi-web-search"] as const;
@@ -72,15 +73,35 @@ function sync(from: string): number {
   return check() === 0 ? 0 : 1;
 }
 
-const [cmd = "check", ...rest] = process.argv.slice(2);
-const fromFlag = rest.find((arg) => arg.startsWith("--from="));
-const from = fromFlag ? fromFlag.split("=")[1] : PACKAGES[0];
-
-let code = 0;
-if (cmd === "check") code = check() === 0 ? 0 : 1;
-else if (cmd === "sync") code = sync(from);
-else {
-  console.error(`unknown command: ${cmd} (expected "check" or "sync")`);
-  code = 1;
+export interface SyncArguments {
+  command: "check" | "sync";
+  from: (typeof PACKAGES)[number];
 }
-process.exit(code);
+
+/**
+ * Parses `sync-web-modules` CLI arguments, accepting both `--from=X` and
+ * `--from X` spellings of the source package.
+ */
+export function parseSyncArguments(argv: string[]): SyncArguments {
+  const [command = "check", ...rest] = argv;
+  if (command !== "check" && command !== "sync") {
+    throw new Error(`unknown command: ${command} (expected "check" or "sync")`);
+  }
+  const fromFlagIndex = rest.findIndex((arg) => arg === "--from");
+  const fromFlag = rest.find((arg) => arg.startsWith("--from="));
+  const from = fromFlag
+    ? (fromFlag.split("=")[1] as (typeof PACKAGES)[number])
+    : fromFlagIndex !== -1
+      ? (rest[fromFlagIndex + 1] as (typeof PACKAGES)[number])
+      : PACKAGES[0];
+  if (!PACKAGES.includes(from)) {
+    throw new Error(`--from must be one of: ${PACKAGES.join(", ")}`);
+  }
+  return { command, from };
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const { command, from } = parseSyncArguments(process.argv.slice(2));
+  const code = command === "check" ? (check() === 0 ? 0 : 1) : sync(from);
+  process.exit(code);
+}

@@ -32,7 +32,14 @@ export function normalizeGitHubBlobUrl(rawUrl: string): string {
 const APP_SHELL_MARKERS = [
   /please\s+enable\s+javascript/i,
   /enable\s+javascript/i,
-  /consent/i,
+  // Consent is only treated as an interstitial signal when it appears in a
+  // cookie/consent-banner phrase. A bare "consent" matches ordinary prose
+  // (e.g. privacy articles) and must not flag readable content as a shell.
+  /manage\s+(your\s+)?consent/i,
+  /your\s+(privacy\s+)?consent/i,
+  /consent\s+to\s+(our\s+use\s+of\s+cookies|cookies)/i,
+  /accept\s+(all\s+)?cookies/i,
+  /we\s+use\s+cookies/i,
   /are\s+you\s+a\s+robot/i,
   /verify\s+you\s+are\s+human/i,
   /checking\s+your\s+browser/i,
@@ -49,7 +56,10 @@ const APP_SHELL_MARKERS = [
  */
 export function detectAppShell(raw: string, markdown: string): boolean {
   if (APP_SHELL_MARKERS.some((marker) => marker.test(raw))) return true;
-  return raw.length > 4000 && markdown.length < raw.length * 0.015;
+  // Require the extracted text to be both absolutely tiny and a very small
+  // fraction of the raw payload, so content-rich pages (e.g. React/Next.js SPAs
+  // whose raw HTML is dominated by inline scripts) are not mistaken for shells.
+  return raw.length > 4000 && markdown.length < 1024 && markdown.length < raw.length * 0.008;
 }
 
 const REQUEST_TIMEOUT_MS = 20_000;

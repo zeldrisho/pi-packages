@@ -27,7 +27,7 @@ minimumReleaseAgeExclude:
   - "@earendil-works/pi-telemetry@0.84.0"
   - "@earendil-works/pi-tui@0.84.0"
   # Newly published security fix; remove after the normal release-age window.
-  - nanoid@3.3.17
+  - nanoid@3.3.18
   - "@voidzero-dev/vite-plus-core@0.2.9"
   - "@voidzero-dev/vite-plus-darwin-arm64@0.2.9"
   - "@voidzero-dev/vite-plus-darwin-x64@0.2.9"
@@ -53,6 +53,11 @@ overrides:
   # became a no-op. brace-expansion was dropped earlier with the 0.83.0 bump.
   vite: "catalog:"
   vitest: "catalog:"
+  # Dev-only advisory GHSA-2v37-7h3g-55p8: nanoid custom generators loop
+  # indefinitely on size zero. Transitively pulled by postcss via the Vite+
+  # toolchain; forced to the patched release. Override lifecycle tracked in
+  # issue #37.
+  "nanoid@^3.3.17": "3.3.18"
 
 peerDependencyRules:
   allowAny:

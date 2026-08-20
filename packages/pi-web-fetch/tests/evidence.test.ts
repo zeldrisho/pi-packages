@@ -71,6 +71,19 @@ describe("detectAppShell", () => {
     const raw = `<html><body><article>${"word ".repeat(2000)}</article></body></html>`;
     expect(detectAppShell(raw, "word ".repeat(2000))).toBe(false);
   });
+
+  it("does not flag ordinary prose that merely mentions consent", () => {
+    const body = "By continuing you consent to our newsletter and privacy policy. ".repeat(150);
+    const raw = "<html><body><article>" + body + "</article></body></html>";
+    expect(detectAppShell(raw, body)).toBe(false);
+  });
+
+  it("does not flag a content-rich page dominated by script markup", () => {
+    const script = "<script>" + "x".repeat(60_000) + "</script>";
+    const body = "Lorem ipsum dolor sit amet. ".repeat(400);
+    const raw = "<html><body>" + script + "<article>" + body + "</article></body></html>";
+    expect(detectAppShell(raw, body)).toBe(false);
+  });
 });
 
 describe("classifyContentKind", () => {

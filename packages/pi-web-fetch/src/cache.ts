@@ -1,5 +1,5 @@
 import { chmodSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { resolve, sep } from "node:path";
 import { createHash } from "node:crypto";
 
 interface ExpiringCacheEntry<V> {
@@ -23,6 +23,21 @@ export interface CachePersistence<K, V> {
 /** Hashes a cache key into a safe, collision-resistant filename segment. */
 export function stableKeyHash(key: string): string {
   return createHash("sha256").update(key).digest("hex");
+}
+
+/**
+ * Resolves a cache entry's on-disk path and refuses to escape the cache
+ * directory, guarding against a `keyToPath` that returns `..` segments. The
+ * `keyToPath` implementations in this repo return a hex SHA-256 digest, so this
+ * never triggers in normal operation but keeps best-effort persistence safe.
+ */
+export function resolveCachePath(directory: string, keyPath: string): string {
+  const base = resolve(directory);
+  const full = resolve(base, keyPath);
+  if (full !== base && !full.startsWith(base + sep)) {
+    throw new Error(`Refusing to write cache entry outside ${base}: ${keyPath}`);
+  }
+  return full;
 }
 
 function encodeExpiresAt(expiresAt: number): Uint8Array {
@@ -94,9 +109,9 @@ export class ExpiringLruCache<K, V> {
   }
 
   #loadFromDisk(key: K): ExpiringCacheEntry<V> | undefined {
-    const path = join(this.persistence!.directory, this.persistence!.keyToPath(key));
     let bytes: Uint8Array;
     try {
+      const path = resolveCachePath(this.persistence!.directory, this.persistence!.keyToPath(key));
       bytes = readFileSync(path);
     } catch {
       return undefined;
@@ -129,7 +144,7 @@ export class ExpiringLruCache<K, V> {
       mkdirSync(directory, { recursive: true, mode: 0o700 });
       chmodSync(directory, 0o700);
       const payload = this.persistence!.serialize(value);
-      const path = join(directory, this.persistence!.keyToPath(key));
+      const path = resolveCachePath(directory, this.persistence!.keyToPath(key));
       const temp = `${path}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
       writeFileSync(temp, Buffer.concat([encodeExpiresAt(expiresAt), payload]), { mode: 0o600 });
       chmodSync(temp, 0o600);
@@ -141,7 +156,7 @@ export class ExpiringLruCache<K, V> {
 
   #removeFromDisk(key: K): void {
     try {
-      unlinkSync(join(this.persistence!.directory, this.persistence!.keyToPath(key)));
+      unlinkSync(resolveCachePath(this.persistence!.directory, this.persistence!.keyToPath(key)));
     } catch {
       // Ignore missing or undeletable files; a cache miss is the correct outcome.
     }
