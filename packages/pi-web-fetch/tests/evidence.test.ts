@@ -13,12 +13,14 @@ function fakeTextResponse(body: string): IncomingMessage {
       yield buffer;
     },
   };
+  // SAFETY: the literal satisfies IncomingMessage's stream contract; we set the few
+  // fields the tests read (statusCode, headers) immediately above.
   return {
     statusCode: 200,
     headers: { "content-type": "text/plain" },
     destroy() {},
     ...iterator,
-  } as unknown as IncomingMessage;
+  } as IncomingMessage;
 }
 
 describe("normalizeGitHubBlobUrl", () => {

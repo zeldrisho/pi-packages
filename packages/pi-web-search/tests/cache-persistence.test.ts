@@ -13,6 +13,8 @@ function makePersistence(directory: string): CachePersistence<string, SearchResu
   return {
     directory,
     serialize: (results) => encoder.encode(JSON.stringify(results)),
+    // SAFETY: the on-disk bytes are produced by this same serializer, so they always
+    // decode back into a SearchResult[].
     deserialize: (bytes) => JSON.parse(decoder.decode(bytes)) as SearchResult[],
     keyToPath: (key) => stableKeyHash(key),
   };

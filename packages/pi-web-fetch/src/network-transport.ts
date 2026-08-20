@@ -182,7 +182,7 @@ export async function readResponseBytes(
   let total = 0;
   try {
     for await (const value of response) {
-      const chunk = typeof value === "string" ? encoder.encode(value) : new Uint8Array(value);
+      const chunk = value instanceof Uint8Array ? value : encoder.encode(value);
       total += chunk.byteLength;
       if (total > maxBytes) {
         response.destroy();

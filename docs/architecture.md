@@ -79,24 +79,21 @@ failure or session shutdown.
 
 ```mermaid
 flowchart LR
-  A[Conventional commits on main] --> B[Validate repository]
-  B --> C[Discover package-local changes]
-  C --> D[Release automation calculates component versions]
-  D --> E[Generated release PR]
-  E --> F[Merge version and changelog files]
-  F --> G[Status checks tag / GitHub / npm independently]
-  G --> H[Create missing tag and GitHub release]
-  H --> I[Publish missing npm version with OIDC]
+  A[Agent bumps package.json] --> B[Agent writes CHANGELOG entry]
+  B --> C[Agent pushes component tag]
+  C --> D[Workflow resolves package from tag]
+  D --> E[Workflow reads CHANGELOG section as notes]
+  E --> F[Create GitHub release]
+  F --> G[Publish npm version with OIDC]
 ```
 
-`scripts/release.ts` validates package paths, manifest versions, and component tags before planning or
-publishing. Component tags sort by semantic version and use `<directory>-v<version>`. Release status
-checks tags, GitHub releases, and npm versions independently, making retries safe after partial
-publication. The release matrix admits untagged manifest versions only when the push merges the
-generated release pull request or when their changelog entry already landed on `main`; regular feature
-merges only update that pull request. Temporary release notes are written to the runner temp directory and
-passed to `softprops/action-gh-release` for GitHub release creation. Details, approvals, and escalation
-conditions remain in [release.md](release.md).
+`scripts/release.ts` resolves a `<package>-v<version>` tag to its package and
+verifies the tag version matches the manifest version. It then reads the
+package's `CHANGELOG.md` section for the released version and writes it to a
+file for `softprops/action-gh-release`, which creates the GitHub release. The
+workflow publishes the package through npm trusted publishing (OIDC). The agent
+owns the version and changelog; the workflow only reads them. Details, approvals,
+and escalation conditions remain in [release.md](release.md).
 
 Note: `repository-contract.test.ts` is a vitest suite run via `vp run test:contracts` (and
 covered by `vp test`). `package-smoke-test.ts` remains an executable smoke-test script run from

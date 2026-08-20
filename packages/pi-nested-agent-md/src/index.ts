@@ -16,9 +16,10 @@ export default function nestedAgents(pi: ExtensionAPI): void {
 
   pi.on("tool_result", async (event, ctx) => {
     if (event.isError || !isReadToolResult(event)) return;
-    const inputPath = event.input.path;
-    if (typeof inputPath !== "string" || !event.content.some((block) => block.type === "text"))
-      return;
+    // SAFETY: a read tool result always carries a string `path`; isReadToolResult already
+    // confirmed the tool, so after the null check we treat it as the path string.
+    const inputPath = event.input.path == null ? undefined : (event.input.path as string);
+    if (!inputPath || !event.content.some((block) => block.type === "text")) return;
 
     // A successful direct read already put this file's instructions in context.
     // Reserve it before awaiting so a concurrent sibling read cannot append it again.

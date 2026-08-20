@@ -65,25 +65,29 @@ function fail(message: string): never {
 }
 
 describe("repository contracts", () => {
-  it("creates GitHub releases with softprops/action-gh-release using short package names", () => {
-    if (
-      !releaseWorkflow.includes(
-        "- name: Prepare release changes\n        env:\n          GITHUB_TOKEN: ${{ github.token }}\n",
-      )
-    ) {
-      fail("the release planning step must receive GITHUB_TOKEN for its push check");
-    }
-    if (!releaseWorkflow.includes("actions: write")) {
-      fail("the release PR job must be allowed to dispatch its required CI check");
-    }
-    if (!releaseWorkflow.includes('gh workflow run ci.yml --ref "$branch"')) {
-      fail("the generated release PR must explicitly dispatch CI for its head branch");
-    }
+  it("creates GitHub releases with softprops/action-gh-release on component tag push", () => {
     if (!releaseWorkflow.includes("uses: softprops/action-gh-release")) {
       fail("the release job must create GitHub releases with softprops/action-gh-release");
     }
-    if (!releaseWorkflow.includes("matrix.shortName")) {
+    if (!releaseWorkflow.includes("tags:") || !releaseWorkflow.includes('"*-v*.*.*"')) {
+      fail("the release workflow must trigger on component tag pushes (<package>-v<version>)");
+    }
+    if (!releaseWorkflow.includes("id-token: write")) {
+      fail("the publishing job must grant id-token: write for npm trusted publishing");
+    }
+    if (!releaseWorkflow.includes("environment: publish")) {
+      fail("npm publication must require approval through the protected publish environment");
+    }
+    if (!releaseWorkflow.includes("shortName")) {
       fail("the GitHub release name must use the package short name, not the scoped npm name");
+    }
+    if (
+      !releaseWorkflow.includes("scripts/release.ts package") ||
+      !releaseWorkflow.includes("scripts/release.ts notes")
+    ) {
+      fail(
+        "the release job must resolve the package from the tag and read release notes from the CHANGELOG",
+      );
     }
   });
 

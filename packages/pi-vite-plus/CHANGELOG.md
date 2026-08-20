@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **vite-plus:** Sync upstream agent guidance ([f3ca011](https://github.com/zeldrisho/pi-packages/commit/f3ca0115cfffdca1cd9d116d4de7e30e3d2868e4))
+- Sync upstream agent guidance ([f3ca011](https://github.com/zeldrisho/pi-packages/commit/f3ca0115cfffdca1cd9d116d4de7e30e3d2868e4))
 
 ## [0.5.1] - 2026-07-27
 
@@ -29,19 +29,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **pi-vite-plus:** use official agent guidance ([06beba0](https://github.com/zeldrisho/pi-packages/commit/06beba00d8f0689773950dd129f4ab705ea7b4df))
+- use official agent guidance ([06beba0](https://github.com/zeldrisho/pi-packages/commit/06beba00d8f0689773950dd129f4ab705ea7b4df))
 
 ## [0.3.0] - 2026-07-20
 
 ### Added
 
-- **vite-plus:** Add migration command guidance ([2ac8201](https://github.com/zeldrisho/pi-packages/commit/2ac8201ac48d082f4ab44506738195f84d527266))
+- Add migration command guidance ([2ac8201](https://github.com/zeldrisho/pi-packages/commit/2ac8201ac48d082f4ab44506738195f84d527266))
 
 ## [0.2.0] - 2026-07-19
 
 ### Added
 
-- **vite-plus:** Add Vite+ workflow guidance ([a7fbc7a](https://github.com/zeldrisho/pi-packages/commit/a7fbc7aa3acbf4286f9f3473d1746ca0936de9cf))
+- Add Vite+ workflow guidance ([a7fbc7a](https://github.com/zeldrisho/pi-packages/commit/a7fbc7aa3acbf4286f9f3473d1746ca0936de9cf))
 
 [Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-vite-plus-v0.5.2...HEAD
 [0.5.2]: https://github.com/zeldrisho/pi-packages/compare/pi-vite-plus-v0.5.1...pi-vite-plus-v0.5.2

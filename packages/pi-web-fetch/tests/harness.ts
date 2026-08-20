@@ -114,17 +114,7 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
  *
  * @returns An object for managing the fixture server, accessing fetch dependencies, and tracking request counts.
  */
-export function createFetchHarness(): {
-  start(): Promise<void>;
-  stop(): Promise<void>;
-  origin(): string;
-  dependencies(): FetchRemoteDependencies;
-  resetContinuationRequests(): void;
-  continuationRequests(): number;
-  resetCoalescedRequests(): void;
-  coalescedRequests(): number;
-  waitForStalledBody(): Promise<void>;
-} {
+export function createFetchHarness() {
   const server = createServer(fixtureResponse);
   let fixtureOrigin = "";
   let fixtureDependencies: FetchRemoteDependencies;
@@ -132,6 +122,8 @@ export function createFetchHarness(): {
     async start() {
       server.listen(0, "127.0.0.1");
       await once(server, "listening");
+      // SAFETY: the server listens on a TCP port, so `server.address()` is an
+      // AddressInfo (never a string or null in this start() path).
       const address = server.address() as AddressInfo;
       fixtureOrigin = `http://fixture.test:${address.port}`;
       fixtureDependencies = {

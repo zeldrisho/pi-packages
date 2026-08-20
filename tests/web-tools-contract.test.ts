@@ -6,7 +6,9 @@ import { executeWebFetch, type ValidatedTarget } from "../packages/pi-web-fetch/
 import { SearchRuntime } from "../packages/pi-web-search/src/index";
 
 function textResponse(body: string): IncomingMessage {
-  const response = Readable.from([body]) as unknown as IncomingMessage;
+  // SAFETY: Readable.from yields the exact byte stream an IncomingMessage provides;
+  // we attach statusCode and headers immediately afterward.
+  const response = Readable.from([body]) as IncomingMessage;
   response.statusCode = 200;
   response.headers = { "content-type": "text/plain; charset=utf-8" };
   return response;

@@ -20,6 +20,31 @@ export interface SearchResult {
   quality: ResultQuality;
 }
 
+interface BraveWebResult {
+  title?: string;
+  url?: string;
+  description?: string;
+}
+
+interface BraveWebResponse {
+  web?: { results?: BraveWebResult[] };
+}
+
+interface BraveSnippet {
+  caption?: string;
+  table?: Array<Record<string, string>>;
+}
+
+interface BraveContextResult {
+  title?: string;
+  url?: string;
+  snippets?: string[];
+}
+
+interface BraveContextResponse {
+  grounding?: { generic?: BraveContextResult[] };
+}
+
 /**
  * Classifies a search result by how much usable, sourced information it carries.
  *
@@ -66,11 +91,10 @@ export function validateProviderRequest(query: string, count: number, mode: Sear
 /**
  * Normalizes an HTTP or HTTPS URL and limits the result to 2,048 characters.
  *
- * @param value - The value to normalize
+ * @param value - The URL text to normalize
  * @returns The normalized URL, or an empty string for invalid values or unsupported protocols
  */
-function normalizeUrl(value: unknown): string {
-  if (typeof value !== "string") return "";
+function normalizeUrl(value: string): string {
   try {
     const url = new URL(value);
     return url.protocol === "http:" || url.protocol === "https:"
@@ -85,55 +109,37 @@ function escapeMarkdownLinkText(value: string): string {
   return value.replace(/([\\[\]])/g, "\\$1");
 }
 
-function escapeMarkdownCell(value: unknown): string {
-  let text = "";
-  if (typeof value === "string") text = value;
-  else if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
-    text = String(value);
-  } else if (value !== null && value !== undefined) {
-    try {
-      text = JSON.stringify(value) ?? "";
-    } catch {
-      text = "";
-    }
-  }
-  return text.replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
+function escapeMarkdownCell(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
 }
 
-function structuredSnippetToMarkdown(value: unknown): string | undefined {
-  if (!value || typeof value !== "object") return undefined;
-  const record = value as { caption?: unknown; table?: unknown };
-  if (!Array.isArray(record.table) || record.table.length === 0) return undefined;
+function structuredSnippetToMarkdown(value: BraveSnippet): string | undefined {
+  const table = value.table;
+  if (!table || table.length === 0) return undefined;
 
-  const rows = record.table.filter(
-    (row): row is Record<string, unknown> => Boolean(row) && typeof row === "object",
-  );
+  const rows = table.filter(Boolean);
   const headers = [...new Set(rows.flatMap((row) => Object.keys(row)))];
   if (headers.length === 0) return undefined;
 
-  const caption =
-    typeof record.caption === "string" ? `**${escapeMarkdownLinkText(record.caption)}**\n\n` : "";
+  const caption = value.caption ? `**${escapeMarkdownLinkText(value.caption)}**\n\n` : "";
   const header = `| ${headers.map(escapeMarkdownCell).join(" | ")} |`;
   const separator = `| ${headers.map(() => "---").join(" | ")} |`;
   const body = rows
-    .map((row) => `| ${headers.map((key) => escapeMarkdownCell(row[key])).join(" | ")} |`)
+    .map((row) => `| ${headers.map((key) => escapeMarkdownCell(String(row[key]))).join(" | ")} |`)
     .join("\n");
   return `${caption}${header}\n${separator}\n${body}`;
 }
 
-function braveSnippetToMarkdown(value: unknown): string {
-  if (typeof value !== "string") return "";
-  const snippet = value.trim();
-  if (!snippet) return "";
-
+function braveSnippetToMarkdown(value: string): string {
   try {
-    const parsed = JSON.parse(snippet) as unknown;
-    return (
-      structuredSnippetToMarkdown(parsed) ??
-      `\`\`\`json\n${JSON.stringify(parsed, null, 2)}\n\`\`\``
-    ).slice(0, 8000);
+    const snippet = value.trim();
+    if (!snippet) return "";
+    const parsed: BraveSnippet = JSON.parse(snippet);
+    const rendered = structuredSnippetToMarkdown(parsed);
+    if (rendered !== undefined) return rendered.slice(0, 8000);
+    return `\`\`\`json\n${JSON.stringify(parsed, null, 2)}\n\`\`\``.slice(0, 8000);
   } catch {
-    return snippet
+    return String(value)
       .replace(/\r\n/g, "\n")
       .replace(/\n{4,}/g, "\n\n\n")
       .slice(0, 8000);
@@ -167,7 +173,7 @@ export async function searchBraveWeb(
       { day: "pd", week: "pw", month: "pm", year: "py" }[freshness],
     );
 
-  const data = (await requestJson(
+  const data = await requestJson<BraveWebResponse>(
     url,
     {
       headers: {
@@ -176,14 +182,14 @@ export async function searchBraveWeb(
       },
     },
     signal,
-  )) as { web?: { results?: Array<{ title?: unknown; url?: unknown; description?: unknown }> } };
+  );
 
   return (data.web?.results ?? []).map((item) => {
-    const title = normalizeText(item.title, 300);
-    const snippet = normalizeText(item.description, 600);
+    const title = normalizeText(item.title ?? "", 300);
+    const snippet = normalizeText(item.description ?? "", 600);
     return {
       title,
-      url: normalizeUrl(item.url),
+      url: normalizeUrl(item.url ?? ""),
       snippet,
       quality: classifyResultQuality({ title, snippet }),
     };
@@ -220,7 +226,7 @@ export async function searchBraveContext(
       { day: "pd", week: "pw", month: "pm", year: "py" }[freshness],
     );
 
-  const data = (await requestJson(
+  const data = await requestJson<BraveContextResponse>(
     url,
     {
       headers: {
@@ -229,19 +235,17 @@ export async function searchBraveContext(
       },
     },
     signal,
-  )) as {
-    grounding?: { generic?: Array<{ title?: unknown; url?: unknown; snippets?: unknown[] }> };
-  };
+  );
 
   return (data.grounding?.generic ?? []).map((item) => {
     const snippets = [
       ...new Set((item.snippets ?? []).map(braveSnippetToMarkdown).filter(Boolean)),
     ];
-    const title = normalizeText(item.title, 300);
+    const title = normalizeText(item.title ?? "", 300);
     const snippet = snippets.slice(0, BRAVE_MAX_SNIPPETS_PER_URL).join("\n\n");
     return {
       title,
-      url: normalizeUrl(item.url),
+      url: normalizeUrl(item.url ?? ""),
       snippet,
       quality: classifyResultQuality({ title, snippet }),
     };

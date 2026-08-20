@@ -40,11 +40,15 @@ async function smokeDependencyVersion(packageName: string): Promise<string> {
         ...packageName.split("/"),
         "package.json",
       );
-      const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as { version?: unknown };
-      if (typeof manifest.version === "string" && /^\d+\.\d+\.\d+/.test(manifest.version)) {
+      // SAFETY: manifests are produced by `vp pm pack`; we only read the `version`
+      // field, which is a semver string when present.
+      const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as { version?: string };
+      if (manifest.version && /^\d+\.\d+\.\d+/.test(manifest.version)) {
         return manifest.version;
       }
     } catch (error) {
+      // SAFETY: a read failure other than a missing manifest file is unexpected and must
+      // propagate; we only swallow ENOENT (the package is simply not installed).
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
   }

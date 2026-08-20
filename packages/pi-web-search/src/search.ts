@@ -85,6 +85,8 @@ interface SearchUpdate {
 const searchCachePersistence: CachePersistence<string, SearchResult[]> = {
   directory: resolveCacheDirectory("pi-web-search"),
   serialize: (results) => encoder.encode(JSON.stringify(results)),
+  // SAFETY: cache entries are written by this same serializer, so the decoded
+  // JSON always matches the SearchResult[] shape.
   deserialize: (bytes) => JSON.parse(new TextDecoder().decode(bytes)) as SearchResult[],
   keyToPath: (key) => stableKeyHash(key),
 };

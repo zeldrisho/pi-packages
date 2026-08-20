@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **file-remove:** Simplify removal guidance ([ecf201c](https://github.com/zeldrisho/pi-packages/commit/ecf201c60a400af2952aecb0364986808fe9d49c))
+- Simplify removal guidance ([ecf201c](https://github.com/zeldrisho/pi-packages/commit/ecf201c60a400af2952aecb0364986808fe9d49c))
 
 ## [0.3.1] - 2026-07-27
 
@@ -29,21 +29,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **file-remove:** require approval for rm commands ([02b7d41](https://github.com/zeldrisho/pi-packages/commit/02b7d410ff09022f2dfb14f560189ca417fd33c5))
+- require approval for rm commands ([02b7d41](https://github.com/zeldrisho/pi-packages/commit/02b7d410ff09022f2dfb14f560189ca417fd33c5))
 
 ### Fixed
 
-- **file-remove:** avoid ambiguous regex backtracking ([9b40c2f](https://github.com/zeldrisho/pi-packages/commit/9b40c2f1796d2df1ce23036aac235b216736137c))
+- avoid ambiguous regex backtracking ([9b40c2f](https://github.com/zeldrisho/pi-packages/commit/9b40c2f1796d2df1ce23036aac235b216736137c))
 
 ## [0.1.0] - 2026-07-21
 
 ### Added
 
-- **file-remove:** add gomi removal guidance ([4df3f44](https://github.com/zeldrisho/pi-packages/commit/4df3f440376ff91f54f24154aa85a0db6267e847))
+- add gomi removal guidance ([4df3f44](https://github.com/zeldrisho/pi-packages/commit/4df3f440376ff91f54f24154aa85a0db6267e847))
 
 ### Fixed
 
-- **file-remove:** pin initial release version ([7b72403](https://github.com/zeldrisho/pi-packages/commit/7b72403432bb57c443ea8f3997e0ea4a5b19ee16))
+- pin initial release version ([7b72403](https://github.com/zeldrisho/pi-packages/commit/7b72403432bb57c443ea8f3997e0ea4a5b19ee16))
 
 [Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-file-remove-v0.3.2...HEAD
 [0.3.2]: https://github.com/zeldrisho/pi-packages/compare/pi-file-remove-v0.3.1...pi-file-remove-v0.3.2

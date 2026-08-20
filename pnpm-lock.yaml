@@ -6,24 +6,12 @@ settings:
 
 catalogs:
   default:
-    '@earendil-works/pi-ai':
-      specifier: ^0.84.0
-      version: 0.84.0
-    '@earendil-works/pi-coding-agent':
-      specifier: ^0.84.0
-      version: 0.84.0
-    '@earendil-works/pi-tui':
-      specifier: ^0.84.0
-      version: 0.84.0
     '@types/node':
       specifier: ^26.1.1
       version: 26.1.1
     '@vitest/coverage-v8':
       specifier: 4.1.10
       version: 4.1.10
-    typebox:
-      specifier: ^1.1.24
-      version: 1.3.7
     typescript:
       specifier: ^7.0.0
       version: 7.0.2
@@ -40,6 +28,9 @@ importers:
 
   .:
     devDependencies:
+      '@oxlint/plugins':
+        specifier: 1.79.0
+        version: 1.79.0
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.1
@@ -745,6 +736,10 @@ packages:
 
   '@oxlint/plugins@1.73.0':
     resolution: {integrity: sha512-OhgMQeMmZA0dcFcX4/priaJZWdFECxiClgq6mRX6aatZEcV9PbKC3P3/v8U1hVjviT1i5U+vR8lAtBV6m4FXAA==}
+    engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
+
+  '@oxlint/plugins@1.79.0':
+    resolution: {integrity: sha512-S0uyoxakDINJ4DPgqxGlEEvrdSMeQb7Z2lKVjxoY2gwsbZbfg2Xr8Klfeo5ZeraHmmdBCELFUHkSe6KEmBpMvg==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
 
   '@polka/url@1.0.0-next.29':
@@ -2544,6 +2539,8 @@ snapshots:
     optional: true
 
   '@oxlint/plugins@1.73.0': {}
+
+  '@oxlint/plugins@1.79.0': {}
 
   '@polka/url@1.0.0-next.29': {}
 

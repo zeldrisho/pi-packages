@@ -20,6 +20,7 @@
     "prepare": "vp config"
   },
   "devDependencies": {
+    "@oxlint/plugins": "1.79.0",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "typescript": "catalog:",
