@@ -5,7 +5,7 @@ import {
   type SpawnSyncOptionsWithStringEncoding,
 } from "node:child_process";
 import { readFile, readdir, writeFile } from "node:fs/promises";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, resolve, sep } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { formatChangelog } from "./format-changelog.ts";
@@ -572,10 +572,16 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
     const suffix = referenceLine ? `\n\n${referenceLine}` : "";
     // Release notes are written to an explicitly provided path. Normalize it so
     // `..` segments cannot escape, and reject relative paths that would resolve
-    // outside the working directory. Absolute paths chosen by the caller (the CI
-    // runner temp directory or a local file) are trusted.
+    // outside the working directory. The resolved path must equal the working
+    // directory or sit underneath it (separator-bounded) so a sibling directory
+    // sharing the cwd prefix cannot bypass the check. Absolute paths chosen by the
+    // caller (the CI runner temp directory or a local file) are trusted.
+    const resolvedCwd = resolve(process.cwd());
     const resolvedPath = resolve(outputPath);
-    if (!isAbsolute(outputPath) && !resolvedPath.startsWith(process.cwd())) {
+    if (
+      !isAbsolute(outputPath) &&
+      !(resolvedPath === resolvedCwd || resolvedPath.startsWith(resolvedCwd + sep))
+    ) {
       throw new Error(
         `Refusing to write release notes outside the working directory: ${outputPath}`,
       );

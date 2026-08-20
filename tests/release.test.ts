@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   createReleaseAutomation,
@@ -513,6 +513,19 @@ describe("release notes extraction", () => {
     await expect(
       automation.writeReleaseNotes("packages/alpha", join(root, "notes.md")),
     ).rejects.toThrow("Changelog does not contain @zeldrisho/alpha@1.0.0");
+  });
+
+  it("rejects output paths that escape via a sibling-directory prefix", async () => {
+    const root = await createRepository();
+    await writeFile(
+      join(root, "packages/alpha/CHANGELOG.md"),
+      "# Changelog\n\n## 1.0.0 (2026-08-05)\n\n* Initial release\n\n## 0.0.1\n\n* Bootstrap\n",
+    );
+    const automation = createReleaseAutomation({ root });
+    const sibling = join("..", `${basename(process.cwd())}-evil`, "notes.md");
+    await expect(automation.writeReleaseNotes("packages/alpha", sibling)).rejects.toThrow(
+      "outside the working directory",
+    );
   });
 });
 
