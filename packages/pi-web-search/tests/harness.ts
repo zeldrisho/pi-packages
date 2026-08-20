@@ -44,21 +44,21 @@ export type ShutdownHandler = () => Promise<void> | void;
  *
  * @returns The registered search tool and a getter for the session shutdown handler.
  */
-export function createSearchHarness(): {
-  tool: SearchTool;
-  getShutdownHandler: () => ShutdownHandler | undefined;
-} {
+export function createSearchHarness() {
   let registered: unknown;
   let shutdownHandler: ShutdownHandler | undefined;
+  // SAFETY: registerWebSearch registers the search tool via `registerTool` and a single
+  // `session_shutdown` handler; we capture both for the test harness.
   registerWebSearch({
-    registerTool(tool: unknown) {
+    registerTool(tool: any) {
       registered = tool;
     },
     on(event: string, handler: ShutdownHandler) {
       if (event === "session_shutdown") shutdownHandler = handler;
     },
-  } as unknown as ExtensionAPI);
+  } as ExtensionAPI);
   if (!registered) throw new Error("web_search was not registered");
+  // SAFETY: the captured value is the web_search SearchTool registered above.
   return {
     tool: registered as SearchTool,
     getShutdownHandler: () => shutdownHandler,
@@ -81,7 +81,7 @@ export function createSearchTool(): SearchTool {
  * @param status - The HTTP status code for the response
  * @returns A response with a JSON body and content type
  */
-export function jsonResponse(value: unknown, status = 200): Response {
+export function jsonResponse(value: any, status = 200): Response {
   return new Response(JSON.stringify(value), {
     status,
     headers: { "content-type": "application/json" },

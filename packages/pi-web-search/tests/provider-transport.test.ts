@@ -138,13 +138,15 @@ describe("web_search provider transport", () => {
       .execute("call", { query: "oversized provider error test" }, undefined, undefined)
       .then(
         () => undefined,
-        (reason: unknown) => reason,
+        (reason: any) => reason,
       );
 
     expect(error).toBeInstanceOf(Error);
-    expect((error as Error).message).toMatch(/^Search provider returned HTTP 429: failure/);
-    expect((error as Error).message).not.toContain("<b>");
-    expect((error as Error).message.length).toBeLessThan(550);
+    // SAFETY: the rejection value is always an Error thrown by the provider transport.
+    const err = error as Error;
+    expect(err.message).toMatch(/^Search provider returned HTTP 429: failure/);
+    expect(err.message).not.toContain("<b>");
+    expect(err.message.length).toBeLessThan(550);
     expect(cancelled).toBe(true);
   });
 

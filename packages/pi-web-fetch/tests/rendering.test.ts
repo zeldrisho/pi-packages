@@ -26,12 +26,16 @@ const renderTheme: RenderTheme = {
 describe("web_fetch rendering", () => {
   it("shows a Pi-style preview until tool output is expanded", () => {
     let registered: unknown;
+    // SAFETY: registerWebFetch registers a single web_fetch tool via `registerTool`;
+    // we capture it and replay it through the typed renderer below.
     registerWebFetch({
-      registerTool(tool: unknown) {
+      registerTool(tool: any) {
         registered = tool;
       },
-    } as unknown as ExtensionAPI);
+    } as ExtensionAPI);
 
+    // SAFETY: the captured value is the web_fetch SearchTool registered above; we assert
+    // the render-call/result shape the extension exposes.
     const tool = registered as {
       renderCall(args: { url: string }, theme: RenderTheme): RenderedComponent;
       renderResult(

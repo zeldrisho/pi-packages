@@ -7,16 +7,18 @@ type BeforeAgentStartHandler = (event: {
   systemPromptOptions: { selectedTools?: string[] };
 }) => { systemPrompt: string } | undefined;
 
-function registerExtension(): { events: string[]; handler: BeforeAgentStartHandler } {
+function registerExtension() {
   const events: string[] = [];
-  let handler: BeforeAgentStartHandler | undefined;
+  let handler!: BeforeAgentStartHandler;
 
+  // SAFETY: registerFileRemove registers exactly one `before_agent_start` handler via
+  // `on`; we capture it and fail the test if it never arrives.
   registerFileRemove({
-    on(name: string, registeredHandler: BeforeAgentStartHandler) {
+    on(name: string, registeredHandler: any) {
       events.push(name);
       if (name === "before_agent_start") handler = registeredHandler;
     },
-  } as unknown as ExtensionAPI);
+  } as ExtensionAPI);
 
   if (!handler) throw new Error("before_agent_start handler was not registered");
   return { events, handler };

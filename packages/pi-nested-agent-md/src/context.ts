@@ -18,7 +18,7 @@ function lineCount(value: string): number {
   return value.split("\n").length;
 }
 
-function truncateUtf8(value: string, maxBytes: number): { text: string; truncated: boolean } {
+function truncateUtf8(value: string, maxBytes: number) {
   const bytes = encoder.encode(value);
   if (bytes.byteLength <= maxBytes) return { text: value, truncated: false };
 
@@ -28,7 +28,7 @@ function truncateUtf8(value: string, maxBytes: number): { text: string; truncate
   return { text, truncated: true };
 }
 
-function truncateLines(value: string, maxLines: number): { text: string; truncated: boolean } {
+function truncateLines(value: string, maxLines: number) {
   const lines = value.split("\n");
   if (lines.length <= maxLines) return { text: value, truncated: false };
   return { text: lines.slice(0, Math.max(0, maxLines)).join("\n"), truncated: true };
@@ -88,7 +88,7 @@ export class ContextAccumulator {
     return this.addition;
   }
 
-  private capacity(root: string, path: string): { bytes: number; lines: number } {
+  private capacity(root: string, path: string) {
     const reservedWrapper = formatContext(root, path, "", true);
     return {
       bytes: Math.min(MAX_FILE_BYTES, this.bytesLeft - byteLength(reservedWrapper)),

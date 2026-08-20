@@ -22,7 +22,7 @@ export function awaitWithAbort<T>(operation: Promise<T>, signal: AbortSignal): P
 
     operation.then(
       (value) => finish(() => resolve(value)),
-      (error: unknown) => finish(() => reject(error)),
+      (error) => finish(() => reject(error)),
     );
     if (signal.aborted) abort();
     else signal.addEventListener("abort", abort, { once: true });

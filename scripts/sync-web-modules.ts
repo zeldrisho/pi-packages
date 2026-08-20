@@ -53,6 +53,8 @@ function check(): number {
 }
 
 function sync(from: string): number {
+  // SAFETY: `from` is a validated PACKAGES member; the assertion narrows the
+  // CLI string so `includes` accepts the known union.
   if (!PACKAGES.includes(from as (typeof PACKAGES)[number])) {
     console.error(`--from must be one of: ${PACKAGES.join(", ")}`);
     return 1;
@@ -89,6 +91,8 @@ export function parseSyncArguments(argv: string[]): SyncArguments {
   }
   const fromFlagIndex = rest.findIndex((arg) => arg === "--from");
   const fromFlag = rest.find((arg) => arg.startsWith("--from="));
+  // SAFETY: the `--from` value is validated against PACKAGES below; the
+  // assertions narrow the CLI string to the known union of package names.
   const from = fromFlag
     ? (fromFlag.split("=")[1] as (typeof PACKAGES)[number])
     : fromFlagIndex !== -1

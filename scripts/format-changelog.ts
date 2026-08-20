@@ -29,7 +29,7 @@ const STANDARD_SECTIONS = ["Added", "Changed", "Deprecated", "Removed", "Fixed",
  * the closest standard type; anything else is preserved verbatim (so bespoke
  * categories survive a normalization pass).
  */
-const SECTION_TITLE_MAP: Record<string, string> = {
+const SECTION_TITLE_MAP = {
   Features: "Added",
   Feature: "Added",
   "Bug Fixes": "Fixed",
@@ -57,7 +57,7 @@ const SECTION_TITLE_MAP: Record<string, string> = {
   Removed: "Removed",
   Fixed: "Fixed",
   Security: "Security",
-};
+} as const;
 
 interface ChangeEntry {
   version: string;
@@ -67,7 +67,9 @@ interface ChangeEntry {
 }
 
 function normalizeSectionTitle(title: string): string {
-  return SECTION_TITLE_MAP[title.trim()] ?? title.trim();
+  // SAFETY: the trimmed heading title is used only as a map key; an unknown key
+  // falls back to the title itself, so a miss is harmless.
+  return SECTION_TITLE_MAP[title.trim() as keyof typeof SECTION_TITLE_MAP] ?? title.trim();
 }
 
 function compareSemver(left: string, right: string): number {
@@ -79,7 +81,7 @@ function compareSemver(left: string, right: string): number {
   return 0;
 }
 
-function parseHeading(line: string): { version: string; date: string | null } {
+function parseHeading(line: string) {
   const bracket = line.match(/^##\s+\[([^\]]+)\]/);
   const raw = bracket ? bracket[1].trim() : line.replace(/^##\s+/, "").trim();
   // Some legacy headings pack the date inside the bracket, e.g. `[0.2.0 (2026-07-19)]`.

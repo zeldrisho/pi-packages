@@ -123,6 +123,7 @@ interface WebFetchUpdate {
 const fetchCachePersistence: CachePersistence<string, CompleteDocument> = {
   directory: resolveCacheDirectory("pi-web-fetch"),
   serialize: (document) => encoder.encode(JSON.stringify(document)),
+  // SAFETY: cached documents are serialized with JSON.stringify(CompleteDocument); decoding restores the same shape.
   deserialize: (bytes) => JSON.parse(new TextDecoder().decode(bytes)) as CompleteDocument,
   keyToPath: (key) => stableKeyHash(key),
 };

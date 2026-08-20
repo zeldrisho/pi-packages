@@ -89,19 +89,18 @@ export async function extractHtmlToMarkdown(
   try {
     const { Defuddle } = await import("defuddle/node");
     const { document } = parseHTML(html);
-    const defuddleDocument = document as unknown as Document;
-    removeMalformedSchemaOrgData(defuddleDocument);
-    normalizeSelectorUnsafeIds(defuddleDocument);
-    const result = await Defuddle(defuddleDocument, baseUrl.toString(), {
+    removeMalformedSchemaOrgData(document);
+    normalizeSelectorUnsafeIds(document);
+    const result = await Defuddle(document, baseUrl.toString(), {
       markdown: true,
       useAsync: false,
     });
-    const markdown = typeof result.content === "string" ? result.content.trim() : "";
+    const markdown = result.content?.trim() ?? "";
+    const trimmedTitle = result.title?.trim();
     if (markdown) {
       return {
         markdown,
-        title:
-          typeof result.title === "string" && result.title.trim() ? result.title.trim() : undefined,
+        title: trimmedTitle || undefined,
         extractor: "defuddle",
       };
     }

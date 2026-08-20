@@ -9,8 +9,7 @@ export function configuredProvider(): "brave" {
   return "brave";
 }
 
-export function normalizeText(value: unknown, maxLength: number): string {
-  if (typeof value !== "string") return "";
+export function normalizeText(value: string, maxLength: number): string {
   const text = value
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
@@ -72,11 +71,11 @@ async function readResponseText(
   return new TextDecoder().decode(await readResponseBytes(response, maxBytes, truncate));
 }
 
-export async function requestJson(
+export async function requestJson<T>(
   url: string | URL,
   init: RequestInit,
   signal: AbortSignal | undefined,
-): Promise<unknown> {
+): Promise<T> {
   const controller = new AbortController();
   let timedOut = false;
   const timeout = setTimeout(() => {
@@ -100,7 +99,8 @@ export async function requestJson(
       }
       throw new Error(`Search provider returned HTTP ${response.status}${body ? `: ${body}` : ""}`);
     }
-    return JSON.parse(await readResponseText(response, SEARCH_MAX_RESPONSE_BYTES)) as unknown;
+    // SAFETY: the caller supplies the expected response shape T; JSON.parse yields the decoded document.
+    return JSON.parse(await readResponseText(response, SEARCH_MAX_RESPONSE_BYTES)) as T;
   } catch (error) {
     if (timedOut)
       throw new Error(`Web search timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds.`);

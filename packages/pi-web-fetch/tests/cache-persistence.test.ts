@@ -14,6 +14,8 @@ function makePersistence(directory: string): CachePersistence<string, CompleteDo
   return {
     directory,
     serialize: (document) => encoder.encode(JSON.stringify(document)),
+    // SAFETY: the on-disk bytes are produced by this same serializer, so they always
+    // decode back into a CompleteDocument.
     deserialize: (bytes) => JSON.parse(decoder.decode(bytes)) as CompleteDocument,
     keyToPath: (key) => stableKeyHash(key),
   };

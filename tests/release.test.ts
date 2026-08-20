@@ -3,12 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import {
-  createReleaseAutomation,
-  runReleaseCli,
-  type PackageInfo,
-  type ReleaseAutomation,
-} from "../scripts/release.ts";
+import { createReleaseAutomation, runReleaseCli, type PackageInfo } from "../scripts/release.ts";
 
 const temporaryDirectories: string[] = [];
 
@@ -156,11 +151,7 @@ describe("release CLI", () => {
     ).not.toThrow();
   });
 
-  function fakeAutomation(): {
-    automation: ReleaseAutomation;
-    resolvePackageByTag: ReturnType<typeof vi.fn>;
-    writeReleaseNotes: ReturnType<typeof vi.fn>;
-  } {
+  function fakeAutomation() {
     const resolvePackageByTag = vi.fn().mockResolvedValue({ path: "packages/alpha" });
     const writeReleaseNotes = vi.fn();
     return {

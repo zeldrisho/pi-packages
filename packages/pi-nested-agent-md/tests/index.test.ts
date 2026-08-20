@@ -20,7 +20,7 @@ async function createTemporaryDirectory(prefix: string): Promise<string> {
   return path;
 }
 
-type EventHandler = (event: unknown, context: unknown) => object | undefined | Promise<unknown>;
+type EventHandler = (event: any, context: any) => object | undefined | Promise<object>;
 
 interface HandlerMap {
   session_start: EventHandler;
@@ -31,11 +31,13 @@ interface HandlerMap {
 
 function registerHandlers(): HandlerMap {
   const handlers = new Map<string, EventHandler>();
+  // SAFETY: registerNestedAgents only registers a fixed set of session/tool handlers via
+  // `on`; we capture them in a map and replay them with explicit test inputs.
   registerNestedAgents({
     on(name: string, handler: EventHandler) {
       handlers.set(name, handler);
     },
-  } as unknown as ExtensionAPI);
+  } as ExtensionAPI);
   return {
     session_start: handlers.get("session_start")!,
     tool_result: handlers.get("tool_result")!,
@@ -107,6 +109,8 @@ describe("nested AGENTS.md discovery", () => {
     const context = { cwd: root };
     await handlers.session_start({}, context);
 
+    // SAFETY: handlers.tool_result returns the injected-instructions object built by the
+    // extension; we assert it has the rendered `content` shape.
     const first = (await handlers.tool_result(readResult(target), context)) as {
       content: Array<{ type: string; text: string }>;
     };
@@ -138,6 +142,8 @@ describe("nested AGENTS.md discovery", () => {
     const context = { cwd: root };
     await handlers.session_start({}, context);
 
+    // SAFETY: handlers.tool_result returns the injected-instructions object built by the
+    // extension; we assert it has the rendered `content` shape.
     const directResult = (await handlers.tool_result(readResult(innerAgents), context)) as {
       content: Array<{ type: string; text: string }>;
     };
@@ -157,6 +163,8 @@ describe("nested AGENTS.md discovery", () => {
     await writeFile(target, "export {};", "utf8");
 
     const handlers = registerHandlers();
+    // SAFETY: handlers.tool_result returns the injected-instructions object built by the
+    // extension; we assert it has the rendered `content` shape.
     const result = (await handlers.tool_result(readResult(target), { cwd: root })) as {
       content: Array<{ type: string; text: string }>;
     };
@@ -176,6 +184,8 @@ describe("nested AGENTS.md discovery", () => {
     const context = { cwd: root };
     await handlers.session_start({}, context);
 
+    // SAFETY: handlers.tool_result returns the injected-instructions object built by the
+    // extension; we assert it has the rendered `content` shape.
     const result = (await handlers.tool_result(readResult(target), context)) as {
       content: Array<{ type: string; text: string }>;
     };

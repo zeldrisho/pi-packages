@@ -7,21 +7,18 @@ interface AgentStartEvent {
   systemPromptOptions: { selectedTools?: string[] };
 }
 
-function registerExtension(): {
-  eventNames: string[];
-  beforeAgentStart: (event: AgentStartEvent) => { systemPrompt: string } | undefined;
-} {
+function registerExtension() {
   const eventNames: string[] = [];
-  let beforeAgentStart:
-    | ((event: AgentStartEvent) => { systemPrompt: string } | undefined)
-    | undefined;
+  let beforeAgentStart!: (event: AgentStartEvent) => { systemPrompt: string } | undefined;
 
+  // SAFETY: registerCloudflare registers exactly one `before_agent_start` handler via
+  // `on`; we capture it and fail the test if it never arrives.
   registerCloudflare({
-    on(name: string, handler: (event: AgentStartEvent) => { systemPrompt: string } | undefined) {
+    on(name: string, handler: any) {
       eventNames.push(name);
       if (name === "before_agent_start") beforeAgentStart = handler;
     },
-  } as unknown as ExtensionAPI);
+  } as ExtensionAPI);
 
   if (!beforeAgentStart) throw new Error("before_agent_start handler was not registered");
   return { eventNames, beforeAgentStart };

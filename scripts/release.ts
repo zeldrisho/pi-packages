@@ -4,14 +4,11 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const defaultRoot = resolve(import.meta.dirname, "..");
-const releaseRepository = "zeldrisho/pi-packages";
-const releaseRepositoryUrl = `https://github.com/${releaseRepository}`;
 const tagPattern = /^([A-Za-z0-9._-]+)-v(\d+\.\d+\.\d+)$/;
 
 interface PackageManifest {
   name: string;
   version: string;
-  [key: string]: unknown;
 }
 
 export interface PackageInfo {
@@ -68,7 +65,7 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
           }
           const path = `packages/${entry.name}`;
           const manifestPath = join(root, path, "package.json");
-          const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as PackageManifest;
+          const manifest: PackageManifest = JSON.parse(await readFile(manifestPath, "utf8"));
           if (manifest.name !== `@zeldrisho/${entry.name}`) {
             throw new Error(`Unexpected package name in ${manifestPath}: ${manifest.name}`);
           }
