@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-20
+
 ### Added
 
 - Persist search results to a private cross-session disk cache (24h TTL) behind the existing in-memory cache
@@ -58,7 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded Brave web search ([cbc9491](https://github.com/zeldrisho/pi-packages/commit/cbc9491dce36555ab91b6bef203ec8b380596a89))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.4.2...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.5.0...HEAD
+[0.5.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.4.2...pi-web-search-v0.5.0
 [0.4.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.4.1...pi-web-search-v0.4.2
 [0.4.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.4.0...pi-web-search-v0.4.1
 [0.4.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.3.1...pi-web-search-v0.4.0
