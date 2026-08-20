@@ -36,8 +36,12 @@ when it adds meaning beyond the file, for example `**deps:**` or `**security:**`
 3. Add a `## [version] - YYYY-MM-DD` entry to `packages/<name>/CHANGELOG.md` and run `vp run format:changelog`.
 4. Run `vp run validate` on the change, then open and merge a pull request.
 5. From `main`, create and push the component tag: `git tag <name>-v<version> && git push origin <name>-v<version>`.
-6. Approve the protected `publish` deployment only after confirming the package and version.
+6. Confirm the package and version **before** pushing the tag. The `publish` environment is declared for OIDC trusted publishing and provenance, but in this repository it does **not** require a manual approval, so pushing the tag publishes to npm automatically (to add a manual gate, configure required reviewers on the `publish` environment).
 7. Confirm CI, the component tag, the GitHub release, OIDC publication, provenance, npm metadata, and tarball contents.
+
+If a tag run fails after its GitHub release was already created, it leaves a partial
+release. To retry, delete the GitHub release and the remote tag, then re-create and
+push the tag at the corrected commit; the run republishes automatically.
 
 ## Bootstrap a new npm package
 
@@ -57,12 +61,12 @@ access level, tarball content, or publisher setting is unexpected.
 
 - Keep each package manifest, component tag, GitHub release, npm version, and changelog synchronized for the same version.
 - The agent writes all changelog entries by hand; the workflow only reads them.
-- Only the repository owner approves the `publish` environment deployment.
+- Pushing the component tag publishes automatically via the `publish` environment (OIDC trusted publishing). The environment is configured for provenance only and does not currently require a manual approval, so confirm the package and version are correct before pushing the tag.
 - Rebase work branches onto their target; never merge the target into them.
 - Verify npm trusted publication end to end after every release.
 
 ## Escalation conditions
 
 Pause the release and notify the repository owner if the manifest version, tag,
-package path, or changelog disagree; authentication, OIDC, provenance, or
-publication fails; or the protected-environment deployment lacks explicit approval.
+package path, or changelog disagree; or authentication, OIDC, provenance, or
+publication fails.
