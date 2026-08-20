@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-20
+
 ### Added
 
 - Persist fetched pages to a private cross-session disk cache (24h TTL) behind the existing in-memory cache
@@ -85,7 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.4...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.6.0...HEAD
+[0.6.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.4...pi-web-fetch-v0.6.0
 [0.5.4]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.3...pi-web-fetch-v0.5.4
 [0.5.3]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.2...pi-web-fetch-v0.5.3
 [0.5.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.1...pi-web-fetch-v0.5.2
