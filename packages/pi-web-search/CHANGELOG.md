@@ -12,6 +12,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **web-search:** Persist search results to a private cross-session disk cache (24h TTL) behind the existing in-memory cache
 - **web-search:** Report honest-evidence metadata (`evidence` summary and per-result `quality`) in `details`
 
+## [0.5.0] - 2026-08-20
+
+### Added
+
+- add disk cache, honest-evidence, and GitHub raw rewrite ([4455814](https://github.com/zeldrisho/pi-packages/commit/4455814a785723046d07f04dba87f42edc422c0b))
+
+### Changed
+
+- replace semantic-release with Keep a Changelog 2.0.0 tooling ([5bde8d3](https://github.com/zeldrisho/pi-packages/commit/5bde8d3ce057f4ce5b85c63c3140e57d2bca6bff))
+- upgrade Vite+ toolchain to 0.2.9 ([9921cf3](https://github.com/zeldrisho/pi-packages/commit/9921cf3ffbed29f9c08ca3ab595a5096fadf2be0))
+- replace semantic-release with Keep a Changelog 2.0.0 tooling ([5bde8d3](https://github.com/zeldrisho/pi-packages/commit/5bde8d3ce057f4ce5b85c63c3140e57d2bca6bff))
+- upgrade Vite+ toolchain to 0.2.9 ([9921cf3](https://github.com/zeldrisho/pi-packages/commit/9921cf3ffbed29f9c08ca3ab595a5096fadf2be0))
+- replace semantic-release with Keep a Changelog 2.0.0 tooling ([5bde8d3](https://github.com/zeldrisho/pi-packages/commit/5bde8d3ce057f4ce5b85c63c3140e57d2bca6bff))
+- upgrade Vite+ toolchain to 0.2.9 ([9921cf3](https://github.com/zeldrisho/pi-packages/commit/9921cf3ffbed29f9c08ca3ab595a5096fadf2be0))
+- replace semantic-release with Keep a Changelog 2.0.0 tooling ([5bde8d3](https://github.com/zeldrisho/pi-packages/commit/5bde8d3ce057f4ce5b85c63c3140e57d2bca6bff))
+- upgrade Vite+ toolchain to 0.2.9 ([9921cf3](https://github.com/zeldrisho/pi-packages/commit/9921cf3ffbed29f9c08ca3ab595a5096fadf2be0))
+- replace semantic-release with Keep a Changelog 2.0.0 tooling ([5bde8d3](https://github.com/zeldrisho/pi-packages/commit/5bde8d3ce057f4ce5b85c63c3140e57d2bca6bff))
+- upgrade Vite+ toolchain to 0.2.9 ([9921cf3](https://github.com/zeldrisho/pi-packages/commit/9921cf3ffbed29f9c08ca3ab595a5096fadf2be0))
+
+### Fixed
+
+- resolve web-tools review feedback and clear nanoid advisory ([96aa77f](https://github.com/zeldrisho/pi-packages/commit/96aa77ff55762984c00b1d15a6b25137c9263b89))
+
 ## [0.4.2] - 2026-08-05
 
 ### Changed
@@ -58,7 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **web-search:** Add bounded Brave web search ([cbc9491](https://github.com/zeldrisho/pi-packages/commit/cbc9491dce36555ab91b6bef203ec8b380596a89))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.4.2...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.5.0...HEAD
+[0.5.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.4.2...pi-web-search-v0.5.0
 [0.4.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.4.1...pi-web-search-v0.4.2
 [0.4.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.4.0...pi-web-search-v0.4.1
 [0.4.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.3.1...pi-web-search-v0.4.0

@@ -13,6 +13,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **web-fetch:** Report honest-evidence metadata (`requestedUrl`, `finalUrl`, `contentKind`, `shellSuspected`, `confidence`) in `details`
 - **web-fetch:** Rewrite GitHub `blob` URLs to their raw `raw.githubusercontent.com` counterpart for clean file fetching
 
+## [0.6.0] - 2026-08-20
+
+### Added
+
+- add disk cache, honest-evidence, and GitHub raw rewrite ([4455814](https://github.com/zeldrisho/pi-packages/commit/4455814a785723046d07f04dba87f42edc422c0b))
+
+### Changed
+
+- replace semantic-release with Keep a Changelog 2.0.0 tooling ([5bde8d3](https://github.com/zeldrisho/pi-packages/commit/5bde8d3ce057f4ce5b85c63c3140e57d2bca6bff))
+- replace semantic-release with Keep a Changelog 2.0.0 tooling ([5bde8d3](https://github.com/zeldrisho/pi-packages/commit/5bde8d3ce057f4ce5b85c63c3140e57d2bca6bff))
+- replace semantic-release with Keep a Changelog 2.0.0 tooling ([5bde8d3](https://github.com/zeldrisho/pi-packages/commit/5bde8d3ce057f4ce5b85c63c3140e57d2bca6bff))
+- replace semantic-release with Keep a Changelog 2.0.0 tooling ([5bde8d3](https://github.com/zeldrisho/pi-packages/commit/5bde8d3ce057f4ce5b85c63c3140e57d2bca6bff))
+- replace semantic-release with Keep a Changelog 2.0.0 tooling ([5bde8d3](https://github.com/zeldrisho/pi-packages/commit/5bde8d3ce057f4ce5b85c63c3140e57d2bca6bff))
+
+### Fixed
+
+- resolve web-tools review feedback and clear nanoid advisory ([96aa77f](https://github.com/zeldrisho/pi-packages/commit/96aa77ff55762984c00b1d15a6b25137c9263b89))
+
 ## [0.5.4] - 2026-08-12
 
 ### Fixed
@@ -85,7 +103,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **web-fetch:** Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.4...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.6.0...HEAD
+[0.6.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.4...pi-web-fetch-v0.6.0
 [0.5.4]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.3...pi-web-fetch-v0.5.4
 [0.5.3]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.2...pi-web-fetch-v0.5.3
 [0.5.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.1...pi-web-fetch-v0.5.2
