@@ -42,8 +42,21 @@ jobs:
         id: pkg
         run: echo "result=$(vp exec node scripts/release.ts package '${{ github.ref_name }}')" >> "$GITHUB_OUTPUT"
 
+      - name: Validate package path
+        id: path
+        run: |
+          pkg_path='${{ fromJSON(steps.pkg.outputs.result).path }}'
+          case "$pkg_path" in
+            packages/*) ;;
+            *) echo "Refusing to write release notes for non-package path: $pkg_path" >&2; exit 1 ;;
+          esac
+          case "$pkg_path" in
+            *".."*) echo "Refusing package path with '..' component: $pkg_path" >&2; exit 1 ;;
+          esac
+          echo "value=$pkg_path" >> "$GITHUB_OUTPUT"
+
       - name: Write release notes
-        run: vp exec node scripts/release.ts notes '${{ fromJSON(steps.pkg.outputs.result).path }}' "${{ runner.temp }}/notes.md"
+        run: vp exec node scripts/release.ts notes '${{ steps.path.outputs.value }}' "${{ runner.temp }}/notes.md"
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v3
@@ -55,5 +68,5 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish package
-        working-directory: ${{ fromJSON(steps.pkg.outputs.result).path }}
+        working-directory: ${{ steps.path.outputs.value }}
         run: vp pm publish -- --access public
