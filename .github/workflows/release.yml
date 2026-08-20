@@ -57,7 +57,11 @@ jobs:
 
       - name: Verify release commit is on the default branch
         run: |
-          git fetch origin '+refs/heads/main:refs/remotes/origin/main' --no-tags
+          # actions/checkout runs with persist-credentials: false, so the git
+          # credential helper has no token and an unauthenticated fetch fails on
+          # private repositories. Supply the token explicitly for this single
+          # fetch so the guard also works there.
+          git fetch 'https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git' '+refs/heads/main:refs/remotes/origin/main' --no-tags
           if ! git merge-base --is-ancestor "${{ github.sha }}" origin/main; then
             echo "Refusing to release: ${{ github.sha }} is not an ancestor of main, so it was not reviewed via a pull request." >&2
             exit 1
@@ -77,4 +81,7 @@ jobs:
 
       - name: Publish package
         working-directory: ${{ steps.path.outputs.value }}
-        run: vp pm publish -- --access public
+        # The tag checkout leaves HEAD detached, so pnpm's publish-branch git
+        # check (master|main) aborts. The custom guard above already verifies the
+        # commit is reviewed on main, so skip pnpm's redundant git checks here.
+        run: vp pm publish -- --access public --no-git-checks
