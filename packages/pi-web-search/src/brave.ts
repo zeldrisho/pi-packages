@@ -110,7 +110,7 @@ function escapeMarkdownLinkText(value: string): string {
 }
 
 function escapeMarkdownCell(value: string): string {
-  return value.replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
+  return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
 }
 
 function structuredSnippetToMarkdown(value: BraveSnippet): string | undefined {
