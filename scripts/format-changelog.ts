@@ -137,9 +137,14 @@ function renderEntry(entry: ChangeEntry): string {
   );
   for (const [sectionTitle, lines] of ordered) {
     // Keep a Changelog lists bullets contiguously; drop the blank separators
-    // the legacy generator left between items.
-    const body = lines.filter((line) => line.trim() !== "").join("\n");
-    parts.push(body ? `### ${sectionTitle}\n${body}` : `### ${sectionTitle}`);
+    // the legacy generator left between items, normalize the bullet marker to
+    // '-', and precede the list with a blank line so the rendered changelog
+    // satisfies the project formatter (vite-plus/dprint fmt).
+    const body = lines
+      .filter((line) => line.trim() !== "")
+      .map((line) => line.replace(/^\*\s+/, "- "))
+      .join("\n");
+    parts.push(body ? `### ${sectionTitle}\n\n${body}` : `### ${sectionTitle}`);
   }
   if (parts.length === 0) return heading;
   return `${heading}\n\n${parts.join("\n\n")}`;

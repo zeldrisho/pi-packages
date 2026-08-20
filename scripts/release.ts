@@ -519,7 +519,11 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
         throw new Error(`Invalid changelog header for ${pkg.name}`);
       }
       const existingNotes = changelog.slice(changelogHeader.length).trim();
-      const composed = `${changelogHeader}\n\n${plan.notes.trim()}${existingNotes ? `\n\n${existingNotes}` : ""}\n`;
+      // Place the existing changelog body before the newly generated notes so
+      // formatChangelog parses from the first existing '## ' heading and keeps
+      // the standard intro paragraph (which it rebuilds at the top) outside the
+      // parsed entries instead of absorbing it into the new version's section.
+      const composed = `${changelogHeader}\n\n${existingNotes ? `${existingNotes}\n\n` : ""}${plan.notes.trim()}\n`;
       await writeFile(
         pkg.changelogPath,
         formatChangelog(composed, {
