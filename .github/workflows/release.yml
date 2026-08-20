@@ -55,6 +55,14 @@ jobs:
           esac
           echo "value=$pkg_path" >> "$GITHUB_OUTPUT"
 
+      - name: Verify release commit is on the default branch
+        run: |
+          git fetch origin '+refs/heads/main:refs/remotes/origin/main' --no-tags
+          if ! git merge-base --is-ancestor "${{ github.sha }}" origin/main; then
+            echo "Refusing to release: ${{ github.sha }} is not an ancestor of main, so it was not reviewed via a pull request." >&2
+            exit 1
+          fi
+
       - name: Write release notes
         run: vp exec node scripts/release.ts notes '${{ steps.path.outputs.value }}' "${{ runner.temp }}/notes.md"
 
