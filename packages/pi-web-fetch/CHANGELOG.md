@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve the absolute URL when extracting HTML so Defuddle never constructs `new URL(pathname)` for GitHub-style host + path pages, and guard Defuddle failures (including detached rejections) so extraction always falls back to the basic converter instead of surfacing an `ERR_INVALID_URL` to the caller
+
 ## [0.6.0] - 2026-08-20
 
 ### Added

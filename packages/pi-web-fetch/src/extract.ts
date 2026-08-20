@@ -1,4 +1,5 @@
 import { parseHTML } from "linkedom";
+import type { DefuddleResponse } from "defuddle/node";
 
 const RAW_ID_SELECTOR_SAFE = /^-?[_a-zA-Z][-_a-zA-Z0-9]*$/;
 
@@ -76,10 +77,60 @@ export function htmlToMarkdownFallback(html: string): string {
 }
 
 /**
+ * Runs Defuddle over an already-normalized document.
+ *
+ * Defuddle can fail in two distinct ways. The common case rejects the promise
+ * we `await` below, which the caller's `try/catch` catches and turns into a
+ * fallback. The dangerous case is when Defuddle schedules a throw on a
+ * *detached* microtask or timer — for example, when it resolves a
+ * document-relative link such as `/owner/repo/releases` into
+ * `new URL(relative, undefined)` *after* its own promise has already resolved.
+ * That rejection never reaches the `await` and instead escapes as an unhandled
+ * rejection that bypasses the surrounding `try/catch` and crashes the calling
+ * harness UI.
+ *
+ * To keep `extractHtmlToMarkdown` from ever propagating such a failure, this
+ * helper attaches a scoped `unhandledRejection` guard for the lifetime of the
+ * call and yields a macrotask so any promise chain Defuddle spawned has a
+ * chance to settle before we commit to a successful result. A rejection
+ * observed during that window is re-thrown so the caller falls back to the
+ * basic extractor.
+ *
+ * @param document - The normalized document to parse
+ * @param pageUrl - The absolute URL of the page, used to resolve relative links
+ * @returns The Defuddle result, or `undefined` when extraction must fall back
+ */
+async function runDefuddle(
+  document: Document,
+  pageUrl: string,
+): Promise<DefuddleResponse | undefined> {
+  let escapedRejection: unknown = undefined;
+  // `cause` is the unhandled rejection's reason — the cause of the Defuddle
+  // failure we capture so the caller can fall back instead of crashing.
+  const captureUnhandled = (cause: unknown): void => {
+    if (escapedRejection === undefined) escapedRejection = cause;
+  };
+  process.on("unhandledRejection", captureUnhandled);
+  try {
+    const { Defuddle } = await import("defuddle/node");
+    const result = await Defuddle(document, pageUrl, { markdown: true, useAsync: false });
+    // Let any promise Defuddle scheduled after resolving settle so a detached
+    // rejection is observed by the guard above instead of reaching the harness.
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    if (escapedRejection !== undefined) throw escapedRejection;
+    return result;
+  } catch {
+    return undefined;
+  } finally {
+    process.off("unhandledRejection", captureUnhandled);
+  }
+}
+
+/**
  * Extracts readable Markdown and an optional title from HTML.
  *
  * @param html - The HTML document to convert
- * @param baseUrl - The base URL used to resolve document-relative links
+ * @param baseUrl - The absolute base URL used to resolve document-relative links
  * @returns The extracted Markdown, optional title, and extractor used
  */
 export async function extractHtmlToMarkdown(
@@ -87,16 +138,15 @@ export async function extractHtmlToMarkdown(
   baseUrl: URL,
 ): Promise<{ markdown: string; title?: string; extractor: "defuddle" | "basic" }> {
   try {
-    const { Defuddle } = await import("defuddle/node");
     const { document } = parseHTML(html);
     removeMalformedSchemaOrgData(document);
     normalizeSelectorUnsafeIds(document);
-    const result = await Defuddle(document, baseUrl.toString(), {
-      markdown: true,
-      useAsync: false,
-    });
-    const markdown = result.content?.trim() ?? "";
-    const trimmedTitle = result.title?.trim();
+    // Pass the full absolute URL so Defuddle resolves relative links (e.g.
+    // `/owner/repo/releases`) and metadata against the real origin instead of
+    // dropping the scheme and host and constructing `new URL(pathname)`.
+    const result = await runDefuddle(document, baseUrl.href);
+    const markdown = result?.content?.trim() ?? "";
+    const trimmedTitle = result?.title?.trim();
     if (markdown) {
       return {
         markdown,
