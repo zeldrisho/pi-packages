@@ -1,8 +1,14 @@
 name: Release
 
+# Releases are driven by the agent: it bumps `package.json`, writes the
+# `CHANGELOG.md` entry by hand, and pushes a `<package>-v<version>` tag
+# (for example `pi-web-search-v0.5.0`). Pushing that tag creates the GitHub
+# release from the changelog and publishes the package to npm.
+
 on:
   push:
-    branches: [main]
+    tags:
+      - "*-v*.*.*"
 
 permissions:
   contents: read
@@ -12,104 +18,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  validate:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - uses: voidzero-dev/setup-vp@v1.17.0
-        with:
-          node-version: "24"
-          cache: true
-
-      - run: vp install
-      - run: vp run validate
-
-  plan:
-    needs: validate
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    outputs:
-      matrix: ${{ steps.status.outputs.matrix }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - uses: voidzero-dev/setup-vp@v1.17.0
-        with:
-          node-version: "24"
-          cache: true
-
-      - run: vp install
-      - id: status
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: echo "matrix=$(vp exec node scripts/release.ts status)" >> "$GITHUB_OUTPUT"
-
   release:
-    needs: plan
-    # Only a push that merges the generated release pull request, or a retry of a
-    # release whose changelog entry already landed on main but which is not yet
-    # tagged, populates the matrix (scripts/release.ts status). Regular feature
-    # merges only update the release pull request via the prepare job.
-    if: fromJSON(needs.plan.outputs.matrix).include[0] != null
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: publish
     permissions:
       contents: write
       id-token: write
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - uses: voidzero-dev/setup-vp@v1.17.0
-        with:
-          node-version: "24"
-          cache: false
-
-      - run: vp install
-      - name: Write release notes
-        if: ${{ !matrix.released }}
-        run: vp exec node scripts/release.ts notes '${{ matrix.package }}' "${{ runner.temp }}/${{ matrix.tag }}.md"
-      - name: Create GitHub release
-        if: ${{ !matrix.released }}
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ matrix.tag }}
-          name: ${{ matrix.shortName }} v${{ matrix.version }}
-          body_path: ${{ runner.temp }}/${{ matrix.tag }}.md
-          target_commitish: ${{ github.sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish package
-        if: matrix.publish
-        working-directory: ${{ matrix.package }}
-        run: vp pm publish -- --access public
-
-  prepare:
-    needs: [plan, release]
-    if: >-
-      always() && needs.plan.result == 'success' &&
-      (needs.release.result == 'success' || needs.release.result == 'skipped')
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    permissions:
-      actions: write
-      contents: write
-      pull-requests: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -122,52 +37,23 @@ jobs:
           cache: true
 
       - run: vp install
-      - name: Prepare release changes
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          RELEASE_PR_BODY: ${{ runner.temp }}/release-pr.md
-        run: vp exec node scripts/release.ts prepare
 
-      - name: Validate and update release pull request
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_PR_BODY: ${{ runner.temp }}/release-pr.md
-        run: |
-          if git diff --quiet; then
-            exit 0
-          fi
+      - name: Resolve package from tag
+        id: pkg
+        run: echo "result=$(vp exec node scripts/release.ts package '${{ github.ref_name }}')" >> "$GITHUB_OUTPUT"
 
-          vp run validate
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+      - name: Write release notes
+        run: vp exec node scripts/release.ts notes '${{ fromJSON(steps.pkg.outputs.result).path }}' "${{ runner.temp }}/notes.md"
 
-          branch='release/prepare'
-          remote_sha=$(git ls-remote --heads origin "refs/heads/$branch" | cut -f1)
-          if [ -n "$remote_sha" ]; then
-            git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch"
-          fi
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ fromJSON(steps.pkg.outputs.result).shortName }} v${{ fromJSON(steps.pkg.outputs.result).version }}
+          body_path: ${{ runner.temp }}/notes.md
+          target_commitish: ${{ github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-          git checkout -B "$branch"
-          git add packages/*/package.json packages/*/CHANGELOG.md
-          git commit -m 'chore: release packages'
-          if [ -n "$remote_sha" ]; then
-            git push --force-with-lease="refs/heads/$branch:$remote_sha" origin "$branch"
-          else
-            git push --set-upstream origin "$branch"
-          fi
-
-          pr=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')
-          if [ -n "$pr" ]; then
-            gh pr edit "$pr" --body-file "$RELEASE_PR_BODY"
-          else
-            gh pr create \
-              --base main \
-              --head "$branch" \
-              --title 'chore: release packages' \
-              --body-file "$RELEASE_PR_BODY"
-          fi
-
-          # Pull requests created with GITHUB_TOKEN do not emit pull_request
-          # workflow events, so explicitly dispatch the required head check.
-          gh workflow run ci.yml --ref "$branch"
+      - name: Publish package
+        working-directory: ${{ fromJSON(steps.pkg.outputs.result).path }}
+        run: vp pm publish -- --access public

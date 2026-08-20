@@ -6,10 +6,8 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   createReleaseAutomation,
   runReleaseCli,
-  type CommandAttempt,
-  type CommandRunner,
+  type PackageInfo,
   type ReleaseAutomation,
-  type ReleasePlanner,
 } from "../scripts/release.ts";
 
 const temporaryDirectories: string[] = [];
@@ -35,80 +33,6 @@ async function createRepository(version = "1.0.0"): Promise<string> {
   return root;
 }
 
-async function commit(root: string, subject: string, body?: string): Promise<void> {
-  const marker = join(root, "packages", "alpha", "marker.txt");
-  await writeFile(marker, `${subject}\n${body ?? ""}\n${crypto.randomUUID()}\n`);
-  git(root, "add", ".");
-  const args = ["commit", "--quiet", "-m", subject];
-  if (body) args.push("-m", body);
-  git(root, ...args);
-}
-
-interface FakeServices {
-  npm?: CommandAttempt;
-  github?: CommandAttempt;
-  nextTag?: string;
-  failCreate?: boolean;
-  failPlan?: boolean;
-  plannerCalls: number;
-  calls: Array<{ command: string; args: string[] }>;
-}
-
-function runnerFor(root: string, services: FakeServices): CommandRunner {
-  return {
-    run(command, args) {
-      services.calls.push({ command, args });
-      if (command === "git") return git(root, ...args);
-      if (command === "gh") {
-        if (services.failCreate) throw new Error("GitHub create failed");
-        return "";
-      }
-      throw new Error(`Unexpected command: ${command}`);
-    },
-    attempt(command, args) {
-      services.calls.push({ command, args });
-      if (command === "git") {
-        try {
-          return { status: 0, stdout: git(root, ...args), stderr: "" };
-        } catch {
-          return { status: 1, stdout: "", stderr: "not found" };
-        }
-      }
-      if (command === "vp") {
-        return (
-          services.npm ?? {
-            status: 1,
-            stdout: JSON.stringify({ error: { code: "ERR_PNPM_NO_MATCHING_VERSION" } }),
-            stderr: "",
-          }
-        );
-      }
-      if (command === "gh") {
-        return services.github ?? { status: 1, stdout: "", stderr: "HTTP 404" };
-      }
-      throw new Error(`Unexpected attempted command: ${command}`);
-    },
-  };
-}
-
-function services(overrides: Partial<FakeServices> = {}): FakeServices {
-  return { calls: [], plannerCalls: 0, ...overrides };
-}
-
-function plannerFor(state: FakeServices): ReleasePlanner {
-  return {
-    async plan(_pkg, requestedVersion) {
-      state.plannerCalls += 1;
-      if (state.failPlan) throw new Error("Changelog generation failed");
-      const tag = requestedVersion
-        ? `alpha-v${requestedVersion}`
-        : (state.nextTag ?? "alpha-v1.0.1");
-      const version = tag.slice("alpha-v".length);
-      return { version, tag, notes: "## generated\n\nGenerated release notes" };
-    },
-  };
-}
-
 afterEach(async () => {
   await Promise.all(
     temporaryDirectories
@@ -117,370 +41,62 @@ afterEach(async () => {
   );
 });
 
-describe("release planning", () => {
-  it("orders component tags semantically and rejects manifest/tag inconsistencies", async () => {
-    const root = await createRepository("1.5.0");
-    for (const tag of ["alpha-v1.2.0", "alpha-v1.10.0", "alpha-v1.5.0", "alpha-vbad"]) {
-      git(root, "tag", tag);
-    }
-    const state = services();
-    const automation = createReleaseAutomation({ root, runner: runnerFor(root, state) });
-    const pkg = (await automation.packageCatalog())[0];
+describe("package catalog", () => {
+  it("discovers package directories and computes their component tag", async () => {
+    const root = await createRepository("1.2.3");
+    const automation = createReleaseAutomation({ root });
+    const catalog = await automation.packageCatalog();
 
-    expect(automation.componentTags(pkg)).toEqual([
-      "alpha-v1.10.0",
-      "alpha-v1.5.0",
-      "alpha-v1.2.0",
-    ]);
-    expect(() => automation.assertCurrentVersionIsLatest(pkg)).toThrow(
-      "inconsistent with latest component tag alpha-v1.10.0",
-    );
-  });
-
-  it("treats package directories literally in component tag patterns", () => {
-    const runner: CommandRunner = {
-      run: () => "a.b-v1.2.0\naxb-v1.3.0",
-      attempt: () => ({ status: 1, stdout: "", stderr: "" }),
-    };
-    const automation = createReleaseAutomation({ runner });
-    const pkg = {
-      directory: "a.b",
-      path: "packages/a.b",
-      manifestPath: "packages/a.b/package.json",
-      changelogPath: "packages/a.b/CHANGELOG.md",
-      name: "@zeldrisho/a.b",
-      shortName: "a.b",
-      version: "1.2.0",
-      tag: "a.b-v1.2.0",
-    };
-
-    expect(automation.componentTags(pkg)).toEqual(["a.b-v1.2.0"]);
-  });
-
-  it.each([
-    ["docs: explain alpha", undefined, false],
-    ["fix: repair alpha", undefined, true],
-    ["chore: reorganize alpha", "BREAKING CHANGE: remove old behavior", true],
-  ] as const)("classifies %s commits", async (subject, body, expected) => {
-    const root = await createRepository();
-    git(root, "tag", "alpha-v1.0.0");
-    await commit(root, subject, body);
-    const state = services();
-    const automation = createReleaseAutomation({ root, runner: runnerFor(root, state) });
-
-    expect(automation.hasReleasableChanges((await automation.packageCatalog())[0])).toBe(expected);
-  });
-
-  it("generates versions, changelogs, and the release pull-request body", async () => {
-    const root = await createRepository();
-    git(root, "tag", "alpha-v1.0.0");
-    await commit(root, "fix: repair alpha");
-    const bodyPath = join(root, "release-body.md");
-    const state = services({ nextTag: "alpha-v1.0.1" });
-    const messages: string[] = [];
-    const automation = createReleaseAutomation({
-      root,
-      runner: runnerFor(root, state),
-      planner: plannerFor(state),
-      env: { RELEASE_PR_BODY: bodyPath },
-      log: (message) => messages.push(message),
-    });
-
-    await automation.prepare();
-
-    expect(
-      JSON.parse(await readFile(join(root, "packages/alpha/package.json"), "utf8")),
-    ).toMatchObject({
-      version: "1.0.1",
-    });
-    expect(await readFile(join(root, "packages/alpha/CHANGELOG.md"), "utf8")).toContain(
-      "## [generated]",
-    );
-    expect(await readFile(bodyPath, "utf8")).toContain("`@zeldrisho/alpha` → `1.0.1`");
-    expect(messages).toEqual(["Prepared 1 package release(s): alpha-v1.0.1"]);
-  });
-
-  it("plans releases from package-local conventional commits", async () => {
-    const root = await createRepository();
-    git(root, "branch", "-M", "main");
-    git(root, "tag", "alpha-v1.0.0");
-    await commit(root, "fix(alpha): repair behavior");
-    await writeFile(join(root, "unrelated.txt"), "unrelated feature\n");
-    git(root, "add", "unrelated.txt");
-    git(root, "commit", "--quiet", "-m", "feat: unrelated behavior");
-    await mkdir(join(root, "scripts"));
-    await writeFile(
-      join(root, "scripts", "release.ts"),
-      await readFile(join(process.cwd(), "scripts", "release.ts"), "utf8"),
-    );
-    await writeFile(
-      join(root, "scripts", "format-changelog.ts"),
-      await readFile(join(process.cwd(), "scripts", "format-changelog.ts"), "utf8"),
-    );
-    const parentReleaseBody = join(root, "parent-release-body.md");
-    await writeFile(parentReleaseBody, "keep parent release metadata\n");
-
-    const output = execFileSync(process.execPath, ["scripts/release.ts", "prepare"], {
-      cwd: root,
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        GITHUB_REF: "refs/heads/main",
-        // The workflow's RELEASE_PR_BODY must not leak into this nested planner.
-        RELEASE_PR_BODY: "",
+    expect(catalog).toEqual<PackageInfo[]>([
+      {
+        directory: "alpha",
+        path: "packages/alpha",
+        manifestPath: join(root, "packages/alpha/package.json"),
+        changelogPath: join(root, "packages/alpha/CHANGELOG.md"),
+        name: "@zeldrisho/alpha",
+        shortName: "alpha",
+        version: "1.2.3",
+        tag: "alpha-v1.2.3",
       },
-    });
-
-    expect(
-      JSON.parse(await readFile(join(root, "packages/alpha/package.json"), "utf8")),
-    ).toMatchObject({ version: "1.0.1" });
-    const changelog = await readFile(join(root, "packages/alpha/CHANGELOG.md"), "utf8");
-    expect(changelog).toContain("### Fixed");
-    expect(changelog).toContain("## [1.0.1] - ");
-    expect(changelog).toContain(
-      "[1.0.1]: https://github.com/zeldrisho/pi-packages/releases/tag/alpha-v1.0.1",
-    );
-    expect(changelog).not.toContain("## [1.0.1](");
-    expect(output).toContain("Prepared 1 package release(s): alpha-v1.0.1");
-    expect(await readFile(parentReleaseBody, "utf8")).toBe("keep parent release metadata\n");
-  }, 30_000);
-
-  it.each(["wrong-v1.0.1", "alpha-vnot-semver"])(
-    "rejects malformed planner version output %s",
-    async (nextTag) => {
-      const root = await createRepository();
-      git(root, "tag", "alpha-v1.0.0");
-      await commit(root, "feat: add behavior");
-      const state = services({ nextTag });
-      const automation = createReleaseAutomation({
-        root,
-        runner: runnerFor(root, state),
-        planner: plannerFor(state),
-      });
-
-      await expect(automation.prepare()).rejects.toThrow(/unexpected tag|invalid version/);
-    },
-  );
-
-  it("logs when there are no releasable package changes", async () => {
-    const root = await createRepository();
-    git(root, "tag", "alpha-v1.0.0");
-    const messages: string[] = [];
-    const state = services();
-    const automation = createReleaseAutomation({
-      root,
-      runner: runnerFor(root, state),
-      log: (message) => messages.push(message),
-    });
-
-    await automation.prepare();
-
-    expect(messages).toEqual(["No releasable package changes found."]);
-  });
-
-  it("prepares a changelog-only initial release for an untagged package", async () => {
-    const root = await createRepository();
-    const bodyPath = join(root, "release-body.md");
-    const state = services();
-    const messages: string[] = [];
-    const automation = createReleaseAutomation({
-      root,
-      runner: runnerFor(root, state),
-      planner: plannerFor(state),
-      env: { RELEASE_PR_BODY: bodyPath },
-      log: (message) => messages.push(message),
-    });
-
-    await automation.prepare();
-
-    expect(
-      JSON.parse(await readFile(join(root, "packages/alpha/package.json"), "utf8")),
-    ).toMatchObject({ version: "1.0.0" });
-    expect(await readFile(join(root, "packages/alpha/CHANGELOG.md"), "utf8")).toContain(
-      "## [generated]",
-    );
-    expect(await readFile(bodyPath, "utf8")).toContain("`@zeldrisho/alpha` → `1.0.0`");
-    expect(messages).toEqual(["Prepared 1 package release(s): alpha-v1.0.0"]);
-  });
-
-  it("skips an untagged package whose changelog already documents the version", async () => {
-    const root = await createRepository();
-    await writeFile(
-      join(root, "packages/alpha/CHANGELOG.md"),
-      "# Changelog\n\n## 1.0.0 (2026-08-05)\n",
-    );
-    const messages: string[] = [];
-    const state = services();
-    const automation = createReleaseAutomation({
-      root,
-      runner: runnerFor(root, state),
-      log: (message) => messages.push(message),
-    });
-
-    await automation.prepare();
-
-    expect(messages).toEqual(["No releasable package changes found."]);
-    expect(state.plannerCalls).toBe(0);
-  });
-
-  it("does not bump the manifest when changelog generation fails", async () => {
-    const root = await createRepository();
-    git(root, "tag", "alpha-v1.0.0");
-    await commit(root, "fix: repair alpha");
-    const state = services({ failPlan: true });
-    const automation = createReleaseAutomation({
-      root,
-      runner: runnerFor(root, state),
-      planner: plannerFor(state),
-    });
-
-    await expect(automation.prepare()).rejects.toThrow("Changelog generation failed");
-    expect(
-      JSON.parse(await readFile(join(root, "packages/alpha/package.json"), "utf8")),
-    ).toMatchObject({ version: "1.0.0" });
+    ]);
   });
 });
 
-describe("partial-release recovery and service errors", () => {
-  it.each([
-    ["missing GitHub release", true, true, false, false],
-    ["fully released", true, true, true, undefined],
-  ] as const)("reports %s", async (_label, tagged, published, released, publish) => {
-    const root = await createRepository();
-    git(root, "tag", "alpha-v1.0.0");
-    const state = services({
-      npm: published
-        ? { status: 0, stdout: '"1.0.0"', stderr: "" }
-        : {
-            status: 1,
-            stdout: JSON.stringify({ error: { code: "ERR_PNPM_NO_MATCHING_VERSION" } }),
-            stderr: "",
-          },
-      github: released
-        ? { status: 0, stdout: "", stderr: "" }
-        : { status: 1, stdout: "", stderr: "HTTP 404" },
-    });
-    let output = "";
-    const automation = createReleaseAutomation({
-      root,
-      runner: runnerFor(root, state),
-      env: { GITHUB_REPOSITORY: "owner/repository" },
-      stdout: (value) => {
-        output += value;
-      },
-    });
+describe("tag resolution", () => {
+  it("resolves a well-formed tag to its package and confirms the manifest version", async () => {
+    const root = await createRepository("1.0.0");
+    const automation = createReleaseAutomation({ root });
 
-    await automation.status();
+    const pkg = await automation.resolvePackageByTag("alpha-v1.0.0");
 
-    const result = JSON.parse(output) as { include: Array<{ publish: boolean }> };
-    if (publish === undefined) expect(result.include).toEqual([]);
-    else expect(result.include).toEqual([expect.objectContaining({ publish })]);
+    expect(pkg.path).toBe("packages/alpha");
+    expect(pkg.version).toBe("1.0.0");
   });
 
-  it("plans the release of an untagged package only on a release-merge push", async () => {
-    const root = await createRepository();
-    git(
-      root,
-      "commit",
-      "--allow-empty",
-      "-m",
-      "Merge pull request #42 from zeldrisho/release/prepare",
+  it("rejects a tag whose version does not match the manifest", async () => {
+    const root = await createRepository("1.0.0");
+    const automation = createReleaseAutomation({ root });
+
+    await expect(automation.resolvePackageByTag("alpha-v1.0.1")).rejects.toThrow(
+      "does not match @zeldrisho/alpha manifest version 1.0.0",
     );
-    const state = services();
-    let output = "";
-    const automation = createReleaseAutomation({
-      root,
-      runner: runnerFor(root, state),
-      env: { GITHUB_REPOSITORY: "owner/repository" },
-      stdout: (value) => {
-        output += value;
-      },
-    });
-
-    await automation.status();
-
-    const result = JSON.parse(output) as { include: Array<{ publish: boolean }> };
-    expect(result.include).toEqual([
-      expect.objectContaining({ tag: "alpha-v1.0.0", publish: true }),
-    ]);
-    expect(state.calls.some((call) => call.command === "gh")).toBe(false);
   });
 
-  it("does not plan an untagged package on a regular feature push", async () => {
+  it("rejects a tag with no matching package", async () => {
     const root = await createRepository();
-    const state = services();
-    let output = "";
-    const automation = createReleaseAutomation({
-      root,
-      runner: runnerFor(root, state),
-      env: { GITHUB_REPOSITORY: "owner/repository" },
-      stdout: (value) => {
-        output += value;
-      },
-    });
+    const automation = createReleaseAutomation({ root });
 
-    await automation.status();
-
-    const result = JSON.parse(output) as { include: Array<{ publish: boolean }> };
-    expect(result.include).toEqual([]);
-    expect(state.calls.some((call) => call.command === "gh")).toBe(false);
-  });
-
-  it("retries an untagged package whose changelog entry already landed on main", async () => {
-    const root = await createRepository();
-    await writeFile(
-      join(root, "packages/alpha/CHANGELOG.md"),
-      "# Changelog\n\n## 1.0.0 (2026-08-05)\n",
+    await expect(automation.resolvePackageByTag("missing-v1.0.0")).rejects.toThrow(
+      "No package matches the tag",
     );
-    const state = services();
-    let output = "";
-    const automation = createReleaseAutomation({
-      root,
-      runner: runnerFor(root, state),
-      env: { GITHUB_REPOSITORY: "owner/repository" },
-      stdout: (value) => {
-        output += value;
-      },
-    });
-
-    await automation.status();
-
-    const result = JSON.parse(output) as { include: Array<{ publish: boolean }> };
-    expect(result.include).toEqual([
-      expect.objectContaining({ tag: "alpha-v1.0.0", publish: true }),
-    ]);
   });
 
-  it.each([
-    [
-      "malformed npm output",
-      { npm: { status: 1, stdout: "not-json", stderr: "registry failed" } },
-      "registry failed",
-    ],
-    [
-      "unknown npm error",
-      { npm: { status: 1, stdout: '{"error":{"code":"E500","message":"down"}}', stderr: "" } },
-      "down",
-    ],
-    [
-      "GitHub API failure",
-      {
-        npm: { status: 0, stdout: '"1.0.0"', stderr: "" },
-        github: { status: 1, stdout: "", stderr: "HTTP 500" },
-      },
-      "HTTP 500",
-    ],
-  ] as const)("classifies %s", async (_label, overrides, message) => {
-    const root = await createRepository();
-    git(root, "tag", "alpha-v1.0.0");
-    const state = services(overrides);
-    const automation = createReleaseAutomation({
-      root,
-      runner: runnerFor(root, state),
-      env: { GITHUB_REPOSITORY: "owner/repository" },
-    });
+  it("rejects a malformed tag", async () => {
+    const automation = createReleaseAutomation();
 
-    await expect(automation.status()).rejects.toThrow(message);
+    await expect(automation.resolvePackageByTag("alpha-not-semver")).rejects.toThrow(
+      "does not match <package>-v<version>",
+    );
   });
 });
 
@@ -542,32 +158,24 @@ describe("release CLI", () => {
 
   function fakeAutomation(): {
     automation: ReleaseAutomation;
-    status: ReturnType<typeof vi.fn>;
-    prepare: ReturnType<typeof vi.fn>;
+    resolvePackageByTag: ReturnType<typeof vi.fn>;
     writeReleaseNotes: ReturnType<typeof vi.fn>;
   } {
-    const status = vi.fn();
-    const prepare = vi.fn();
+    const resolvePackageByTag = vi.fn().mockResolvedValue({ path: "packages/alpha" });
     const writeReleaseNotes = vi.fn();
     return {
       automation: {
         packageCatalog: vi.fn(),
-        componentTags: vi.fn(),
-        hasReleasableChanges: vi.fn(),
-        assertCurrentVersionIsLatest: vi.fn(),
-        status,
-        prepare,
+        resolvePackageByTag,
         writeReleaseNotes,
       },
-      status,
-      prepare,
+      resolvePackageByTag,
       writeReleaseNotes,
     };
   }
 
   it.each([
-    ["status", undefined, undefined],
-    ["prepare", undefined, undefined],
+    ["package", "alpha-v1.0.0", undefined],
     ["notes", "packages/alpha", "notes.md"],
   ] as const)("dispatches %s", async (command, argument, secondArgument) => {
     const fake = fakeAutomation();
@@ -580,9 +188,15 @@ describe("release CLI", () => {
       fake.automation,
     );
 
-    if (command === "status") expect(fake.status).toHaveBeenCalledOnce();
-    else if (command === "prepare") expect(fake.prepare).toHaveBeenCalledOnce();
+    if (command === "package")
+      expect(fake.resolvePackageByTag).toHaveBeenCalledWith("alpha-v1.0.0");
     else expect(fake.writeReleaseNotes).toHaveBeenCalledWith("packages/alpha", "notes.md");
+  });
+
+  it("rejects a missing argument for package", async () => {
+    await expect(runReleaseCli(["package"], fakeAutomation().automation)).rejects.toThrow(
+      "A tag is required",
+    );
   });
 
   it("rejects a missing output path for notes", async () => {

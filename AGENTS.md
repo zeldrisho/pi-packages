@@ -3,7 +3,7 @@
 ## Project Structure
 
 - `packages/*/`: independently published Pi extensions with runtime code in `src/` and package tests in `tests/`.
-- `scripts/`: release automation (`release.ts`), invoked by the release workflow.
+- `scripts/`: release tooling (`release.ts` resolves a component tag to its package and reads release notes from the changelog; `format-changelog.ts` normalizes `CHANGELOG.md`), invoked by the release workflow.
 - `tests/`: repository contracts, packaged-extension smoke tests, and automated tests (unit, cross-package contract, and release automation tests).
 
 ## Commands
@@ -32,4 +32,5 @@
 | Package behavior and setup  | `packages/*/README.md`          |
 | Releases                    | `docs/release.md`               |
 | Release automation          | `scripts/release.ts`            |
+| Changelog normalizer        | `scripts/format-changelog.ts`   |
 | Release workflow            | `.github/workflows/release.yml` |

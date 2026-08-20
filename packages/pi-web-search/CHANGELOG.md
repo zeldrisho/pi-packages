@@ -2,25 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
 ### Added
 
-- **web-search:** Persist search results to a private cross-session disk cache (24h TTL) behind the existing in-memory cache
-- **web-search:** Report honest-evidence metadata (`evidence` summary and per-result `quality`) in `details`
+- Persist search results to a private cross-session disk cache (24h TTL) behind the existing in-memory cache
+- Report honest-evidence metadata (`evidence` summary and per-result `quality`) in `details`
 
 ## [0.4.2] - 2026-08-05
 
 ### Changed
 
-- **web-search:** Document runtime enforcement of the context query limit ([347b386](https://github.com/zeldrisho/pi-packages/commit/347b386c62f33d489b6be207aff2a96f491eced0))
+- Document runtime enforcement of the context query limit ([347b386](https://github.com/zeldrisho/pi-packages/commit/347b386c62f33d489b6be207aff2a96f491eced0))
 
 ### Fixed
 
-- **web-search:** Emit provider-compatible object schema for tool parameters ([fe81916](https://github.com/zeldrisho/pi-packages/commit/fe819161e9cf61be09a0d68be713b63cb318155e))
+- Emit provider-compatible object schema for tool parameters ([fe81916](https://github.com/zeldrisho/pi-packages/commit/fe819161e9cf61be09a0d68be713b63cb318155e))
 
 ## [0.4.1] - 2026-08-03
 
@@ -56,7 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **web-search:** Add bounded Brave web search ([cbc9491](https://github.com/zeldrisho/pi-packages/commit/cbc9491dce36555ab91b6bef203ec8b380596a89))
+- Add bounded Brave web search ([cbc9491](https://github.com/zeldrisho/pi-packages/commit/cbc9491dce36555ab91b6bef203ec8b380596a89))
 
 [Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.4.2...HEAD
 [0.4.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.4.1...pi-web-search-v0.4.2
