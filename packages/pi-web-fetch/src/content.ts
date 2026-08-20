@@ -10,6 +10,8 @@ export interface CompleteDocument {
   markdown: string;
   title?: string;
   extractor: "defuddle" | "basic" | "raw";
+  /** True when the page appears to be an app shell, bot wall, or consent page. */
+  shellSuspected: boolean;
 }
 
 export interface FetchResult extends CompleteDocument {

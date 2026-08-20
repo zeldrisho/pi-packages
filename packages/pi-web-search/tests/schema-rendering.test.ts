@@ -117,6 +117,7 @@ describe("web_search schema rendering", () => {
       title: "Result",
       url: "https://example.com/path",
       snippet: "A useful snippet",
+      quality: "medium",
     });
     expect(result.content[0].text).toContain("untrusted external data");
     expect(result.details.truncation).toMatchObject({

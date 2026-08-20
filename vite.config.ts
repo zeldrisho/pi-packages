@@ -2,6 +2,7 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   test: {
+    setupFiles: ["./tests/cache-env.setup.ts"],
     coverage: {
       provider: "v8",
       reporter: [["text", { skipFull: false }]],
@@ -16,7 +17,7 @@ export default defineConfig({
     },
   },
   fmt: {
-    ignorePatterns: ["**/CHANGELOG.md", "coverage/**", "dist/**", "pnpm-lock.yaml"],
+    ignorePatterns: ["coverage/**", "dist/**", "pnpm-lock.yaml"],
     printWidth: 100,
     tabWidth: 2,
     useTabs: false,

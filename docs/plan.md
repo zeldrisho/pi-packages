@@ -1,217 +1,356 @@
-# Technical debt remediation plan
-
-This plan turns the repository-wide technical debt audit into work that can be completed alongside feature development. It prioritizes release safety, dependency governance, and maintenance of security-sensitive boundaries without requiring a rewrite.
-
-Use the repository commands and conventions in [development.md](development.md), preserve the invariants in [security-invariants.md](security-invariants.md), and follow [release.md](release.md) for publication changes.
-
-## Historical baseline
-
-At the time of the 2026-08-03 audit:
-
-- `vp run validate` passes;
-- all 137 tests pass;
-- line coverage is 94.38% and branch coverage is 81.05%;
-- package contracts, tarball inspection, and packaged-extension smoke tests pass; and
-- the dependency audit reports no known vulnerabilities.
-
-At the 2026-08-05 follow-up audit (PR #36):
-
-- `vp run validate` passes: 266 tests across 23 files pass;
-- line coverage is 94.77%, statements 91.35%, branches 82.94%, and functions 94.11%;
-- package contracts, tarball inspection, and packaged-extension smoke tests pass; and
-- GitHub advisory scanning surfaced six transitive advisories — five in `undici` (pinned at `8.5.0` by `@earendil-works/pi-coding-agent` even at its latest `0.83.0`) and one in `brace-expansion` (arriving via `minimatch`) — resolved in PR #36 with repo-level overrides (`undici 8.9.0`, `brace-expansion 5.0.9`); one moderate dev-only advisory remains (`postcss` via the Vite/Vitest toolchain, GHSA-fxqj-rqcc-2cmp).
-
-The repository is healthy. The work below is preventative and should normally consume 15–20% of maintenance capacity rather than block feature delivery.
-
-## Prioritization
-
-Priority is calculated as `(Impact + Risk) × (6 − Effort)`, with each input scored from 1 to 5. Lower-effort work receives a higher score.
-
-| Priority | Item                                                              | Category                  | Impact | Risk | Effort | Score |
-| -------: | ----------------------------------------------------------------- | ------------------------- | -----: | ---: | -----: | ----: |
-|        1 | Standardize GitHub Actions and dependency review                  | Infrastructure/dependency |      3 |    5 |      2 |    32 |
-|        2 | Consolidate duplicated cancellation logic                         | Code                      |      2 |    4 |      1 |    30 |
-|        3 | Make limits and defaults single-source                            | Code/configuration        |      3 |    3 |      2 |    24 |
-|        4 | Make the web-fetch network policy maintainable                    | Security/code             |      3 |    5 |      3 |    24 |
-|        5 | Test against locked and latest Pi APIs                            | Dependency/test           |      3 |    4 |      3 |    21 |
-|        6 | Document complex architecture and data flows                      | Documentation             |      2 |    3 |      2 |    20 |
-|        7 | Add characterization tests for release automation                 | Test/infrastructure       |      4 |    5 |      4 |    18 |
-|        8 | Split oversized integration test files                            | Test                      |      3 |    2 |      3 |    15 |
-|        9 | Clean release temporary directories                               | Code                      |      1 |    2 |      1 |    15 |
-|       10 | Detect drift in repeated package configuration                    | Configuration             |      2 |    2 |      3 |    12 |
-|       11 | Reassess synchronized web modules when they gain another consumer | Architecture              |      2 |    3 |      4 |    10 |
-|       12 | Manage the dependency-override lifecycle                          | Dependency/documentation  |      2 |    4 |      1 |    30 |
-|       13 | Gate CI on dependency audits                                      | Infrastructure/dependency |      3 |    3 |      2 |    24 |
-|       14 | Refresh the Pi catalog on a cadence                               | Dependency                |      2 |    3 |      3 |    15 |
-|       15 | Document schema-level limit enforcement                           | Documentation             |      1 |    2 |      1 |    15 |
-
-## Phase 1: quick safety improvements
-
-Complete these as small, independent pull requests over the next one or two feature cycles.
-
-### 1. Standardize Actions and dependency review
-
-Dependency update automation was deliberately superseded in favor of manual updates.
-
-- [x] Use reviewed semantic major tags for third-party actions in `.github/workflows/`.
-- [x] Upgrade checkout steps to `actions/checkout@v7`.
-- [x] Keep dependency updates manual; do not add Dependabot or Renovate configuration.
-- [x] Review related Pi ecosystem updates together while keeping major toolchain upgrades separate.
-- [x] Document the expected review process for dependency updates.
-
-**Done when:** workflows consistently use approved semantic major tags, dependency updates follow the documented manual review process, and `vp run validate` passes.
-
-### 2. Consolidate cancellation logic
-
-The same `awaitWithAbort` behavior currently appears in `packages/pi-web-fetch/src/fetch.ts` and `packages/pi-web-fetch/src/network-redirects.ts`.
-
-- [x] Extract a package-local cancellation helper.
-- [x] Preserve timeout and caller-cancellation error semantics.
-- [x] Add focused tests for already-aborted signals, late settlement, rejection, and listener cleanup.
-
-**Done when:** only one implementation remains and existing timeout, redirect, extraction, and cancellation tests pass unchanged.
-
-### 3. Centralize limits and defaults
-
-- [x] Define fetch defaults and bounds once and consume them from both the schema and runtime.
-- [x] Define search query and result limits once and consume them from schema, runtime, and Brave request code.
-- [x] Derive smoke-test Pi dependency versions from workspace configuration or installed resolution instead of duplicating them in `scripts/package-smoke-test.ts`.
-- [x] Add contract tests for values whose duplication cannot be removed.
-
-**Done when:** changing a limit or locked Pi version requires one intentional source change, plus any user-facing documentation update.
-
-### 4. Clean release temporary directories
-
-- [x] Wrap the temporary notes directory in `scripts/release.ts` in `try/finally` cleanup.
-- [x] Verify cleanup after both successful and failed GitHub release creation.
-
-**Done when:** `ensure-github-release` leaves no temporary release-notes directory behind.
-
-### 12. Manage the dependency-override lifecycle
-
-The 2026-08-05 audit fixed six transitive advisories with repo-level overrides because upstream still ships vulnerable pins: `undici` is pinned at `8.5.0` by `@earendil-works/pi-coding-agent` (even at its latest `0.83.0`; GHSA-4cwx-7wf7-3272, GHSA-8xcm-r25x-g524, GHSA-v3r7-h72x-cjcm, GHSA-jr45-8vmc-qm54, GHSA-m8rv-5g2x-5cg5), and `brace-expansion` arrives via `minimatch` below the fixed `5.0.9` (GHSA-rgw5-rvv9-x895).
-
-Overrides are forks of upstream dependency decisions. Without a removal condition they persist silently, force versions across every future upstream bump, and can break installs if upstream moves to a semver-incompatible release, because pnpm overrides ignore upstream ranges.
-
-- [x] Annotate each override in `pnpm-workspace.yaml` with the advisory IDs and the removal condition (for example “drop when `pi-coding-agent` repins `undici` ≥ `8.9.0`”).
-- [x] File a tracking issue listing both overrides and link it from the override comment block.
-- [x] Re-check the removal conditions on every catalog or lockfile bump and drop the satisfied override in the same change.
-- [x] Extend `scripts/repository-contract-test.ts` (or a small script) to fail when an overridden package is no longer present in the dependency graph, signaling a removable override.
-
-**Done when:** every override states why it exists and when it can be removed, a tracking issue links them, and a check surfaces stale overrides.
-
-### 13. Gate CI on dependency audits
-
-GitHub advisory scanning surfaces alerts asynchronously as PR comments; the build itself never failed on the six open advisories. A local audit gate turns that into a deterministic failure. This does not reintroduce update automation — item 1's manual-review decision stands; this adds detection only.
-
-- [x] Add `pnpm audit --audit-level high` to `ci.yml` after `vp install`.
-- [x] Define a policy for dev-only advisories: the current `postcss ≤ 8.5.22` finding (GHSA-fxqj-rqcc-2cmp, via the Vite/Vitest toolchain) may be allowlisted only with justification and a tracking issue, or resolved by bumping the toolchain.
-- [x] Keep production-path advisories unallowlisted so the item-12 overrides remain the only escape hatch for transitive runtime dependencies.
-
-**Done when:** a new high-severity advisory fails the build, and the allowlist contains only documented dev-only entries.
-
-### 15. Document schema-level limit enforcement
-
-PR #36 flattened the web-search tool schema from an `Intersect`/`Union` to a provider-compatible object schema because the provider rejects `allOf`/`anyOf`. `mode: "context"` now accepts up to the web-mode query length (500) at the schema level; the tighter 400-character context limit is enforced at runtime and covered by `schema-rendering.test.ts`. The behavior change is easy to rediscover as a bug.
-
-- [x] Add one sentence to `packages/pi-web-search/README.md` stating that context-mode queries are validated at runtime, not in the tool schema, because the provider rejects union schemas.
-- [x] Note the runtime-enforcement test in the schema contract test so the coupling is discoverable.
-
-**Done when:** the README states where each query limit is enforced.
-
-## Phase 2: strengthen critical boundaries
-
-Schedule this work after Phase 1, reserving maintenance capacity in each feature cycle.
-
-### 5. Characterize release automation
-
-Refactor command execution only as much as needed to test behavior without live npm or GitHub operations.
-
-- [x] Test component-tag ordering and manifest/tag consistency.
-- [x] Test releasable commits, documentation-only commits, and breaking changes.
-- [x] Test partial-release recovery for missing tags, GitHub releases, and npm versions.
-- [x] Test npm and GitHub error classification.
-- [x] Test invalid package paths and malformed external command output.
-- [x] Test generated versions, changelogs, and release pull-request bodies.
-- [x] Use temporary Git repositories and injected command runners rather than live services.
-
-**Done when:** the important state transitions in `scripts/release.ts` are deterministic under test and the live workflow remains retry-safe.
-
-### 6. Maintain the network policy systematically
-
-The address policy in `packages/pi-web-fetch/src/network-policy.ts` is a security boundary. Do not weaken DNS validation, address pinning, or redirect revalidation while restructuring it.
-
-- [x] Document the authoritative registry sources and the date or version reviewed.
-- [x] Convert address expectations into table-driven boundary tests.
-- [x] Cover the first and last address around each blocked range where practical.
-- [x] Establish a periodic review or safe fixture-generation process.
-- [x] Keep the complete validate–resolve–pin–redirect boundary inside `pi-web-fetch` as required by [security-invariants.md](security-invariants.md).
-
-**Done when:** reviewers can establish why every range is present and tests detect accidental gaps or boundary changes.
-
-### 7. Add Pi compatibility testing
-
-Packages intentionally declare Pi-provided packages as `"*"` peer dependencies, so compatibility needs active verification.
-
-- [x] Add a smoke-test matrix for the locked workspace Pi version and the latest supported Pi release.
-- [x] Run the latest-version lane on a schedule if it would make normal pull requests unstable.
-- [x] Update the Pi catalog in small, separately reviewed changes.
-- [x] Update Typebox and Vite+ independently from any TypeScript major migration.
-- [x] Treat TypeScript 7 as a dedicated migration with explicit compatibility validation.
-
-**Done when:** peer compatibility failures are discovered before users encounter them, without sacrificing deterministic validation against the lockfile.
-
-### 14. Refresh the Pi catalog on a cadence
-
-The catalog pins `@earendil-works/*` at `^0.80.10` (a 0.x caret range, so updates to `0.83.0` are manual). The `0.83.0` release still pins vulnerable `undici@8.5.0`, so this is not a security fix today — but staying behind keeps the item-12 overrides in place longer and delays surfacing upstream dependency fixes.
-
-- [x] Bump the catalog to the latest upstream release (currently `0.83.0`) in a small, separately reviewed change per item 7.
-- [x] On each bump, re-check the item-12 removal conditions and drop any satisfied override in the same change.
-- [x] Establish a cadence: at minimum once per release cycle, or a scheduled lane if the repository grows.
-
-**Done when:** the catalog tracks the latest upstream release with a defined cadence and each bump re-evaluates the overrides.
-
-## Phase 3: ongoing maintainability
-
-Apply a touch-it rule: complete the relevant item when feature work already modifies that area.
-
-### 8. Split large tests by concern
-
-- [x] Split `packages/pi-web-fetch/tests/index.test.ts` into network policy, redirects, transport, cancellation, caching, and service-level suites.
-- [x] Split `packages/pi-web-search/tests/index.test.ts` into schema/rendering, provider transport, context formatting, caching/coalescing, truncation, and lifecycle suites.
-- [x] Share only stable test harnesses; keep security-boundary fixtures explicit.
-- [x] Preserve or improve coverage and test execution time.
-
-### 9. Add architecture documentation
-
-- [x] Create `docs/architecture.md` rather than expanding this plan. It covers:
-  - web-fetch validation, DNS resolution, address pinning, redirects, extraction, caching, and continuation;
-  - web-search provider requests, coalescing, truncation, temporary files, and shutdown cleanup;
-  - release planning, versioning, tagging, GitHub releases, and npm publication; and
-  - package independence and the reasons for intentional source duplication.
-
-Link to existing documentation instead of copying setup, release, or security instructions.
-
-### 10. Detect package-configuration drift
-
-- [x] Extend `scripts/repository-contract-test.ts` to verify intentionally uniform scripts, TypeScript configuration, engine constraints, file allowlists, and Pi extension entries.
-- [x] Keep package manifests independently publishable.
-- [x] Avoid manifest generation unless package growth makes the maintenance benefit clear.
-
-### 11. Keep synchronized web modules as accepted debt
-
-The following files are intentionally byte-for-byte synchronized between `pi-web-fetch` and `pi-web-search`:
-
-- `cache.ts`
-- `inflight.ts`
-- `render.ts`
-
-The repository contract already controls this debt. Do not extract a shared package solely to remove duplication. Reconsider extraction only when another consumer appears or synchronized changes become materially burdensome.
-
-## Working agreement
-
-- Prefer one debt item per pull request unless a feature change naturally owns it.
-- Run `vp run validate` before proposing completion.
-- Add boundary and failure-path tests whenever trust-boundary behavior changes.
-- Update this plan when an item is completed, superseded, or deliberately deferred.
-- Record significant architectural choices in an ADR if they introduce a new package boundary or change a security invariant.
+# Web tools enhancement plan (`pi-web-fetch` + `pi-web-search`)
+
+Planning-only document. No implementation is performed in this session. It scopes the work we agreed
+on, grounds each decision in the current code and in evidence from the sibling web-tool repos, lists
+the invariants that must hold, and proposes process tooling for the shared modules.
+
+## Prior plan status
+
+The previous `plan.md` (repository tech-debt remediation) is **complete**: all 15 items are done,
+`vp run validate` passes, line coverage is ~95%, and the six transitive advisories are mitigated via
+repo-level `pnpm-workspace.yaml` overrides. That plan is retired into this single document; active
+work follows below.
+
+## 1. Decisions (from the planning session)
+
+| #   | Proposal                                                                       | Decision                                                                          | Effect                                              |
+| --- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- | --------------------------------------------------- |
+| 1   | Add multi-provider search routing/fallback (à `pi-web-access` `searchRouting`) | **Skip**                                                                          | Keep Brave-only. No provider fan-out.               |
+| 2   | Add a persistent, cross-session cache                                          | **Accept**                                                                        | Disk-backed cache survives sessions.                |
+| 3   | PDF / YouTube handlers; GitHub handler                                         | **Skip PDF/YT.** GitHub → rely on Defuddle, with one minimal raw-URL fix (see §4) | No special handlers; assess Defuddle with evidence. |
+| 4   | Add an honest-evidence output shape                                            | **Accept**                                                                        | Tool output reports what actually happened.         |
+| 5   | Add a keyless second search backend (DuckDuckGo/SearXNG)                       | **Skip**                                                                          | Keep Brave-only.                                    |
+
+Net scope: **enhance, don't expand**. Both packages keep their single-purpose, keyless-fetch /
+Brave-search posture. The two accepted items (persistent cache, honest-evidence) are additive metadata
+and a storage swap, not new provider or content-type surface area.
+
+## 2. Current state (grounded in the code)
+
+- **Shared, byte-synced modules** (`cache.ts`, `inflight.ts`, `render.ts`) are identical between the
+  two packages (verified with `diff`). The repository contract detects drift
+  (`tests/repository-contract.test.ts`, lines 30–32 define the three pairs; lines 103–110 fail the
+  build on any mismatch). Any change to these three files must be applied identically to both packages.
+  `render.ts` is the collapsible-output formatter and is **not** affected by this plan.
+- **`pi-web-fetch`** extraction (`src/extract.ts`): already uses `defuddle/node` with markdown output,
+  falling back to a linkedom text extractor on any failure. The extractor name is already reported in
+  `details.extractor` (`"defuddle" | "basic" | "raw"`).
+- **`pi-web-fetch`** output (`src/service.ts` → `WebFetchDetails`): already bounds output, wraps it in
+  `<untrusted_web_content>`, and reports `cached`, `truncated`, `contentType`, `title`, `extractor`,
+  `offset`/`nextOffset`, `totalCharacters`, `characterCount`, `truncation`. So honest-evidence is
+  _partially present today_ — the gap is content-quality signalling, not presence/absence.
+- **`pi-web-search`** output (`src/search.ts` → `SearchDetails`): already returns a structured
+  `results: SearchResult[]` (url/title/snippet) plus `provider`, `mode`, `resultCount`, `cached`,
+  `truncated`, and full-output temp-file details. The rendered text (`format-results.ts`) is a numbered
+  `[title](url)` + snippet list wrapped in `<untrusted_web_content>`. Structure exists; the gap is
+  per-result quality/status signalling and a request-vs-returned summary.
+- **Cache today** (`src/cache.ts` `ExpiringLruCache`): in-memory only, TTL 10 min, 100 entries, 20 MiB
+  aggregate markdown/JSON bytes; per-caller cancellation via `InflightCoalescer`
+  (`src/inflight.ts`). Search (`search.ts`) and fetch (`service.ts`) each own an instance.
+
+## 3. Scope
+
+**In scope**
+
+- Disk-backed, cross-session cache behind the existing `ExpiringLruCache` API (both packages).
+- Honest-evidence metadata for `web_fetch` and `web_search` (additive `details` fields).
+- Minimal GitHub URL normalization: rewrite `github.com/.../blob/...` →
+  `raw.githubusercontent.com/...` so code is read as clean plain text.
+
+**Out of scope (per decisions)**
+
+- Multi-provider search/fetch routing or fallback chains (decisions 1, 5).
+- PDF, YouTube, or any other multimedia extraction (decision 3).
+- GitHub clone, tree/contents API, or a dedicated GitHub handler (decision 3). Directory listings stay
+  a known limitation (§4).
+- Code search and library-docs surfaces (those belong to dedicated tools, not these two packages).
+- Cross-session full-text search over the cache (magpi-style `index.db`); we persist for reuse and
+  bounds, not for querying.
+
+## 4. Evidence: is Defuddle "strong enough" for GitHub? (decision 3)
+
+We ran `extract.ts`'s exact pipeline (`linkedom` parse + `Defuddle(..., { markdown: true })`) against
+live GitHub pages. Findings:
+
+| URL kind                                         | Defuddle result                                                                                                                                                                  | Verdict                                                 |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Repo root (`/owner/repo`)                        | Extracts the README cleanly (~2.3 KB of the package table). No file tree.                                                                                                        | **Adequate** for "what is this repo / read its README". |
+| Blob of a `.ts` file (`/blob/main/.../cache.ts`) | Returns ~1.6 KB but **mostly line numbers** from the gutter column; the real code lines are present but fragmented across the two-column `<table>` and interleaved with numbers. | **Weak** — noisy, not clean code.                       |
+| Tree/directory (`/tree/main/.../src`)            | Returns nav junk (Notifications / Fork / Star, "## Files", "## src"); the file list lives in React embedded data, not SSR text.                                                  | **Fails** — no usable directory listing.                |
+| `raw.githubusercontent.com/...`                  | Plain `text/plain`; the extractor is bypassed and the tool returns the raw text directly.                                                                                        | **Clean** — best path for file contents.                |
+
+**Conclusion:** Defuddle is fine for README/repo-root pages, but it mishandles GitHub's code-rendering
+table (line-number pollution) and cannot list directories. The cheapest fix that honours "rely on
+Defuddle, no handler" is a **one-line URL normalization**: rewrite
+`https://github.com/<o>/<r>/blob/<ref>/<path>` → `https://raw.githubusercontent.com/<o>/<r>/<ref>/<path>`
+_before_ fetch. The raw URL is public HTTPS, passes the existing SSRF policy unchanged, and yields
+clean text with no extraction needed. Directory/tree pages remain a documented limitation (the agent
+can be steered toward `blob`/`raw` URLs, which is the common case for "read this file").
+
+## 5. Design
+
+### A. Persistent cross-session cache (decision 2)
+
+Keep the `ExpiringLruCache<K, V>` contract so `service.ts` (`fetchCache`) and `search.ts`
+(`searchCache`) change minimally. Add disk persistence as a layer the cache writes through.
+
+- **Location:** XDG cache dir, e.g. `${XDG_CACHE_HOME:-~/.cache}/pi-web-fetch/` and
+  `.../pi-web-search/`. Resolve via Pi config dir if XDG is unset. Files/dirs created `0700`/`0600`
+  (consistent with the untrusted-content handling in `security-invariants.md`).
+- **Generic, not package-specific:** `cache.ts` gains a small persistence adapter
+  (`serialize(v)`, `deserialize(b)`, `keyToPath(k)`). Each package supplies its own serializer
+  (`CompleteDocument` for fetch, `SearchResult[]` for search). This keeps `cache.ts` byte-identical
+  across both packages.
+- **Layering:** memory is the hot layer; on `get`, fall back to disk when the in-memory entry is
+  missing and not expired; on `set`, write memory + atomically write disk (temp file + rename).
+- **Bounds & TTL:** keep entry-count (100) and aggregate-byte (20 MiB) ceilings; raise TTL from 10 min
+  to a cross-session value (proposed 24 h) so entries survive session restarts but still expire.
+  Maintain LRU eviction; **eviction deletes the backing file**.
+- **Resilience:** corrupt/missing files are treated as a cache miss (never throw into the caller);
+  stale entries (TTL past) are deleted on access. Best-effort concurrency: atomic rename for writes;
+  last-writer-wins is acceptable for a local dev tool (note as a risk; revisit only if multi-session
+  corruption appears).
+- **Why not extract a shared package:** the existing architecture decision (prior plan, item 11) keeps
+  these three files duplicated to avoid a shared runtime package. This plan preserves that.
+
+### B. Honest-evidence output shape (decision 4)
+
+Additive `details` metadata only — no change to byte/line bounds or untrusted wrapping.
+
+**`web_fetch` (`WebFetchDetails`, in `service.ts`):**
+
+- `requestedUrl` and `finalUrl` (after redirect + GitHub normalization), so the model knows if the URL
+  was rewritten.
+- `contentKind`: coarse classification — `repository-readme | code-file | directory-listing |
+article | raw-text | markup-shell | unknown`. Derived from URL pattern + extraction result.
+- `shellSuspected: boolean` — true when extracted text is very short relative to raw bytes, or matches
+  known app-shell markers ("enable JavaScript", consent walls). Borrowed from `ketch`'s `spa_markers`
+  idea and `pi-web-agent`'s "bot-check pages" caveat.
+- `confidence: "high" | "medium" | "low"` — function of extractor (`raw`/`defuddle` > `basic`),
+  content length, and `shellSuspected`.
+- Keep existing `extractor`, `cached`, `truncated`, `offset`/`nextOffset`.
+
+**`web_search` (`SearchDetails`, in `search.ts`):**
+
+- Per-result `quality` hint on `SearchResult` (e.g. snippet length / presence) so the model can weight
+  citations.
+- Top-level `evidence` summary: `requestedCount` vs `returnedCount`, `dropped` (results removed by
+  bounds), `freshness` applied, `truncated`. Surfaces "Brave gave fewer than asked" honestly.
+- Keep existing `provider`, `mode`, `resultCount`, `results`, `cached`, `truncated`, temp-file details.
+
+Both outputs already wrap content in `<untrusted_web_content>` and keep within Pi's 2,000-line / 50 KiB
+limit; honest-evidence fields are metadata, not extra raw content, so the security invariants hold.
+
+### C. GitHub raw normalization (decision 3 refinement)
+
+- Add a small URL-normalization step in `pi-web-fetch` **before** the network-policy validation, so the
+  _rewritten_ URL is what gets validated and fetched:
+  - `https://github.com/<o>/<r>/blob/<ref>/<path>` →
+    `https://raw.githubusercontent.com/<o>/<r>/<ref>/<path>`.
+  - Leave `/tree/`, repo root, and non-GitHub URLs untouched (Defuddle handles root READMEs; tree pages
+    are a documented limitation).
+- The rewritten URL is still public HTTPS and passes `network-policy.ts` unchanged; `finalUrl` is
+  reported (see §B) so the model sees the canonical source.
+- No GitHub API calls, no auth, no clone.
+
+## 6. Reference patterns from example repos
+
+For each accepted item, the sibling repos provide tested, concrete patterns we can borrow.
+
+### A. Persistent cross-session cache
+
+- **magpi `src/cachedb.ts`** — SQLite (`node:sqlite`) _accelerator_ over a file cache; files are the
+  source of truth, the index is rebuildable from disk, it degrades to filesystem walks when SQLite is
+  absent, evicts LRU by `lastAccess`, uses FTS5 + BM25, sets `WAL` + `busy_timeout=1000`, and makes
+  every operation best-effort (try/catch → no-op). **Borrow:** files are source of truth; metadata is a
+  rebuildable accelerator; degrade gracefully; best-effort writes.
+- **ketch `cache/cache.go`** — `bbolt` store; `os.UserCacheDir()` + `ensurePrivateDir` 0o700; a
+  **nil-safe cache** (init failure → no-op cache so the tool still works); `cacheKey = sha256(url)[:8]`
+  (avoids filename injection); TTL expiry checked on read; lazy optional `RawHTML` field (`omitempty`).
+  **Borrow:** cache init must never break the tool; hash the URL for the on-disk key; private dir 0o700.
+- **pi-web-access `storage.ts`** — in-memory `Map` + disk files; `fchmodSync` 0o700/0o600;
+  `O_CREAT|O_EXCL|O_WRONLY|O_NOFOLLOW` (symlink-safe); atomic temp + rename; TTL sweep on access.
+  **Borrow:** atomic writes + symlink protection + 0600/0700 perms for any on-disk cache.
+
+### B. Honest-evidence output shape
+
+- **pi-web-agent `src/orchestration/evidence-quality.ts`** — `EvidenceQualityReport` with `counts`
+  (official/community/thread/packagePage/primaryContent/distinctHosts), `flags`, and `caveatReasons`
+  (`community-only`, `low-diversity`, `unreadable-direct-source`, `possible-conflict`, `bot-check`).
+  **Borrow:** the _caveat-reason list_ pattern for our `shellSuspected`/`confidence` and the search
+  `evidence` summary; `distinctHosts` as a diversity signal.
+- **pi-web-access `source-check.ts`** — `ResearchArtifact` with `sources[]` (rank/url/title/`quality`),
+  `passages[]` (`passage_id`, `extraction_span {start,end}`, `content_hash`), `claims[]`
+  (`status`: supported/contradicted/unclear/missing-evidence, `confidence`), a top-level `content_hash`
+  (sha256), and an `errors[]` array that _surfaces_ failures instead of swallowing them.
+  `classifySource()` uses host/path regexes (`official_docs`/`vendor_docs`/`repo_issue`/`blog`/`forum`/
+  `news`). **Borrow:** per-source `quality` classification + `content_hash` for stable citation ids +
+  _keep errors in the artifact_.
+- **ketch `mcp/errors.go`** — stable error prefixes `[validation]`/`[not_found]`/`[upstream]`/
+  `[precondition]`/`[cancelled]` mapping to exit codes 2/3/4/5/6, classifying "fix input" vs "retry" vs
+  "operator must configure". **Borrow:** when a fetch/search _partially_ fails, tag the failure kind in
+  `details` so the model knows whether to retry.
+
+Mapping onto §5 B: `contentKind` ↔ magpi/ketch source-kind thinking; `confidence`/`shellSuspected` ↔
+pi-web-agent `caveatReasons`; per-result `quality` + `content_hash` ↔ pi-web-access `classifySource`/
+`hashContent`; `evidence` summary + kept errors ↔ pi-web-access artifact + ketch taxonomy.
+
+### C. GitHub raw normalization
+
+- **magpi `src/handlers/github.ts` + `handler.ts`** — `defineHandler` with `match(url)` + `fetch(url,
+ctx)`; an SSRF guard in `handler.ts` blocks loopback/link-local/private. **rpiv-web-tools**
+  `docs/github-interceptor.md` — an opt-in GitHub URL interceptor returning file trees/dirs via shallow
+  clone. We deliberately _don't_ adopt the clone/handler approach (decision 3); the only borrowing is
+  the **URL-pattern match** idea (`/blob/<ref>/<path>` → raw) kept as a pre-validation normalize step,
+  preserving `pi-web-fetch`'s existing SSRF boundary.
+
+## 7. Sync script for the shared modules
+
+Today, `tests/repository-contract.test.ts` only **detects** drift and fails the build; the agent still
+edits one copy and must remember to copy to the other. The proposal below automates the copy.
+
+**`scripts/sync-web-modules.ts`** (new, dependency-free — matches `scripts/format-changelog.ts` style):
+
+- `check` (default): assert the three file pairs are byte-identical; list any diffs; exit 1 on drift.
+  CLI-speed companion to the vitest contract, usable in a pre-commit hook.
+- `sync --from <pkg>` (default `pi-web-fetch`): copy the source package's copy of each of the three
+  files to the other package, making them byte-identical; then run `check`.
+
+It keeps the files **duplicated** (no shared package) per `AGENTS.md`; it only automates the copy. Run
+with `vp exec node scripts/sync-web-modules.ts sync --from pi-web-fetch`. Add a root `package.json`
+script `sync:web-modules` for discoverability.
+
+```ts
+#!/usr/bin/env node
+// scripts/sync-web-modules.ts
+// Keep packages/pi-web-fetch/src/{cache,inflight,render}.ts byte-for-byte
+// identical to packages/pi-web-search/src/{cache,inflight,render}.ts.
+//   node scripts/scripts/sync-web-modules.ts            # check (default)
+//   node scripts/scripts/sync-web-modules.ts check
+//   node scripts/scripts/sync-web-modules.ts sync [--from pi-web-fetch|pi-web-search]
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+
+const ROOT = resolve(import.meta.dirname ?? process.cwd(), "..");
+const PACKAGES = ["pi-web-fetch", "pi-web-search"] as const;
+const FILES = ["cache.ts", "inflight.ts", "render.ts"] as const;
+
+function paths() {
+  return FILES.map((file) => ({
+    file,
+    a: join(ROOT, "packages", PACKAGES[0], "src", file),
+    b: join(ROOT, "packages", PACKAGES[1], "src", file),
+  }));
+}
+
+function read(path: string): string | null {
+  return existsSync(path) ? readFileSync(path, "utf8") : null;
+}
+
+function check(): number {
+  let drift = 0;
+  for (const { file, a, b } of paths()) {
+    const left = read(a);
+    const right = read(b);
+    if (left === null || right === null) {
+      console.error(`missing: ${left === null ? a : b}`);
+      drift += 1;
+      continue;
+    }
+    if (left !== right) {
+      console.error(`DRIFT: ${file} differs between ${PACKAGES[0]} and ${PACKAGES[1]}`);
+      drift += 1;
+    } else {
+      console.log(`ok: ${file}`);
+    }
+  }
+  return drift;
+}
+
+function sync(from: string): number {
+  if (!PACKAGES.includes(from as (typeof PACKAGES)[number])) {
+    console.error(`--from must be one of: ${PACKAGES.join(", ")}`);
+    return 1;
+  }
+  const source = from === PACKAGES[0] ? PACKAGES[0] : PACKAGES[1];
+  const target = source === PACKAGES[0] ? PACKAGES[1] : PACKAGES[0];
+  for (const { file } of paths()) {
+    const src = join(ROOT, "packages", source, "src", file);
+    const dst = join(ROOT, "packages", target, "src", file);
+    const content = read(src);
+    if (content === null) {
+      console.error(`missing source: ${src}`);
+      return 1;
+    }
+    writeFileSync(dst, content, "utf8");
+    console.log(`synced ${file}: ${source} -> ${target}`);
+  }
+  return check() === 0 ? 0 : 1;
+}
+
+const [cmd = "check", ...rest] = process.argv.slice(2);
+const fromFlag = rest.find((arg) => arg.startsWith("--from="));
+const from = fromFlag ? fromFlag.split("=")[1] : PACKAGES[0];
+
+let code = 0;
+if (cmd === "check") code = check() === 0 ? 0 : 1;
+else if (cmd === "sync") code = sync(from);
+else {
+  console.error(`unknown command: ${cmd} (expected "check" or "sync")`);
+  code = 1;
+}
+process.exit(code);
+```
+
+## 8. Invariant & contract checklist
+
+From `docs/security-invariants.md` and `AGENTS.md`:
+
+- [ ] HTTP(S)-only; embedded-credential URLs rejected; DNS validation rejects local/private/reserved;
+      every redirect revalidated; response-size and media-type bounds kept. (GitHub rewrite validates
+      the final `raw.githubusercontent.com` URL.)
+- [ ] Disk cache files private (`0700`/`0600`), bounded, deleted on eviction; corrupt files ignored.
+- [ ] Output stays within explicit byte/line limits; truncation/continuation details reported.
+- [ ] Cancellation propagated; per-caller cancellation preserved via `InflightCoalescer`.
+- [ ] `cache.ts` / `inflight.ts` / `render.ts` remain **byte-identical** between the two packages
+      (repository-contract test must still pass after the `cache.ts` change; `sync-web-modules.ts`
+      keeps them in lockstep).
+- [ ] Pi-provided packages stay in `peerDependencies` with `"*"`; `files` allowlist unchanged.
+- [ ] `vp run validate` passes (check + coverage + contract + pack dry-run + package smoke) before any
+      change is proposed.
+
+## 9. Testing plan
+
+- **Cache (persistence):** write entry → simulate restart (new cache instance) → entry still resolvable
+  within TTL; entry expired by TTL is absent and its file deleted; LRU eviction past byte/entry ceiling
+  deletes backing files; corrupt/partial file → miss, no throw; byte ceiling rejects oversized entries.
+- **Honest-evidence:** `web_fetch` details include `contentKind`/`shellSuspected`/`confidence` and the
+  values are consistent with the extractor; `web_search` details include `evidence` (requested vs
+  returned, dropped) and per-result `quality`; bounds still enforced.
+- **GitHub raw:** `blob` URL is rewritten to `raw.githubusercontent.com`, the rewritten URL still passes
+  policy, `finalUrl` differs from `requestedUrl`; non-GitHub and `/tree/` URLs are untouched.
+- **Sync script:** `check` exits 0 on identical pairs, 1 after an intentional edit; `sync` makes a
+  diverged pair identical and `check` passes.
+- **Regression:** existing `cache.test.ts`, `caching.test.ts`, `caching-coalescing.test.ts`,
+  extraction/redirect/network-policy suites, and `repository-contract.test.ts` stay green.
+
+## 10. Phasing (no implementation this session)
+
+1. **Cache disk layer** — extend `cache.ts` with the persistence adapter; wire `fetchCache` and
+   `searchCache` to it; add persistence/eviction/corruption tests. Keep `cache.ts` identical in both
+   packages (use `scripts/sync-web-modules.ts sync --from pi-web-fetch`).
+2. **Honest-evidence metadata** — extend `WebFetchDetails` and `SearchDetails` (+ `SearchResult`);
+   update `service.ts`/`search.ts` classification logic; add tests.
+3. **GitHub raw normalization** — add the pre-validation URL rewrite in `pi-web-fetch`; add tests;
+   note the directory-listing limitation in the README.
+4. **Sync tooling** — add `scripts/sync-web-modules.ts` and a `sync:web-modules` root script.
+
+## 11. Open questions
+
+- Cross-session TTL: 24 h proposed; should it be configurable (global vs project scope, like magpi)?
+- Should the disk cache be scoped global-only, or also support a project-local root? (Propose
+  global-only for v1 to keep the change small.)
+- Directory/tree listings: accept the limitation for now, or add a tiny GitHub contents-API step later?
+  (Deferred — not in this plan.)
+- Should `sync-web-modules.ts` also verify that `cache.ts` changes compile in both packages, or stay a
+  pure byte-sync? (Propose pure byte-sync; compilation is covered by `vp run validate`.)

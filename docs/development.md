@@ -58,7 +58,7 @@ Refresh the `@earendil-works/*` catalog at least once per release cycle so the w
 latest upstream Pi release. On every catalog or lockfile bump, re-check the override removal
 conditions annotated in `pnpm-workspace.yaml` (tracked in issue
 [#37](https://github.com/zeldrisho/pi-packages/issues/37)) and drop any satisfied override in the same
-change; `scripts/repository-contract-test.ts` fails when an overridden package disappears from the
+change; `tests/repository-contract.test.ts` fails when an overridden package disappears from the
 dependency graph.
 
 CI runs `pnpm audit --audit-level high` on every pull request (`.github/workflows/ci.yml`).

@@ -81,10 +81,18 @@ jobs:
           cache: false
 
       - run: vp install
+      - name: Write release notes
+        if: ${{ !matrix.released }}
+        run: vp exec node scripts/release.ts notes '${{ matrix.package }}' "${{ runner.temp }}/${{ matrix.tag }}.md"
       - name: Create GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: vp exec node scripts/release.ts ensure-github-release '${{ matrix.package }}'
+        if: ${{ !matrix.released }}
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ matrix.tag }}
+          name: ${{ matrix.shortName }} v${{ matrix.version }}
+          body_path: ${{ runner.temp }}/${{ matrix.tag }}.md
+          target_commitish: ${{ github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish package
         if: matrix.publish
@@ -117,13 +125,13 @@ jobs:
       - name: Prepare release changes
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          RELEASE_PR_BODY: ${{ runner.temp }}/semantic-release-pr.md
+          RELEASE_PR_BODY: ${{ runner.temp }}/release-pr.md
         run: vp exec node scripts/release.ts prepare
 
       - name: Validate and update release pull request
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_PR_BODY: ${{ runner.temp }}/semantic-release-pr.md
+          RELEASE_PR_BODY: ${{ runner.temp }}/release-pr.md
         run: |
           if git diff --quiet; then
             exit 0
@@ -132,8 +140,9 @@ jobs:
           vp run validate
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
-          branch='semantic-release/release'
+          branch='release/prepare'
           remote_sha=$(git ls-remote --heads origin "refs/heads/$branch" | cut -f1)
           if [ -n "$remote_sha" ]; then
             git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch"
@@ -142,15 +151,11 @@ jobs:
           git checkout -B "$branch"
           git add packages/*/package.json packages/*/CHANGELOG.md
           git commit -m 'chore: release packages'
-          auth_header=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')
           if [ -n "$remote_sha" ]; then
-            git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth_header" \
-              push --force-with-lease="refs/heads/$branch:$remote_sha" origin "$branch"
+            git push --force-with-lease="refs/heads/$branch:$remote_sha" origin "$branch"
           else
-            git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth_header" \
-              push --set-upstream origin "$branch"
+            git push --set-upstream origin "$branch"
           fi
-          unset auth_header
 
           pr=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')
           if [ -n "$pr" ]; then

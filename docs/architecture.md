@@ -14,7 +14,7 @@ locked development resolution and smoke-tests the packed extensions against that
 
 `pi-web-fetch` and `pi-web-search` intentionally contain byte-identical copies of `cache.ts`,
 `inflight.ts`, and `render.ts`. This keeps both npm packages independent and avoids creating a shared
-runtime package for three small utilities. `scripts/repository-contract-test.ts` detects drift. Extract
+runtime package for three small utilities. `tests/repository-contract.test.ts` detects drift. Extract
 a shared package only if another consumer appears or synchronized maintenance becomes materially
 burdensome. Do not extract only part of web-fetch's validate–resolve–pin–redirect security boundary.
 
@@ -81,7 +81,7 @@ failure or session shutdown.
 flowchart LR
   A[Conventional commits on main] --> B[Validate repository]
   B --> C[Discover package-local changes]
-  C --> D[semantic-release calculates component versions]
+  C --> D[Release automation calculates component versions]
   D --> E[Generated release PR]
   E --> F[Merge version and changelog files]
   F --> G[Status checks tag / GitHub / npm independently]
@@ -94,6 +94,10 @@ publishing. Component tags sort by semantic version and use `<directory>-v<versi
 checks tags, GitHub releases, and npm versions independently, making retries safe after partial
 publication. The release matrix admits untagged manifest versions only when the push merges the
 generated release pull request or when their changelog entry already landed on `main`; regular feature
-merges only update that pull request. Temporary semantic-release notes are always cleaned after GitHub
-release creation succeeds or fails. Details, approvals, and escalation conditions remain in
-[release.md](release.md).
+merges only update that pull request. Temporary release notes are written to the runner temp directory and
+passed to `softprops/action-gh-release` for GitHub release creation. Details, approvals, and escalation
+conditions remain in [release.md](release.md).
+
+Note: `repository-contract.test.ts` is a vitest suite run via `vp run test:contracts` (and
+covered by `vp test`). `package-smoke-test.ts` remains an executable smoke-test script run from
+`tests/` via `vp run test:packages`; it is not a vitest suite.

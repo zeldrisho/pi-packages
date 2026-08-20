@@ -10,10 +10,27 @@ export type Provider = "brave";
 export type Freshness = "day" | "week" | "month" | "year";
 export type SearchMode = "web" | "context";
 
+export type ResultQuality = "high" | "medium" | "low";
+
 export interface SearchResult {
   title: string;
   url: string;
   snippet: string;
+  /** Honest-evidence hint about how useful the result is likely to be as a citation. */
+  quality: ResultQuality;
+}
+
+/**
+ * Classifies a search result by how much usable, sourced information it carries.
+ *
+ * @param result - The result title and snippet to assess
+ * @returns A coarse quality hint for weighting citations
+ */
+export function classifyResultQuality(result: { title: string; snippet: string }): ResultQuality {
+  if (!result.title && !result.snippet) return "low";
+  if (result.snippet.length >= 80) return "high";
+  if (result.title || result.snippet) return "medium";
+  return "low";
 }
 
 const BRAVE_MAX_CONTEXT_TOKENS = 2_048;
@@ -161,11 +178,16 @@ export async function searchBraveWeb(
     signal,
   )) as { web?: { results?: Array<{ title?: unknown; url?: unknown; description?: unknown }> } };
 
-  return (data.web?.results ?? []).map((item) => ({
-    title: normalizeText(item.title, 300),
-    url: normalizeUrl(item.url),
-    snippet: normalizeText(item.description, 600),
-  }));
+  return (data.web?.results ?? []).map((item) => {
+    const title = normalizeText(item.title, 300);
+    const snippet = normalizeText(item.description, 600);
+    return {
+      title,
+      url: normalizeUrl(item.url),
+      snippet,
+      quality: classifyResultQuality({ title, snippet }),
+    };
+  });
 }
 
 /**
@@ -215,10 +237,13 @@ export async function searchBraveContext(
     const snippets = [
       ...new Set((item.snippets ?? []).map(braveSnippetToMarkdown).filter(Boolean)),
     ];
+    const title = normalizeText(item.title, 300);
+    const snippet = snippets.slice(0, BRAVE_MAX_SNIPPETS_PER_URL).join("\n\n");
     return {
-      title: normalizeText(item.title, 300),
+      title,
       url: normalizeUrl(item.url),
-      snippet: snippets.slice(0, BRAVE_MAX_SNIPPETS_PER_URL).join("\n\n"),
+      snippet,
+      quality: classifyResultQuality({ title, snippet }),
     };
   });
 }
