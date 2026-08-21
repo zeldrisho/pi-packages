@@ -77,7 +77,7 @@ export function htmlToMarkdownFallback(html: string): string {
 }
 
 /**
- * Runs Defuddle over an already-normalized document.
+ * Runs Defuddle over an already-normalized document with Markdown extraction enabled.
  *
  * Defuddle can fail in two distinct ways. The common case rejects the promise
  * we `await` below, which the caller's `try/catch` catches and turns into a
