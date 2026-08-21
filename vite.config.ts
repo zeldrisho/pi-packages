@@ -33,7 +33,7 @@ export default defineConfig({
       ".roo/**",
       ".vite-hooks/**",
       ".windsurf/**",
-      "scripts/oxlint/anti-slop/**",
+      "tools/oxlint/anti-slop/**",
     ],
     printWidth: 100,
     tabWidth: 2,
@@ -55,11 +55,11 @@ export default defineConfig({
       ".roo/**",
       ".vite-hooks/**",
       ".windsurf/**",
-      "scripts/oxlint/anti-slop/**",
+      "tools/oxlint/anti-slop/**",
     ],
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
-      { name: "anti-slop", specifier: "./scripts/oxlint/anti-slop/index.ts" },
+      { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
     ],
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
