@@ -87,14 +87,20 @@ export function htmlToMarkdownFallback(html: string): string {
  * `new URL(relative, undefined)` *after* its own promise has already resolved.
  * That rejection never reaches the `await` and instead escapes as an unhandled
  * rejection that bypasses the surrounding `try/catch` and crashes the calling
- * harness UI.
+ * harness UI. Passing the absolute `pageUrl` prevents the URL-resolution form
+ * of this failure, but the guard below still covers any residual detached
+ * rejection.
  *
  * To keep `extractHtmlToMarkdown` from ever propagating such a failure, this
- * helper attaches a scoped `unhandledRejection` guard for the lifetime of the
- * call and yields a macrotask so any promise chain Defuddle spawned has a
- * chance to settle before we commit to a successful result. A rejection
- * observed during that window is re-thrown so the caller falls back to the
- * basic extractor.
+ * helper arms a scoped `unhandledRejection` listener for the lifetime of the
+ * call. The listener is scoped, not process-wide in effect: it only treats a
+ * rejection as a Defuddle failure when its message or stack mentions Defuddle,
+ * so unrelated rejections from other concurrent work are ignored and do not
+ * force a spurious fallback to the basic extractor. After Defuddle resolves we
+ * flush a microtask and a macrotask so any rejection Defuddle scheduled settles
+ * inside the armed window; a rejection observed there is re-thrown so the
+ * caller falls back. Deeply-nested timers in Defuddle are out of scope and would
+ * still surface as a logged (non-crashing) unhandled rejection.
  *
  * @param document - The normalized document to parse
  * @param pageUrl - The absolute URL of the page, used to resolve relative links
@@ -105,23 +111,29 @@ async function runDefuddle(
   pageUrl: string,
 ): Promise<DefuddleResponse | undefined> {
   let escapedRejection: unknown = undefined;
-  // `cause` is the unhandled rejection's reason — the cause of the Defuddle
-  // failure we capture so the caller can fall back instead of crashing.
+  let armed = true;
+  // Only attribute a rejection to Defuddle when it mentions Defuddle. This keeps
+  // the guard scoped so unrelated concurrent rejections are ignored.
   const captureUnhandled = (cause: unknown): void => {
-    if (escapedRejection === undefined) escapedRejection = cause;
+    if (!armed || escapedRejection !== undefined) return;
+    const detail =
+      cause instanceof Error ? `${cause.message}\n${cause.stack ?? ""}` : String(cause);
+    if (/defuddle/i.test(detail)) escapedRejection = cause;
   };
   process.on("unhandledRejection", captureUnhandled);
   try {
     const { Defuddle } = await import("defuddle/node");
     const result = await Defuddle(document, pageUrl, { markdown: true, useAsync: false });
-    // Let any promise Defuddle scheduled after resolving settle so a detached
-    // rejection is observed by the guard above instead of reaching the harness.
+    // Let Defuddle's scheduled microtask/macrotask work settle so a detached
+    // rejection is observed by the guard instead of reaching the harness.
+    await Promise.resolve();
     await new Promise<void>((resolve) => setImmediate(resolve));
     if (escapedRejection !== undefined) throw escapedRejection;
     return result;
   } catch {
     return undefined;
   } finally {
+    armed = false;
     process.off("unhandledRejection", captureUnhandled);
   }
 }

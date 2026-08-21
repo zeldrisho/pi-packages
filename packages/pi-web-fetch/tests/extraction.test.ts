@@ -1,9 +1,23 @@
 import { describe, expect, it, vi } from "vite-plus/test";
+import type { DefuddleResponse } from "defuddle/node";
 import { extractHtmlToMarkdown } from "../src/extract";
+
+// Mock defuddle/node so we can induce failures. The factory keeps the real
+// implementation by default (the other tests exercise the real extractor) and
+// lets individual tests override `Defuddle` to simulate rejections.
+vi.mock("defuddle/node", async () => {
+  const actual = await vi.importActual<typeof import("defuddle/node")>("defuddle/node");
+  return { ...actual, Defuddle: vi.fn(actual.Defuddle) };
+});
+
+const articleHtml = (text: string): string =>
+  `<html><head><title>Fixture</title></head><body><main><article><h1>Fixture</h1><p>${text}</p></article></main></body></html>`;
+
+const longText = (): string => Array.from({ length: 150 }, (_, index) => `word${index}`).join(" ");
 
 describe("HTML extraction", () => {
   it("discards malformed schema.org data without writing through Pi's TUI", async () => {
-    const articleText = Array.from({ length: 150 }, (_, index) => `word${index}`).join(" ");
+    const articleText = longText();
     const html = `<html><head><title>Fixture</title><script type="application/ld+json">{"@type":"Article","description":"invalid
 schema"}</script></head><body><main><article><h1>Fixture</h1><p>${articleText}</p></article></main></body></html>`;
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -20,7 +34,7 @@ schema"}</script></head><body><main><article><h1>Fixture</h1><p>${articleText}</
   });
 
   it("normalizes IDs that Defuddle cannot safely use in generated selectors", async () => {
-    const articleText = Array.from({ length: 150 }, (_, index) => `word${index}`).join(" ");
+    const articleText = longText();
     const html = `<html><head><title>Fixture</title></head><body><div id="defuddle-safe-id-0">Existing ID</div><main><article><h1>Fixture</h1><p>This is the <a href="#P:1">target link</a>. ${articleText}</p><h2 id="P:1">Target heading</h2><p>${articleText}</p></article></main></body></html>`;
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -58,17 +72,69 @@ schema"}</script></head><body><main><article><h1>Fixture</h1><p>${articleText}</
     expect(result.markdown).toContain("https://github.com/voidzero-dev/setup-vp");
   });
 
-  it("never propagates a Defuddle failure for a GitHub-style URL", async () => {
-    const articleText = Array.from({ length: 150 }, (_, index) => `word${index}`).join(" ");
-    const html = `<html><head><title>Releases · voidzero-dev/setup-vp</title></head><body><main><article><h1>Releases</h1><p>${articleText}</p></article></main></body></html>`;
+  it("falls back to the basic extractor when Defuddle rejects", async () => {
+    const { Defuddle } = await import("defuddle/node");
+    vi.mocked(Defuddle).mockRejectedValueOnce(new Error("defuddle boom"));
 
-    // Even if Defuddle throws synchronously or schedules a detached rejection
-    // after its own promise resolves, extractHtmlToMarkdown must resolve rather
-    // than reject, falling back to the basic extractor instead of crashing the UI.
-    await expect(
-      extractHtmlToMarkdown(html, new URL("https://github.com/voidzero-dev/setup-vp/releases")),
-    ).resolves.toMatchObject({
-      extractor: expect.stringMatching(/^(defuddle|basic)$/),
+    const result = await extractHtmlToMarkdown(
+      articleHtml(longText()),
+      new URL("https://example.com/article"),
+    );
+
+    expect(result.extractor).toBe("basic");
+    expect(result.markdown).toContain("word149");
+  });
+
+  it("falls back when Defuddle schedules a detached rejection after resolving", async () => {
+    const { Defuddle } = await import("defuddle/node");
+    // Resolve successfully, then schedule a detached rejection (simulating Defuddle
+    // throwing on a delayed timer after its promise has already resolved).
+    vi.mocked(Defuddle).mockImplementation(async () => {
+      setImmediate(() => {
+        void Promise.reject(new Error("defuddle detached failure"));
+      });
+      // SAFETY: mock fixture only needs `content`/`title`; remaining DefuddleResponse
+      // fields are unused by the caller.
+      return { content: "ignored", title: "x" } as DefuddleResponse;
     });
+
+    const result = await extractHtmlToMarkdown(
+      articleHtml(longText()),
+      new URL("https://example.com/article"),
+    );
+
+    expect(result.extractor).toBe("basic");
+  });
+
+  it("does not fall back when an unrelated rejection occurs during extraction", async () => {
+    // Defuddle succeeds; meanwhile unrelated concurrent work rejects. The guard
+    // must ignore that rejection (it does not mention Defuddle) and must not
+    // force a spurious fallback to the basic extractor.
+    const swallow = (): void => {};
+    process.once("unhandledRejection", swallow);
+    const { Defuddle } = await import("defuddle/node");
+    vi.mocked(Defuddle).mockImplementation(async () => {
+      // Schedule a concurrent, unrelated rejection. setImmediate registers it
+      // during this call, while the guard's listener is still armed, so it is
+      // observed but must be ignored (it does not mention Defuddle).
+      setImmediate(() => {
+        void Promise.reject(new Error("unrelated concurrent failure"));
+      });
+      // SAFETY: mock fixture only needs `content`/`title`; remaining DefuddleResponse
+      // fields are unused by the caller.
+      return { content: "word149", title: "Fixture" } as DefuddleResponse;
+    });
+
+    try {
+      const result = await extractHtmlToMarkdown(
+        articleHtml(longText()),
+        new URL("https://example.com/article"),
+      );
+
+      expect(result.extractor).toBe("defuddle");
+      expect(result.markdown).toContain("word149");
+    } finally {
+      process.off("unhandledRejection", swallow);
+    }
   });
 });
