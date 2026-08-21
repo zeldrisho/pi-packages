@@ -1,8 +1,8 @@
-import { chmod, mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { afterEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import registerNestedAgents, { findNestedAgentsFiles } from "../src/index";
 
 const temporaryDirectories = new Set<string>();
@@ -144,7 +144,16 @@ describe("nested AGENTS.md discovery", () => {
     const context = { cwd: root };
     await handlers.session_start({}, context);
 
-    await chmod(innerAgents, 0o000);
+    // Mock readFile to reject deterministically for the inner AGENTS.md file.
+    const originalReadFile = readFile;
+    const readFileSpy = vi.spyOn(await import("node:fs/promises"), "readFile");
+    readFileSpy.mockImplementation(async (path, ...args) => {
+      if (path === innerAgents) {
+        throw new Error("EACCES: permission denied");
+      }
+      return originalReadFile(path, ...args);
+    });
+
     try {
       // SAFETY: handlers.tool_result returns the injected-instructions object built by the
       // extension; we assert it has the rendered `content` shape.
@@ -155,7 +164,7 @@ describe("nested AGENTS.md discovery", () => {
       expect(output).toContain("outer instructions");
       expect(output).not.toContain("inner instructions");
     } finally {
-      await chmod(innerAgents, 0o644);
+      readFileSpy.mockRestore();
     }
 
     // The failed file stays eligible: once readable again it is injected.

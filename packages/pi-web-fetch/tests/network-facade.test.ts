@@ -13,8 +13,12 @@ describe("network compatibility facade", () => {
     expect(isPrivateAddress("127.0.0.1")).toBe(true);
     expect(isPrivateAddress("8.8.8.8")).toBe(false);
 
-    await expect(validateRemoteUrl("https://example.com")).resolves.toBeTruthy();
-    await expect(validateRemoteUrl("http://localhost/x")).rejects.toThrow();
+    await expect(
+      validateRemoteUrl("https://example.com", async () => ["93.184.216.34"]),
+    ).resolves.toBeTruthy();
+    await expect(
+      validateRemoteUrl("http://localhost/x", async () => ["127.0.0.1"]),
+    ).rejects.toThrow();
 
     // requestPinned is exercised through transport tests; here we only pin the
     // facade re-export to a stable call signature.
