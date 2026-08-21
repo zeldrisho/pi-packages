@@ -5,6 +5,15 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import registerNestedAgents, { findNestedAgentsFiles } from "../src/index";
 
+// Mock node:fs/promises so the "unreadable instruction file" test can force a
+// deterministic rejection for a single path. The factory keeps the real
+// implementation by default (every other test exercises real filesystem I/O)
+// and lets that one test override `readFile` to simulate a permission error.
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...actual, readFile: vi.fn(actual.readFile) };
+});
+
 const temporaryDirectories = new Set<string>();
 
 afterEach(async () => {
@@ -145,13 +154,14 @@ describe("nested AGENTS.md discovery", () => {
     await handlers.session_start({}, context);
 
     // Mock readFile to reject deterministically for the inner AGENTS.md file.
-    const originalReadFile = readFile;
-    const readFileSpy = vi.spyOn(await import("node:fs/promises"), "readFile");
-    readFileSpy.mockImplementation(async (path, ...args) => {
+    const actualFsPromises =
+      await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+    const readFileMock = vi.mocked(readFile);
+    readFileMock.mockImplementation(async (path, ...args) => {
       if (path === innerAgents) {
         throw new Error("EACCES: permission denied");
       }
-      return originalReadFile(path, ...args);
+      return actualFsPromises.readFile(path, ...args);
     });
 
     try {
@@ -164,7 +174,7 @@ describe("nested AGENTS.md discovery", () => {
       expect(output).toContain("outer instructions");
       expect(output).not.toContain("inner instructions");
     } finally {
-      readFileSpy.mockRestore();
+      readFileMock.mockImplementation(actualFsPromises.readFile);
     }
 
     // The failed file stays eligible: once readable again it is injected.
