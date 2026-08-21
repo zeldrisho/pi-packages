@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -27,6 +27,7 @@ interface HandlerMap {
   tool_result: EventHandler;
   session_compact: EventHandler;
   session_tree: EventHandler;
+  session_shutdown: EventHandler;
 }
 
 function registerHandlers(): HandlerMap {
@@ -43,6 +44,7 @@ function registerHandlers(): HandlerMap {
     tool_result: handlers.get("tool_result")!,
     session_compact: handlers.get("session_compact")!,
     session_tree: handlers.get("session_tree")!,
+    session_shutdown: handlers.get("session_shutdown")!,
   };
 }
 
@@ -123,6 +125,46 @@ describe("nested AGENTS.md discovery", () => {
     await expect(handlers.tool_result(readResult(target), context)).resolves.toBeUndefined();
     await handlers.session_compact({}, context);
     await expect(handlers.tool_result(readResult(target), context)).resolves.toBeDefined();
+  });
+
+  it("reinjects instructions after session shutdown", async () => {
+    const { root, target } = await createTree();
+    const handlers = registerHandlers();
+    const context = { cwd: root };
+
+    await expect(handlers.tool_result(readResult(target), context)).resolves.toBeDefined();
+    await expect(handlers.tool_result(readResult(target), context)).resolves.toBeUndefined();
+    await handlers.session_shutdown({}, context);
+    await expect(handlers.tool_result(readResult(target), context)).resolves.toBeDefined();
+  });
+
+  it("skips unreadable instruction files instead of failing the tool result", async () => {
+    const { root, target, innerAgents } = await createTree();
+    const handlers = registerHandlers();
+    const context = { cwd: root };
+    await handlers.session_start({}, context);
+
+    await chmod(innerAgents, 0o000);
+    try {
+      // SAFETY: handlers.tool_result returns the injected-instructions object built by the
+      // extension; we assert it has the rendered `content` shape.
+      const result = (await handlers.tool_result(readResult(target), context)) as {
+        content: Array<{ type: string; text: string }>;
+      };
+      const output = result.content.map((block) => block.text).join("\n");
+      expect(output).toContain("outer instructions");
+      expect(output).not.toContain("inner instructions");
+    } finally {
+      await chmod(innerAgents, 0o644);
+    }
+
+    // The failed file stays eligible: once readable again it is injected.
+    // SAFETY: handlers.tool_result returns the injected-instructions object built by the
+    // extension; we assert it has the rendered `content` shape.
+    const retried = (await handlers.tool_result(readResult(target), context)) as {
+      content: Array<{ type: string; text: string }>;
+    };
+    expect(retried.content.map((block) => block.text).join("\n")).toContain("inner instructions");
   });
 
   it("reinjects instructions after tree navigation", async () => {
