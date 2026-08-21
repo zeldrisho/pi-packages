@@ -67,6 +67,7 @@ remain the only escape hatch for transitive runtime dependencies. Dev-only advis
 updating the toolchain or lockfile; if one cannot be resolved, it may be allowlisted in the audit
 command only with justification and a tracking issue.
 
-The scheduled Pi compatibility workflow remains independent of update automation. It smoke-tests packed
-extensions against both the locked workspace Pi resolution and the latest Pi APIs, while retaining the
-locked Typebox version, so wildcard Pi peer incompatibilities are detected before a catalog update.
+Before a Pi catalog bump, verify wildcard peer compatibility against the latest Pi APIs: run
+`PI_SMOKE_DEPENDENCIES=latest vp run test:packages` (or `vp run test:packages` alone to smoke-test
+against the locked workspace resolution) while retaining the locked Typebox version, so wildcard Pi
+peer incompatibilities are caught before the lockfile is updated.
