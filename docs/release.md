@@ -35,13 +35,17 @@ when it adds meaning beyond the file, for example `**deps:**` or `**security:**`
 2. Bump `version` in `packages/<name>/package.json`.
 3. Add a `## [version] - YYYY-MM-DD` entry to `packages/<name>/CHANGELOG.md` and run `vp run format:changelog`.
 4. Run `vp run validate` on the change, then open and merge a pull request.
-5. From `main`, create and push the component tag: `git tag <name>-v<version> && git push origin <name>-v<version>`.
-6. Confirm the package and version **before** pushing the tag. The `publish` environment is declared for OIDC trusted publishing and provenance, but in this repository it does **not** require a manual approval, so pushing the tag publishes to npm automatically (to add a manual gate, configure required reviewers on the `publish` environment).
+5. Confirm the package and version **before** creating the tag. The `publish` environment is declared for OIDC trusted publishing and provenance, but in this repository it does **not** require a manual approval, so pushing the tag publishes to npm automatically (to add a manual gate, configure required reviewers on the `publish` environment).
+6. From `main`, create and push the component tag: `git tag <name>-v<version> && git push origin <name>-v<version>`.
 7. Confirm CI, the component tag, the GitHub release, OIDC publication, provenance, npm metadata, and tarball contents.
 
 If a tag run fails after its GitHub release was already created, it leaves a partial
-release. To retry, delete the GitHub release and the remote tag, then re-create and
-push the tag at the corrected commit; the run republishes automatically.
+release. First check whether the version already exists on npm with `npm view
+<package>@<version>`. npm permanently reserves a published `name@version` pair and
+rejects a second publish, so if the version is present, reconcile the existing GitHub
+release and provenance and escalate rather than republishing. If the version is
+absent, delete the GitHub release and the remote tag, then re-create and push the tag
+at the corrected commit; the run republishes automatically.
 
 ## Bootstrap a new npm package
 
