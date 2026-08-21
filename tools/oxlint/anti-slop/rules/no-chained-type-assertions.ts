@@ -3,10 +3,21 @@ import type { ESTree } from "@oxlint/plugins";
 
 type TypeAssertionExpression = ESTree.TSAsExpression | ESTree.TSTypeAssertion;
 
+/**
+ * Determines whether a node represents a TypeScript type assertion.
+ *
+ * @returns `true` if the node is a TypeScript `as` or angle-bracket assertion, `false` otherwise.
+ */
 function isTypeAssertionExpression(node: ESTree.Node): node is TypeAssertionExpression {
   return node.type === "TSAsExpression" || node.type === "TSTypeAssertion";
 }
 
+/**
+ * Removes all outer parentheses from an expression.
+ *
+ * @param expression - The expression to unwrap
+ * @returns The expression without outer parentheses
+ */
 function unwrapParenthesizedExpression(expression: ESTree.Expression): ESTree.Expression {
   let current = expression;
   while (current.type === "ParenthesizedExpression") {
@@ -15,6 +26,11 @@ function unwrapParenthesizedExpression(expression: ESTree.Expression): ESTree.Ex
   return current;
 }
 
+/**
+ * Determines whether a type assertion uses `const` as its type annotation.
+ *
+ * @returns `true` if the assertion is a `const` assertion, `false` otherwise.
+ */
 function isConstAssertion(node: TypeAssertionExpression): boolean {
   const { typeAnnotation } = node;
   return (
@@ -24,6 +40,12 @@ function isConstAssertion(node: TypeAssertionExpression): boolean {
   );
 }
 
+/**
+ * Determines whether an assertion is the outermost assertion in its parenthesized chain.
+ *
+ * @param node - The type assertion to evaluate
+ * @returns `true` if `node` is the outermost assertion in its chain, `false` otherwise
+ */
 function isOutermostAssertionInChain(node: TypeAssertionExpression): boolean {
   let current: ESTree.Expression = node;
   let parent = node.parent;
@@ -36,6 +58,12 @@ function isOutermostAssertionInChain(node: TypeAssertionExpression): boolean {
   return !isTypeAssertionExpression(parent) || parent.expression !== current;
 }
 
+/**
+ * Determines whether an assertion chain contains multiple assertions and at least one non-`const` assertion.
+ *
+ * @param node - The first type assertion in the chain
+ * @returns `true` if the chain is forbidden, `false` otherwise.
+ */
 function isForbiddenAssertionChain(node: TypeAssertionExpression): boolean {
   let assertionCount = 0;
   let hasNonConstAssertion = false;

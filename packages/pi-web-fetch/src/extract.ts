@@ -77,28 +77,11 @@ export function htmlToMarkdownFallback(html: string): string {
 }
 
 /**
- * Runs Defuddle over an already-normalized document.
+ * Runs Defuddle on a normalized document with Markdown extraction enabled.
  *
- * Defuddle can fail in two distinct ways. The common case rejects the promise
- * we `await` below, which the caller's `try/catch` catches and turns into a
- * fallback. The dangerous case is when Defuddle schedules a throw on a
- * *detached* microtask or timer — for example, when it resolves a
- * document-relative link such as `/owner/repo/releases` into
- * `new URL(relative, undefined)` *after* its own promise has already resolved.
- * That rejection never reaches the `await` and instead escapes as an unhandled
- * rejection that bypasses the surrounding `try/catch` and crashes the calling
- * harness UI.
- *
- * To keep `extractHtmlToMarkdown` from ever propagating such a failure, this
- * helper attaches a scoped `unhandledRejection` guard for the lifetime of the
- * call and yields a macrotask so any promise chain Defuddle spawned has a
- * chance to settle before we commit to a successful result. A rejection
- * observed during that window is re-thrown so the caller falls back to the
- * basic extractor.
- *
- * @param document - The normalized document to parse
- * @param pageUrl - The absolute URL of the page, used to resolve relative links
- * @returns The Defuddle result, or `undefined` when extraction must fall back
+ * @param document - The normalized document to process
+ * @param pageUrl - The absolute page URL used to resolve relative links
+ * @returns The extracted Defuddle response, or `undefined` if extraction fails
  */
 async function runDefuddle(
   document: Document,

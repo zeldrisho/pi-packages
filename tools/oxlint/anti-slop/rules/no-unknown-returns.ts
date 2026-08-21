@@ -13,6 +13,12 @@ type FunctionWithReturnType =
   | ESTree.TSFunctionType
   | ESTree.TSMethodSignature;
 
+/**
+ * Gets the name of a non-generic identifier type reference.
+ *
+ * @param type - The type to inspect
+ * @returns The referenced type name, or `null` when the type is not a supported reference
+ */
 function referencedAliasName(type: ESTree.TSType): string | null {
   if (type.type === "TSParenthesizedType") return referencedAliasName(type.typeAnnotation);
   if (type.type !== "TSTypeReference" || type.typeName.type !== "Identifier") return null;

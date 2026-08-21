@@ -1,5 +1,11 @@
 import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins";
 
+/**
+ * Finds the variable definition visible from an identifier's lexical scope.
+ *
+ * @param identifier - The identifier whose variable definition to resolve
+ * @returns The resolved variable, or `null` when no definition is found
+ */
 function resolveVariable(
   sourceCode: SourceCode,
   identifier: ESTree.IdentifierReference,
@@ -13,6 +19,13 @@ function resolveVariable(
   return null;
 }
 
+/**
+ * Determines whether an expression refers to the global, unshadowed `Reflect` object.
+ *
+ * @param sourceCode - The source code context used to resolve the expression
+ * @param expression - The expression to inspect
+ * @returns `true` if the expression refers to global `Reflect`, `false` otherwise
+ */
 function isGlobalReflect(sourceCode: SourceCode, expression: ESTree.Expression): boolean {
   if (expression.type !== "Identifier" || expression.name !== "Reflect") return false;
   if (sourceCode.isGlobalReference(expression)) return true;
@@ -20,7 +33,13 @@ function isGlobalReflect(sourceCode: SourceCode, expression: ESTree.Expression):
   return variable === null || variable.defs.length === 0;
 }
 
-/** Reports whether a call target names one method on the global Reflect object. */
+/**
+ * Determines whether a call target refers to a specified method on the global `Reflect` object.
+ *
+ * @param callee - The call target to inspect
+ * @param methodName - The method name to match
+ * @returns `true` if the call target names the specified global `Reflect` method, `false` otherwise.
+ */
 export function isGlobalReflectMethodCall(
   sourceCode: SourceCode,
   callee: ESTree.Expression,

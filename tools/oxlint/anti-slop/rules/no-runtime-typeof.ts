@@ -4,6 +4,12 @@ import type { ESTree } from "@oxlint/plugins";
 
 type RuntimeFunction = ESTree.ArrowFunctionExpression | ESTree.Function;
 
+/**
+ * Determines whether an AST node represents a runtime function.
+ *
+ * @param node - The AST node to inspect
+ * @returns `true` if the node is an arrow function, function declaration, or function expression, `false` otherwise.
+ */
 function isRuntimeFunction(node: ESTree.Node): node is RuntimeFunction {
 	return (
 		node.type === "ArrowFunctionExpression" ||
@@ -12,6 +18,12 @@ function isRuntimeFunction(node: ESTree.Node): node is RuntimeFunction {
 	);
 }
 
+/**
+ * Determines whether a node is enclosed by a runtime function with a TypeScript type-predicate return annotation.
+ *
+ * @param node - The node whose enclosing function is checked
+ * @returns `true` if the nearest enclosing runtime function has a type-predicate return annotation, `false` otherwise
+ */
 function isInsideTypeGuard(node: ESTree.Node): boolean {
 	let current: ESTree.Node | null = node.parent;
 	while (current !== null && current.type !== "Program") {

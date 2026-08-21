@@ -11,6 +11,12 @@ type ParameterOwner =
   | ESTree.TSFunctionType
   | ESTree.TSMethodSignature;
 
+/**
+ * Extracts the TypeScript type annotation from a function parameter.
+ *
+ * @param parameter - The parameter whose annotation should be retrieved
+ * @returns The parameter's type annotation, or `null` or `undefined` when none is present
+ */
 function parameterAnnotation(parameter: Parameter): ESTree.TSTypeAnnotation | null | undefined {
   if (parameter.type === "TSParameterProperty") {
     return parameterAnnotation(parameter.parameter);
@@ -24,6 +30,13 @@ function parameterAnnotation(parameter: Parameter): ESTree.TSTypeAnnotation | nu
   return parameter.typeAnnotation;
 }
 
+/**
+ * Derives a readable name for a function parameter.
+ *
+ * @param parameter - The parameter node whose name should be determined
+ * @param sourceText - Source text used when the parameter has no identifier name
+ * @returns The parameter's identifier name or source text without a trailing `unknown` annotation
+ */
 function parameterName(parameter: Parameter, sourceText: string): string {
   if (parameter.type === "TSParameterProperty") {
     return parameterName(parameter.parameter, sourceText);

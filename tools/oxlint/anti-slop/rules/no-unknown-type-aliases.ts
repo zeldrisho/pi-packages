@@ -2,6 +2,12 @@ import { defineRule } from "@oxlint/plugins";
 
 import type { ESTree } from "@oxlint/plugins";
 
+/**
+ * Gets the referenced alias name from a direct, non-generic type reference.
+ *
+ * @param type - The type to inspect, including any parenthesized type wrappers
+ * @returns The referenced identifier name, or `null` if the type is not a supported alias reference
+ */
 function referencedAliasName(type: ESTree.TSType): string | null {
 	if (type.type === "TSParenthesizedType") return referencedAliasName(type.typeAnnotation);
 	if (type.type !== "TSTypeReference" || type.typeName.type !== "Identifier") return null;
