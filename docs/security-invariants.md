@@ -18,6 +18,7 @@ Use this checklist when reviewing extension runtime behavior, tool schemas, netw
 - `pi-file-remove` must remain prompt-only and must not execute or intercept removal commands. Its `gomi` preference applies only to the user's local development machine, not CI, containers, production, or other shared or automated environments.
 - `pi-file-search` must remain prompt-only and must never execute, intercept, or block discovery commands or silently broaden Pi's tool permissions.
 - `pi-vite-plus` must remain prompt-only and must never intercept commands, change package-manager metadata, or run migration, install, or publish commands itself.
+- `pi-cloudflare` must remain prompt-only and must not execute or intercept Cloudflare API calls. Its guidance applies only to retrieving current Workers documentation and limits.
 
 ## Web fetch
 
