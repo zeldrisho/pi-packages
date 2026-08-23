@@ -30,7 +30,7 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
 
   if (request.url?.startsWith("/owner/repo/")) {
     // Stands in for the rewritten raw.githubusercontent.com file path produced by
-    // normalizeGitHubBlobUrl so the end-to-end fetch can return clean plain text.
+    // normalizeGitHubRawUrl so the end-to-end fetch can return clean plain text.
     response.setHeader("content-type", "text/plain");
     response.end("export const example = 1;\n");
     return;

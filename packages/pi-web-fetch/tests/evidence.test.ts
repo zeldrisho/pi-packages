@@ -2,7 +2,7 @@ import type { IncomingMessage } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { executeWebFetch, type FetchRemoteDependencies } from "../src/index";
 import { classifyContentKind, classifyConfidence } from "../src/service";
-import { detectAppShell, normalizeGitHubBlobUrl } from "../src/fetch";
+import { detectAppShell, normalizeGitHubRawUrl } from "../src/fetch";
 import { createFetchHarness } from "./harness";
 
 /** Builds a minimal text/plain HTTP response for offline fetch testing. */
@@ -23,38 +23,62 @@ function fakeTextResponse(body: string): IncomingMessage {
   } as IncomingMessage;
 }
 
-describe("normalizeGitHubBlobUrl", () => {
+describe("normalizeGitHubRawUrl", () => {
   it("rewrites blob URLs to raw.githubusercontent.com", () => {
-    expect(normalizeGitHubBlobUrl("https://github.com/o/r/blob/main/src/x.ts")).toBe(
+    expect(normalizeGitHubRawUrl("https://github.com/o/r/blob/main/src/x.ts")).toBe(
       "https://raw.githubusercontent.com/o/r/main/src/x.ts",
     );
   });
 
   it("preserves query strings when rewriting", () => {
-    expect(normalizeGitHubBlobUrl("https://github.com/o/r/blob/main/x.ts?foo=1")).toBe(
+    expect(normalizeGitHubRawUrl("https://github.com/o/r/blob/main/x.ts?foo=1")).toBe(
       "https://raw.githubusercontent.com/o/r/main/x.ts?foo=1",
     );
   });
 
+  it("appends /raw to bare gist pages", () => {
+    expect(normalizeGitHubRawUrl("https://gist.github.com/user/abc123")).toBe(
+      "https://gist.github.com/user/abc123/raw",
+    );
+    expect(normalizeGitHubRawUrl("https://gist.github.com/user/abc123/")).toBe(
+      "https://gist.github.com/user/abc123/raw",
+    );
+    expect(normalizeGitHubRawUrl("https://gist.github.com/user/abc123?foo=1")).toBe(
+      "https://gist.github.com/user/abc123/raw?foo=1",
+    );
+  });
+
+  it("leaves gist subpages untouched", () => {
+    expect(normalizeGitHubRawUrl("https://gist.github.com/user/abc123/revisions")).toBe(
+      "https://gist.github.com/user/abc123/revisions",
+    );
+    expect(normalizeGitHubRawUrl("https://gist.github.com/user/abc123/raw")).toBe(
+      "https://gist.github.com/user/abc123/raw",
+    );
+  });
+
   it("leaves non-blob github URLs untouched", () => {
-    expect(normalizeGitHubBlobUrl("https://github.com/o/r")).toBe("https://github.com/o/r");
-    expect(normalizeGitHubBlobUrl("https://github.com/o/r/tree/main")).toBe(
+    expect(normalizeGitHubRawUrl("https://github.com/o/r")).toBe("https://github.com/o/r");
+    expect(normalizeGitHubRawUrl("https://github.com/o/r/tree/main")).toBe(
       "https://github.com/o/r/tree/main",
     );
   });
 
   it("leaves non-github URLs untouched", () => {
-    expect(normalizeGitHubBlobUrl("https://example.com/a/b")).toBe("https://example.com/a/b");
+    expect(normalizeGitHubRawUrl("https://example.com/a/b")).toBe("https://example.com/a/b");
   });
 
   it("leaves non-https github URLs untouched", () => {
-    expect(normalizeGitHubBlobUrl("http://github.com/o/r/blob/main/x")).toBe(
+    expect(normalizeGitHubRawUrl("http://github.com/o/r/blob/main/x")).toBe(
       "http://github.com/o/r/blob/main/x",
+    );
+    expect(normalizeGitHubRawUrl("http://gist.github.com/user/abc123")).toBe(
+      "http://gist.github.com/user/abc123",
     );
   });
 
   it("returns invalid URLs unchanged", () => {
-    expect(normalizeGitHubBlobUrl("not a url")).toBe("not a url");
+    expect(normalizeGitHubRawUrl("not a url")).toBe("not a url");
   });
 });
 
@@ -199,11 +223,11 @@ describe("web_fetch honest-evidence details", () => {
     // A per-process unique URL keeps the test independent of the cross-session disk cache.
     const requested = `https://github.com/owner/repo/blob/main/file-${process.pid}.ts`;
     const expectedFinal = `https://raw.githubusercontent.com/owner/repo/main/file-${process.pid}.ts`;
-    let validatedUrl = "";
+    const validatedUrls: string[] = [];
     const fetchDependencies: FetchRemoteDependencies = {
       validateUrl: async (value) => {
         const url = value instanceof URL ? value : new URL(value);
-        validatedUrl = url.toString();
+        validatedUrls.push(url.toString());
         return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
       },
       request: async () => fakeTextResponse("export const example = 1;\n"),
@@ -214,11 +238,39 @@ describe("web_fetch honest-evidence details", () => {
       undefined,
       fetchDependencies,
     );
-    // The rewrite happens before validation, so the validator sees the raw URL.
-    expect(validatedUrl).toBe(expectedFinal);
+    // The rewrite happens before validation, and the parallel llms.txt probe also
+    // validates its own URL, so the rewritten raw URL must be among the validations.
+    expect(validatedUrls).toContain(expectedFinal);
     expect(result.details.requestedUrl).toBe(requested);
     expect(result.details.finalUrl).toBe(expectedFinal);
     expect(result.details.contentKind).toBe("code-file");
+    expect(result.details.confidence).toBe("high");
+  });
+
+  it("rewrites bare gist URLs to their raw path and reports the canonical source", async () => {
+    const requested = `https://gist.github.com/owner/gist-id-${process.pid}`;
+    const expectedFinal = `https://gist.github.com/owner/gist-id-${process.pid}/raw`;
+    const validatedUrls: string[] = [];
+    const fetchDependencies: FetchRemoteDependencies = {
+      validateUrl: async (value) => {
+        const url = value instanceof URL ? value : new URL(value);
+        validatedUrls.push(url.toString());
+        return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
+      },
+      request: async () => fakeTextResponse("const gist = true;\n"),
+    };
+    const result = await executeWebFetch(
+      { url: requested },
+      undefined,
+      undefined,
+      fetchDependencies,
+    );
+    // The rewrite happens before validation, and the parallel llms.txt probe also
+    // validates its own URL, so the rewritten raw URL must be among the validations.
+    expect(validatedUrls).toContain(expectedFinal);
+    expect(result.details.requestedUrl).toBe(requested);
+    expect(result.details.finalUrl).toBe(expectedFinal);
+    expect(result.details.extractor).toBe("raw");
     expect(result.details.confidence).toBe("high");
   });
 });
