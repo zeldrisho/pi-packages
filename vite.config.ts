@@ -1,8 +1,14 @@
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite-plus";
+
+// Anchor paths on this file's location so the same config works when vp
+// invokes tests from the repository root and from inside packages/<name>/.
+const repoRoot = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   test: {
-    setupFiles: ["./tests/cache-env.setup.ts"],
+    setupFiles: [join(repoRoot, "tests", "cache-env.setup.ts")],
     coverage: {
       provider: "v8",
       reporter: [["text", { skipFull: false }]],
