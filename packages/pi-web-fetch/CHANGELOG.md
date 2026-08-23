@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-08-23
+
 ### Fixed
 
 - Preserve the absolute URL when extracting HTML so Defuddle never constructs `new URL(pathname)` for GitHub-style host + path pages, and guard Defuddle failures (including detached rejections) so extraction always falls back to the basic converter instead of surfacing an `ERR_INVALID_URL` to the caller
@@ -91,7 +93,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.6.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.6.1...HEAD
+[0.6.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.6.0...pi-web-fetch-v0.6.1
 [0.6.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.4...pi-web-fetch-v0.6.0
 [0.5.4]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.3...pi-web-fetch-v0.5.4
 [0.5.3]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.2...pi-web-fetch-v0.5.3
