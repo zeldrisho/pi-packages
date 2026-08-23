@@ -11,9 +11,9 @@ describe("web_search provider transport", () => {
   it.each([SEARCH_MIN_RESULT_COUNT - 1, SEARCH_MAX_RESULT_COUNT + 1, 1.5])(
     "rejects invalid provider result counts (%s)",
     async (count) => {
-      await expect(searchBraveWeb("query", count, undefined, undefined, undefined)).rejects.toThrow(
-        "Search result count must be an integer",
-      );
+      await expect(
+        searchBraveWeb("query", count, undefined, undefined, undefined, "transport-secret"),
+      ).rejects.toThrow("Search result count must be an integer");
     },
   );
 

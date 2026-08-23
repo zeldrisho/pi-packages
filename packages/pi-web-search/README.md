@@ -23,7 +23,9 @@ export BRAVE_SEARCH_API_KEY="your-api-key"
 pi
 ```
 
-If Pi is already running when you set the environment variable, run `/reload` in that Pi session.
+If the environment variable is not set, the tool also resolves the key from a `BRAVE_SEARCH_API_KEY=` line in the workspace `.env`, and then in the agent-global `.env` (in that order). Only where the key was found is ever reported; the value itself never appears in output or errors.
+
+If Pi is already running when you set the key, run `/reload` in that Pi session.
 
 ## Usage
 
@@ -31,7 +33,7 @@ The `web_search` tool returns compact web results by default, making it suitable
 
 Context snippets may not reflect the current live page. The tool does not fetch result URLs. When live-page inspection is needed, call `web_fetch` explicitly on the relevant URL.
 
-Searches accept an optional result count of up to 20, a freshness filter (`day`, `week`, `month`, or `year`), and a language code such as `en` or `en-US`.
+Searches accept an optional result count of up to 20, a freshness filter (`day`, `week`, `month`, or `year`), and a language code such as `en` or `en-US`. Web mode additionally accepts a country code (`US`, `DE`, …), a SafeSearch level (`off`, `moderate`, or `strict`; default `moderate`), and an `extraSnippets` flag that appends Brave's additional excerpt paragraphs to each result snippet. These three options apply only to web mode; requests that use them with `mode: "context"` fail with a clear error.
 
 Identical searches are cached in byte-bounded memory for a limited time. Concurrent identical searches share one provider request; cancelling one caller does not cancel work still needed by another. In Pi's interactive UI, results use Pi's standard collapsed preview; use the configured tool-expansion shortcut (`Ctrl+O` by default) to show all visible tool output. Output sent to the agent remains bounded, and when a result is truncated, the complete output is written to a temporary file that is removed when the Pi session shuts down.
 

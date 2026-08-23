@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Resolve `BRAVE_SEARCH_API_KEY` from the process environment, the workspace `.env`, or the agent-global `.env`, and report only the credential source in `details.apiKeySource`
+- Add web-mode search options: `country` code filter, `safesearch` level (`off`/`moderate`/`strict`, default `moderate`), and `extraSnippets` to append Brave's additional excerpts per result; using them in context mode now fails with a clear error
+
 ## [0.5.0] - 2026-08-20
 
 ### Added

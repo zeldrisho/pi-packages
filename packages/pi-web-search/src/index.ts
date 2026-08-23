@@ -5,8 +5,10 @@ import { Type } from "typebox";
 import {
   SEARCH_CONTEXT_MAX_QUERY_CHARACTERS,
   SEARCH_DEFAULT_RESULT_COUNT,
+  SEARCH_MAX_COUNTRY_CHARACTERS,
   SEARCH_MAX_LANGUAGE_CHARACTERS,
   SEARCH_MAX_RESULT_COUNT,
+  SEARCH_MIN_COUNTRY_CHARACTERS,
   SEARCH_MIN_LANGUAGE_CHARACTERS,
   SEARCH_MIN_RESULT_COUNT,
   SEARCH_WEB_MAX_QUERY_CHARACTERS,
@@ -54,6 +56,25 @@ export const webSearchParameters = Type.Object({
       description: "Optional language code, such as en or en-US",
     }),
   ),
+  country: Type.Optional(
+    Type.String({
+      minLength: SEARCH_MIN_COUNTRY_CHARACTERS,
+      maxLength: SEARCH_MAX_COUNTRY_CHARACTERS,
+      description:
+        "Optional country code to boost or restrict results, such as US, DE, or CH (web mode only)",
+    }),
+  ),
+  safesearch: Type.Optional(
+    StringEnum(["off", "moderate", "strict"] as const, {
+      description: "Optional SafeSearch level (web mode only; default: moderate)",
+    }),
+  ),
+  extraSnippets: Type.Optional(
+    Type.Boolean({
+      description:
+        "Request additional excerpt paragraphs per web result when Brave has them, appended to each snippet (web mode only)",
+    }),
+  ),
 });
 
 export default function (pi: ExtensionAPI) {
@@ -81,8 +102,8 @@ export default function (pi: ExtensionAPI) {
       );
     },
 
-    async execute(_toolCallId, params, signal, onUpdate) {
-      return runtime.execute(params, signal, onUpdate);
+    async execute(_toolCallId, params, signal, onUpdate, ctx) {
+      return runtime.execute(params, signal, onUpdate, ctx?.cwd);
     },
 
     renderResult(result, { expanded, isPartial }, theme) {

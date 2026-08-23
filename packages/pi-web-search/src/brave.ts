@@ -8,6 +8,7 @@ import { normalizeText, requestJson } from "./provider";
 
 export type Provider = "brave";
 export type Freshness = "day" | "week" | "month" | "year";
+export type SafesearchMode = "off" | "moderate" | "strict";
 export type SearchMode = "web" | "context";
 
 export type ResultQuality = "high" | "medium" | "low";
@@ -24,6 +25,7 @@ interface BraveWebResult {
   title?: string;
   url?: string;
   description?: string;
+  extra_snippets?: string[];
 }
 
 interface BraveWebResponse {
@@ -45,6 +47,13 @@ interface BraveContextResponse {
   grounding?: { generic?: BraveContextResult[] };
 }
 
+/** Web-mode-only search options that the context endpoint does not support. */
+export interface WebSearchExtras {
+  country?: string;
+  safesearch?: SafesearchMode;
+  extraSnippets?: boolean;
+}
+
 /**
  * Classifies a search result by how much usable, sourced information it carries.
  *
@@ -62,6 +71,7 @@ const BRAVE_MAX_CONTEXT_TOKENS = 2_048;
 const BRAVE_MAX_SNIPPETS = 15;
 const BRAVE_MAX_TOKENS_PER_URL = 1_024;
 const BRAVE_MAX_SNIPPETS_PER_URL = 3;
+const BRAVE_MAX_EXTRA_SNIPPETS = 5;
 
 /**
  * Validates a search query and requested result count against the provider limits.
@@ -71,7 +81,22 @@ const BRAVE_MAX_SNIPPETS_PER_URL = 3;
  * @param mode - The search mode whose query limit applies
  * @throws If the query exceeds the mode limit or the result count is outside the allowed range
  */
-export function validateProviderRequest(query: string, count: number, mode: SearchMode): void {
+export function validateProviderRequest(
+  query: string,
+  count: number,
+  mode: SearchMode,
+  extras?: WebSearchExtras,
+): void {
+  if (
+    mode === "context" &&
+    (extras?.country !== undefined ||
+      extras?.safesearch !== undefined ||
+      extras?.extraSnippets !== undefined)
+  ) {
+    throw new Error(
+      "The country, safesearch, and extraSnippets options are only supported in web mode.",
+    );
+  }
   const maximumQueryCharacters =
     mode === "context" ? SEARCH_CONTEXT_MAX_QUERY_CHARACTERS : SEARCH_WEB_MAX_QUERY_CHARACTERS;
   if (query.length > maximumQueryCharacters) {
@@ -151,6 +176,8 @@ function braveSnippetToMarkdown(value: string): string {
  *
  * @param query - The search query
  * @param count - The requested number of results
+ * @param apiKey - The resolved Brave subscription token (never logged or echoed)
+ * @param extras - Optional web-mode filters: country, safesearch level, extra snippets
  * @returns Normalized web search results
  */
 export async function searchBraveWeb(
@@ -159,14 +186,18 @@ export async function searchBraveWeb(
   freshness: Freshness | undefined,
   language: string | undefined,
   signal: AbortSignal | undefined,
+  apiKey: string,
+  extras: WebSearchExtras = {},
 ): Promise<SearchResult[]> {
   validateProviderRequest(query, count, "web");
   const url = new URL("https://api.search.brave.com/res/v1/web/search");
   url.searchParams.set("q", query);
   url.searchParams.set("count", String(count));
-  url.searchParams.set("safesearch", "moderate");
+  url.searchParams.set("safesearch", extras.safesearch ?? "moderate");
   url.searchParams.set("text_decorations", "false");
   if (language) url.searchParams.set("search_lang", language);
+  if (extras.country) url.searchParams.set("country", extras.country);
+  if (extras.extraSnippets) url.searchParams.set("extra_snippets", "true");
   if (freshness)
     url.searchParams.set(
       "freshness",
@@ -178,7 +209,7 @@ export async function searchBraveWeb(
     {
       headers: {
         Accept: "application/json",
-        "X-Subscription-Token": process.env.BRAVE_SEARCH_API_KEY!,
+        "X-Subscription-Token": apiKey,
       },
     },
     signal,
@@ -186,7 +217,16 @@ export async function searchBraveWeb(
 
   return (data.web?.results ?? []).map((item) => {
     const title = normalizeText(item.title ?? "", 300);
-    const snippet = normalizeText(item.description ?? "", 600);
+    let snippet = normalizeText(item.description ?? "", 600);
+    if (extras.extraSnippets && item.extra_snippets?.length) {
+      const additional = item.extra_snippets
+        .slice(0, BRAVE_MAX_EXTRA_SNIPPETS)
+        .map((value) => normalizeText(value ?? "", 300))
+        .filter(Boolean);
+      if (additional.length) {
+        snippet = normalizeText([snippet, ...additional].filter(Boolean).join("\n\n"), 2000);
+      }
+    }
     return {
       title,
       url: normalizeUrl(item.url ?? ""),
@@ -199,6 +239,7 @@ export async function searchBraveWeb(
 /**
  * Searches Brave's context API and maps grounding results to normalized search results.
  *
+ * @param apiKey - The resolved Brave subscription token (never logged or echoed)
  * @returns Search results containing normalized titles and URLs with deduplicated Markdown snippets.
  */
 export async function searchBraveContext(
@@ -207,6 +248,7 @@ export async function searchBraveContext(
   freshness: Freshness | undefined,
   language: string | undefined,
   signal: AbortSignal | undefined,
+  apiKey: string,
 ): Promise<SearchResult[]> {
   validateProviderRequest(query, count, "context");
 
@@ -231,7 +273,7 @@ export async function searchBraveContext(
     {
       headers: {
         Accept: "application/json",
-        "X-Subscription-Token": process.env.BRAVE_SEARCH_API_KEY!,
+        "X-Subscription-Token": apiKey,
       },
     },
     signal,

@@ -29,6 +29,7 @@ export interface SearchTool {
     onUpdate:
       | ((update: { content: Array<{ type: "text"; text: string }>; details: object }) => void)
       | undefined,
+    ctx?: { cwd?: string },
   ): Promise<SearchExecutionResult>;
   renderResult(
     result: SearchExecutionResult,
