@@ -14,12 +14,6 @@ Install only for the current project:
 pi install -l npm:@zeldrisho/pi-vite-plus
 ```
 
-To try it for one session without installing it:
-
-```bash
-pi -e npm:@zeldrisho/pi-vite-plus
-```
-
 When Pi's `bash` tool is active, the extension injects complete Vite+ CLI agent guidance. It explains the unified `vp` CLI, distinguishes built-in commands from `package.json` scripts and `vite.config.ts` tasks, points agents to the Vite+ documentation, and provides a review checklist covering installation, checks, tests, project tasks, and environment diagnostics.
 
 The extension provides prompt guidance only. It does not intercept or block tool calls.
