@@ -44,4 +44,4 @@ Changes to `pi-web-search` must preserve:
 - private temporary files and cleanup on every exit path; and
 - untrusted-content wrappers for snippets and extracted context.
 
-Run the complete validation command in `AGENTS.md` before proposing a security-sensitive change.
+Run the complete validation command (`vp run validate`) before proposing a security-sensitive change.

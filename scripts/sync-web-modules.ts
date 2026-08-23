@@ -8,7 +8,7 @@
 //   node scripts/sync-web-modules.ts check
 //   node scripts/sync-web-modules.ts sync [--from pi-web-fetch|pi-web-search]
 //
-// The three files stay duplicated (no shared package) per AGENTS.md; this
+// The three files stay duplicated (no shared package) by design; this
 // script only automates copying one side to the other so the agent never has
 // to remember the manual write. `tests/repository-contract.test.ts` still
 // fails the build on drift as the source of truth.
