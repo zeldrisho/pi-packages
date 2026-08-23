@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Surface a visible warning when a discovered `AGENTS.md` cannot be read instead of silently skipping it; the file stays retry-eligible for later reads
+
 ## [0.2.2] - 2026-07-22
 
 ### Fixed

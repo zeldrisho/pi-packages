@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { basename, isAbsolute, resolve } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isReadToolResult } from "@earendil-works/pi-coding-agent";
-import { ContextAccumulator } from "./context";
+import { ContextAccumulator, formatReadWarning } from "./context";
 import { AGENTS_FILE, findNestedAgentsFiles, resolveContainedTarget } from "./discovery";
 
 export { findNestedAgentsFiles } from "./discovery";
@@ -46,7 +46,11 @@ export default function nestedAgents(pi: ExtensionAPI): void {
       try {
         fileContent = await readFile(path, "utf8");
       } catch {
+        // The file existed during discovery but became unreadable before the
+        // read (race, permissions). Fail loudly instead of silently dropping
+        // instructions; keep the path retry-eligible for later reads.
         injected.delete(path);
+        context.warn(formatReadWarning(ctx.cwd, path));
         continue;
       }
 

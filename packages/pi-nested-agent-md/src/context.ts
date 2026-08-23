@@ -73,6 +73,16 @@ function formatContext(root: string, path: string, content: string, truncated: b
   );
 }
 
+/**
+ * Formats a visible warning for a discovered instruction file whose contents
+ * could not be read. Paths are control-character-sanitized and bounded so
+ * untrusted file names cannot inject noise into model-visible output.
+ */
+export function formatReadWarning(root: string, path: string): string {
+  const displayPath = safePathText(relative(root, path) || basename(path)).slice(0, 200);
+  return `\n\n[nested-agents] Warning: nested instructions were found at ${displayPath}, but the file could not be read, so its instructions are NOT applied.`;
+}
+
 export class ContextAccumulator {
   private bytesLeft: number;
   private linesLeft: number;
@@ -99,6 +109,19 @@ export class ContextAccumulator {
   hasCapacity(root: string, path: string): boolean {
     const capacity = this.capacity(root, path);
     return capacity.bytes > 0 && capacity.lines > 0;
+  }
+
+  /** Appends a short diagnostic line when capacity remains; returns whether it fit. */
+  warn(raw: string): boolean {
+    const section = raw;
+    const sectionBytes = byteLength(section);
+    const sectionLines = lineCount(section);
+    if (sectionBytes > this.bytesLeft || sectionLines > this.linesLeft) return false;
+
+    this.addition += section;
+    this.bytesLeft -= sectionBytes;
+    this.linesLeft -= sectionLines;
+    return true;
   }
 
   append(root: string, path: string, content: string): boolean {

@@ -147,7 +147,7 @@ describe("nested AGENTS.md discovery", () => {
     await expect(handlers.tool_result(readResult(target), context)).resolves.toBeDefined();
   });
 
-  it("skips unreadable instruction files instead of failing the tool result", async () => {
+  it("warns visibly when an instruction file is unreadable and stays retry-eligible", async () => {
     const { root, target, innerAgents } = await createTree();
     const handlers = registerHandlers();
     const context = { cwd: root };
@@ -173,6 +173,9 @@ describe("nested AGENTS.md discovery", () => {
       const output = result.content.map((block) => block.text).join("\n");
       expect(output).toContain("outer instructions");
       expect(output).not.toContain("inner instructions");
+      // The unreadable file must fail loudly instead of being silently skipped.
+      expect(output).toContain("could not be read");
+      expect(output).toContain("AGENTS.md");
     } finally {
       readFileMock.mockImplementation(actualFsPromises.readFile);
     }
