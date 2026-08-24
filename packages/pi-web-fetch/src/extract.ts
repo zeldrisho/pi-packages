@@ -198,11 +198,12 @@ export async function extractHtmlToMarkdown(
   describedByLink?: string;
   markdownAlternateLink?: string;
 }> {
+  let advertised: AdvertisedLinks = {};
   try {
     const { document } = parseHTML(html);
     removeMalformedSchemaOrgData(document);
     normalizeSelectorUnsafeIds(document);
-    const advertised = readAdvertisedLinks(document, baseUrl);
+    advertised = readAdvertisedLinks(document, baseUrl);
     // Pass the full absolute URL so Defuddle resolves relative links (e.g.
     // `/owner/repo/releases`) and metadata against the real origin instead of
     // dropping the scheme and host and constructing `new URL(pathname)`.
@@ -220,5 +221,5 @@ export async function extractHtmlToMarkdown(
   } catch {
     // Fall through to the basic converter for malformed or unsupported pages.
   }
-  return { markdown: htmlToMarkdownFallback(html), extractor: "basic" };
+  return { markdown: htmlToMarkdownFallback(html), extractor: "basic", ...advertised };
 }
