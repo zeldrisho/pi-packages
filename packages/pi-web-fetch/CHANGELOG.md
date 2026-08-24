@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-24
+
 ### Added
 
 - Rewrite bare GitHub Gist pages (`gist.github.com/<user>/<id>`) by appending `/raw`, so gist contents are fetched as clean plain text instead of Defuddle's rendered page
@@ -100,7 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.6.1...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.7.0...HEAD
+[0.7.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.6.1...pi-web-fetch-v0.7.0
 [0.6.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.6.0...pi-web-fetch-v0.6.1
 [0.6.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.4...pi-web-fetch-v0.6.0
 [0.5.4]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.3...pi-web-fetch-v0.5.4

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-08-24
+
 ### Changed
 
 - Surface a visible warning when a discovered `AGENTS.md` cannot be read instead of silently skipping it; the file stays retry-eligible for later reads
@@ -29,7 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add scoped instruction discovery ([00764a9](https://github.com/zeldrisho/pi-packages/commit/00764a9d073a5074f2c382ece24a1a6ecacba0e6))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-nested-agent-md-v0.2.2...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-nested-agent-md-v0.2.3...HEAD
+[0.2.3]: https://github.com/zeldrisho/pi-packages/compare/pi-nested-agent-md-v0.2.2...pi-nested-agent-md-v0.2.3
 [0.2.2]: https://github.com/zeldrisho/pi-packages/compare/pi-nested-agent-md-v0.2.1...pi-nested-agent-md-v0.2.2
 [0.2.1]: https://github.com/zeldrisho/pi-packages/compare/pi-nested-agent-md-v0.2.0...pi-nested-agent-md-v0.2.1
 [0.2.0]: https://github.com/zeldrisho/pi-packages/releases/tag/pi-nested-agent-md-v0.2.0
