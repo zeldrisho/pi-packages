@@ -150,6 +150,7 @@ export class SearchRuntime {
       country: params.country,
       safesearch: params.safesearch,
       extraSnippets: params.extraSnippets,
+      cwd,
     });
     const cachedEntry = searchCache.get(cacheKey);
     const cached = cachedEntry !== undefined;
