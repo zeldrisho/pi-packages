@@ -203,6 +203,20 @@ async function probeUsableRawText(
 }
 
 /**
+ * Validates that a candidate URL is safe to probe: must use HTTP(S) and match the primary
+ * page's origin. This prevents SSRF-like issues where a fetched page could embed meta tags
+ * pointing to arbitrary/internal/cross-origin URLs.
+ */
+function isSafeToProbe(candidate: URL | undefined, primaryUrl: string): boolean {
+  if (!candidate) return false;
+  const protocol = candidate.protocol;
+  if (protocol !== "http:" && protocol !== "https:") return false;
+  const primaryParsed = safeUrl(primaryUrl);
+  if (!primaryParsed) return false;
+  return candidate.origin === primaryParsed.origin;
+}
+
+/**
  * Fetches a page with llms.txt awareness:
  *
  * - Probes the site's `/llms.txt` index once per origin per TTL window, in parallel with
@@ -230,9 +244,10 @@ async function fetchDocumentWithLlmsTxtSupport(
   let index = blindIndex;
   if (primary.llmsTxtDescribedBy) {
     const describedBy = toAbsoluteUrl(primary.llmsTxtDescribedBy);
-    const described = describedBy
-      ? await probeUsableRawText(describedBy, signal, dependencies)
-      : undefined;
+    const described =
+      describedBy && isSafeToProbe(describedBy, primary.url)
+        ? await probeUsableRawText(describedBy, signal, dependencies)
+        : undefined;
     if (described && describedBy) index = { url: describedBy.href, document: described };
   }
   if (isLowQualityDocument(primary)) {
@@ -240,9 +255,10 @@ async function fetchDocumentWithLlmsTxtSupport(
     const markdownAlternate = primary.markdownAlternateUrl
       ? toAbsoluteUrl(primary.markdownAlternateUrl)
       : undefined;
-    const alternate = markdownAlternate
-      ? await probeUsableRawText(markdownAlternate, signal, dependencies)
-      : undefined;
+    const alternate =
+      markdownAlternate && isSafeToProbe(markdownAlternate, primary.url)
+        ? await probeUsableRawText(markdownAlternate, signal, dependencies)
+        : undefined;
     if (alternate && markdownAlternate) {
       return { ...alternate, markdownAlternateFallback: true };
     }
