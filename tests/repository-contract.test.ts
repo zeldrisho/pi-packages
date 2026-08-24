@@ -174,7 +174,13 @@ describe("repository contracts", () => {
     // indicate a wrong package manager was used and would break workspace
     // catalog resolution.
     const rootEntries = await readdir(root);
-    const forbidden = ["package-lock.json", "yarn.lock", "bun.lock", "bun.lockb"];
+    const forbidden = [
+      "package-lock.json",
+      "npm-shrinkwrap.json",
+      "yarn.lock",
+      "bun.lock",
+      "bun.lockb",
+    ];
     const found = rootEntries.filter((entry) => forbidden.includes(entry));
     if (found.length > 0) {
       fail(`repository root must not contain ${found.join(", ")} — use pnpm via vp install`);
