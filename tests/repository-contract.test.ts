@@ -72,8 +72,14 @@ describe("repository contracts", () => {
     if (releaseWorkflow.includes("softprops/action-gh-release")) {
       fail("the release workflow must not use softprops/action-gh-release");
     }
-    if (!releaseWorkflow.includes('gh release create "${{ github.ref_name }}"')) {
-      fail("the release job must create the release for tag ${{ github.ref_name }}");
+    if (!releaseWorkflow.includes("RELEASE_TAG: ${{ github.ref_name }}")) {
+      fail("the release job must pass the tag via RELEASE_TAG: ${{ github.ref_name }} env var");
+    }
+    if (!releaseWorkflow.includes('gh release create "$RELEASE_TAG"')) {
+      fail('the release job must create the release with gh release create "$RELEASE_TAG"');
+    }
+    if (!releaseWorkflow.includes("--verify-tag")) {
+      fail("the release job must pass --verify-tag to gh release create");
     }
     if (
       !releaseWorkflow.includes(
