@@ -3,7 +3,7 @@
 Packages are versioned independently. The agent owns the release end to end: it
 bumps `package.json`, writes the `CHANGELOG.md` entry by hand, and pushes a
 component tag. Pushing the tag runs [`.github/workflows/release.yml`](../.github/workflows/release.yml),
-which creates the GitHub release from the changelog and publishes the package to
+which creates the GitHub release via `gh release create` from the changelog and publishes the package to
 npm with trusted publishing (OIDC).
 
 ## Tag format

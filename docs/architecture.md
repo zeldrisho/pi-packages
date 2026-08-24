@@ -90,7 +90,7 @@ flowchart LR
 `scripts/release.ts` resolves a `<package>-v<version>` tag to its package and
 verifies the tag version matches the manifest version. It then reads the
 package's `CHANGELOG.md` section for the released version and writes it to a
-file for `softprops/action-gh-release`, which creates the GitHub release. The
+notes file consumed by `gh release create`, which creates the GitHub release via the GitHub CLI. The
 workflow publishes the package through npm trusted publishing (OIDC). The agent
 owns the version and changelog; the workflow only reads them. Details, approvals,
 and escalation conditions remain in [release.md](release.md).
