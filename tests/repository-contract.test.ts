@@ -23,7 +23,7 @@ const expectedScripts = {
   typecheck: "vp check --no-fmt --no-lint",
 };
 const expectedTypeScriptConfiguration = {
-  extends: "../../tsconfig.base.json",
+  extends: "../../tsconfig.json",
   include: ["src", "tests"],
 };
 const synchronizedInfrastructurePairs = [

@@ -2,13 +2,6 @@ const REQUEST_TIMEOUT_MS = 20_000;
 const SEARCH_MAX_RESPONSE_BYTES = 2_000_000;
 const SEARCH_ERROR_EXCERPT_BYTES = 8_192;
 
-export function configuredProvider(): "brave" {
-  if (!process.env.BRAVE_SEARCH_API_KEY) {
-    throw new Error("BRAVE_SEARCH_API_KEY is required for web search. Set it, then run /reload.");
-  }
-  return "brave";
-}
-
 export function normalizeText(value: string, maxLength: number): string {
   const text = value
     .replace(/<[^>]*>/g, " ")

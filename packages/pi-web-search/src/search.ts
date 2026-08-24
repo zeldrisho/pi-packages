@@ -14,14 +14,15 @@ import {
   validateProviderRequest,
   type Freshness,
   type Provider,
+  type SafesearchMode,
   type SearchMode,
   type SearchResult,
 } from "./brave";
 import { ExpiringLruCache, stableKeyHash, type CachePersistence } from "./cache";
+import { resolveApiKey, type ApiKeySource } from "./credentials";
 import { formatResults } from "./format-results";
 import { InflightCoalescer } from "./inflight";
 import { SEARCH_DEFAULT_RESULT_COUNT } from "./limits";
-import { configuredProvider } from "./provider";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
 const CACHE_MAX_ENTRIES = 100;
@@ -52,6 +53,9 @@ export interface SearchParameters {
   freshness?: Freshness;
   mode?: SearchMode;
   language?: string;
+  country?: string;
+  safesearch?: SafesearchMode;
+  extraSnippets?: boolean;
 }
 
 export interface SearchTruncationDetails {
@@ -72,6 +76,8 @@ export interface SearchDetails {
   results: SearchResult[];
   evidence: SearchEvidence;
   cached: boolean;
+  /** Where the Brave API key was found; the key value itself is never reported. */
+  apiKeySource: ApiKeySource;
   truncated: boolean;
   fullOutputPath?: string;
   truncation: SearchTruncationDetails;
@@ -114,14 +120,26 @@ export class SearchRuntime {
     params: SearchParameters,
     signal: AbortSignal | undefined,
     onUpdate: ((update: SearchUpdate) => void) | undefined,
+    cwd: string = process.cwd(),
   ) {
     const query = params.query.trim();
     if (!query) throw new Error("Search query cannot be empty.");
 
     const count = params.count ?? SEARCH_DEFAULT_RESULT_COUNT;
     const mode = params.mode ?? "web";
-    validateProviderRequest(query, count, mode);
-    const provider = configuredProvider();
+    const extras = {
+      country: params.country,
+      safesearch: params.safesearch,
+      extraSnippets: params.extraSnippets,
+    };
+    validateProviderRequest(query, count, mode, extras);
+    const credentials = await resolveApiKey(cwd);
+    if (!credentials) {
+      throw new Error(
+        "BRAVE_SEARCH_API_KEY is required for web search. Set it in the environment, the workspace .env, or the agent .env, then run /reload.",
+      );
+    }
+    const provider: Provider = "brave";
     const cacheKey = JSON.stringify({
       provider,
       mode,
@@ -129,6 +147,10 @@ export class SearchRuntime {
       count,
       freshness: params.freshness,
       language: params.language,
+      country: params.country,
+      safesearch: params.safesearch,
+      extraSnippets: params.extraSnippets,
+      cwd,
     });
     const cachedEntry = searchCache.get(cacheKey);
     const cached = cachedEntry !== undefined;
@@ -157,8 +179,17 @@ export class SearchRuntime {
                   params.freshness,
                   params.language,
                   sharedSignal,
+                  credentials.key,
                 )
-              : await searchBraveWeb(query, count, params.freshness, params.language, sharedSignal);
+              : await searchBraveWeb(
+                  query,
+                  count,
+                  params.freshness,
+                  params.language,
+                  sharedSignal,
+                  credentials.key,
+                  extras,
+                );
           const bounded = found.filter((result) => result.url).slice(0, count);
           searchCache.set(cacheKey, bounded, Date.now() + CACHE_TTL_MS);
           return bounded;
@@ -209,6 +240,7 @@ export class SearchRuntime {
         results,
         evidence,
         cached,
+        apiKeySource: credentials.source,
         truncated: truncation.truncated,
         fullOutputPath,
         truncation: {
