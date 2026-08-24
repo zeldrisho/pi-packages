@@ -14,12 +14,6 @@ Install only for the current project:
 pi install -l npm:@zeldrisho/pi-cloudflare
 ```
 
-To try it for one session without installing it:
-
-```bash
-pi -e npm:@zeldrisho/pi-cloudflare
-```
-
 ## Behavior
 
 While Pi's `bash` tool is active, the extension appends Cloudflare Workers guidance to the system prompt at the start of every agent turn: where the docs and MCP server live, how to look up limits and quotas, the `wrangler` commands, Node.js compatibility, how to diagnose errors, the product documentation index, and best practices for Durable Objects and Workflows.

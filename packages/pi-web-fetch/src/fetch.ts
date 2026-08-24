@@ -12,18 +12,32 @@ import {
 } from "./network-transport";
 
 /**
- * Rewrites a GitHub `blob` URL to its raw counterpart so file contents are fetched as
- * clean plain text instead of Defuddle's noisy code-rendering table.
+ * Rewrites GitHub source URLs to their raw counterparts so file contents are fetched as
+ * clean plain text instead of Defuddle's noisy rendered view:
+ *
+ * - `github.com` `blob` URLs become their `raw.githubusercontent.com` counterpart.
+ * - Bare gist pages (`gist.github.com/<user>/<id>`) get `/raw` appended; the redirect to
+ *   `gist.githubusercontent.com` is followed by the normal redirect policy.
  *
  * @param rawUrl - The URL to normalize
- * @returns The rewritten raw URL, or the input unchanged for non-GitHub and non-blob URLs
+ * @returns The rewritten raw URL, or the input unchanged for non-GitHub and non-source URLs
  */
-export function normalizeGitHubBlobUrl(rawUrl: string): string {
+export function normalizeGitHubRawUrl(rawUrl: string): string {
   try {
     const url = new URL(rawUrl);
-    if (url.protocol !== "https:" || url.hostname !== "github.com") return rawUrl;
-    if (!url.pathname.includes("/blob/")) return rawUrl;
-    return `https://raw.githubusercontent.com${url.pathname.replace("/blob/", "/")}${url.search}`;
+    if (url.protocol !== "https:") return rawUrl;
+    if (url.hostname === "github.com") {
+      if (!url.pathname.includes("/blob/")) return rawUrl;
+      return `https://raw.githubusercontent.com${url.pathname.replace("/blob/", "/")}${url.search}`;
+    }
+    if (url.hostname === "gist.github.com") {
+      const segments = url.pathname.split("/").filter(Boolean);
+      // Only rewrite bare gist pages. Subpages such as `/revisions`, `/forks`, or an
+      // explicit `/raw` path already point at a usable resource and stay untouched.
+      if (segments.length !== 2) return rawUrl;
+      return `https://gist.github.com/${segments[0]}/${segments[1]}/raw${url.search}`;
+    }
+    return rawUrl;
   } catch {
     return rawUrl;
   }
@@ -64,6 +78,78 @@ export function detectAppShell(raw: string, markdown: string): boolean {
 
 const REQUEST_TIMEOUT_MS = 20_000;
 
+/** Agent-discovery hints advertised in an HTTP `Link:` header. */
+export interface LinkHeaderAgentHints {
+  describedBy?: string;
+  markdownAlternate?: string;
+}
+
+/**
+ * Parses an HTTP `Link:` header for the agent-discovery link relations defined by
+ * llmstxt.org v2: `rel="describedby"` (the covering `llms.txt`) and
+ * `rel="alternate" type="text/markdown"` (the Markdown version of the resource).
+ *
+ * @param header - The raw `Link:` header value
+ * @param baseUrl - URL used to resolve relative references
+ * @returns The first advertised target of each relation, when present
+ */
+export function parseLinkHeaderForAgentHints(
+  header: string,
+  baseUrl: string | URL,
+): LinkHeaderAgentHints {
+  // Split on commas outside <...> and quoted strings, since URIs and quoted values may
+  // themselves contain commas.
+  const directives: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  let inAngleBrackets = false;
+  for (const character of header) {
+    if (character === '"') inQuotes = !inQuotes;
+    if (character === "<") inAngleBrackets = true;
+    if (character === ">" && !inQuotes) inAngleBrackets = false;
+    if (character === "," && !inQuotes && !inAngleBrackets) {
+      directives.push(current);
+      current = "";
+    } else {
+      current += character;
+    }
+  }
+  directives.push(current);
+
+  let describedBy: string | undefined;
+  let markdownAlternate: string | undefined;
+  for (const directive of directives) {
+    const match = /^\s*<([^>]*)>\s*(.*)$/.exec(directive);
+    if (!match) continue;
+    const [, rawTarget, rawParameters] = match;
+    const parameters = new Map<string, string>();
+    for (const parameter of rawParameters.split(";")) {
+      const equals = parameter.indexOf("=");
+      if (equals === -1) continue;
+      const key = parameter.slice(0, equals).trim().toLowerCase();
+      const value = parameter
+        .slice(equals + 1)
+        .trim()
+        .replace(/^"|"$/g, "");
+      parameters.set(key, value);
+    }
+    const relations = (parameters.get("rel") ?? "").toLowerCase().split(/\s+/);
+    const type = (parameters.get("type") ?? "").toLowerCase();
+    let resolved: string | undefined;
+    try {
+      resolved = new URL(rawTarget.trim(), baseUrl).href;
+    } catch {
+      continue;
+    }
+    if (!resolved) continue;
+    if (!describedBy && relations.includes("describedby")) describedBy = resolved;
+    if (!markdownAlternate && relations.includes("alternate") && type === "text/markdown") {
+      markdownAlternate = resolved;
+    }
+  }
+  return { describedBy, markdownAlternate };
+}
+
 export interface FetchRemoteDependencies extends RedirectDependencies {
   extractHtml?: typeof extractHtmlToMarkdown;
   timeoutMs?: number;
@@ -97,6 +183,10 @@ async function documentFromResponse(
 
   const contentTypeHeader = responseHeader(response, "content-type") ?? "text/plain";
   const contentType = contentTypeHeader.split(";", 1)[0].trim().toLowerCase();
+  const linkHints = parseLinkHeaderForAgentHints(
+    responseHeader(response, "link") ?? "",
+    target.url,
+  );
   const allowed =
     contentType.startsWith("text/") ||
     [
@@ -118,11 +208,15 @@ async function documentFromResponse(
   let markdown: string;
   let title: string | undefined;
   let extractor: CompleteDocument["extractor"] = "raw";
+  let describedBy: string | undefined = linkHints.describedBy;
+  let markdownAlternateUrl: string | undefined = linkHints.markdownAlternate;
   if (contentType === "text/html" || contentType === "application/xhtml+xml") {
     const extracted = await awaitWithAbort(extractHtml(raw, target.url), signal);
     markdown = extracted.markdown;
     title = extracted.title;
     extractor = extracted.extractor;
+    describedBy = describedBy ?? extracted.describedByLink;
+    markdownAlternateUrl = markdownAlternateUrl ?? extracted.markdownAlternateLink;
   } else if (contentType === "application/json") {
     try {
       markdown = `\`\`\`json\n${JSON.stringify(JSON.parse(raw), null, 2)}\n\`\`\``;
@@ -143,6 +237,8 @@ async function documentFromResponse(
     title,
     extractor,
     shellSuspected,
+    llmsTxtDescribedBy: describedBy,
+    markdownAlternateUrl,
   };
 }
 
@@ -164,7 +260,7 @@ export async function fetchCompleteDocument(
 
   try {
     const { target, response } = await requestFollowingRedirects(
-      normalizeGitHubBlobUrl(rawUrl),
+      normalizeGitHubRawUrl(rawUrl),
       controller.signal,
       {
         validateUrl: dependencies.validateUrl,

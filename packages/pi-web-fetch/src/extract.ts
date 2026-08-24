@@ -138,21 +138,72 @@ async function runDefuddle(
   }
 }
 
+/** Discovery links advertised by a page via `<link>` relations. */
+interface AdvertisedLinks {
+  describedByLink?: string;
+  markdownAlternateLink?: string;
+}
+
+/**
+ * Reads agent-discovery `<link>` relations from an HTML document (llmstxt.org v2):
+ * `rel="describedby"` points at the covering `llms.txt`, and
+ * `rel="alternate" type="text/markdown"` points at the Markdown version of the page.
+ * HREFs are resolved against the page URL; absent or malformed links are omitted.
+ */
+function readAdvertisedLinks(
+  document: ReturnType<typeof parseHTML>["document"],
+  baseUrl: URL,
+): AdvertisedLinks {
+  const resolve = (href: string | null): string | undefined => {
+    if (!href) return undefined;
+    try {
+      return new URL(href, baseUrl.href).href;
+    } catch {
+      return undefined;
+    }
+  };
+  let describedByLink: string | undefined;
+  let markdownAlternateLink: string | undefined;
+  for (const link of document.querySelectorAll("link")) {
+    const href = resolve(link.getAttribute("href"));
+    if (!href) continue;
+    const tokens = (link.getAttribute("rel") ?? "").toLowerCase().split(/\s+/);
+    if (!describedByLink && tokens.includes("describedby")) describedByLink = href;
+    if (
+      !markdownAlternateLink &&
+      tokens.includes("alternate") &&
+      (link.getAttribute("type") ?? "").toLowerCase() === "text/markdown"
+    ) {
+      markdownAlternateLink = href;
+    }
+  }
+  return { describedByLink, markdownAlternateLink };
+}
+
 /**
  * Extracts readable Markdown and an optional title from HTML.
  *
  * @param html - The HTML document to convert
  * @param baseUrl - The absolute base URL used to resolve document-relative links
- * @returns The extracted Markdown, optional title, and extractor used
+ * @returns The extracted Markdown, optional title, extractor used, and any advertised
+ *   discovery links resolved against the base URL
  */
 export async function extractHtmlToMarkdown(
   html: string,
   baseUrl: URL,
-): Promise<{ markdown: string; title?: string; extractor: "defuddle" | "basic" }> {
+): Promise<{
+  markdown: string;
+  title?: string;
+  extractor: "defuddle" | "basic";
+  describedByLink?: string;
+  markdownAlternateLink?: string;
+}> {
+  let advertised: AdvertisedLinks = {};
   try {
     const { document } = parseHTML(html);
     removeMalformedSchemaOrgData(document);
     normalizeSelectorUnsafeIds(document);
+    advertised = readAdvertisedLinks(document, baseUrl);
     // Pass the full absolute URL so Defuddle resolves relative links (e.g.
     // `/owner/repo/releases`) and metadata against the real origin instead of
     // dropping the scheme and host and constructing `new URL(pathname)`.
@@ -164,10 +215,11 @@ export async function extractHtmlToMarkdown(
         markdown,
         title: trimmedTitle || undefined,
         extractor: "defuddle",
+        ...advertised,
       };
     }
   } catch {
     // Fall through to the basic converter for malformed or unsupported pages.
   }
-  return { markdown: htmlToMarkdownFallback(html), extractor: "basic" };
+  return { markdown: htmlToMarkdownFallback(html), extractor: "basic", ...advertised };
 }

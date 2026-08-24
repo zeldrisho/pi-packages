@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Rewrite bare GitHub Gist pages (`gist.github.com/<user>/<id>`) by appending `/raw`, so gist contents are fetched as clean plain text instead of Defuddle's rendered page
+- Fall back to a site's `/llms.txt` index when a fetched page looks like an app shell or has little readable text, surfacing the substitution via `details.llmsTxtFallback`, an `llms-index` content kind, and an output note
+- Probe each path's ancestor `/llms.txt` indexes (root plus the first-level section directory) once per cache TTL alongside the first page request, prefer the deepest usable one, and advertise it via `details.llmsTxtUrl` plus an output note
+- Read llmstxt.org v2 discovery hints (`Link:` header and `<link>` elements): serve a page's advertised Markdown version (`rel="alternate" type="text/markdown"`) when the page itself is low-quality, reported via `details.markdownAlternateFallback`; prefer `rel="describedby"` indexes over blind probes
+
 ## [0.6.1] - 2026-08-23
 
 ### Fixed

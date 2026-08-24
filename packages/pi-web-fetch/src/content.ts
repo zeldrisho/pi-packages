@@ -12,6 +12,16 @@ export interface CompleteDocument {
   extractor: "defuddle" | "basic" | "raw";
   /** True when the page appears to be an app shell, bot wall, or consent page. */
   shellSuspected: boolean;
+  /** True when this document is the site's /llms.txt served instead of a low-quality page. */
+  llmsTxtFallback?: boolean;
+  /** Set when the site publishes a usable /llms.txt index and this document is not that index. */
+  llmsTxtIndexUrl?: string;
+  /** Absolute URL advertised via `rel="describedby"` (header or HTML link) for this page. */
+  llmsTxtDescribedBy?: string;
+  /** Absolute URL advertised for a Markdown version of this page (`rel="alternate" type="text/markdown"`). */
+  markdownAlternateUrl?: string;
+  /** True when this document is the advertised Markdown version served instead of a low-quality page. */
+  markdownAlternateFallback?: boolean;
 }
 
 export interface FetchResult extends CompleteDocument {
