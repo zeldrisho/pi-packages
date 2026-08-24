@@ -65,9 +65,34 @@ function fail(message: string): never {
 }
 
 describe("repository contracts", () => {
-  it("creates GitHub releases with softprops/action-gh-release on component tag push", () => {
-    if (!releaseWorkflow.includes("uses: softprops/action-gh-release")) {
-      fail("the release job must create GitHub releases with softprops/action-gh-release");
+  it("creates GitHub releases with gh release create on component tag push", () => {
+    if (!releaseWorkflow.includes("gh release create")) {
+      fail("the release job must create GitHub releases with gh release create");
+    }
+    if (releaseWorkflow.includes("softprops/action-gh-release")) {
+      fail("the release workflow must not use softprops/action-gh-release");
+    }
+    if (!releaseWorkflow.includes('gh release create "${{ github.ref_name }}"')) {
+      fail("the release job must create the release for tag ${{ github.ref_name }}");
+    }
+    if (
+      !releaseWorkflow.includes(
+        '--title "${{ fromJSON(steps.pkg.outputs.result).shortName }} v${{ fromJSON(steps.pkg.outputs.result).version }}"',
+      )
+    ) {
+      fail("the GitHub release title must use the package short name and version");
+    }
+    if (!releaseWorkflow.includes('--notes-file "${{ runner.temp }}/notes.md"')) {
+      fail("the release job must use the notes file at ${{ runner.temp }}/notes.md");
+    }
+    if (!releaseWorkflow.includes('--target "${{ github.sha }}"')) {
+      fail("the release job must target ${{ github.sha }}");
+    }
+    if (
+      !releaseWorkflow.includes("GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}") ||
+      !releaseWorkflow.includes("GH_REPO: ${{ github.repository }}")
+    ) {
+      fail("the release job must set GH_TOKEN and GH_REPO for gh release create");
     }
     if (!releaseWorkflow.includes("tags:") || !releaseWorkflow.includes('"*-v*.*.*"')) {
       fail("the release workflow must trigger on component tag pushes (<package>-v<version>)");
