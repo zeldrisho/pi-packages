@@ -11,15 +11,15 @@ catalog:
   "@earendil-works/pi-coding-agent": "^0.84.2"
   "@earendil-works/pi-tui": "^0.84.2"
   "@types/node": "^26.2.0"
-  "@vitest/coverage-v8": 4.1.10
+  "@vitest/coverage-v8": 4.1.11
   typebox: "^1.3.16"
   typescript: "^7.0.2"
-  vite: npm:@voidzero-dev/vite-plus-core@0.2.9
-  vite-plus: 0.2.9
-  vitest: 4.1.10
+  vite: npm:@voidzero-dev/vite-plus-core@0.3.0
+  vite-plus: 0.3.0
+  vitest: 4.1.11
 
 minimumReleaseAgeExclude:
-  # Vite+ 0.2.9 published 2026-08-12 and nanoid@3.3.18 published 2026-08-07
+  # Vite+ 0.3.0 published 2026-08-24 and nanoid@3.3.18 published 2026-08-07
   # (per `npm view <pkg> time`). Re-audit on every catalog bump: drop each
   # entry once its version is older than the configured minimumReleaseAge
   # window, and drop entries for versions that no longer appear in the
@@ -28,16 +28,16 @@ minimumReleaseAgeExclude:
   # Security fix for nanoid (see override comment below); same audit rule as
   # the toolchain entries.
   - nanoid@3.3.18
-  - "@voidzero-dev/vite-plus-core@0.2.9"
-  - "@voidzero-dev/vite-plus-darwin-arm64@0.2.9"
-  - "@voidzero-dev/vite-plus-darwin-x64@0.2.9"
-  - "@voidzero-dev/vite-plus-linux-arm64-gnu@0.2.9"
-  - "@voidzero-dev/vite-plus-linux-arm64-musl@0.2.9"
-  - "@voidzero-dev/vite-plus-linux-x64-gnu@0.2.9"
-  - "@voidzero-dev/vite-plus-linux-x64-musl@0.2.9"
-  - "@voidzero-dev/vite-plus-win32-arm64-msvc@0.2.9"
-  - "@voidzero-dev/vite-plus-win32-x64-msvc@0.2.9"
-  - vite-plus@0.2.9
+  - "@voidzero-dev/vite-plus-core@0.3.0"
+  - "@voidzero-dev/vite-plus-darwin-arm64@0.3.0"
+  - "@voidzero-dev/vite-plus-darwin-x64@0.3.0"
+  - "@voidzero-dev/vite-plus-linux-arm64-gnu@0.3.0"
+  - "@voidzero-dev/vite-plus-linux-arm64-musl@0.3.0"
+  - "@voidzero-dev/vite-plus-linux-x64-gnu@0.3.0"
+  - "@voidzero-dev/vite-plus-linux-x64-musl@0.3.0"
+  - "@voidzero-dev/vite-plus-win32-arm64-msvc@0.3.0"
+  - "@voidzero-dev/vite-plus-win32-x64-msvc@0.3.0"
+  - vite-plus@0.3.0
 
 overrides:
   # Dependency-override lifecycle, tracked in issue #37
