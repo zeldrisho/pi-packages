@@ -1,6 +1,6 @@
 {
   "name": "@zeldrisho/pi-nested-agent-md",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Pi extension that discovers and injects nested AGENTS.md instructions",
   "keywords": [
     "agents-md",

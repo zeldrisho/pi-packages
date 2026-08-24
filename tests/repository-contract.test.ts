@@ -168,6 +168,64 @@ describe("repository contracts", () => {
     }
   });
 
+  it("pnpm is the only allowed lockfile — no npm/yarn/bun locks", async () => {
+    // Mirrors `pi` guardrails `no-npm` + `lock-files`: this repo uses `vp`/`pnpm`
+    // via `catalog:` — any `package-lock.json`/`yarn.lock`/`bun.lock` would
+    // indicate a wrong package manager was used and would break workspace
+    // catalog resolution.
+    const rootEntries = await readdir(root);
+    const forbidden = [
+      "package-lock.json",
+      "npm-shrinkwrap.json",
+      "yarn.lock",
+      "bun.lock",
+      "bun.lockb",
+    ];
+    const found = rootEntries.filter((entry) => forbidden.includes(entry));
+    if (found.length > 0) {
+      fail(`repository root must not contain ${found.join(", ")} — use pnpm via vp install`);
+    }
+    const packageLocks = await Promise.all(
+      packageDirectories.map(async (directory) => {
+        const entries = await readdir(join(packagesDirectory, directory));
+        return entries
+          .filter((entry) => forbidden.includes(entry))
+          .map((entry) => `${directory}/${entry}`);
+      }),
+    );
+    const foundInPackages = packageLocks.flat();
+    if (foundInPackages.length > 0) {
+      fail(`packages must not contain ${foundInPackages.join(", ")} — use pnpm via vp install`);
+    }
+  });
+
+  it("package src contains only TypeScript — no JS build output", async () => {
+    // Mirrors `pi` guardrails `typescript-only` (blocks `*.js`): published
+    // packages use `files: ["src", ...]` and Pi loads TypeScript directly —
+    // a stray `src/*.js` would be published without a build step.
+    for (const directory of packageDirectories) {
+      const stack = [join(packagesDirectory, directory, "src")];
+      while (stack.length > 0) {
+        // SAFETY: stack is non-empty by while condition — pop always returns a string.
+        const current = stack.pop() as string;
+        const entries = await readdir(current, { withFileTypes: true });
+        for (const entry of entries) {
+          const full = join(current, entry.name);
+          if (entry.isDirectory()) {
+            stack.push(full);
+          } else if (
+            entry.name.endsWith(".js") ||
+            entry.name.endsWith(".cjs") ||
+            entry.name.endsWith(".mjs")
+          ) {
+            const relative = full.slice(root.length + 1);
+            fail(`${relative} must not exist — packages publish TypeScript directly; use *.ts`);
+          }
+        }
+      }
+    }
+  });
+
   it("packages match the uniform package contracts", async () => {
     for (const directory of packageDirectories) {
       const packageDirectory = join(packagesDirectory, directory);
