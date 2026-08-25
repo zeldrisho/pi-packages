@@ -5,7 +5,7 @@
 ## Remaining
 
 - [ ] Manual: `pi -e ./packages/pi-web-fetch -- web_fetch https://github.com/voidzero-dev/vite-plus/releases` — confirm no footer stack, no duplicated `[Latest]`/`[vite-plus v0.3.0]`, `ctrl+o` expands 86 lines, `details.extractor: defuddle`
-- [ ] Release: cut next patch from `packages/pi-web-fetch/CHANGELOG.md` `## [Unreleased]` (currently holds the fix, since `0.7.0` is published `ab04905`) after manual green — `vp run validate` then publish
+- [ ] Release: manually write `packages/pi-web-fetch/CHANGELOG.md` release entry from `## [Unreleased]` (currently holds the fix, since `0.7.0` is published `ab04905`) after manual green — `vp run format:changelog` then `vp run validate` then publish
 
 ## Notes
 

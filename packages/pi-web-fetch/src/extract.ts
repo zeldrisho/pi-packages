@@ -104,8 +104,17 @@ function isBarePathnameInvalidUrl(cause: unknown): boolean {
   return /input:\s*'\/[^']*'/.test(detail);
 }
 
-/** Removes chrome wrappers that pollute Defuddle's article extraction on GitHub releases. */
-function stripChromeWrappers(document: Document): void {
+/**
+ * Removes chrome wrappers that pollute Defuddle's article extraction on GitHub releases.
+ *
+ * @param document - The document from which to remove chrome wrappers
+ * @param baseUrl - The absolute URL of the page, used to determine if chrome should be stripped
+ */
+function stripChromeWrappers(document: Document, baseUrl: URL): void {
+  // Only strip chrome wrappers for GitHub release pages
+  const isGitHubRelease =
+    baseUrl.hostname === "github.com" && /\/releases(?:\/|$)/.test(baseUrl.pathname);
+  if (!isGitHubRelease) return;
   for (const element of document.querySelectorAll("nav, header, footer, aside")) {
     element.remove();
   }
@@ -255,7 +264,7 @@ export async function extractHtmlToMarkdown(
     const { document } = parseHTML(html);
     removeMalformedSchemaOrgData(document);
     normalizeSelectorUnsafeIds(document);
-    stripChromeWrappers(document);
+    stripChromeWrappers(document, baseUrl);
     advertised = readAdvertisedLinks(document, baseUrl);
     // Pass the full absolute URL so Defuddle resolves relative links (e.g.
     // `/owner/repo/releases`) and metadata against the real origin instead of
