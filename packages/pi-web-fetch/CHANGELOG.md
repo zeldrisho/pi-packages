@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix `https://github.com/voidzero-dev/vite-plus/releases` rendering in pi: harden `runDefuddle` to swallow bare-pathname `ERR_INVALID_URL` detached rejections, guarantee absolute `http(s)` URLs at every extraction/fetch boundary, strip `nav`/`header`/`footer`/`aside` chrome before Defuddle, deduplicate adjacent identical markdown links, and bump `defuddle` to `^0.19.3`
+
 ## [0.7.0] - 2026-08-24
 
 ### Added

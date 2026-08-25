@@ -1,19 +1,13 @@
-# Web tools enhancement plan (`pi-web-fetch` + `pi-web-search`)
+# Plan — fix `pi-web-fetch` `vite-plus/releases` rendering
 
-**Retired — complete.** This plan scoped the disk-backed cross-session cache, honest-evidence
-metadata, and GitHub `blob` → `raw` URL normalization. All phases shipped:
+**Status:** active — remaining only. Important completed work split to `docs/fix-vite-plus-releases.md`. Original full plan captured there.
 
-- Persistent disk cache (24 h TTL, private `0700`/`0600`, atomic writes) — `pi-web-fetch@0.6.0`,
-  `pi-web-search@0.5.0`.
-- Honest-evidence metadata (`contentKind`, `shellSuspected`, `confidence` for fetch; `evidence`
-  summary and per-result `quality` for search) — same releases.
-- GitHub raw normalization (`/blob/<ref>/<path>` → `raw.githubusercontent.com`) — same release.
-- Shared-module sync tooling (`scripts/sync-web-modules.ts`, root script `sync:web-modules`) with
-  drift detection in `tests/repository-contract.test.ts`.
+## Remaining
 
-Open questions from the original plan were resolved by the implementation: fixed (non-configurable)
-24 h TTL, global-only cache scope, pure byte-sync in the sync tooling.
+- [ ] Manual: `pi -e ./packages/pi-web-fetch -- web_fetch https://github.com/voidzero-dev/vite-plus/releases` — confirm no footer stack, no duplicated `[Latest]`/`[vite-plus v0.3.0]`, `ctrl+o` expands 86 lines, `details.extractor: defuddle`
+- [ ] Release: manually write `packages/pi-web-fetch/CHANGELOG.md` release entry from `## [Unreleased]` (currently holds the fix, since `0.7.0` is published `ab04905`) after manual green — `vp run format:changelog` then `vp run validate` then publish
 
-The only consciously deferred item remains the GitHub `/tree/` directory-listing limitation, which
-is documented in `packages/pi-web-fetch/README.md`; revisit only if it becomes a recurring friction
-point.
+## Notes
+
+- Fix branch `fix/pi-web-fetch-releases-guard` holds `c45efc3` + `c597167` (guard hardening, absolute URLs, chrome strip, dedup, `defuddle ^0.19.3`, `vp exec node` → `node`, Node shim `24.19.0`).
+- Non-goal unchanged: no new `pi-web-fetch` features beyond `0.7.0` `Added` items.

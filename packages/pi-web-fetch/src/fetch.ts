@@ -242,11 +242,25 @@ async function documentFromResponse(
   };
 }
 
+function assertAbsoluteHttpUrlForFetch(value: string): URL {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`Invalid URL: ${value}`);
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error(`web_fetch only supports http(s) URLs: ${value}`);
+  }
+  return url;
+}
+
 export async function fetchCompleteDocument(
   rawUrl: string,
   signal: AbortSignal | undefined,
   dependencies: FetchRemoteDependencies,
 ): Promise<CompleteDocument> {
+  assertAbsoluteHttpUrlForFetch(normalizeGitHubRawUrl(rawUrl));
   const controller = new AbortController();
   const timeoutMs = dependencies.timeoutMs ?? REQUEST_TIMEOUT_MS;
   const extractHtml = dependencies.extractHtml ?? extractHtmlToMarkdown;
