@@ -76,6 +76,58 @@ export function htmlToMarkdownFallback(html: string): string {
     .trim();
 }
 
+/** Asserts that a URL is absolute http(s) and returns it, or throws for bare pathnames. */
+export function assertAbsoluteHttpUrl(value: string | URL): URL {
+  const url = value instanceof URL ? value : new URL(value);
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new TypeError(`Expected absolute http(s) URL, got ${url.protocol}: ${url.href}`);
+  }
+  return url;
+}
+
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- type-guard helper intentionally narrows unknown at call site
+function isString(value: unknown): value is string {
+  return typeof value === "string";
+}
+
+/** Returns true when a rejection looks like `ERR_INVALID_URL` for a bare pathname. */
+function isBarePathnameInvalidUrl(cause: unknown): boolean {
+  if (!(cause instanceof Error)) return false;
+  if (!/Invalid URL/i.test(cause.message)) return false;
+  // SAFETY: Node's ERR_INVALID_URL extends Error with an `input` string property holding the offending URL.
+  const input = (cause as NodeJS.ErrnoException & { input?: unknown }).input;
+  if (isString(input) && input.startsWith("/")) return true;
+  // SAFETY: Error.stack is an optional string populated by V8; we coerce it for pattern matching.
+  const detail = `${cause.message}\n${(cause as Error).stack ?? ""}`;
+  // Node's ERR_INVALID_URL prints `input: '/path'` in the message/stack even when
+  // `input` is not on the error instance in some Node versions.
+  return /input:\s*'\/[^']*'/.test(detail);
+}
+
+/** Removes chrome wrappers that pollute Defuddle's article extraction on GitHub releases. */
+function stripChromeWrappers(document: Document): void {
+  for (const element of document.querySelectorAll("nav, header, footer, aside")) {
+    element.remove();
+  }
+}
+
+/** Collapses consecutive duplicate markdown link lines (e.g. duplicated [Latest] on GitHub releases). */
+function deduplicateAdjacentLinks(markdown: string): string {
+  const lines = markdown.split("\n");
+  const out: string[] = [];
+  let previousTrimmed: string | undefined;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const isLinkLine =
+      /^\[[^\]]+\]\(<[^>]+>\)$/.test(trimmed) || /^\[[^\]]+\]\([^)]+\)$/.test(trimmed);
+    if (isLinkLine && trimmed === previousTrimmed) continue;
+    out.push(line);
+    previousTrimmed = isLinkLine ? trimmed : undefined;
+  }
+  // Also collapse duplicate adjacent blocks like a repeated vite-plus tag link paragraph.
+  return out.join("\n").replace(/(\[[^\n]+?\([^)]+\)[^\n]*\n)\1/g, "$1");
+}
+
 /**
  * Runs Defuddle over an already-normalized document with Markdown extraction enabled.
  *
@@ -94,9 +146,10 @@ export function htmlToMarkdownFallback(html: string): string {
  * To keep `extractHtmlToMarkdown` from ever propagating such a failure, this
  * helper arms a scoped `unhandledRejection` listener for the lifetime of the
  * call. The listener is scoped, not process-wide in effect: it only treats a
- * rejection as a Defuddle failure when its message or stack mentions Defuddle,
- * so unrelated rejections from other concurrent work are ignored and do not
- * force a spurious fallback to the basic extractor. After Defuddle resolves we
+ * rejection as a Defuddle failure when its message or stack mentions Defuddle
+ * or looks like a bare-pathname `ERR_INVALID_URL` occurring within the armed
+ * window, so unrelated rejections from other concurrent work are ignored and do
+ * not force a spurious fallback to the basic extractor. After Defuddle resolves we
  * flush a microtask and a macrotask so any rejection Defuddle scheduled settles
  * inside the armed window; a rejection observed there is re-thrown so the
  * caller falls back. Deeply-nested timers in Defuddle are out of scope and would
@@ -112,13 +165,11 @@ async function runDefuddle(
 ): Promise<DefuddleResponse | undefined> {
   let escapedRejection: unknown = undefined;
   let armed = true;
-  // Only attribute a rejection to Defuddle when it mentions Defuddle. This keeps
-  // the guard scoped so unrelated concurrent rejections are ignored.
   const captureUnhandled = (cause: unknown): void => {
     if (!armed || escapedRejection !== undefined) return;
     const detail =
       cause instanceof Error ? `${cause.message}\n${cause.stack ?? ""}` : String(cause);
-    if (/defuddle/i.test(detail)) escapedRejection = cause;
+    if (/defuddle/i.test(detail) || isBarePathnameInvalidUrl(cause)) escapedRejection = cause;
   };
   process.on("unhandledRejection", captureUnhandled);
   try {
@@ -200,15 +251,17 @@ export async function extractHtmlToMarkdown(
 }> {
   let advertised: AdvertisedLinks = {};
   try {
+    assertAbsoluteHttpUrl(baseUrl);
     const { document } = parseHTML(html);
     removeMalformedSchemaOrgData(document);
     normalizeSelectorUnsafeIds(document);
+    stripChromeWrappers(document);
     advertised = readAdvertisedLinks(document, baseUrl);
     // Pass the full absolute URL so Defuddle resolves relative links (e.g.
     // `/owner/repo/releases`) and metadata against the real origin instead of
     // dropping the scheme and host and constructing `new URL(pathname)`.
     const result = await runDefuddle(document, baseUrl.href);
-    const markdown = result?.content?.trim() ?? "";
+    const markdown = deduplicateAdjacentLinks(result?.content?.trim() ?? "");
     const trimmedTitle = result?.title?.trim();
     if (markdown) {
       return {
