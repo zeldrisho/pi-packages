@@ -42,7 +42,7 @@ jobs:
         id: pkg
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-        run: echo "result=$(vp exec node scripts/release.ts package "$RELEASE_TAG")" >> "$GITHUB_OUTPUT"
+        run: echo "result=$(node scripts/release.ts package "$RELEASE_TAG")" >> "$GITHUB_OUTPUT"
 
       - name: Validate package path
         id: path
@@ -70,7 +70,7 @@ jobs:
           fi
 
       - name: Write release notes
-        run: vp exec node scripts/release.ts notes '${{ steps.path.outputs.value }}' "${{ runner.temp }}/notes.md"
+        run: node scripts/release.ts notes '${{ steps.path.outputs.value }}' "${{ runner.temp }}/notes.md"
 
       - name: Create GitHub release
         run: gh release create "$RELEASE_TAG" --verify-tag --title "${{ fromJSON(steps.pkg.outputs.result).shortName }} v${{ fromJSON(steps.pkg.outputs.result).version }}" --notes-file "${{ runner.temp }}/notes.md" --target "${{ github.sha }}"
