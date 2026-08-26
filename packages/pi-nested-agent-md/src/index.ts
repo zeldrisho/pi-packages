@@ -1,3 +1,12 @@
+/**
+ * pi-nested-agent-md Extension
+ *
+ * Automatically discovers and injects AGENTS.md files from parent and nested
+ * directories into the agent context when files are read. This allows projects
+ * to distribute agent instructions across multiple directories without requiring
+ * the agent to explicitly read each AGENTS.md file.
+ */
+
 import { readFile } from "node:fs/promises";
 import { basename, isAbsolute, resolve } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -7,6 +16,15 @@ import { AGENTS_FILE, findNestedAgentsFiles, resolveContainedTarget } from "./di
 
 export { findNestedAgentsFiles } from "./discovery";
 
+/**
+ * Nested agents extension that automatically injects AGENTS.md files.
+ *
+ * Monitors read tool results and automatically appends relevant AGENTS.md files
+ * from parent and nested directories to provide contextual instructions to the
+ * agent without requiring explicit reads.
+ *
+ * @param pi - The extension API instance
+ */
 export default function nestedAgents(pi: ExtensionAPI): void {
   const injected = new Set<string>();
 

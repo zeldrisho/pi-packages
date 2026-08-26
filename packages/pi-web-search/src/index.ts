@@ -77,6 +77,14 @@ export const webSearchParameters = Type.Object({
   ),
 });
 
+/**
+ * Pi web search extension that registers the web_search tool.
+ *
+ * Provides a tool for searching the public web using Brave Search API with
+ * support for both compact web results and extracted context modes.
+ *
+ * @param pi - The extension API instance
+ */
 export default function (pi: ExtensionAPI) {
   const runtime = new SearchRuntime();
   pi.on("session_shutdown", () => runtime.shutdown());

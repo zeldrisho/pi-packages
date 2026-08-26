@@ -1,19 +1,51 @@
+/**
+ * pi-git-workflow Extension
+ *
+ * Automates git workflow hygiene by:
+ * - Running `git fetch --prune` and surfacing repository state before agent starts
+ * - Gating branch deletion to ensure branches are merged and upstream is gone
+ * - Blocking force deletions (`git branch -D`) to prevent accidental data loss
+ * - Providing interactive confirmations when deleting unmerged or tracked branches
+ */
+
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 const BRANCH_DELETE_FORCE_RE = /\bgit\s+branch\s+.*(?:-D|--delete\s+--force)\b/;
 const BRANCH_DELETE_RE = /\bgit\s+branch\s+.*(?:-d|--delete)\b/;
 const BRANCH_NAME_FROM_DELETE_RE = /git\s+branch\s+(?:-d|-D|--delete)(?:\s+--force)?\s+([^\s;|&]+)/;
 
+/**
+ * Extracts the branch name from a git branch delete command.
+ *
+ * @param command - The git command string to parse
+ * @returns The branch name if found, otherwise `undefined`
+ */
 export function extractBranchName(command: string): string | undefined {
   const m = command.match(BRANCH_NAME_FROM_DELETE_RE);
   return m?.[1]?.trim();
 }
 
+/**
+ * Checks if the current directory is inside a git repository.
+ *
+ * @param pi - The extension API instance
+ * @returns `true` if the current directory is in a git repository
+ */
 export async function isGitRepo(pi: ExtensionAPI): Promise<boolean> {
   const { code } = await pi.exec("git", ["rev-parse", "--git-dir"]);
   return code === 0;
 }
 
+/**
+ * Detects the target branch (typically `main` or `master`) for the repository.
+ *
+ * Checks `origin/HEAD` first, then falls back to checking for `origin/main`,
+ * `origin/master`, and finally the current branch. Returns `"main"` as the
+ * ultimate fallback.
+ *
+ * @param pi - The extension API instance
+ * @returns The name of the target branch
+ */
 export async function detectTargetBranch(pi: ExtensionAPI): Promise<string> {
   const { stdout, code } = await pi.exec("git", ["symbolic-ref", "refs/remotes/origin/HEAD"]);
   if (code === 0 && stdout.trim()) {
@@ -39,6 +71,17 @@ export async function detectTargetBranch(pi: ExtensionAPI): Promise<string> {
   return branchStdout.trim() || "main";
 }
 
+/**
+ * Checks if a branch has been merged into the target branch.
+ *
+ * First checks `git branch --merged`, then falls back to
+ * `git merge-base --is-ancestor` for a more comprehensive check.
+ *
+ * @param pi - The extension API instance
+ * @param branch - The branch to check
+ * @param target - The target branch to check against
+ * @returns `true` if the branch is merged into the target
+ */
 export async function checkMerged(
   pi: ExtensionAPI,
   branch: string,
@@ -62,6 +105,18 @@ export async function checkMerged(
   return ancestorCode === 0;
 }
 
+/**
+ * Checks if the upstream (remote) branch for a local branch has been deleted.
+ *
+ * Uses multiple checks:
+ * 1. `git branch -vv` to see if the branch shows `: gone]`
+ * 2. `git ls-remote --heads` to verify the remote branch does not exist
+ * 3. `git config` to check if there is no tracking remote configured
+ *
+ * @param pi - The extension API instance
+ * @param branch - The local branch name to check
+ * @returns `true` if the upstream branch is gone or was never tracked
+ */
 export async function checkUpstreamGone(pi: ExtensionAPI, branch: string): Promise<boolean> {
   // 1. git branch -vv shows [origin/branch: gone]
   const { stdout: vv } = await pi.exec("git", ["branch", "-vv"]);
@@ -81,6 +136,15 @@ export async function checkUpstreamGone(pi: ExtensionAPI, branch: string): Promi
   return false;
 }
 
+/**
+ * Pi git workflow extension that automates git repository hygiene.
+ *
+ * Provides two main features:
+ * 1. Runs `git fetch --prune` on agent start and surfaces repository state
+ * 2. Gates branch deletion commands to ensure branches are safely merged
+ *
+ * @param pi - The extension API instance
+ */
 export default function piGitWorkflow(pi: ExtensionAPI): void {
   // Rule 1: run before agent does anything — fetch --prune + inspect
   pi.on("before_agent_start", async (_event, ctx: ExtensionContext) => {

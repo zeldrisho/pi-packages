@@ -13,6 +13,13 @@ function isContained(root: string, target: string): boolean {
   );
 }
 
+/**
+ * Resolves the canonical paths for root and target, verifying the target is contained within root.
+ *
+ * @param root - The root directory path
+ * @param inputPath - The target file path (absolute or relative to root)
+ * @returns An object with canonical root and target paths if the target is contained in root, otherwise `undefined`
+ */
 export async function resolveContainedTarget(
   root: string,
   inputPath: string,

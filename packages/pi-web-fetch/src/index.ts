@@ -51,6 +51,14 @@ export const webFetchParameters = Type.Object({
   ),
 });
 
+/**
+ * Pi web fetch extension that registers the web_fetch tool.
+ *
+ * Provides a tool for fetching public HTTP(S) pages and converting them to
+ * Markdown with support for pagination via offset/nextOffset parameters.
+ *
+ * @param pi - The extension API instance
+ */
 export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "web_fetch",

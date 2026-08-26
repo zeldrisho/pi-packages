@@ -83,6 +83,13 @@ export function formatReadWarning(root: string, path: string): string {
   return `\n\n[nested-agents] Warning: nested instructions were found at ${displayPath}, but the file could not be read, so its instructions are NOT applied.`;
 }
 
+/**
+ * Accumulates nested AGENTS.md content while respecting Pi's output limits.
+ *
+ * Tracks remaining byte and line capacity based on existing tool output and
+ * allows appending instruction files until the limits are reached. Each file
+ * is truncated if necessary to fit within the remaining capacity.
+ */
 export class ContextAccumulator {
   private bytesLeft: number;
   private linesLeft: number;
