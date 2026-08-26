@@ -150,7 +150,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  process.env.PI_CODING_AGENT_DIR = originalEnv;
+  if (originalEnv !== undefined) {
+    process.env.PI_CODING_AGENT_DIR = originalEnv;
+  } else {
+    delete process.env.PI_CODING_AGENT_DIR;
+  }
   try {
     rmSync(workDir, { recursive: true, force: true });
   } catch {
@@ -279,12 +283,10 @@ describe("ensureExampleConfig", () => {
 describe("piGate extension", () => {
   it("registers exactly session_start and tool_call", () => {
     const ext = makeExtension();
-    ext.install();
+    const { handlers } = ext.install();
     // SAFETY: the captured handlers list is keyed by the names the extension registered.
-    expect({
-      sessionStart: true,
-      toolCall: true,
-    }).toEqual({ sessionStart: true, toolCall: true });
+    expect(handlers.sessionStart).toBeDefined();
+    expect(handlers.toolCall).toBeDefined();
   });
 
   describe("session_start notification", () => {
@@ -367,8 +369,8 @@ describe("piGate extension", () => {
 
     it("blocks without a notify call in non-UI mode", async () => {
       setConfig(JSON.stringify({ operations: { sudo: "block" } }));
-      const { uiState, handlers } = makeExtension().install();
-      const { ctx } = createExtensionContext(false);
+      const { handlers } = makeExtension().install();
+      const { ctx, uiState } = createExtensionContext(false);
       const result = await handlers.toolCall!(bashEvent("sudo apt update"), ctx);
       expect(result).toEqual({
         block: true,
@@ -397,8 +399,8 @@ describe("piGate extension", () => {
 
     it("blocks a prompt rule in non-UI mode without calling select", async () => {
       setConfig(JSON.stringify({ operations: { "rm -rf": "prompt" } }));
-      const { uiState, handlers } = makeExtension().install();
-      const { ctx } = createExtensionContext(false);
+      const { handlers } = makeExtension().install();
+      const { ctx, uiState } = createExtensionContext(false);
       const result = await handlers.toolCall!(bashEvent("rm -rf node_modules"), ctx);
       expect(result).toEqual({
         block: true,
