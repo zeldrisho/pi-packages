@@ -85,6 +85,12 @@ export function assertAbsoluteHttpUrl(value: string | URL): URL {
   return url;
 }
 
+/**
+ * Type guard that checks if an unknown value is a string.
+ *
+ * @param value - The value to check
+ * @returns `true` if the value is a string
+ */
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- type-guard helper intentionally narrows unknown at call site
 function isString(value: unknown): value is string {
   return typeof value === "string";
@@ -120,7 +126,12 @@ function stripChromeWrappers(document: Document, baseUrl: URL): void {
   }
 }
 
-/** Collapses consecutive duplicate markdown link lines (e.g. duplicated [Latest] on GitHub releases). */
+/**
+ * Collapses consecutive duplicate markdown link lines (e.g. duplicated [Latest] on GitHub releases).
+ *
+ * @param markdown - The markdown string to process
+ * @returns The markdown with adjacent duplicate links removed
+ */
 function deduplicateAdjacentLinks(markdown: string): string {
   const lines = markdown.split("\n");
   const out: string[] = [];

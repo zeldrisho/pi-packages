@@ -242,6 +242,13 @@ async function documentFromResponse(
   };
 }
 
+/**
+ * Validates that a URL string is an absolute http or https URL.
+ *
+ * @param value - The URL string to validate
+ * @returns The parsed URL object
+ * @throws If the URL is invalid or not http(s)
+ */
 function assertAbsoluteHttpUrlForFetch(value: string): URL {
   let url: URL;
   try {
@@ -255,6 +262,15 @@ function assertAbsoluteHttpUrlForFetch(value: string): URL {
   return url;
 }
 
+/**
+ * Fetches a URL and returns the complete document with extracted content.
+ *
+ * @param rawUrl - The URL to fetch
+ * @param signal - Optional abort signal to cancel the request
+ * @param dependencies - Dependencies for network policy validation, transport, and HTML extraction
+ * @returns The complete document with extracted markdown content
+ * @throws If the request times out, is cancelled, or encounters an error
+ */
 export async function fetchCompleteDocument(
   rawUrl: string,
   signal: AbortSignal | undefined,
@@ -292,6 +308,16 @@ export async function fetchCompleteDocument(
   }
 }
 
+/**
+ * Fetches a URL and returns a slice of the content starting at the given offset.
+ *
+ * @param rawUrl - The URL to fetch
+ * @param offset - The character offset to start slicing from
+ * @param maxCharacters - The maximum number of characters to return
+ * @param signal - Optional abort signal to cancel the request
+ * @param dependencies - Dependencies for network policy validation, transport, and HTML extraction
+ * @returns The sliced fetch result with content and metadata
+ */
 export async function fetchRemoteContent(
   rawUrl: string,
   offset: number,
