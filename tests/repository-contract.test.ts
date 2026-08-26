@@ -55,11 +55,24 @@ function parseOverrides(yaml: string): Map<string, string> {
   return overrides;
 }
 
+/**
+ * Checks if two string arrays contain the same values regardless of order.
+ *
+ * @param actual - The actual array of strings
+ * @param expected - The expected array of strings
+ * @returns `true` if both arrays contain the same values when sorted
+ */
 function sameValues(actual: string[], expected: string[]) {
   const compare = (left: string, right: string) => left.localeCompare(right);
   return JSON.stringify([...actual].sort(compare)) === JSON.stringify([...expected].sort(compare));
 }
 
+/**
+ * Throws an error indicating a repository contract violation.
+ *
+ * @param message - The violation message to include in the error
+ * @throws Always throws an Error with the prefixed message
+ */
 function fail(message: string): never {
   throw new Error(`Repository contract violation: ${message}`);
 }

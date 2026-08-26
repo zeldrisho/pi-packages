@@ -48,18 +48,39 @@ const EXAMPLE_CONFIG: GateConfig = {
   },
 };
 
+/**
+ * Returns the directory where pi-gate configuration files are stored.
+ *
+ * @returns The absolute path to the agent configuration directory
+ */
 function agentDir(): string {
   return process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent");
 }
 
+/**
+ * Returns the full path to the pi-gate configuration file.
+ *
+ * @returns The absolute path to pi-gate.json
+ */
 function configPath(): string {
   return join(agentDir(), CONFIG_FILE_NAME);
 }
 
+/**
+ * Returns the full path to the example pi-gate configuration file.
+ *
+ * @returns The absolute path to pi-gate.json.example
+ */
 function examplePath(): string {
   return join(agentDir(), EXAMPLE_FILE_NAME);
 }
 
+/**
+ * Type guard that checks if an unknown value is a valid Action.
+ *
+ * @param value - The value to check
+ * @returns `true` if the value is one of "prompt", "block", or "allow"
+ */
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- type-guard helper intentionally narrows untrusted JSON values at the parse boundary
 function isAction(value: unknown): value is Action {
   return (
@@ -71,6 +92,12 @@ function isAction(value: unknown): value is Action {
   );
 }
 
+/**
+ * Type guard that checks if an unknown value is a plain JSON object.
+ *
+ * @param value - The value to check
+ * @returns `true` if the value is a non-null object and not an array
+ */
 // oxlint-disable-next-line anti-slop/no-unknown-parameters, anti-slop/no-unsafe-dictionary-type -- type-guard helper intentionally narrows untrusted JSON values at the parse boundary
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -152,6 +179,10 @@ export function ensureExampleConfig(): void {
  * Returns `null` when no rule matches, in which case the caller should let the
  * command through. When multiple rules match, the longest pattern wins so
  * that narrow rules can override broader ones.
+ *
+ * @param command - The bash command to evaluate against the rules
+ * @param rules - A map of pattern strings to actions
+ * @returns The action to take, or `null` if no rule matches
  */
 export function resolveAction(command: string, rules: Record<string, Action>): Action | null {
   let bestPattern: string | null = null;
