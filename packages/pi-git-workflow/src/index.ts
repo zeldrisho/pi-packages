@@ -10,9 +10,10 @@
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-const BRANCH_DELETE_FORCE_RE = /\bgit\s+branch\s+.*(?:-D|--delete\s+--force)\b/;
+const BRANCH_DELETE_FORCE_RE = /\bgit\s+branch\s+.*(?:-D|--delete\s+--force|--force\s+--delete)\b/;
 const BRANCH_DELETE_RE = /\bgit\s+branch\s+.*(?:-d|--delete)\b/;
-const BRANCH_NAME_FROM_DELETE_RE = /git\s+branch\s+(?:-d|-D|--delete)(?:\s+--force)?\s+([^\s;|&]+)/;
+const BRANCH_NAME_FROM_DELETE_RE =
+  /git\s+branch\s+(?:(?:-d|-D|--delete)(?:\s+--force)?|--force\s+--delete)\s+([^\s;|&]+)/;
 
 /**
  * Extracts the branch name from a git branch delete command.
@@ -50,9 +51,10 @@ export async function detectTargetBranch(pi: ExtensionAPI): Promise<string> {
   const { stdout, code } = await pi.exec("git", ["symbolic-ref", "refs/remotes/origin/HEAD"]);
   if (code === 0 && stdout.trim()) {
     // refs/remotes/origin/main -> main
+    // refs/remotes/origin/release/2026 -> release/2026
     const ref = stdout.trim();
-    const slash = ref.lastIndexOf("/");
-    if (slash !== -1) return ref.slice(slash + 1);
+    const prefix = "refs/remotes/origin/";
+    if (ref.startsWith(prefix)) return ref.slice(prefix.length);
   }
   // fallback: prefer origin/main if exists
   const { code: mainCode } = await pi.exec("git", [
@@ -120,7 +122,15 @@ export async function checkMerged(
 export async function checkUpstreamGone(pi: ExtensionAPI, branch: string): Promise<boolean> {
   // 1. git branch -vv shows [origin/branch: gone]
   const { stdout: vv } = await pi.exec("git", ["branch", "-vv"]);
-  const goneLine = vv.split("\n").find((l: string) => l.includes(branch) && l.includes(": gone]"));
+  const goneLine = vv.split("\n").find((l: string) => {
+    // Parse the first column (branch name) from git branch -vv output
+    // Format: "* branchname hash [remote: gone] message" or "  branchname hash [remote: gone] message"
+    const parsed = l
+      .replace(/^[* ]+/, "")
+      .trim()
+      .split(/\s+/)[0];
+    return parsed === branch && l.includes(": gone]");
+  });
   if (goneLine) return true;
 
   // 2. ls-remote --heads origin <branch> empty => no remote branch

@@ -29,6 +29,8 @@ describe("extractBranchName", () => {
   it("extracts --delete", () => expect(extractBranchName("git branch --delete baz")).toBe("baz"));
   it("handles --delete --force", () =>
     expect(extractBranchName("git branch --delete --force qux")).toBe("qux"));
+  it("handles --force --delete", () =>
+    expect(extractBranchName("git branch --force --delete feature")).toBe("feature"));
   it("returns undefined for non-delete", () =>
     expect(extractBranchName("git status")).toBeUndefined());
 });
@@ -52,6 +54,14 @@ describe("detectTargetBranch", () => {
       return { code: 1, stdout: "", stderr: "", killed: false };
     });
     expect(await detectTargetBranch(pi)).toBe("main");
+  });
+  it("preserves hierarchical branch names", async () => {
+    const pi = makePi(async (_c, args) => {
+      if (args[0] === "symbolic-ref")
+        return { code: 0, stdout: "refs/remotes/origin/release/2026\n", stderr: "", killed: false };
+      return { code: 1, stdout: "", stderr: "", killed: false };
+    });
+    expect(await detectTargetBranch(pi)).toBe("release/2026");
   });
   it("falls back to origin/main", async () => {
     const pi = makePi(async (_c, args) => {
@@ -134,6 +144,22 @@ describe("checkUpstreamGone", () => {
       return { code: 0, stdout: "", stderr: "", killed: false };
     });
     expect(await checkUpstreamGone(pi, "foo")).toBe(true);
+  });
+  it("correctly distinguishes branches when one is a prefix of another", async () => {
+    const pi = makePi(async (_c, args) => {
+      if (args[0] === "branch" && args[1] === "-vv")
+        return {
+          code: 0,
+          stdout: "  foo  abc [origin/foo] msg\n  foobar  def [origin/foobar: gone] other\n",
+          stderr: "",
+          killed: false,
+        };
+      if (args[0] === "ls-remote")
+        return { code: 0, stdout: "abc\trefs/heads/foo\n", stderr: "", killed: false };
+      if (args[0] === "config") return { code: 0, stdout: "origin\n", stderr: "", killed: false };
+      return { code: 0, stdout: "", stderr: "", killed: false };
+    });
+    expect(await checkUpstreamGone(pi, "foo")).toBe(false);
   });
   it("true via ls-remote empty", async () => {
     const pi = makePi(async (_c, args) => {

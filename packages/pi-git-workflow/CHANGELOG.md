@@ -12,8 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - enforce `git fetch --prune` and inspect before implementation via `before_agent_start`
-- block unsafe `git branch -D` / `--force` deletion until merged and upstream gone
-- never discard uncommitted work: abort checkout when dirty and report status
+- block force branch deletion (`git branch -D` / `--force`) to prevent accidental data loss
+- gate regular branch deletion (`git branch -d`) by merge and upstream checks with interactive confirmation
+- report dirty working tree status without aborting checkout
 
 [Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-git-workflow-v0.1.0...HEAD
 [0.1.0]: https://github.com/zeldrisho/pi-packages/releases/tag/pi-git-workflow-v0.1.0

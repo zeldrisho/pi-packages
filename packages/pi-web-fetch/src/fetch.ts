@@ -30,10 +30,14 @@ export function normalizeGitHubRawUrl(rawUrl: string): string {
       if (url.pathname.includes("/blob/")) {
         return `https://raw.githubusercontent.com${url.pathname.replace("/blob/", "/")}${url.search}`;
       }
-      if (url.pathname.includes("/tree/")) {
-        const lastSegment = url.pathname.split("/").pop() ?? "";
+      // Parse pathname segments: /owner/repo/tree/ref/path
+      const segments = url.pathname.split("/").filter(Boolean);
+      if (segments.length >= 4 && segments[2] === "tree") {
+        const lastSegment = segments[segments.length - 1];
         if (lastSegment.includes(".")) {
-          return `https://raw.githubusercontent.com${url.pathname.replace("/tree/", "/")}${url.search}`;
+          // Reconstruct path: /owner/repo/ref/path (remove "tree" segment)
+          const newPath = `/${segments[0]}/${segments[1]}/${segments.slice(3).join("/")}`;
+          return `https://raw.githubusercontent.com${newPath}${url.search}`;
         }
         return rawUrl;
       }

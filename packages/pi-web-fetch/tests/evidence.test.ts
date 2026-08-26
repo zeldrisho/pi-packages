@@ -57,6 +57,24 @@ describe("normalizeGitHubRawUrl", () => {
     );
   });
 
+  it("rewrites tree URLs with file extensions to raw", () => {
+    expect(normalizeGitHubRawUrl("https://github.com/o/r/tree/main/src/x.ts")).toBe(
+      "https://raw.githubusercontent.com/o/r/main/src/x.ts",
+    );
+  });
+
+  it("handles owner named tree correctly", () => {
+    expect(normalizeGitHubRawUrl("https://github.com/tree/repo/tree/main/file.ts")).toBe(
+      "https://raw.githubusercontent.com/tree/repo/main/file.ts",
+    );
+  });
+
+  it("preserves query strings when rewriting tree URLs", () => {
+    expect(normalizeGitHubRawUrl("https://github.com/o/r/tree/main/x.ts?foo=1")).toBe(
+      "https://raw.githubusercontent.com/o/r/main/x.ts?foo=1",
+    );
+  });
+
   it("leaves non-blob github URLs untouched", () => {
     expect(normalizeGitHubRawUrl("https://github.com/o/r")).toBe("https://github.com/o/r");
     expect(normalizeGitHubRawUrl("https://github.com/o/r/tree/main")).toBe(
