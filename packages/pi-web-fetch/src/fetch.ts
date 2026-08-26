@@ -27,8 +27,21 @@ export function normalizeGitHubRawUrl(rawUrl: string): string {
     const url = new URL(rawUrl);
     if (url.protocol !== "https:") return rawUrl;
     if (url.hostname === "github.com") {
-      if (!url.pathname.includes("/blob/")) return rawUrl;
-      return `https://raw.githubusercontent.com${url.pathname.replace("/blob/", "/")}${url.search}`;
+      if (url.pathname.includes("/blob/")) {
+        return `https://raw.githubusercontent.com${url.pathname.replace("/blob/", "/")}${url.search}`;
+      }
+      // Parse pathname segments: /owner/repo/tree/ref/path
+      const segments = url.pathname.split("/").filter(Boolean);
+      if (segments.length >= 4 && segments[2] === "tree") {
+        const lastSegment = segments[segments.length - 1];
+        if (lastSegment.includes(".")) {
+          // Reconstruct path: /owner/repo/ref/path (remove "tree" segment)
+          const newPath = `/${segments[0]}/${segments[1]}/${segments.slice(3).join("/")}`;
+          return `https://raw.githubusercontent.com${newPath}${url.search}`;
+        }
+        return rawUrl;
+      }
+      return rawUrl;
     }
     if (url.hostname === "gist.github.com") {
       const segments = url.pathname.split("/").filter(Boolean);

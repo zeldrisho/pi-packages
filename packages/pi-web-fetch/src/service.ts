@@ -87,10 +87,20 @@ export function classifyConfidence(
  * Returns them ordered shallow → deep, and an empty list for non-HTTP(S) targets or when
  * the page itself is already a `llms.txt` path, so a fallback never retries itself.
  */
+function isGitHubLikeHost(hostname: string): boolean {
+  return (
+    hostname === "github.com" ||
+    hostname === "raw.githubusercontent.com" ||
+    hostname === "gist.github.com" ||
+    hostname === "gist.githubusercontent.com"
+  );
+}
+
 export function buildLlmsTxtCandidateUrls(rawUrl: string): URL[] {
   try {
     const url = new URL(rawUrl);
     if (url.protocol !== "https:" && url.protocol !== "http:") return [];
+    if (isGitHubLikeHost(url.hostname)) return [];
     if (url.pathname === "/llms.txt" || url.pathname.endsWith("/llms.txt")) return [];
     // Ancestor directories only, one level deep: for `/r2/buckets/x` probe
     // `/llms.txt` and `/r2/llms.txt`, never deeper. A trailing slash marks the final
@@ -232,6 +242,13 @@ async function fetchDocumentWithLlmsTxtSupport(
   signal: AbortSignal | undefined,
   dependencies: FetchRemoteDependencies,
 ): Promise<CompleteDocument> {
+  try {
+    if (isGitHubLikeHost(new URL(rawUrl).hostname)) {
+      return fetchCompleteDocument(rawUrl, signal, dependencies);
+    }
+  } catch {
+    // Invalid URL falls through to fetchCompleteDocument which will throw.
+  }
   const candidates = buildLlmsTxtCandidateUrls(rawUrl);
   const [primary, blindIndex] = await Promise.all([
     fetchCompleteDocument(rawUrl, signal, dependencies),

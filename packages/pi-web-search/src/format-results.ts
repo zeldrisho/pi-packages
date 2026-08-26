@@ -4,6 +4,15 @@ function escapeMarkdownLinkText(value: string): string {
   return value.replace(/([\\[\]])/g, "\\$1");
 }
 
+/**
+ * Formats search results as Markdown with untrusted content warnings.
+ *
+ * @param query - The search query that was executed
+ * @param provider - The search provider used (e.g., "brave")
+ * @param mode - The search mode (e.g., "web", "context")
+ * @param results - Array of search results to format
+ * @returns Formatted Markdown string with results wrapped in untrusted content tags
+ */
 export function formatResults(
   query: string,
   provider: Provider,

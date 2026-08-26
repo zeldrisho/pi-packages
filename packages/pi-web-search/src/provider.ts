@@ -2,6 +2,13 @@ const REQUEST_TIMEOUT_MS = 20_000;
 const SEARCH_MAX_RESPONSE_BYTES = 2_000_000;
 const SEARCH_ERROR_EXCERPT_BYTES = 8_192;
 
+/**
+ * Normalizes text by removing HTML tags, collapsing whitespace, and truncating to a maximum length.
+ *
+ * @param value - The text to normalize
+ * @param maxLength - Maximum length of the normalized text
+ * @returns Normalized text, truncated with ellipsis if needed
+ */
 export function normalizeText(value: string, maxLength: number): string {
   const text = value
     .replace(/<[^>]*>/g, " ")

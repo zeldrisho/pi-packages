@@ -27,8 +27,6 @@
 ## Key Conventions
 
 - Write every `CHANGELOG.md` entry by hand in Keep a Changelog 2.0.0 form, then run `vp run format:changelog` to normalize the file (it rebuilds the `[Unreleased]` comparison links and the version reference block). The released version section becomes the GitHub release notes; the release workflow only reads the changelog — it never writes it.
-- Before implementation, run `git fetch --prune`, inspect local and upstream state, and start from the latest target branch without discarding uncommitted work.
-- Delete a completed local branch only when it is merged into its target and its upstream branch is gone.
 
 ## External References
 
