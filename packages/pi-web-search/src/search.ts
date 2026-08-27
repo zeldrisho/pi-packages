@@ -47,6 +47,7 @@ function resolveCacheDirectory(name: string): string {
   return base;
 }
 
+/** Parameters for a web search operation. */
 export interface SearchParameters {
   query: string;
   count?: number;
@@ -58,6 +59,7 @@ export interface SearchParameters {
   extraSnippets?: boolean;
 }
 
+/** Details about search result truncation and overflow handling. */
 export interface SearchTruncationDetails {
   truncated: boolean;
   strategy: "temporary-file" | "none";
@@ -68,6 +70,7 @@ export interface SearchTruncationDetails {
   totalLines: number;
 }
 
+/** Comprehensive metadata about a search operation result. */
 export interface SearchDetails {
   query: string;
   provider: Provider;
@@ -105,6 +108,12 @@ const searchCache = new ExpiringLruCache<string, SearchResult[]>(
 );
 const inflightSearches = new InflightCoalescer<string, SearchResult[]>(MAX_INFLIGHT_REQUESTS);
 
+/**
+ * Runtime environment for web search operations.
+ *
+ * Manages temporary files created for truncated search results and provides
+ * cleanup on shutdown.
+ */
 export class SearchRuntime {
   readonly #tempDirectories = new Set<string>();
 

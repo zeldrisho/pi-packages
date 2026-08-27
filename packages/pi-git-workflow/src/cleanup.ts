@@ -15,6 +15,7 @@ const MAX_REVIEW_BRANCHES = 25;
 const MAX_CONTEXT_BYTES = 6_000;
 const queues = new Map<string, Promise<void>>();
 
+/** Local Git branch metadata. */
 export interface LocalBranch {
   name: string;
   ref: string;
@@ -23,12 +24,14 @@ export interface LocalBranch {
   tracking: string;
 }
 
+/** Branch requiring manual review before deletion. */
 export interface ReviewBranch {
   name: string;
   commit: string;
   reason: string;
 }
 
+/** Result of a repository cleanup operation. */
 export interface CleanupResult {
   root: string;
   target: string;
@@ -38,6 +41,16 @@ export interface CleanupResult {
   retained: string[];
 }
 
+/**
+ * Execute an operation with exclusive access to a repository.
+ *
+ * Ensures only one cleanup operation runs at a time per repository root
+ * by queuing operations and waiting for previous ones to complete.
+ *
+ * @param root - Canonical repository root path
+ * @param run - Async operation to execute exclusively
+ * @returns Promise resolving to the operation result
+ */
 export async function withRepoQueue<T>(root: string, run: () => Promise<T>): Promise<T> {
   const previous = queues.get(root) ?? Promise.resolve();
   let release = (): void => {};
@@ -55,6 +68,16 @@ export async function withRepoQueue<T>(root: string, run: () => Promise<T>): Pro
   }
 }
 
+/**
+ * Parse Git for-each-ref output into structured local branch metadata.
+ *
+ * Expects output in the format: refname\0objectname\0upstream\0tracking\0
+ * for each branch, separated by \0\n.
+ *
+ * @param output - Raw output from git for-each-ref
+ * @returns Array of parsed LocalBranch objects
+ * @throws {GitInspectionError} When output is malformed or too large
+ */
 export function parseLocalBranches(output: string): LocalBranch[] {
   if (Buffer.byteLength(output, "utf8") > 1_000_000) {
     throw new GitInspectionError("output_too_large", "branch enumeration returned too much data");
@@ -83,6 +106,16 @@ export function parseLocalBranches(output: string): LocalBranch[] {
   return branches;
 }
 
+/**
+ * Parse Git worktree list output to identify checked-out branches.
+ *
+ * Extracts branch names from porcelain-format worktree output to determine
+ * which branches are currently checked out in any linked worktree.
+ *
+ * @param output - Raw output from git worktree list --porcelain
+ * @returns Set of branch names currently checked out in worktrees
+ * @throws {GitInspectionError} When output is malformed or too large
+ */
 export function parseWorktreeBranches(output: string): Set<string> {
   if (Buffer.byteLength(output, "utf8") > 1_000_000) {
     throw new GitInspectionError("output_too_large", "worktree enumeration returned too much data");
@@ -128,6 +161,21 @@ export function parseWorktreeBranches(output: string): Set<string> {
   return occupied;
 }
 
+/**
+ * Clean up merged local branches from a Git repository.
+ *
+ * Safely deletes local branches that:
+ * - Have an upstream that is marked as "[gone]" after fetch --prune
+ * - Are fully merged into the target branch
+ * - Are not currently checked out in any worktree
+ *
+ * Requires the project to be trusted. Returns branches that need manual review.
+ *
+ * @param pi - Extension API with exec capability
+ * @param context - Cleanup context with working directory and trust status
+ * @returns Promise resolving to cleanup result with deleted/review/retained branches
+ * @throws {GitInspectionError} When project is untrusted or inspection fails
+ */
 export async function cleanupRepository(
   pi: Pick<ExtensionAPI, "exec">,
   context: { cwd: string; trusted: boolean },
@@ -257,6 +305,15 @@ function encodeUntrusted(value: string): string {
   return JSON.stringify(bounded).slice(1, -1).replace(/`/g, "\\u0060");
 }
 
+/**
+ * Format branch review information as agent context.
+ *
+ * Creates a bounded message listing branches that require manual review,
+ * suitable for inclusion in agent context to inform the user.
+ *
+ * @param review - Array of branches requiring review
+ * @returns Formatted markdown context string, or undefined if no branches need review
+ */
 export function formatCleanupContext(review: ReviewBranch[]): string | undefined {
   if (review.length === 0) return undefined;
   const shown = review.slice(0, MAX_REVIEW_BRANCHES);
@@ -276,6 +333,15 @@ export function formatCleanupContext(review: ReviewBranch[]): string | undefined
   return message;
 }
 
+/**
+ * Generate a stable fingerprint for a set of review branches.
+ *
+ * Creates a deterministic hash based on branch names, commits, and reasons
+ * to detect when the review set has changed.
+ *
+ * @param review - Array of branches requiring review
+ * @returns SHA-256 hex digest of the stable branch metadata
+ */
 export function reviewFingerprint(review: ReviewBranch[]): string {
   const stable = [...review]
     .sort((left, right) => left.name.localeCompare(right.name))

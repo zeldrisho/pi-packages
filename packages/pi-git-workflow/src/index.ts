@@ -27,6 +27,15 @@ const BRANCH_DELETE_RE = /\bgit\s+branch\s+.*(?:-d|--delete)\b/;
 const BRANCH_NAME_FROM_DELETE_RE =
   /git\s+branch\s+(?:(?:-d|-D|--delete)(?:\s+--force)?|--force\s+--delete)\s+(?:--\s+)?([^\s;|&]+)/;
 
+/**
+ * Extract the branch name from a git branch delete command.
+ *
+ * Parses various forms of git branch deletion commands to extract the
+ * target branch name.
+ *
+ * @param command - Git command string to parse
+ * @returns Branch name if found, undefined otherwise
+ */
 export function extractBranchName(command: string): string | undefined {
   return command.match(BRANCH_NAME_FROM_DELETE_RE)?.[1]?.trim();
 }

@@ -4,6 +4,7 @@ import { isIP, type LookupFunction } from "node:net";
 import { formatSize } from "@earendil-works/pi-coding-agent";
 import type { ValidatedTarget } from "./network-policy";
 
+/** Maximum size in bytes for raw HTTP response bodies. */
 export const FETCH_MAX_BYTES = 5 * 1_024 * 1_024;
 
 /**
@@ -166,6 +167,18 @@ export function responseHeader(response: IncomingMessage, name: string): string 
   return Array.isArray(value) ? value[0] : value;
 }
 
+/**
+ * Read and buffer the complete response body.
+ *
+ * Enforces the maximum byte limit and respects abort signals during the read.
+ * Destroys the response stream if limits are exceeded or abort is signaled.
+ *
+ * @param response - HTTP response to read
+ * @param maxBytes - Maximum allowed response size in bytes
+ * @param signal - Optional abort signal to cancel the read
+ * @returns Buffered response body as bytes
+ * @throws When response exceeds maxBytes or abort signal fires
+ */
 export async function readResponseBytes(
   response: IncomingMessage,
   maxBytes: number,
@@ -213,6 +226,16 @@ export async function readResponseBytes(
   return output;
 }
 
+/**
+ * Decode HTTP response bytes to a string using the charset from Content-Type.
+ *
+ * Extracts the charset parameter from the Content-Type header and uses it
+ * to decode the response. Falls back to UTF-8 if charset is missing or invalid.
+ *
+ * @param bytes - Raw response bytes to decode
+ * @param contentTypeHeader - Value of the Content-Type response header
+ * @returns Decoded response string
+ */
 export function decodeResponse(bytes: Uint8Array, contentTypeHeader: string): string {
   const charset = contentTypeHeader.match(/(?:^|;)\s*charset\s*=\s*["']?([^;"'\s]+)/i)?.[1];
   try {

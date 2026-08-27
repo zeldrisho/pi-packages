@@ -1,11 +1,21 @@
 import { realpath } from "node:fs/promises";
 import type { ExtensionAPI, ExecResult } from "@earendil-works/pi-coding-agent";
 
+/** Default timeout in milliseconds for Git operations. */
 export const GIT_TIMEOUT_MS = 30_000;
+
+/** Maximum size in bytes for Git command output to prevent memory exhaustion. */
 export const MAX_GIT_OUTPUT_BYTES = 1_000_000;
 
+/** Minimal interface for executing Git commands. */
 export type GitRunner = Pick<ExtensionAPI, "exec">;
 
+/**
+ * Error thrown when Git repository inspection operations fail.
+ *
+ * Includes an error code for programmatic handling and optional details
+ * for diagnostic context.
+ */
 export class GitInspectionError extends Error {
   constructor(
     readonly code: string,
@@ -17,6 +27,15 @@ export class GitInspectionError extends Error {
   }
 }
 
+/**
+ * Execute a Git command with the specified arguments.
+ *
+ * @param pi - Git command runner interface
+ * @param cwd - Working directory for the Git command
+ * @param args - Array of command-line arguments for Git
+ * @param timeout - Optional timeout in milliseconds (defaults to GIT_TIMEOUT_MS)
+ * @returns Promise resolving to the command execution result
+ */
 export async function git(
   pi: GitRunner,
   cwd: string,
@@ -26,6 +45,16 @@ export async function git(
   return pi.exec("git", args, { cwd, timeout });
 }
 
+/**
+ * Sanitize Git command output by removing control characters and limiting length.
+ *
+ * Strips ANSI escape codes and normalizes whitespace to make output safe
+ * for display in error messages and logs.
+ *
+ * @param value - Raw Git output to sanitize
+ * @param max - Maximum length for the sanitized output (defaults to 600)
+ * @returns Sanitized string, or undefined if the input is empty after cleaning
+ */
 export function sanitizeGitOutput(value: string, max = 600): string | undefined {
   const clean = Array.from(value, (character) => {
     const code = character.codePointAt(0) ?? 0;
@@ -40,6 +69,16 @@ export function sanitizeGitOutput(value: string, max = 600): string | undefined 
   return clean.length > max ? `${clean.slice(0, max)}…` : clean;
 }
 
+/**
+ * Validate that a Git command result has bounded output size.
+ *
+ * Throws GitInspectionError if stdout or stderr exceeds MAX_GIT_OUTPUT_BYTES
+ * to prevent memory exhaustion from unexpectedly large Git responses.
+ *
+ * @param result - Git command execution result to validate
+ * @param operation - Description of the operation for error messages
+ * @throws {GitInspectionError} When output exceeds the maximum allowed size
+ */
 export function requireBoundedOutput(result: ExecResult, operation: string): void {
   if (
     Buffer.byteLength(result.stdout, "utf8") > MAX_GIT_OUTPUT_BYTES ||
@@ -49,6 +88,20 @@ export function requireBoundedOutput(result: ExecResult, operation: string): voi
   }
 }
 
+/**
+ * Execute a Git command and require successful completion.
+ *
+ * Runs the specified Git command, validates its output is bounded, and throws
+ * a GitInspectionError if the command exits with a non-zero status.
+ *
+ * @param pi - Git command runner interface
+ * @param cwd - Working directory for the Git command
+ * @param args - Array of command-line arguments for Git
+ * @param code - Error code to use if the command fails
+ * @param message - Error message to use if the command fails
+ * @returns Promise resolving to the successful command execution result
+ * @throws {GitInspectionError} When the command fails or output is too large
+ */
 export async function requireGitOk(
   pi: GitRunner,
   cwd: string,
@@ -64,7 +117,17 @@ export async function requireGitOk(
   return result;
 }
 
-/** Resolve a canonical, non-bare Git worktree root. */
+/**
+ * Resolve a canonical, non-bare Git worktree root.
+ *
+ * Verifies the current directory is inside a Git working tree (not bare),
+ * and returns the canonicalized absolute path to the repository root.
+ *
+ * @param pi - Git command runner interface
+ * @param cwd - Working directory to inspect
+ * @returns Promise resolving to the absolute repository root path
+ * @throws {GitInspectionError} When not in a worktree or repository is bare
+ */
 export async function resolveRepoRoot(pi: GitRunner, cwd: string): Promise<string> {
   const inside = await git(pi, cwd, ["rev-parse", "--is-inside-work-tree"]);
   requireBoundedOutput(inside, "repository inspection");
@@ -105,6 +168,19 @@ export async function resolveRepoRoot(pi: GitRunner, cwd: string): Promise<strin
   }
 }
 
+/**
+ * Detect the target branch name for the repository.
+ *
+ * Attempts to determine the main development branch by checking:
+ * 1. The symbolic ref origin/HEAD points to
+ * 2. Existence of common branch names (main, master)
+ * 3. The current branch if others are not found
+ *
+ * @param pi - Git command runner interface
+ * @param cwd - Working directory containing the Git repository
+ * @returns Promise resolving to the target branch name
+ * @throws {GitInspectionError} When target detection fails or HEAD is detached
+ */
 export async function detectTargetBranchInRepo(pi: GitRunner, cwd: string): Promise<string> {
   const symbolic = await git(pi, cwd, ["symbolic-ref", "refs/remotes/origin/HEAD"]);
   requireBoundedOutput(symbolic, "target detection");
@@ -136,6 +212,18 @@ export async function detectTargetBranchInRepo(pi: GitRunner, cwd: string): Prom
   return current.stdout.trim();
 }
 
+/**
+ * Get the exact commit SHA that a Git reference points to.
+ *
+ * Resolves the given ref to a commit object and validates the format.
+ * Returns undefined if the ref does not exist or does not point to a commit.
+ *
+ * @param pi - Git command runner interface
+ * @param cwd - Working directory containing the Git repository
+ * @param ref - Git reference name to resolve
+ * @returns Promise resolving to the commit SHA (40-64 hex chars), or undefined
+ * @throws {GitInspectionError} When output validation fails
+ */
 export async function exactRefCommit(
   pi: GitRunner,
   cwd: string,

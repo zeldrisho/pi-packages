@@ -47,6 +47,17 @@ function safeUrl(value: string): URL | undefined {
   }
 }
 
+/**
+ * Classify the kind of content returned by a fetch operation.
+ *
+ * Determines the content type based on URL patterns, extractor used,
+ * and whether an app shell was detected.
+ *
+ * @param url - The fetched URL
+ * @param extractor - Extraction method used
+ * @param shellSuspected - Whether the page appears to be an app shell
+ * @returns Content classification
+ */
 export function classifyContentKind(
   url: string,
   extractor: CompleteDocument["extractor"],
@@ -69,6 +80,17 @@ export function classifyContentKind(
   return "unknown";
 }
 
+/**
+ * Classify confidence level for fetched content quality.
+ *
+ * Determines how confident we are that the extracted content accurately
+ * represents the source page, based on extraction method and content length.
+ *
+ * @param extractor - Extraction method used
+ * @param shellSuspected - Whether the page appears to be an app shell
+ * @param markdownLength - Length of extracted markdown content
+ * @returns Confidence level (high, medium, or low)
+ */
 export function classifyConfidence(
   extractor: CompleteDocument["extractor"],
   shellSuspected: boolean,
@@ -96,6 +118,16 @@ function isGitHubLikeHost(hostname: string): boolean {
   );
 }
 
+/**
+ * Build candidate /llms.txt URLs to probe for a given page.
+ *
+ * Generates a list of potential /llms.txt index URLs by checking the site root
+ * and ancestor directories up to a maximum depth. Returns URLs ordered from
+ * shallowest to deepest.
+ *
+ * @param rawUrl - The original page URL
+ * @returns Array of candidate /llms.txt URLs to probe (empty for non-HTTP/S or GitHub)
+ */
 export function buildLlmsTxtCandidateUrls(rawUrl: string): URL[] {
   try {
     const url = new URL(rawUrl);
@@ -294,18 +326,21 @@ function resolveCacheDirectory(name: string): string {
   return base;
 }
 
+/** Parameters for a web fetch operation. */
 export interface WebFetchParameters {
   url: string;
   offset?: number;
   maxCharacters?: number;
 }
 
+/** Details about content truncation and pagination strategy. */
 export interface WebFetchTruncationDetails {
   truncated: boolean;
   strategy: "continuation" | "none";
   nextOffset?: number;
 }
 
+/** Comprehensive metadata about a web fetch result. */
 export interface WebFetchDetails {
   url: string;
   requestedUrl: string;
