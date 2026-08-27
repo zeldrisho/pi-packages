@@ -22,7 +22,7 @@ import {
 } from "./git";
 
 const BRANCH_DELETE_FORCE_RE =
-  /\bgit\s+branch\b(?=[^;\n]*(?:-D\b|--delete\b|-d\b|-[A-Za-z]*[dD][A-Za-z]*f|-[A-Za-z]*f[A-Za-z]*[dD]))(?=[^;\n]*(?:-D\b|--force\b|-f\b|-[A-Za-z]*[dD][A-Za-z]*f|-[A-Za-z]*f[A-Za-z]*[dD]))/;
+  /\bgit\s+branch\b(?=[^;&|\n]*(?:-D\b|--delete\b|-d\b|-[A-Za-z]*[dD][A-Za-z]*f|-[A-Za-z]*f[A-Za-z]*[dD]))(?=[^;&|\n]*(?:-D\b|--force\b|-f\b|-[A-Za-z]*[dD][A-Za-z]*f|-[A-Za-z]*f[A-Za-z]*[dD]))/;
 const BRANCH_DELETE_RE = /\bgit\s+branch\s+.*(?:-d|--delete)\b/;
 const BRANCH_NAME_FROM_DELETE_RE =
   /git\s+branch\s+(?:(?:-d|-D|--delete)(?:\s+--force)?|--force\s+--delete)\s+(?:--\s+)?([^\s;|&]+)/;
@@ -68,9 +68,17 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
       };
     } catch (caught) {
       const error = caught instanceof Error ? caught : new Error("unknown Git inspection failure");
-      if (error instanceof GitInspectionError && error.code === "not_git_worktree") return;
+      if (
+        error instanceof GitInspectionError &&
+        (error.code === "not_git_worktree" || error.code === "untrusted_project")
+      )
+        return;
+      const fingerprint = `${ctx.cwd}:${error instanceof GitInspectionError ? error.code : "unknown"}`;
       const message = formatInspectionFailure(error);
-      if (ctx.hasUI) ctx.ui.notify(`pi-git-workflow: ${message}`, "warning");
+      if (ctx.hasUI && visibleFingerprints.get(ctx.cwd) !== fingerprint) {
+        ctx.ui.notify(`pi-git-workflow: ${message}`, "warning");
+        visibleFingerprints.set(ctx.cwd, fingerprint);
+      }
       return {
         message: {
           customType: "pi-git-workflow-cleanup",
@@ -115,7 +123,7 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
       const target = await detectTargetBranchInRepo(pi, root);
       const branchRef = `refs/heads/${branch}`;
       const branchCommit = await exactRefCommit(pi, root, branchRef);
-      if (!branchCommit) return;
+      if (!branchCommit) return blocked(branch, "the local branch ref is missing or ambiguous");
       const targetCommit = await exactRefCommit(pi, root, `refs/remotes/origin/${target}`);
       if (!targetCommit) return blocked(branch, "the fetched target ref is missing");
       const merged = await git(pi, root, [
