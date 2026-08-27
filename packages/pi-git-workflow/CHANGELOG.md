@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- automatically prune and safely delete local branches whose upstream is gone and whose commit is merged into the fetched target
+- inject bounded agent context and deduplicated UI notices for branches requiring user review
+
+### Changed
+
+- refresh and pin exact Git refs before cleanup and ordinary branch-deletion checks
+- keep remote deletion delegated to GitHub and retain branches when inspection or non-force deletion is uncertain
+
 ## [0.1.0] - 2026-08-26
 
 ### Added

@@ -27,7 +27,7 @@ Browse the [Pi package directory](https://pi.dev/packages) for examples of publi
 
 ## Security invariants
 
-Read [`security-invariants.md`](security-invariants.md) before changing extension runtime behavior, tool schemas, network access, filesystem access, credentials, caching, or output rendering.
+Read [`security-invariants.md`](security-invariants.md) before changing extension runtime behavior, tool schemas, network access, filesystem access, credentials, caching, or output rendering. Follow [`git.md`](git.md) when an extension inspects or mutates a Git repository.
 
 ## Verification
 

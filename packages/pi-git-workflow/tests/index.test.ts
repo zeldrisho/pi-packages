@@ -1,440 +1,412 @@
-// oxlint-disable anti-slop/no-chained-type-assertions, typescript/unbound-method, anti-slop/require-safety-comment-for-type-assertion, anti-slop/no-unknown-parameters, anti-slop/no-unknown-returns
+// oxlint-disable anti-slop/no-chained-type-assertions, typescript/unbound-method, anti-slop/require-safety-comment-for-type-assertion, anti-slop/no-unknown-parameters
 import { describe, expect, it, vi } from "vite-plus/test";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import piGitWorkflow, {
-  checkMerged,
-  checkUpstreamGone,
-  detectTargetBranch,
-  extractBranchName,
-  isGitRepo,
-} from "../src/index";
+import {
+  cleanupRepository,
+  formatCleanupContext,
+  parseLocalBranches,
+  parseWorktreeBranches,
+  withRepoQueue,
+} from "../src/cleanup";
+import piGitWorkflow, { extractBranchName } from "../src/index";
+import {
+  detectTargetBranchInRepo,
+  GitInspectionError,
+  requireBoundedOutput,
+  sanitizeGitOutput,
+} from "../src/git";
 
-function makePi(
-  execImpl: (
-    cmd: string,
-    args: string[],
-  ) => Promise<{ code: number; stdout: string; stderr: string; killed: boolean }>,
-): ExtensionAPI {
-  return {
-    // SAFETY: test mock only implements exec
-    exec: (cmd: string, args: string[]) => execImpl(cmd, args),
-    on: vi.fn(),
-    // SAFETY: test mock coerced to ExtensionAPI; only exec/on are used
-  } as unknown as ExtensionAPI;
+const root = process.cwd();
+const mainCommit = "a".repeat(40);
+const branchCommit = "b".repeat(40);
+
+function branchRecord(
+  name: string,
+  commit = branchCommit,
+  upstream = `refs/remotes/origin/${name}`,
+  tracking = "[gone]",
+): string {
+  return `refs/heads/${name}\0${commit}\0${upstream}\0${tracking}\0\n`;
 }
 
-describe("extractBranchName", () => {
-  it("extracts -d", () => expect(extractBranchName("git branch -d foo")).toBe("foo"));
-  it("extracts -D", () => expect(extractBranchName("git branch -D bar")).toBe("bar"));
-  it("extracts --delete", () => expect(extractBranchName("git branch --delete baz")).toBe("baz"));
-  it("handles --delete --force", () =>
-    expect(extractBranchName("git branch --delete --force qux")).toBe("qux"));
-  it("handles --force --delete", () =>
-    expect(extractBranchName("git branch --force --delete feature")).toBe("feature"));
-  it("returns undefined for non-delete", () =>
-    expect(extractBranchName("git status")).toBeUndefined());
-});
+function cleanupPi(
+  branchOutput: string,
+  overrides: (args: string[], call: number) => Partial<ExecResult> | undefined = () => undefined,
+) {
+  const calls: string[][] = [];
+  const exec = vi.fn(async (_command: string, args: string[]) => {
+    calls.push(args);
+    const override = overrides(args, calls.length);
+    if (override) return result(override);
+    const key = args.join(" ");
+    if (key === "rev-parse --is-inside-work-tree") return result({ stdout: "true\n" });
+    if (key === "rev-parse --is-bare-repository") return result({ stdout: "false\n" });
+    if (key === "rev-parse --show-toplevel") return result({ stdout: `${root}\n` });
+    if (key === "fetch --prune origin") return result();
+    if (key === "symbolic-ref refs/remotes/origin/HEAD")
+      return result({ stdout: "refs/remotes/origin/main\n" });
+    if (key === "rev-parse --verify refs/remotes/origin/main^{commit}")
+      return result({ stdout: `${mainCommit}\n` });
+    if (key === "branch --show-current") return result({ stdout: "main\n" });
+    if (args[0] === "for-each-ref") return result({ stdout: branchOutput });
+    if (key === "worktree list --porcelain")
+      return result({ stdout: `worktree ${root}\nHEAD ${mainCommit}\nbranch refs/heads/main\n\n` });
+    if (args[0] === "merge-base") return result();
+    if (key === "rev-parse --verify refs/heads/feature^{commit}")
+      return result({ stdout: `${branchCommit}\n` });
+    if (key === "branch --delete -- feature") return result();
+    return result({ code: 1, stderr: `unexpected: ${key}` });
+  });
+  return { pi: { exec } as unknown as Pick<ExtensionAPI, "exec">, calls };
+}
 
-describe("isGitRepo", () => {
-  it("true when git-dir exists", async () => {
-    const pi = makePi(async () => ({ code: 0, stdout: ".git", stderr: "", killed: false }));
-    expect(await isGitRepo(pi)).toBe(true);
-  });
-  it("false when not repo", async () => {
-    const pi = makePi(async () => ({ code: 128, stdout: "", stderr: "fatal", killed: false }));
-    expect(await isGitRepo(pi)).toBe(false);
-  });
-});
+interface ExecResult {
+  code: number;
+  stdout: string;
+  stderr: string;
+  killed: boolean;
+}
 
-describe("detectTargetBranch", () => {
-  it("uses origin/HEAD", async () => {
-    const pi = makePi(async (_c, args) => {
-      if (args[0] === "symbolic-ref")
-        return { code: 0, stdout: "refs/remotes/origin/main\n", stderr: "", killed: false };
-      return { code: 1, stdout: "", stderr: "", killed: false };
-    });
-    expect(await detectTargetBranch(pi)).toBe("main");
-  });
-  it("preserves hierarchical branch names", async () => {
-    const pi = makePi(async (_c, args) => {
-      if (args[0] === "symbolic-ref")
-        return { code: 0, stdout: "refs/remotes/origin/release/2026\n", stderr: "", killed: false };
-      return { code: 1, stdout: "", stderr: "", killed: false };
-    });
-    expect(await detectTargetBranch(pi)).toBe("release/2026");
-  });
-  it("falls back to origin/main", async () => {
-    const pi = makePi(async (_c, args) => {
-      if (args[0] === "symbolic-ref") return { code: 1, stdout: "", stderr: "", killed: false };
-      if (args.includes("refs/remotes/origin/main"))
-        return { code: 0, stdout: "", stderr: "", killed: false };
-      return { code: 1, stdout: "", stderr: "", killed: false };
-    });
-    expect(await detectTargetBranch(pi)).toBe("main");
-  });
-  it("falls back to origin/master", async () => {
-    const pi = makePi(async (_c, args) => {
-      if (args[0] === "symbolic-ref") return { code: 1, stdout: "", stderr: "", killed: false };
-      if (args.includes("refs/remotes/origin/main"))
-        return { code: 1, stdout: "", stderr: "", killed: false };
-      if (args.includes("refs/remotes/origin/master"))
-        return { code: 0, stdout: "", stderr: "", killed: false };
-      return { code: 1, stdout: "", stderr: "", killed: false };
-    });
-    expect(await detectTargetBranch(pi)).toBe("master");
-  });
-  it("falls back to HEAD", async () => {
-    const pi = makePi(async (_c, args) => {
-      if (args[0] === "symbolic-ref") return { code: 1, stdout: "", stderr: "", killed: false };
-      if (args.includes("refs/remotes/origin/main"))
-        return { code: 1, stdout: "", stderr: "", killed: false };
-      if (args.includes("refs/remotes/origin/master"))
-        return { code: 1, stdout: "", stderr: "", killed: false };
-      if (args[0] === "rev-parse" && args[1] === "--abbrev-ref")
-        return { code: 0, stdout: "develop\n", stderr: "", killed: false };
-      return { code: 1, stdout: "", stderr: "", killed: false };
-    });
-    expect(await detectTargetBranch(pi)).toBe("develop");
-  });
-});
+function result(partial: Partial<ExecResult> = {}): ExecResult {
+  return { code: 0, stdout: "", stderr: "", killed: false, ...partial };
+}
 
-describe("checkMerged", () => {
-  it("true via branch --merged", async () => {
-    const pi = makePi(async (_c, args) => {
-      if (args[0] === "branch" && args[1] === "--merged")
-        return { code: 0, stdout: "  main\n* feat/x\n  feat/y\n", stderr: "", killed: false };
-      return { code: 1, stdout: "", stderr: "", killed: false };
+describe("Git inspection helpers", () => {
+  it("uses bounded target fallbacks and rejects detached fallback", async () => {
+    function targetPi(available: "main" | "master" | "current" | "detached") {
+      return {
+        exec: vi.fn(async (_command: string, args: string[]) => {
+          if (args[0] === "symbolic-ref") return result({ code: 1 });
+          if (args[0] === "show-ref") {
+            const name = args.at(-1)?.split("/").at(-1);
+            return result({ code: name === available ? 0 : 1 });
+          }
+          if (args[0] === "branch")
+            return result({ stdout: available === "detached" ? "" : "develop\n" });
+          return result({ code: 1 });
+        }),
+      } as unknown as Pick<ExtensionAPI, "exec">;
+    }
+    await expect(detectTargetBranchInRepo(targetPi("main"), root)).resolves.toBe("main");
+    await expect(detectTargetBranchInRepo(targetPi("master"), root)).resolves.toBe("master");
+    await expect(detectTargetBranchInRepo(targetPi("current"), root)).resolves.toBe("develop");
+    await expect(detectTargetBranchInRepo(targetPi("detached"), root)).rejects.toMatchObject({
+      code: "detached_head",
     });
-    expect(await checkMerged(pi, "feat/x", "main")).toBe(true);
   });
-  it("true via merge-base", async () => {
-    const pi = makePi(async (_c, args) => {
-      if (args[0] === "branch" && args[1] === "--merged")
-        return { code: 0, stdout: "  main\n", stderr: "", killed: false };
-      if (args[0] === "merge-base") return { code: 0, stdout: "", stderr: "", killed: false };
-      return { code: 1, stdout: "", stderr: "", killed: false };
-    });
-    expect(await checkMerged(pi, "feat/x", "main")).toBe(true);
-  });
-  it("false when not merged", async () => {
-    const pi = makePi(async (_c, args) => {
-      if (args[0] === "branch" && args[1] === "--merged")
-        return { code: 0, stdout: "  main\n", stderr: "", killed: false };
-      if (args[0] === "merge-base") return { code: 1, stdout: "", stderr: "", killed: false };
-      return { code: 1, stdout: "", stderr: "", killed: false };
-    });
-    expect(await checkMerged(pi, "feat/x", "main")).toBe(false);
-  });
-  it("false on branch --merged failure", async () => {
-    const pi = makePi(async () => ({ code: 1, stdout: "", stderr: "", killed: false }));
-    expect(await checkMerged(pi, "x", "main")).toBe(false);
+
+  it("sanitizes control output and enforces the output bound", () => {
+    expect(sanitizeGitOutput("bad\u001b\n message", 20)).toBe("bad message");
+    expect(() =>
+      requireBoundedOutput(result({ stdout: "x".repeat(1_000_001) }), "inspection"),
+    ).toThrow(/too much data/);
   });
 });
 
-describe("checkUpstreamGone", () => {
-  it("true via gone", async () => {
-    const pi = makePi(async (_c, args) => {
-      if (args[0] === "branch" && args[1] === "-vv")
-        return {
-          code: 0,
-          stdout: "  foo  abc [origin/foo: gone] msg\n",
-          stderr: "",
-          killed: false,
-        };
-      return { code: 0, stdout: "", stderr: "", killed: false };
-    });
-    expect(await checkUpstreamGone(pi, "foo")).toBe(true);
+describe("machine-readable parsing", () => {
+  it("parses branches and tracking state", () => {
+    const branches = parseLocalBranches(
+      branchRecord("feature") + branchRecord("local", branchCommit, "", ""),
+    );
+    expect(branches).toMatchObject([
+      { name: "feature", upstream: "refs/remotes/origin/feature", tracking: "[gone]" },
+      { name: "local", upstream: undefined },
+    ]);
   });
-  it("correctly distinguishes branches when one is a prefix of another", async () => {
-    const pi = makePi(async (_c, args) => {
-      if (args[0] === "branch" && args[1] === "-vv")
-        return {
-          code: 0,
-          stdout: "  foo  abc [origin/foo] msg\n  foobar  def [origin/foobar: gone] other\n",
-          stderr: "",
-          killed: false,
-        };
-      if (args[0] === "ls-remote")
-        return { code: 0, stdout: "abc\trefs/heads/foo\n", stderr: "", killed: false };
-      if (args[0] === "config") return { code: 0, stdout: "origin\n", stderr: "", killed: false };
-      return { code: 0, stdout: "", stderr: "", killed: false };
-    });
-    expect(await checkUpstreamGone(pi, "foo")).toBe(false);
+
+  it("rejects malformed and oversized branch output", () => {
+    expect(() => parseLocalBranches("not-machine-readable\n")).toThrow(GitInspectionError);
+    expect(() => parseLocalBranches("x".repeat(1_000_001))).toThrow(/too much data/);
   });
-  it("true via ls-remote empty", async () => {
-    const pi = makePi(async (_c, args) => {
-      if (args[0] === "branch" && args[1] === "-vv")
-        return { code: 0, stdout: "  foo  abc [origin/foo] msg\n", stderr: "", killed: false };
-      if (args[0] === "ls-remote") return { code: 0, stdout: "", stderr: "", killed: false };
-      if (args[0] === "config") return { code: 0, stdout: "origin\n", stderr: "", killed: false };
-      return { code: 0, stdout: "", stderr: "", killed: false };
-    });
-    expect(await checkUpstreamGone(pi, "foo")).toBe(true);
-  });
-  it("true when no remote and ls empty", async () => {
-    const pi = makePi(async (_c, args) => {
-      if (args[0] === "branch" && args[1] === "-vv")
-        return { code: 0, stdout: "", stderr: "", killed: false };
-      if (args[0] === "ls-remote") return { code: 0, stdout: "", stderr: "", killed: false };
-      if (args[0] === "config") return { code: 0, stdout: "", stderr: "", killed: false };
-      return { code: 0, stdout: "", stderr: "", killed: false };
-    });
-    expect(await checkUpstreamGone(pi, "foo")).toBe(true);
-  });
-  it("false when upstream exists", async () => {
-    const pi = makePi(async (_c, args) => {
-      if (args[0] === "branch" && args[1] === "-vv")
-        return { code: 0, stdout: "  foo  abc [origin/foo] msg\n", stderr: "", killed: false };
-      if (args[0] === "ls-remote")
-        return { code: 0, stdout: "abc\trefs/heads/foo\n", stderr: "", killed: false };
-      if (args[0] === "config") return { code: 0, stdout: "origin\n", stderr: "", killed: false };
-      return { code: 0, stdout: "", stderr: "", killed: false };
-    });
-    expect(await checkUpstreamGone(pi, "foo")).toBe(false);
+
+  it("parses branches occupied by linked worktrees and rejects uncertain output", () => {
+    expect(
+      parseWorktreeBranches(
+        "worktree /one\nHEAD abc\nbranch refs/heads/main\n\nworktree /two\nHEAD def\nbranch refs/heads/feature\n",
+      ),
+    ).toEqual(new Set(["main", "feature"]));
+    expect(() => parseWorktreeBranches("worktree /one\nunknown field\n")).toThrow(/malformed/);
+    expect(() => parseWorktreeBranches("worktree /truncated")).toThrow(/incomplete/);
   });
 });
 
-describe("piGitWorkflow extension", () => {
-  // SAFETY: test captures variably-typed handlers as any; narrowed at call site
-  function capture() {
-    const handlers = new Map<string, (e: any, ctx: any) => Promise<any>>();
-    const pi = {
-      exec: vi.fn(async () => ({ code: 0, stdout: "", stderr: "", killed: false })),
-      on: vi.fn((event: string, h: (e: any, ctx: any) => Promise<any>) => {
-        handlers.set(event, h);
-      }),
-      // SAFETY: test mock only needs exec/on; coerce to ExtensionAPI
-      // oxlint-disable-next-line anti-slop/require-safety-comment-for-type-assertion
-    } as unknown as ExtensionAPI;
-    piGitWorkflow(pi);
-    return { pi, handlers };
+describe("cleanupRepository", () => {
+  it("fetches first and deletes only with exact non-force argv", async () => {
+    const { pi, calls } = cleanupPi(
+      branchRecord("main", mainCommit, "refs/remotes/origin/main", "") + branchRecord("feature"),
+    );
+    const cleanup = await cleanupRepository(pi, { cwd: root, trusted: true });
+    expect(cleanup.deleted).toEqual(["feature"]);
+    expect(calls).toContainEqual(["branch", "--delete", "--", "feature"]);
+    expect(calls.flat()).not.toContain("--force");
+    expect(calls.findIndex((args) => args[0] === "fetch")).toBeLessThan(
+      calls.findIndex((args) => args[0] === "symbolic-ref"),
+    );
+  });
+
+  it("retains no-upstream and unmerged upstream-gone branches for review", async () => {
+    const output =
+      branchRecord("main", mainCommit, "refs/remotes/origin/main", "") +
+      branchRecord("local", branchCommit, "", "") +
+      branchRecord("feature");
+    const { pi } = cleanupPi(output, (args) =>
+      args[0] === "merge-base" ? { code: 1 } : undefined,
+    );
+    const cleanup = await cleanupRepository(pi, { cwd: root, trusted: true });
+    expect(cleanup.deleted).toEqual([]);
+    expect(cleanup.review.map((item) => item.name)).toEqual(["local", "feature"]);
+  });
+
+  it("retains branches checked out in another worktree", async () => {
+    const { pi } = cleanupPi(branchRecord("feature"), (args) =>
+      args[0] === "worktree"
+        ? { stdout: "worktree /other\nbranch refs/heads/feature\n" }
+        : undefined,
+    );
+    const cleanup = await cleanupRepository(pi, { cwd: root, trusted: true });
+    expect(cleanup.review[0]?.reason).toContain("linked worktree");
+  });
+
+  it("reverifies refs and retains a concurrently moved branch", async () => {
+    const moved = "c".repeat(40);
+    const { pi, calls } = cleanupPi(branchRecord("feature"), (args) =>
+      args.join(" ") === "rev-parse --verify refs/heads/feature^{commit}"
+        ? { stdout: `${moved}\n` }
+        : undefined,
+    );
+    const cleanup = await cleanupRepository(pi, { cwd: root, trusted: true });
+    expect(cleanup.review[0]?.reason).toContain("moved");
+    expect(calls.some((args) => args[0] === "branch" && args[1] === "--delete")).toBe(false);
+  });
+
+  it("retains a branch when Git or a hook rejects deletion", async () => {
+    const { pi } = cleanupPi(branchRecord("feature"), (args) =>
+      args[0] === "branch" && args[1] === "--delete"
+        ? { code: 1, stderr: "hook rejected\nsecond line" }
+        : undefined,
+    );
+    const cleanup = await cleanupRepository(pi, { cwd: root, trusted: true });
+    expect(cleanup.review[0]?.reason).toContain("hook rejected second line");
+  });
+
+  it("rejects untrusted projects before running Git", async () => {
+    const { pi } = cleanupPi("");
+    await expect(cleanupRepository(pi, { cwd: root, trusted: false })).rejects.toMatchObject({
+      code: "untrusted_project",
+    });
+    expect(pi.exec).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-worktree and bare repositories", async () => {
+    const outside = {
+      exec: vi.fn(async () => result({ code: 128, stderr: "not a repository" })),
+    } as unknown as Pick<ExtensionAPI, "exec">;
+    await expect(cleanupRepository(outside, { cwd: root, trusted: true })).rejects.toMatchObject({
+      code: "not_git_worktree",
+    });
+
+    const bare = {
+      exec: vi.fn(async (_command: string, args: string[]) =>
+        result({ stdout: args.includes("--is-inside-work-tree") ? "true\n" : "true\n" }),
+      ),
+    } as unknown as Pick<ExtensionAPI, "exec">;
+    await expect(cleanupRepository(bare, { cwd: root, trusted: true })).rejects.toMatchObject({
+      code: "bare_repository",
+    });
+  });
+
+  it("serializes work for the same canonical root", async () => {
+    const order: string[] = [];
+    let release!: () => void;
+    const wait = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const first = withRepoQueue(root, async () => {
+      order.push("first-start");
+      await wait;
+      order.push("first-end");
+    });
+    const second = withRepoQueue(root, async () => {
+      order.push("second");
+    });
+    await vi.waitFor(() => expect(order).toEqual(["first-start"]));
+    release();
+    await Promise.all([first, second]);
+    expect(order).toEqual(["first-start", "first-end", "second"]);
+  });
+});
+
+describe("bounded review context", () => {
+  it("sanitizes untrusted names, bounds output, and includes safety instruction", () => {
+    const review = Array.from({ length: 100 }, (_, index) => ({
+      name: `evil\n\`branch-${index}`,
+      commit: branchCommit,
+      reason: "reason\u001b[31m".repeat(100),
+    }));
+    const context = formatCleanupContext(review)!;
+    expect(Buffer.byteLength(context)).toBeLessThanOrEqual(6_000);
+    expect(context).not.toContain("evil\n");
+    expect(context).toContain("Do not force-delete");
+  });
+});
+
+describe("extension registration and gate", () => {
+  function captureHandlers(pi: Pick<ExtensionAPI, "exec">) {
+    const handlers = new Map<string, (event: any, ctx: any) => Promise<any>>();
+    const extension = pi as ExtensionAPI;
+    extension.on = vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
+      handlers.set(name, handler);
+    }) as any;
+    piGitWorkflow(extension);
+    return handlers;
   }
 
-  it("before_agent_start injects message when clean", async () => {
-    const { handlers, pi } = capture();
-    const h = handlers.get("before_agent_start")!;
-    vi.mocked(pi.exec).mockImplementation(async (_c: string, args: string[], _opts?: any) => {
-      if (args[0] === "rev-parse" && args[1] === "--git-dir")
-        return { code: 0, stdout: ".git\n", stderr: "", killed: false };
-      if (args[0] === "symbolic-ref")
-        return { code: 0, stdout: "refs/remotes/origin/main\n", stderr: "", killed: false };
-      if (args[0] === "fetch") return { code: 0, stdout: "", stderr: "", killed: false };
-      if (args[0] === "status") return { code: 0, stdout: "", stderr: "", killed: false };
-      if (args[0] === "branch" && args[1] === "--show-current")
-        return { code: 0, stdout: "main\n", stderr: "", killed: false };
-      if (args[0] === "branch" && args[1] === "-vv")
-        return { code: 0, stdout: "main abc [origin/main] msg\n", stderr: "", killed: false };
-      if (args[0] === "rev-parse" && args.includes("@{u}"))
-        return { code: 0, stdout: "origin/main\n", stderr: "", killed: false };
-      return { code: 0, stdout: "", stderr: "", killed: false };
-    });
-    const notify = vi.fn();
-    // SAFETY: test mock coercion for ExtensionContext/ExtensionAPI
-    const ctx: any = { ui: { notify }, hasUI: true };
-
-    // SAFETY: test asserts handler return shape
-    const res = (await h({ prompt: "hi", systemPrompt: "", systemPromptOptions: {} }, ctx)) as {
-      message: { content: string };
-    };
-    expect(res.message.content).toContain("fetch --prune: ok");
-    expect(res.message.content).toContain("clean");
+  it("registers no command or agent-callable tool", () => {
+    const pi = {
+      on: vi.fn(),
+      registerCommand: vi.fn(),
+      registerTool: vi.fn(),
+    } as unknown as ExtensionAPI;
+    piGitWorkflow(pi);
+    expect(pi.registerCommand).not.toHaveBeenCalled();
+    expect(pi.registerTool).not.toHaveBeenCalled();
   });
 
-  it("before_agent_start reports dirty", async () => {
-    const { handlers, pi } = capture();
-    const h = handlers.get("before_agent_start")!;
-    vi.mocked(pi.exec).mockImplementation(async (_c: string, args: string[], _opts?: any) => {
-      if (args[0] === "rev-parse" && args[1] === "--git-dir")
-        return { code: 0, stdout: ".git\n", stderr: "", killed: false };
-      if (args[0] === "symbolic-ref")
-        return { code: 0, stdout: "refs/remotes/origin/main\n", stderr: "", killed: false };
-      if (args[0] === "fetch") return { code: 0, stdout: "", stderr: "", killed: false };
-      if (args[0] === "status")
-        return { code: 0, stdout: " M foo.ts\n", stderr: "", killed: false };
-      if (args[0] === "branch" && args[1] === "--show-current")
-        return { code: 0, stdout: "feat/x\n", stderr: "", killed: false };
-      if (args[0] === "branch" && args[1] === "-vv")
-        return { code: 0, stdout: "feat/x abc [origin/feat/x] msg\n", stderr: "", killed: false };
-      if (args[0] === "rev-parse" && args.includes("@{u}"))
-        return { code: 0, stdout: "origin/feat/x\n", stderr: "", killed: false };
-      return { code: 0, stdout: "", stderr: "", killed: false };
-    });
-    // SAFETY: test mock coercion for ExtensionContext/ExtensionAPI
-    const ctx: any = { ui: { notify: vi.fn() }, hasUI: true };
-
-    // SAFETY: test asserts handler return shape
-    const res = (await h({ prompt: "hi", systemPrompt: "", systemPromptOptions: {} }, ctx)) as {
-      message: { content: string };
-    };
-    expect(res.message.content).toContain("DIRTY");
-  });
-
-  it("before_agent_start notifies on fetch failure", async () => {
-    const { handlers, pi } = capture();
-    const h = handlers.get("before_agent_start")!;
-    vi.mocked(pi.exec).mockImplementation(async (_c: string, args: string[], _opts?: any) => {
-      if (args[0] === "rev-parse" && args[1] === "--git-dir")
-        return { code: 0, stdout: ".git\n", stderr: "", killed: false };
-      if (args[0] === "symbolic-ref")
-        return { code: 0, stdout: "refs/remotes/origin/main\n", stderr: "", killed: false };
-      if (args[0] === "fetch")
-        return { code: 1, stdout: "", stderr: "network error", killed: false };
-      if (args[0] === "status") return { code: 0, stdout: "", stderr: "", killed: false };
-      if (args[0] === "branch" && args[1] === "--show-current")
-        return { code: 0, stdout: "main\n", stderr: "", killed: false };
-      if (args[0] === "branch" && args[1] === "-vv")
-        return { code: 0, stdout: "", stderr: "", killed: false };
-      if (args[0] === "rev-parse" && args.includes("@{u}")) throw new Error("no upstream");
-      return { code: 0, stdout: "", stderr: "", killed: false };
-    });
-    const notify = vi.fn();
-    // SAFETY: test mock coercion for ExtensionContext/ExtensionAPI
-    const ctx: any = { ui: { notify }, hasUI: true };
-
-    // SAFETY: test asserts handler return shape
-    const res = (await h({ prompt: "hi", systemPrompt: "", systemPromptOptions: {} }, ctx)) as {
-      message: { content: string };
-    };
-    expect(notify).toHaveBeenCalled();
-    expect(res.message.content).toContain("failed");
-  });
-
-  it("tool_call blocks -D", async () => {
-    const { handlers, pi } = capture();
-    const h = handlers.get("tool_call")!;
-    vi.mocked(pi.exec).mockResolvedValue({ code: 0, stdout: "", stderr: "", killed: false });
-    // SAFETY: test mock coercion for ExtensionContext/ExtensionAPI
-    const ctx: any = { hasUI: false, ui: { select: vi.fn() } };
-
-    // SAFETY: test asserts handler return shape
-    const res = (await h({ toolName: "bash", input: { command: "git branch -D foo" } }, ctx)) as {
-      block: boolean;
-    };
-    expect(res.block).toBe(true);
-  });
-
-  it("tool_call blocks -d when not merged headless", async () => {
-    const { handlers, pi } = capture();
-    const h = handlers.get("tool_call")!;
-    vi.mocked(pi.exec).mockImplementation(async (_c: string, args: string[], _opts?: any) => {
-      if (args[0] === "rev-parse" && args[1] === "--git-dir")
-        return { code: 0, stdout: ".git\n", stderr: "", killed: false };
-      if (args[0] === "symbolic-ref")
-        return { code: 0, stdout: "refs/remotes/origin/main\n", stderr: "", killed: false };
-      if (args[0] === "rev-parse" && args[1] === "--verify")
-        return { code: 0, stdout: "", stderr: "", killed: false };
-      if (args[0] === "branch" && args[1] === "--merged")
-        return { code: 0, stdout: "  main\n", stderr: "", killed: false };
-      if (args[0] === "merge-base") return { code: 1, stdout: "", stderr: "", killed: false };
-      return { code: 0, stdout: "", stderr: "", killed: false };
-    });
-    // SAFETY: test mock coercion for ExtensionContext/ExtensionAPI
-    const ctx: any = { hasUI: false, ui: { select: vi.fn() } };
-
-    // SAFETY: test asserts handler return shape
-    const res = (await h(
-      { toolName: "bash", input: { command: "git branch -d feat/x" } },
-      ctx,
-      // oxlint-disable-next-line anti-slop/require-safety-comment-for-type-assertion
-    )) as { block: boolean };
-    expect(res.block).toBe(true);
-  });
-
-  it("tool_call allows -d when merged and gone", async () => {
-    const { handlers, pi } = capture();
-    const h = handlers.get("tool_call")!;
-    vi.mocked(pi.exec).mockImplementation(async (_c: string, args: string[], _opts?: any) => {
-      if (args[0] === "rev-parse" && args[1] === "--git-dir")
-        return { code: 0, stdout: ".git\n", stderr: "", killed: false };
-      if (args[0] === "symbolic-ref")
-        return { code: 0, stdout: "refs/remotes/origin/main\n", stderr: "", killed: false };
-      if (args[0] === "rev-parse" && args[1] === "--verify")
-        return { code: 0, stdout: "", stderr: "", killed: false };
-      if (args[0] === "branch" && args[1] === "--merged")
-        return { code: 0, stdout: "  main\n  feat/x\n", stderr: "", killed: false };
-      if (args[0] === "branch" && args[1] === "-vv")
-        return {
-          code: 0,
-          stdout: "  feat/x abc [origin/feat/x: gone] msg\n",
-          stderr: "",
-          killed: false,
-        };
-      return { code: 0, stdout: "", stderr: "", killed: false };
-    });
-    // SAFETY: test mock coercion for ExtensionContext/ExtensionAPI
-    const ctx: any = { hasUI: false, ui: { select: vi.fn() } };
-
-    const res = await h({ toolName: "bash", input: { command: "git branch -d feat/x" } }, ctx);
-    expect(res).toBeUndefined();
-  });
-
-  it("tool_call prompts when not merged interactive", async () => {
-    const { handlers, pi } = capture();
-    const h = handlers.get("tool_call")!;
-    vi.mocked(pi.exec).mockImplementation(async (_c: string, args: string[], _opts?: any) => {
-      if (args[0] === "rev-parse" && args[1] === "--git-dir")
-        return { code: 0, stdout: ".git\n", stderr: "", killed: false };
-      if (args[0] === "symbolic-ref")
-        return { code: 0, stdout: "refs/remotes/origin/main\n", stderr: "", killed: false };
-      if (args[0] === "rev-parse" && args[1] === "--verify")
-        return { code: 0, stdout: "", stderr: "", killed: false };
-      if (args[0] === "branch" && args[1] === "--merged")
-        return { code: 0, stdout: "  main\n", stderr: "", killed: false };
-      if (args[0] === "merge-base") return { code: 1, stdout: "", stderr: "", killed: false };
-      return { code: 0, stdout: "", stderr: "", killed: false };
-    });
-    const ctx: any = {
-      hasUI: true,
-      ui: { select: vi.fn(async () => "No, keep branch") },
-      // SAFETY: test mock coercion for ExtensionContext/ExtensionAPI
-    };
-
-    // SAFETY: test asserts handler return shape
-    const res = (await h(
-      { toolName: "bash", input: { command: "git branch -d feat/x" } },
-      ctx,
-      // oxlint-disable-next-line anti-slop/require-safety-comment-for-type-assertion
-    )) as { block: boolean };
-    expect(res.block).toBe(true);
-  });
-
-  it("passes through non-git bash", async () => {
-    const { handlers } = capture();
-    const h = handlers.get("tool_call")!;
-    // SAFETY: test mock coercion for ExtensionContext/ExtensionAPI
-    const ctx: any = { hasUI: false, ui: { select: vi.fn() } };
-
-    const res = await h({ toolName: "bash", input: { command: "echo hi" } }, ctx);
-    expect(res).toBeUndefined();
-  });
-
-  it("skips when not git repo", async () => {
-    const { handlers, pi } = capture();
-    const h = handlers.get("tool_call")!;
-    const before = handlers.get("before_agent_start")!;
-    vi.mocked(pi.exec).mockImplementation(async (_c: string, args: string[], _opts?: any) => {
-      if (args[0] === "rev-parse" && args[1] === "--git-dir")
-        return { code: 128, stdout: "", stderr: "", killed: false };
-      return { code: 0, stdout: "", stderr: "", killed: false };
-    });
-    // SAFETY: test mock coercion for ExtensionContext/ExtensionAPI
-    const ctx: any = { ui: { notify: vi.fn() }, hasUI: true };
-
-    const resBefore = await before(
-      { prompt: "hi", systemPrompt: "", systemPromptOptions: {} },
-      ctx,
+  it("extracts deletion names and blocks force deletion without Git", async () => {
+    expect(extractBranchName("git branch --delete -- feature")).toBe("feature");
+    let handler!: (event: any, ctx: any) => Promise<any>;
+    const pi = {
+      on: vi.fn((name: string, value: typeof handler) => {
+        if (name === "tool_call") handler = value;
+      }),
+      exec: vi.fn(),
+    } as unknown as ExtensionAPI;
+    piGitWorkflow(pi);
+    const blocked = await handler(
+      { toolName: "bash", input: { command: "git branch -D feature" } },
+      { cwd: root, isProjectTrusted: () => true },
     );
-    expect(resBefore).toBeUndefined();
-    vi.mocked(pi.exec).mockImplementation(async (_c: string, args: string[], _opts?: any) => {
-      if (args[0] === "rev-parse" && args[1] === "--git-dir")
-        return { code: 128, stdout: "", stderr: "", killed: false };
-      return { code: 0, stdout: "", stderr: "", killed: false };
-    });
-    // SAFETY: test mock coercion for ExtensionContext/ExtensionAPI
-    const ctx2: any = { ui: { notify: vi.fn() }, hasUI: true };
+    expect(blocked.block).toBe(true);
+    expect(pi.exec).not.toHaveBeenCalled();
+    const combined = await handler(
+      { toolName: "bash", input: { command: "git branch -df feature" } },
+      { cwd: root, isProjectTrusted: () => true },
+    );
+    expect(combined.block).toBe(true);
+  });
 
-    // SAFETY: test invokes bash gate with minimal ctx shape
-    const res = await h({ toolName: "bash", input: { command: "git branch -d foo" } }, ctx2);
-    expect(res).toBeUndefined();
+  it("allows ordinary deletion only when refreshed exact refs are merged and upstream-gone", async () => {
+    const { pi } = cleanupPi(branchRecord("feature"));
+    const tool = captureHandlers(pi).get("tool_call")!;
+    const context = { cwd: root, isProjectTrusted: () => true };
+    expect(
+      await tool({ toolName: "bash", input: { command: "git branch -d feature" } }, context),
+    ).toBeUndefined();
+
+    const unmerged = cleanupPi(branchRecord("feature"), (args) =>
+      args[0] === "merge-base" ? { code: 1 } : undefined,
+    );
+    const unmergedResult = await captureHandlers(unmerged.pi).get("tool_call")!(
+      { toolName: "bash", input: { command: "git branch -d feature" } },
+      context,
+    );
+    expect(unmergedResult.block).toBe(true);
+
+    const tracked = cleanupPi(
+      branchRecord("feature", branchCommit, "refs/remotes/origin/feature", ""),
+    );
+    const trackedResult = await captureHandlers(tracked.pi).get("tool_call")!(
+      { toolName: "bash", input: { command: "git branch --delete feature" } },
+      context,
+    );
+    expect(trackedResult.reason).toContain("not confirmed gone");
+  });
+
+  it("fails closed for untrusted projects and failed refreshed inspection", async () => {
+    const { pi } = cleanupPi(branchRecord("feature"), (args) =>
+      args[0] === "fetch" ? { code: 1, stderr: "offline" } : undefined,
+    );
+    const tool = captureHandlers(pi).get("tool_call")!;
+    const event = { toolName: "bash", input: { command: "git branch -d feature" } };
+    expect((await tool(event, { cwd: root, isProjectTrusted: () => false })).reason).toContain(
+      "not trusted",
+    );
+    expect((await tool(event, { cwd: root, isProjectTrusted: () => true })).reason).toContain(
+      "offline",
+    );
+    expect(await tool({ toolName: "read", input: {} }, {})).toBeUndefined();
+    expect(await tool({ toolName: "bash", input: { command: "git status" } }, {})).toBeUndefined();
+  });
+
+  it("deduplicates visible review notices and never reloads", async () => {
+    const { pi } = cleanupPi(branchRecord("feature"), (args) =>
+      args[0] === "merge-base" ? { code: 1 } : undefined,
+    );
+    const before = captureHandlers(pi).get("before_agent_start")!;
+    const notify = vi.fn();
+    const reload = vi.fn();
+    const ctx = {
+      cwd: root,
+      hasUI: true,
+      isProjectTrusted: () => true,
+      ui: { notify },
+      reload,
+    };
+    const first = await before({}, ctx);
+    const second = await before({}, ctx);
+    expect(first.message.content).toContain("feature");
+    expect(second.message.content).toContain("feature");
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it("returns no hidden context when cleanup has no review candidates", async () => {
+    const { pi } = cleanupPi(branchRecord("main", mainCommit, "refs/remotes/origin/main", ""));
+    const before = captureHandlers(pi).get("before_agent_start")!;
+    const result = await before(
+      {},
+      {
+        cwd: root,
+        hasUI: false,
+        isProjectTrusted: () => true,
+        ui: { notify: vi.fn() },
+      },
+    );
+    expect(result).toBeUndefined();
+  });
+
+  it("reports bounded inspection failures but skips non-repositories", async () => {
+    const failed = cleanupPi("", (args) =>
+      args[0] === "fetch" ? { code: 1, stderr: "network\nerror" } : undefined,
+    );
+    const before = captureHandlers(failed.pi).get("before_agent_start")!;
+    const notify = vi.fn();
+    const result = await before(
+      {},
+      {
+        cwd: root,
+        hasUI: true,
+        isProjectTrusted: () => true,
+        ui: { notify },
+      },
+    );
+    expect(result.message.content).toContain("no branches were deleted");
+    expect(notify).toHaveBeenCalledTimes(1);
+
+    const outside = {
+      exec: vi.fn(async () => ({ code: 128, stdout: "", stderr: "", killed: false })),
+    } as unknown as Pick<ExtensionAPI, "exec">;
+    const outsideBefore = captureHandlers(outside).get("before_agent_start")!;
+    expect(
+      await outsideBefore(
+        {},
+        {
+          cwd: root,
+          hasUI: true,
+          isProjectTrusted: () => true,
+          ui: { notify: vi.fn() },
+        },
+      ),
+    ).toBeUndefined();
   });
 });

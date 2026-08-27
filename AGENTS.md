@@ -27,7 +27,6 @@
 
 - Edit shared web modules in `pi-web-fetch`, then run `vp run sync:web-modules`.
 - Write changelog entries, then run `vp run format:changelog`.
-- Update work branches from their target with a merge commit; do not rebase.
 
 ## External References
 
@@ -37,5 +36,6 @@
 | Development and conventions | `docs/development.md`         |
 | Architecture                | `docs/architecture.md`        |
 | Security invariants         | `docs/security-invariants.md` |
+| Git automation              | `docs/git.md`                 |
 | Package behavior and setup  | `packages/*/README.md`        |
 | Releases                    | `docs/release.md`             |

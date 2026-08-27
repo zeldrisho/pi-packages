@@ -12,6 +12,12 @@ Use this checklist when reviewing extension runtime behavior, tool schemas, netw
 - Keep Pi-provided packages in `peerDependencies` with `"*"` ranges and restrict published files with each package's `files` allowlist.
 - Add boundary and failure-path tests whenever a trust boundary changes.
 
+## Git automation
+
+Extensions that execute Git must require project trust before invoking repository-controlled configuration, remotes, or hooks; pin a canonical worktree root and exact refs before mutation; pass untrusted repository data only as fixed arguments; bound all parsed and reported output; and fail closed when inspection or state verification is uncertain.
+
+Follow the shared inspection, mutation, reporting, and testing practices in [`git.md`](git.md).
+
 ## Filesystem and project context
 
 - `pi-nested-agent-md` must reject paths outside the project, including traversal and symlink escapes; preserve outermost-to-innermost instruction ordering, deduplication, and bounded reinjection after context resets.
