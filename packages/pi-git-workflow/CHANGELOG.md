@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-28
+
 ### Added
 
 - automatically prune and safely delete local branches whose upstream is gone and whose commit is merged into the fetched target
@@ -26,5 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - gate regular branch deletion (`git branch -d`) by merge and upstream checks with interactive confirmation
 - report dirty working tree status without aborting checkout
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-git-workflow-v0.1.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-git-workflow-v0.2.0...HEAD
+[0.2.0]: https://github.com/zeldrisho/pi-packages/compare/pi-git-workflow-v0.1.0...pi-git-workflow-v0.2.0
 [0.1.0]: https://github.com/zeldrisho/pi-packages/releases/tag/pi-git-workflow-v0.1.0
