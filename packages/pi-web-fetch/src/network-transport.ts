@@ -63,8 +63,13 @@ async function requestOnce(
   const family = isIP(address);
   if (family !== 4 && family !== 6) throw new Error(`web_fetch could not resolve ${address}.`);
   const lookup: LookupFunction = (_hostname, options, callback) => {
-    if (options.all) callback(null, [{ address, family }]);
-    else callback(null, address, family);
+    // Match dns.lookup's asynchronous callback contract. Calling back inline
+    // lets an immediately unreachable address emit a socket error before
+    // node:http has finished installing its forwarding listeners.
+    queueMicrotask(() => {
+      if (options.all) callback(null, [{ address, family }]);
+      else callback(null, address, family);
+    });
   };
   const request = target.url.protocol === "https:" ? httpsRequest : httpRequest;
   return await new Promise((resolve, reject) => {

@@ -122,6 +122,25 @@ describe("web_fetch transport", () => {
     ).rejects.toThrow();
   });
 
+  it("contains immediate connection failures under concurrent load", async () => {
+    const attempts = Array.from({ length: 100 }, () =>
+      requestPinned(
+        {
+          url: new URL("https://unreachable-test.invalid/"),
+          address: "2001:db8::1",
+          family: 6,
+          addresses: ["2001:db8::1"],
+        },
+        new AbortController().signal,
+        { attemptTimeoutMs: 50 },
+      ),
+    );
+
+    const outcomes = await Promise.allSettled(attempts);
+    expect(outcomes).toHaveLength(100);
+    expect(outcomes.every((outcome) => outcome.status === "rejected")).toBe(true);
+  });
+
   it("extracts HTML while removing executable content", async () => {
     const result = await fetchRemoteContent(`${origin}/html`, 0, 6_000, undefined, dependencies);
     expect(result.markdown).toContain("Hello");
