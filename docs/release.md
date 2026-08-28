@@ -66,7 +66,7 @@ access level, tarball content, or publisher setting is unexpected.
 - Keep each package manifest, component tag, GitHub release, npm version, and changelog synchronized for the same version.
 - The agent writes all changelog entries by hand; the workflow only reads them.
 - Pushing the component tag publishes automatically via the `publish` environment (OIDC trusted publishing). The environment is configured for provenance only and does not currently require a manual approval, so confirm the package and version are correct before pushing the tag.
-- Rebase work branches onto their target; never merge the target into them.
+- Update work branches from their target with a merge commit; do not rebase.
 - Verify npm trusted publication end to end after every release.
 
 ## Escalation conditions

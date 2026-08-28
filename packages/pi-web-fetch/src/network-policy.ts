@@ -1,11 +1,13 @@
 import { lookup as dnsLookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 
-// Reviewed 2026-08-03 against the IANA IPv4 and IPv6 Special-Purpose Address Registries:
-// https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml
-// https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml
-// Keep non-global, documentation, benchmarking, multicast, and reserved space blocked. The explicit
-// endpoints make registry reviews and boundary tests auditable without changing the pinning flow.
+/**
+ * IPv4 address ranges that are blocked from network requests.
+ *
+ * Reviewed 2026-08-03 against the IANA IPv4 Special-Purpose Address Registry:
+ * https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml
+ * Includes non-global, documentation, benchmarking, multicast, and reserved ranges.
+ */
 export const BLOCKED_IPV4_RANGES = [
   ["0.0.0.0", 8, "0.0.0.0", "0.255.255.255", "current network"],
   ["10.0.0.0", 8, "10.0.0.0", "10.255.255.255", "private use"],
@@ -27,6 +29,13 @@ export const BLOCKED_IPV4_RANGES = [
   ["240.0.0.0", 4, "240.0.0.0", "255.255.255.255", "reserved"],
 ] as const;
 
+/**
+ * IPv6 address ranges that are blocked from network requests.
+ *
+ * Reviewed 2026-08-03 against the IANA IPv6 Special-Purpose Address Registry:
+ * https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml
+ * Includes non-global, documentation, benchmarking, multicast, and reserved ranges.
+ */
 export const BLOCKED_IPV6_RANGES = [
   ["::", 128, "::", "::", "unspecified"],
   ["::1", 128, "::1", "::1", "loopback"],
@@ -68,6 +77,12 @@ for (const [network, prefix] of GLOBALLY_REACHABLE_IPV6_EXCEPTIONS) {
   allowedIPv6Addresses.addSubnet(network, prefix, "ipv6");
 }
 
+/**
+ * A validated and resolved network target ready for connection.
+ *
+ * Contains the target URL, preferred address, and all resolved addresses
+ * for the hostname.
+ */
 export interface ValidatedTarget {
   url: URL;
   /** The preferred address used for the first connection attempt. */
@@ -80,6 +95,7 @@ export interface ValidatedTarget {
   addresses?: string[];
 }
 
+/** Function type for resolving a hostname to IP addresses. */
 export type ResolveAddresses = (hostname: string) => Promise<string[]>;
 
 /**

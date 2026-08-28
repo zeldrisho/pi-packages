@@ -4,6 +4,12 @@ const CONTENT_LINE_BUDGET = Math.max(1, DEFAULT_MAX_LINES - 10);
 const CONTENT_BYTE_BUDGET = Math.max(1_024, DEFAULT_MAX_BYTES - 2_048);
 const encoder = new TextEncoder();
 
+/**
+ * A complete fetched document with extracted content and metadata.
+ *
+ * Contains the full markdown representation along with metadata about
+ * the extraction method and any special handling that was applied.
+ */
 export interface CompleteDocument {
   url: string;
   contentType: string;
@@ -24,6 +30,12 @@ export interface CompleteDocument {
   markdownAlternateFallback?: boolean;
 }
 
+/**
+ * A paginated chunk of fetched content with offset tracking.
+ *
+ * Extends CompleteDocument with pagination metadata to support
+ * reading large documents in bounded chunks.
+ */
 export interface FetchResult extends CompleteDocument {
   offset: number;
   nextOffset?: number;
@@ -55,6 +67,18 @@ function boundedContentChunk(value: string, offset: number, maxCharacters: numbe
   return sliceByByteLength(chunk, CONTENT_BYTE_BUDGET);
 }
 
+/**
+ * Slice a complete document into a bounded content chunk.
+ *
+ * Extracts a chunk of content starting at the given offset, respecting
+ * character, line, and byte limits. Adds pagination metadata and
+ * continuation instructions when content is truncated.
+ *
+ * @param document - Complete document to slice
+ * @param offset - Character offset to start reading from
+ * @param maxCharacters - Maximum characters to include in the chunk
+ * @returns Paginated fetch result with content chunk and metadata
+ */
 export function sliceCompleteDocument(
   document: CompleteDocument,
   offset: number,

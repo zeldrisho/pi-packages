@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-08-28
+
 ### Fixed
 
+- Prevent immediately unreachable pinned addresses from emitting uncaught socket errors and terminating Pi under concurrent fetch load
 - Fix `https://github.com/voidzero-dev/vite-plus/releases` rendering in pi: harden `runDefuddle` to swallow bare-pathname `ERR_INVALID_URL` detached rejections, guarantee absolute `http(s)` URLs at every extraction/fetch boundary, strip `nav`/`header`/`footer`/`aside` chrome before Defuddle, deduplicate adjacent identical markdown links, and bump `defuddle` to `^0.19.3`
 - Fix GitHub file fetches returning `https://github.com/llms.txt` instead of raw content: bypass `llms.txt` probing and `describedby`/`alternate` fallbacks for `github.com`, `raw.githubusercontent.com`, `gist.github.com` and `gist.githubusercontent.com`, and rewrite `github.com/*/tree/<ref>/*.*` file URLs to `raw.githubusercontent.com` like existing `blob` handling so `tree` file links (e.g. `.../permission-gate.ts`) return clean code
 
@@ -107,7 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.7.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.7.1...HEAD
+[0.7.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.7.0...pi-web-fetch-v0.7.1
 [0.7.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.6.1...pi-web-fetch-v0.7.0
 [0.6.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.6.0...pi-web-fetch-v0.6.1
 [0.6.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.5.4...pi-web-fetch-v0.6.0

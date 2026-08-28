@@ -1,7 +1,7 @@
 {
   "name": "@zeldrisho/pi-git-workflow",
-  "version": "0.1.0",
-  "description": "Pi extension that enforces git workflow: fetch --prune before implementation and safe branch deletion",
+  "version": "0.2.0",
+  "description": "Pi extension that prunes refs, safely cleans merged local branches, and gates force deletion",
   "keywords": [
     "git",
     "git-workflow",

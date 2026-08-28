@@ -3,8 +3,10 @@ import { awaitWithAbort } from "./abort";
 import { validateRemoteUrl, type ValidatedTarget } from "./network-policy";
 import { requestPinned, responseHeader } from "./network-transport";
 
+/** Maximum number of HTTP redirects to follow before aborting. */
 export const FETCH_MAX_REDIRECTS = 5;
 
+/** Optional dependencies for redirect handling (used for testing). */
 export interface RedirectDependencies {
   validateUrl?: (value: string | URL) => Promise<ValidatedTarget>;
   request?: (target: ValidatedTarget, signal: AbortSignal) => Promise<IncomingMessage>;
