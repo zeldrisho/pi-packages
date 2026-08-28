@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import type { DefuddleResponse } from "defuddle/node";
-import { extractHtmlToMarkdown } from "../src/extract";
+import { extractHtmlToMarkdown, stripExtractedCssCruft } from "../src/extract";
 
 // Mock defuddle/node so we can induce failures. The factory keeps the real
 // implementation by default (the other tests exercise the real extractor) and
@@ -14,6 +14,53 @@ const articleHtml = (text: string): string =>
   `<html><head><title>Fixture</title></head><body><main><article><h1>Fixture</h1><p>${text}</p></article></main></body></html>`;
 
 const longText = (): string => Array.from({ length: 150 }, (_, index) => `word${index}`).join(" ");
+
+describe("extracted CSS cleanup", () => {
+  it("removes leaked style elements and standalone CSS rules", () => {
+    const markdown = [
+      "# Guide",
+      "<style>",
+      ".hidden { display: none; }",
+      "</style>",
+      ".mw-parser-output .infobox { float: right; margin: 0; }",
+      "Readable prose remains.",
+    ].join("\n");
+
+    expect(stripExtractedCssCruft(markdown)).toBe("# Guide\n\nReadable prose remains.");
+  });
+
+  it("removes nested block at-rules", () => {
+    const markdown = [
+      "Before.",
+      "@media (min-width: 40rem) {",
+      "  .card { display: grid; }",
+      "}",
+      "After.",
+    ].join("\n");
+
+    expect(stripExtractedCssCruft(markdown)).toBe("Before.\nAfter.");
+  });
+
+  it("preserves fenced stylesheet examples and prose mentioning CSS", () => {
+    const markdown = [
+      "Use @media queries for responsive layouts.",
+      "",
+      "```css",
+      ".card { display: grid; }",
+      "@media (min-width: 40rem) { .card { grid-template-columns: 1fr 1fr; } }",
+      "```",
+    ].join("\n");
+
+    expect(stripExtractedCssCruft(markdown)).toBe(markdown);
+  });
+
+  it("is idempotent", () => {
+    const markdown = "Intro.\n.foo { color: red; }\nOutro.";
+    const cleaned = stripExtractedCssCruft(markdown);
+
+    expect(stripExtractedCssCruft(cleaned)).toBe(cleaned);
+  });
+});
 
 describe("HTML extraction", () => {
   it("discards malformed schema.org data without writing through Pi's TUI", async () => {

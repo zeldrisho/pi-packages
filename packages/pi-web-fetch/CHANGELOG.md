@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add bounded, fence-aware document outlines to result details, including total words, section word counts, omitted-heading counts, and conservative fallback headings for structure lost during extraction
+- Add an opt-in live extraction-quality corpus that checks expected markers and content size while reporting extractor choice and latency
+
+### Fixed
+
+- Remove leaked style elements, standalone CSS rules, and block at-rules from extracted Markdown while preserving fenced stylesheet examples
+
 ## [0.7.1] - 2026-08-28
 
 ### Fixed

@@ -58,6 +58,8 @@ Fetched and extracted pages are cached in byte-bounded memory and also persisted
 
 Each result includes honest-evidence `details`: `requestedUrl` and `finalUrl` (after any rewrite or redirect), `contentKind` (a coarse classification such as `article`, `code-file`, `repository-readme`, `raw-text`, or `markup-shell`), `shellSuspected` (true when the page looks like an app shell, bot wall, or consent page), and `confidence` (`high`/`medium`/`low`) derived from the extractor, content length, and `shellSuspected`.
 
+`details.outline` provides bounded document-shape metadata: total words, heading count, the first 12 headings with section word counts, and the number of omitted headings. It ignores headings inside fenced code and conservatively infers short title lines only when extraction produced no Markdown headings. Heading text is untrusted remote content and is capped before being exposed.
+
 ## Uninstall
 
 ```bash

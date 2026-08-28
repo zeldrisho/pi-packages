@@ -45,6 +45,14 @@ The tests use deterministic local fixtures and mocked Brave responses. Manually 
 - `pi-web-fetch`: supported formats, redirects, blocked local/private targets, oversized responses, caching, request coalescing, and offset continuation; and
 - `pi-nested-agent-md`: ancestor ordering, direct reads, deduplication, paths outside the working directory, output bounds, and reinjection after compaction.
 
+For extraction changes, run the opt-in live quality corpus separately from deterministic validation:
+
+```bash
+vp run benchmark:web-fetch-extraction
+```
+
+The benchmark checks stable content markers and minimum extracted sizes while reporting extractor choice and latency. Use `-- --filter <category>` for a subset or `-- --json` for machine-readable output. Network or upstream-content failures make the benchmark fail, so it is diagnostic rather than part of `validate`.
+
 To load a local package in an isolated Pi session, run `pi -e ./packages/<name>` and disable globally installed extensions as needed so they cannot interfere with manual verification.
 
 ## Dependency reviews

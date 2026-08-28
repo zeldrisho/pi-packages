@@ -223,6 +223,11 @@ describe("web_fetch honest-evidence details", () => {
     expect(result.details.contentKind).toBe("article");
     expect(result.details.shellSuspected).toBe(false);
     expect(result.details.confidence).toBe("medium");
+    expect(result.details.outline).toMatchObject({
+      totalHeadings: 1,
+      headings: [{ level: 2, text: "Hello", inferred: false }],
+      omittedHeadings: 0,
+    });
   });
 
   it("classifies plain text as raw-text with high confidence", async () => {

@@ -148,6 +148,74 @@ function deduplicateAdjacentLinks(markdown: string): string {
   return out.join("\n").replace(/(\[[^\n]+?\([^)]+\)[^\n]*\n)\1/g, "$1");
 }
 
+const CSS_BLOCK_AT_RULE = /^\s*@(container|font-face|keyframes|layer|media|page|supports)\b/i;
+const STANDALONE_CSS_RULE =
+  /^\s*(?:[.#][-_a-zA-Z]|\*\s*[.#:[>+~]|(?:html|body|main|article|nav|header|footer|aside)(?:\b|[.#:[>+~]))[^{}]*\{[^{}]*\}\s*$/i;
+
+function braceDelta(value: string): number {
+  return (value.match(/{/g)?.length ?? 0) - (value.match(/}/g)?.length ?? 0);
+}
+
+/**
+ * Removes leaked stylesheet fragments from extracted Markdown while preserving fenced examples.
+ *
+ * The matcher is deliberately conservative: it removes style elements, recognized block at-rules,
+ * and complete standalone selector/declaration lines. Prose that merely discusses CSS and fenced
+ * CSS/SCSS/Less examples remain untouched.
+ */
+export function stripExtractedCssCruft(markdown: string): string {
+  const output: string[] = [];
+  let fence: string | undefined;
+  let styleElement = false;
+  let cssBlockDepth = 0;
+
+  for (const originalLine of markdown.split("\n")) {
+    const fenceMatch = /^\s*(`{3,}|~{3,})/.exec(originalLine);
+    if (fenceMatch) {
+      const marker = fenceMatch[1][0];
+      if (!fence) fence = marker;
+      else if (fence === marker) fence = undefined;
+      output.push(originalLine);
+      continue;
+    }
+    if (fence) {
+      output.push(originalLine);
+      continue;
+    }
+
+    let line = originalLine;
+    if (styleElement) {
+      const close = line.search(/<\/style\s*>/i);
+      if (close === -1) continue;
+      line = line.slice(close).replace(/^<\/style\s*>/i, "");
+      styleElement = false;
+    }
+    line = line.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, "");
+    const open = line.search(/<style\b[^>]*>/i);
+    if (open !== -1) {
+      line = line.slice(0, open);
+      styleElement = true;
+    }
+
+    if (cssBlockDepth > 0) {
+      cssBlockDepth += braceDelta(line);
+      if (cssBlockDepth < 0) cssBlockDepth = 0;
+      continue;
+    }
+    if (CSS_BLOCK_AT_RULE.test(line)) {
+      cssBlockDepth = Math.max(0, braceDelta(line));
+      continue;
+    }
+    if (STANDALONE_CSS_RULE.test(line)) continue;
+    output.push(line);
+  }
+
+  return output
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 /**
  * Runs Defuddle over an already-normalized document with Markdown extraction enabled.
  *
@@ -281,7 +349,9 @@ export async function extractHtmlToMarkdown(
     // `/owner/repo/releases`) and metadata against the real origin instead of
     // dropping the scheme and host and constructing `new URL(pathname)`.
     const result = await runDefuddle(document, baseUrl.href);
-    const markdown = deduplicateAdjacentLinks(result?.content?.trim() ?? "");
+    const markdown = stripExtractedCssCruft(
+      deduplicateAdjacentLinks(result?.content?.trim() ?? ""),
+    );
     const trimmedTitle = result?.title?.trim();
     if (markdown) {
       return {
@@ -294,5 +364,9 @@ export async function extractHtmlToMarkdown(
   } catch {
     // Fall through to the basic converter for malformed or unsupported pages.
   }
-  return { markdown: htmlToMarkdownFallback(html), extractor: "basic", ...advertised };
+  return {
+    markdown: stripExtractedCssCruft(htmlToMarkdownFallback(html)),
+    extractor: "basic",
+    ...advertised,
+  };
 }
