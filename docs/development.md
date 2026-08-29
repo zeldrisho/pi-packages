@@ -69,7 +69,7 @@ conditions annotated in `pnpm-workspace.yaml` (tracked in issue
 change; `tests/repository-contract.test.ts` fails when an overridden package disappears from the
 dependency graph.
 
-CI runs `pnpm audit --audit-level high` on every pull request (`.github/workflows/ci.yml`).
+CI runs `vp pm audit -- --audit-level high` on every pull request (`.github/workflows/ci.yml`).
 Production-path advisories are never allowlisted; the documented overrides in `pnpm-workspace.yaml`
 remain the only escape hatch for transitive runtime dependencies. Dev-only advisories are resolved by
 updating the toolchain or lockfile; if one cannot be resolved, it may be allowlisted in the audit

@@ -35,5 +35,5 @@ jobs:
         # are the only escape hatch for transitive runtime dependencies. Dev-only
         # advisories are resolved by toolchain or lockfile updates, or allowlisted
         # only with justification and a tracking issue (docs/development.md).
-        run: vp exec pnpm audit --audit-level high
+        run: vp pm audit -- --audit-level high
       - run: vp run validate
