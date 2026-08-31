@@ -8,6 +8,7 @@ import piGate, {
   loadConfig,
   parseConfig,
   resolveAction,
+  resolveRule,
   type Action,
 } from "../src/index";
 
@@ -231,6 +232,25 @@ describe("loadConfig", () => {
   });
 });
 
+describe("resolveRule", () => {
+  it("returns the matching pattern and action", () => {
+    expect(resolveRule("sudo apt update", { sudo: "block" })).toEqual({
+      pattern: "sudo",
+      action: "block",
+    });
+  });
+
+  it("returns the longest matching rule", () => {
+    expect(
+      resolveRule("rm -rf /", { rm: "block", "rm -rf": "prompt", "rm -rf /": "allow" }),
+    ).toEqual({ pattern: "rm -rf /", action: "allow" });
+  });
+
+  it("returns null when no rule matches", () => {
+    expect(resolveRule("ls -la", { sudo: "block" })).toBeNull();
+  });
+});
+
 describe("resolveAction", () => {
   it("returns null when no rule matches", () => {
     expect(resolveAction("ls -la", { sudo: "block" })).toBeNull();
@@ -361,10 +381,11 @@ describe("piGate extension", () => {
       const result = await handlers.toolCall!(bashEvent("sudo apt update"), ctx);
       expect(result).toEqual({
         block: true,
-        reason: 'pi-gate: command matches a "block" rule',
+        reason: 'pi-gate: command blocked by rule "sudo": "block"',
       });
-      expect(uiState.notifyCalls).toHaveLength(1);
-      expect(uiState.notifyCalls[0]?.level).toBe("warning");
+      expect(uiState.notifyCalls).toEqual([
+        { text: 'pi-gate: command blocked by rule "sudo": "block"', level: "warning" },
+      ]);
     });
 
     it("blocks without a notify call in non-UI mode", async () => {
@@ -374,7 +395,7 @@ describe("piGate extension", () => {
       const result = await handlers.toolCall!(bashEvent("sudo apt update"), ctx);
       expect(result).toEqual({
         block: true,
-        reason: 'pi-gate: command matches a "block" rule',
+        reason: 'pi-gate: command blocked by rule "sudo": "block"',
       });
       expect(uiState.notifyCalls).toHaveLength(0);
     });
@@ -385,8 +406,13 @@ describe("piGate extension", () => {
       uiState.selectResponse = "Allow";
       const result = await handlers.toolCall!(bashEvent("rm -rf node_modules"), ctx);
       expect(result).toBeUndefined();
-      expect(uiState.selectCalls).toHaveLength(1);
-      expect(uiState.selectCalls[0]?.options).toEqual(["Allow", "Deny"]);
+      expect(uiState.selectCalls).toEqual([
+        {
+          prompt:
+            'pi-gate: allow this command?\n\n  rm -rf node_modules\n\nMatched rule: "rm -rf": "prompt"',
+          options: ["Allow", "Deny"],
+        },
+      ]);
     });
 
     it("prompts with the user and blocks on Deny", async () => {
@@ -394,7 +420,10 @@ describe("piGate extension", () => {
       const { ctx, uiState, handlers } = makeExtension().install();
       uiState.selectResponse = "Deny";
       const result = await handlers.toolCall!(bashEvent("rm -rf node_modules"), ctx);
-      expect(result).toEqual({ block: true, reason: "pi-gate: denied by user" });
+      expect(result).toEqual({
+        block: true,
+        reason: 'pi-gate: command denied by user after matching rule "rm -rf": "prompt"',
+      });
     });
 
     it("blocks a prompt rule in non-UI mode without calling select", async () => {
@@ -404,7 +433,8 @@ describe("piGate extension", () => {
       const result = await handlers.toolCall!(bashEvent("rm -rf node_modules"), ctx);
       expect(result).toEqual({
         block: true,
-        reason: "pi-gate: prompt required but no UI is available",
+        reason:
+          'pi-gate: command blocked because rule "rm -rf": "prompt" requires a prompt, but no UI is available',
       });
       expect(uiState.selectCalls).toHaveLength(0);
     });
@@ -426,7 +456,7 @@ describe("piGate extension", () => {
       const blocked = await handlers.toolCall!(bashEvent("sudo apt update"), ctx);
       expect(blocked).toEqual({
         block: true,
-        reason: 'pi-gate: command matches a "block" rule',
+        reason: 'pi-gate: command blocked by rule "sudo apt update": "block"',
       });
       const allowed = await handlers.toolCall!(bashEvent("sudo apt install foo"), ctx);
       expect(allowed).toBeUndefined();
@@ -447,7 +477,7 @@ describe("piGate extension", () => {
       const result = await handlers.toolCall!(event, ctx);
       expect(result).toEqual({
         block: true,
-        reason: 'pi-gate: command matches a "block" rule',
+        reason: 'pi-gate: command blocked by rule "sudo": "block"',
       });
     });
   });

@@ -36,6 +36,11 @@ export interface GateConfig {
   operations: Record<string, Action>;
 }
 
+export interface RuleMatch {
+  pattern: string;
+  action: Action;
+}
+
 const CONFIG_FILE_NAME = "pi-gate.json";
 const EXAMPLE_FILE_NAME = "pi-gate.json.example";
 const ACTIONS: readonly Action[] = ["prompt", "block", "allow"] as const;
@@ -174,7 +179,7 @@ export function ensureExampleConfig(): void {
 }
 
 /**
- * Resolves the action that applies to a command against the configured rules.
+ * Resolves the rule that applies to a command against the configured rules.
  *
  * Returns `null` when no rule matches, in which case the caller should let the
  * command through. When multiple rules match, the longest pattern wins so
@@ -182,9 +187,9 @@ export function ensureExampleConfig(): void {
  *
  * @param command - The bash command to evaluate against the rules
  * @param rules - A map of pattern strings to actions
- * @returns The action to take, or `null` if no rule matches
+ * @returns The matched pattern and action, or `null` if no rule matches
  */
-export function resolveAction(command: string, rules: Record<string, Action>): Action | null {
+export function resolveRule(command: string, rules: Record<string, Action>): RuleMatch | null {
   let bestPattern: string | null = null;
   for (const pattern of Object.keys(rules)) {
     if (!command.includes(pattern)) continue;
@@ -193,7 +198,16 @@ export function resolveAction(command: string, rules: Record<string, Action>): A
     }
   }
   if (bestPattern === null) return null;
-  return rules[bestPattern];
+  return { pattern: bestPattern, action: rules[bestPattern] };
+}
+
+/** Returns only the action selected by {@link resolveRule}. */
+export function resolveAction(command: string, rules: Record<string, Action>): Action | null {
+  return resolveRule(command, rules)?.action ?? null;
+}
+
+function formatRule(match: RuleMatch): string {
+  return `${JSON.stringify(match.pattern)}: ${JSON.stringify(match.action)}`;
 }
 
 /** Gate the built-in `bash` tool against the user-provided rules. */
@@ -228,26 +242,31 @@ export default function piGate(pi: ExtensionAPI): void {
     if (event.toolName !== "bash") return undefined;
     if (!isToolCallEventType("bash", event)) return undefined;
     const command = event.input.command;
-    const action = resolveAction(command, config.operations);
-    if (action === null || action === "allow") return undefined;
+    const match = resolveRule(command, config.operations);
+    if (match === null || match.action === "allow") return undefined;
+    const rule = formatRule(match);
 
-    if (action === "block") {
+    if (match.action === "block") {
+      const reason = `pi-gate: command blocked by rule ${rule}`;
       if (ctx.hasUI) {
-        ctx.ui.notify(`pi-gate: blocked command matching a rule`, "warning");
+        ctx.ui.notify(reason, "warning");
       }
-      return { block: true, reason: `pi-gate: command matches a "block" rule` };
+      return { block: true, reason };
     }
 
     // action === "prompt"
     if (!ctx.hasUI) {
-      return { block: true, reason: "pi-gate: prompt required but no UI is available" };
+      return {
+        block: true,
+        reason: `pi-gate: command blocked because rule ${rule} requires a prompt, but no UI is available`,
+      };
     }
     const choice = await ctx.ui.select(
-      `pi-gate: allow this command?\n\n  ${command}\n\nA rule in pi-gate.json requests confirmation.`,
+      `pi-gate: allow this command?\n\n  ${command}\n\nMatched rule: ${rule}`,
       ["Allow", "Deny"],
     );
     if (choice !== "Allow") {
-      return { block: true, reason: "pi-gate: denied by user" };
+      return { block: true, reason: `pi-gate: command denied by user after matching rule ${rule}` };
     }
     return undefined;
   });
