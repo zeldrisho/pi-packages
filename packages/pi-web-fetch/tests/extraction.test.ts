@@ -105,18 +105,24 @@ schema"}</script></head><body><main><article><h1>Fixture</h1><p>${articleText}</
     const words = Array.from({ length: 150 }, (_, index) => `word${index}`);
     words[10] =
       'see <a href="/voidzero-dev/setup-vp">the project</a> and <a href="/login">sign in</a>';
-    const html = `<html><head><title>Releases · voidzero-dev/setup-vp</title></head><body><main><article><h1>Releases</h1><p>${words.join(" ")}</p></article></main></body></html>`;
+    const html = `<html><head><title>Releases · voidzero-dev/setup-vp</title><meta property="og:url" content="/voidzero-dev/setup-vp/releases"></head><body><main><article><h1>Releases</h1><p>${words.join(" ")}</p></article></main></body></html>`;
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    const result = await extractHtmlToMarkdown(
-      html,
-      new URL("https://github.com/voidzero-dev/setup-vp/releases"),
-    );
+    try {
+      const result = await extractHtmlToMarkdown(
+        html,
+        new URL("https://github.com/voidzero-dev/setup-vp/releases"),
+      );
 
-    expect(result.extractor).toBe("defuddle");
-    expect(result.markdown).toContain("word149");
-    // Relative links must resolve against the full origin, proving the absolute
-    // URL reached Defuddle instead of a stripped pathname.
-    expect(result.markdown).toContain("https://github.com/voidzero-dev/setup-vp");
+      expect(result.extractor).toBe("defuddle");
+      expect(result.markdown).toContain("word149");
+      // Relative links must resolve against the full origin, proving the absolute
+      // URL reached Defuddle instead of a stripped pathname.
+      expect(result.markdown).toContain("https://github.com/voidzero-dev/setup-vp");
+      expect(consoleWarn).not.toHaveBeenCalled();
+    } finally {
+      consoleWarn.mockRestore();
+    }
   });
 
   it("falls back to the basic extractor when Defuddle rejects", async () => {

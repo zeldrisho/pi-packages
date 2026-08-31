@@ -85,6 +85,21 @@ export function assertAbsoluteHttpUrl(value: string | URL): URL {
   return url;
 }
 
+/** Resolves page-URL metadata that Defuddle otherwise parses without a base URL. */
+function resolveDocumentRelativeMetadataUrls(document: Document, pageUrl: URL): void {
+  for (const meta of document.querySelectorAll<HTMLMetaElement>("meta[content]")) {
+    const key = (meta.getAttribute("property") ?? meta.getAttribute("name"))?.toLowerCase();
+    if (key !== "og:url" && key !== "twitter:url") continue;
+    const content = meta.getAttribute("content");
+    if (content) meta.setAttribute("content", new URL(content, pageUrl).href);
+  }
+
+  for (const link of document.querySelectorAll<HTMLLinkElement>('link[rel="canonical"][href]')) {
+    const href = link.getAttribute("href");
+    if (href) link.setAttribute("href", new URL(href, pageUrl).href);
+  }
+}
+
 /**
  * Type guard that checks if an unknown value is a string.
  *
@@ -341,6 +356,10 @@ export async function extractHtmlToMarkdown(
   try {
     assertAbsoluteHttpUrl(baseUrl);
     const { document } = parseHTML(html);
+    // Defuddle parses URL metadata without using its explicit page URL as the
+    // base. Resolve relative values first so it does not log ERR_INVALID_URL
+    // through Pi's TUI even though extraction succeeds.
+    resolveDocumentRelativeMetadataUrls(document, baseUrl);
     removeMalformedSchemaOrgData(document);
     normalizeSelectorUnsafeIds(document);
     stripChromeWrappers(document, baseUrl);

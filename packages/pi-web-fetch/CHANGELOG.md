@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Resolve relative Open Graph, Twitter, and canonical page URLs before Defuddle metadata extraction so successful GitHub release fetches no longer leak `ERR_INVALID_URL` warnings into Pi's TUI
 - Remove leaked style elements, standalone CSS rules, and block at-rules from extracted Markdown while preserving fenced stylesheet examples
 
 ## [0.7.1] - 2026-08-28
