@@ -35,6 +35,21 @@ describe("extracted CSS cleanup", () => {
     expect(stripExtractedCssCruft(markdown)).toBe("Before.\n\nAfter.");
   });
 
+  it("does not close a longer fence with a shorter or suffixed delimiter", () => {
+    const markdown = [
+      "````css",
+      ".first { display: block; }",
+      "```",
+      ".second { display: block; }",
+      "```` not a close",
+      ".third { display: block; }",
+      "````",
+      ".outside { display: none; }",
+    ].join("\n");
+
+    expect(stripExtractedCssCruft(markdown)).toBe(markdown.split("\n").slice(0, -1).join("\n"));
+  });
+
   it("removes nested block at-rules", () => {
     const markdown = [
       "Before.",
@@ -129,6 +144,15 @@ schema"}</script></head><body><main><article><h1>Fixture</h1><p>${articleText}</
     } finally {
       consoleWarn.mockRestore();
     }
+  });
+
+  it("ignores malformed page URL metadata without abandoning Defuddle", async () => {
+    const html = `<html><head><title>Fixture</title><meta property="og:url" content="http://["><link rel="canonical" href="http://["></head><body><main><article><h1>Fixture</h1><p>${longText()}</p></article></main></body></html>`;
+
+    const result = await extractHtmlToMarkdown(html, new URL("https://example.com/article"));
+
+    expect(result.extractor).toBe("defuddle");
+    expect(result.markdown).toContain("word149");
   });
 
   it("falls back to the basic extractor when Defuddle rejects", async () => {

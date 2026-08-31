@@ -66,6 +66,25 @@ describe("document outlines", () => {
     expect(outline.headings[0]).toMatchObject({ text: "Real", inferred: false });
   });
 
+  it("requires a closing fence to be long enough and have no suffix", () => {
+    const outline = createDocumentOutline(
+      [
+        "# Real",
+        "````md",
+        "## Hidden one",
+        "```",
+        "## Hidden two",
+        "```` not a close",
+        "## Hidden three",
+        "````",
+        "## Visible",
+        "Body.",
+      ].join("\n"),
+    );
+
+    expect(outline.headings.map(({ text }) => text)).toEqual(["Real", "Visible"]);
+  });
+
   it("conservatively infers short title lines only when ATX headings are absent", () => {
     const outline = createDocumentOutline(
       [

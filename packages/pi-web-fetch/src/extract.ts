@@ -91,12 +91,22 @@ function resolveDocumentRelativeMetadataUrls(document: Document, pageUrl: URL): 
     const key = (meta.getAttribute("property") ?? meta.getAttribute("name"))?.toLowerCase();
     if (key !== "og:url" && key !== "twitter:url") continue;
     const content = meta.getAttribute("content");
-    if (content) meta.setAttribute("content", new URL(content, pageUrl).href);
+    if (!content) continue;
+    try {
+      meta.setAttribute("content", new URL(content, pageUrl).href);
+    } catch {
+      meta.removeAttribute("content");
+    }
   }
 
   for (const link of document.querySelectorAll<HTMLLinkElement>('link[rel="canonical"][href]')) {
     const href = link.getAttribute("href");
-    if (href) link.setAttribute("href", new URL(href, pageUrl).href);
+    if (!href) continue;
+    try {
+      link.setAttribute("href", new URL(href, pageUrl).href);
+    } catch {
+      link.removeAttribute("href");
+    }
   }
 }
 
@@ -204,21 +214,27 @@ function braceDelta(value: string): number {
  */
 export function stripExtractedCssCruft(markdown: string): string {
   const output: string[] = [];
-  let fence: string | undefined;
+  let fence: { character: string; length: number } | undefined;
   let styleElement = false;
   let cssBlockDepth = 0;
 
   for (const originalLine of markdown.split("\n")) {
-    const fenceMatch = /^\s*(`{3,}|~{3,})/.exec(originalLine);
-    if (fenceMatch) {
-      const marker = fenceMatch[1][0];
-      if (!fence) fence = marker;
-      else if (fence === marker) fence = undefined;
+    const fenceMatch = /^[ \t]{0,3}(`{3,}|~{3,})/.exec(originalLine);
+    if (!fence && fenceMatch) {
+      fence = { character: fenceMatch[1][0], length: fenceMatch[1].length };
       output.push(originalLine);
       continue;
     }
     if (fence) {
       output.push(originalLine);
+      if (
+        fenceMatch &&
+        fenceMatch[1][0] === fence.character &&
+        fenceMatch[1].length >= fence.length &&
+        !originalLine.slice(fenceMatch[0].length).trim()
+      ) {
+        fence = undefined;
+      }
       continue;
     }
 
