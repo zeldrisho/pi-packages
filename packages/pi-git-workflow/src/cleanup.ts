@@ -190,6 +190,13 @@ export async function cleanupRepository(
   return withRepoQueue(root, () => cleanupLocked(pi, root));
 }
 
+/**
+ * Performs the cleanup operation with exclusive repository access.
+ *
+ * @param pi - Extension API with exec capability
+ * @param root - Canonical repository root path
+ * @returns Promise resolving to cleanup result with deleted/review/retained branches
+ */
 async function cleanupLocked(pi: Pick<ExtensionAPI, "exec">, root: string): Promise<CleanupResult> {
   await requireGitOk(
     pi,
@@ -291,15 +298,34 @@ async function cleanupLocked(pi: Pick<ExtensionAPI, "exec">, root: string): Prom
   return { root, target, targetCommit, deleted, review, retained };
 }
 
+/**
+ * Converts a local branch to a review entry with a reason.
+ *
+ * @param branch - The local branch to convert
+ * @param reason - The reason the branch requires manual review
+ * @returns A review branch object with name, commit, and reason
+ */
 function toReview(branch: LocalBranch, reason: string): ReviewBranch {
   return { name: branch.name, commit: branch.commit, reason };
 }
 
+/**
+ * Formats Git stderr output as bounded details for error messages.
+ *
+ * @param stderr - The Git command's stderr output
+ * @returns Formatted details string with leading colon, or empty string if no details
+ */
 function formatDetails(stderr: string): string {
   const details = sanitizeGitOutput(stderr, 160);
   return details ? `: ${details}` : "";
 }
 
+/**
+ * Encodes untrusted branch metadata for safe inclusion in agent context.
+ *
+ * @param value - The untrusted string to encode
+ * @returns Bounded, JSON-escaped string with backticks escaped
+ */
 function encodeUntrusted(value: string): string {
   const bounded = value.length > 300 ? `${value.slice(0, 300)}…` : value;
   return JSON.stringify(bounded).slice(1, -1).replace(/`/g, "\\u0060");

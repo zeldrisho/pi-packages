@@ -36,6 +36,12 @@ interface ParsedAtxHeading {
   text: string;
 }
 
+/**
+ * Checks if a character is a space or tab.
+ *
+ * @param character - The character to check
+ * @returns `true` if the character is a space or tab
+ */
 function isSpaceOrTab(character: string | undefined): boolean {
   return character === " " || character === "\t";
 }
@@ -55,11 +61,23 @@ function parseAtxHeading(line: string): ParsedAtxHeading | undefined {
   return { level, text: line.slice(index) };
 }
 
+/**
+ * Counts the number of whitespace-separated words in a string.
+ *
+ * @param value - The string to count words in
+ * @returns The number of words, or 0 if the string is empty after trimming
+ */
 function countWords(value: string): number {
   const trimmed = value.trim();
   return trimmed ? trimmed.split(/\s+/).length : 0;
 }
 
+/**
+ * Counts the total words in a document while respecting fenced code blocks.
+ *
+ * @param lines - The document lines to count words in
+ * @returns The total word count across all lines, including fenced content
+ */
 function countDocumentWords(lines: string[]): number {
   let fenceCharacter: string | undefined;
   return lines.reduce((total, line) => {
@@ -75,6 +93,12 @@ function countDocumentWords(lines: string[]): number {
   }, 0);
 }
 
+/**
+ * Removes trailing whitespace and optional closing markers from heading text, then bounds the result.
+ *
+ * @param value - The raw heading text to clean
+ * @returns The cleaned and bounded heading text
+ */
 function cleanHeading(value: string): string {
   let contentEnd = value.length;
   while (contentEnd > 0 && isSpaceOrTab(value[contentEnd - 1])) contentEnd -= 1;
@@ -89,6 +113,12 @@ function cleanHeading(value: string): string {
   return value.slice(0, contentEnd).trim().slice(0, MAX_OUTLINE_HEADING_CHARACTERS);
 }
 
+/**
+ * Collects ATX headings from Markdown lines while respecting fenced code blocks.
+ *
+ * @param lines - The document lines to scan for ATX headings
+ * @returns Collection of heading locations and total heading count
+ */
 function collectAtxHeadings(lines: string[]): HeadingCollection {
   const locations: HeadingLocation[] = [];
   let total = 0;
@@ -115,6 +145,13 @@ function collectAtxHeadings(lines: string[]): HeadingCollection {
   return { locations, total };
 }
 
+/**
+ * Heuristically determines if a line looks like a heading when ATX headings are unavailable.
+ *
+ * @param line - The current line to evaluate
+ * @param nextLine - The following non-empty line for context
+ * @returns `true` if the line appears to be a heading
+ */
 function looksLikeFallbackHeading(line: string, nextLine: string): boolean {
   if (/^\s{4,}/.test(line)) return false;
   const candidate = line.trim();
@@ -134,6 +171,12 @@ function looksLikeFallbackHeading(line: string, nextLine: string): boolean {
   return following.length > MAX_FALLBACK_HEADING_CHARACTERS || /[.!?]$/.test(following);
 }
 
+/**
+ * Collects inferred headings using heuristics when no ATX headings are present.
+ *
+ * @param lines - The document lines to scan for heading-like content
+ * @returns Collection of inferred heading locations and total count
+ */
 function collectFallbackHeadings(lines: string[]): HeadingCollection {
   const locations: HeadingLocation[] = [];
   let total = 0;

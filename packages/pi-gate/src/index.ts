@@ -206,6 +206,12 @@ export function resolveAction(command: string, rules: Record<string, Action>): A
   return resolveRule(command, rules)?.action ?? null;
 }
 
+/**
+ * Formats a rule match as a human-readable string for display in prompts and notifications.
+ *
+ * @param match - The rule match to format
+ * @returns A string representation showing the pattern and action
+ */
 function formatRule(match: RuleMatch): string {
   return `${JSON.stringify(match.pattern)}: ${JSON.stringify(match.action)}`;
 }

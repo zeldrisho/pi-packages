@@ -170,6 +170,12 @@ const COMPLETE_STYLE_ELEMENT = /<style\b[^>]*>[\s\S]*?<\/style\s*>/gi;
 const CLOSING_STYLE_ELEMENT = /<\/style\s*>/i;
 const OPENING_STYLE_ELEMENT = /<style\b[^>]*>/i;
 
+/**
+ * Iteratively removes complete style elements from a string to prevent nested fragment recreation.
+ *
+ * @param value - The string to strip style elements from
+ * @returns The string with all complete style elements removed
+ */
 function stripCompleteStyleElements(value: string): string {
   let cleaned = value;
   while (true) {
@@ -179,6 +185,12 @@ function stripCompleteStyleElements(value: string): string {
   }
 }
 
+/**
+ * Calculates the net brace depth change in a string (opening braces minus closing braces).
+ *
+ * @param value - The string to analyze
+ * @returns The difference between opening and closing brace counts
+ */
 function braceDelta(value: string): number {
   return (value.match(/{/g)?.length ?? 0) - (value.match(/}/g)?.length ?? 0);
 }
