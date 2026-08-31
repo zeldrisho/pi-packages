@@ -37,6 +37,32 @@ export interface SearchEvidence {
   dropped: number;
   freshness?: Freshness;
   truncated: boolean;
+  uniqueDomains: number;
+  topDomainShare: number;
+}
+
+export interface DomainDiversity {
+  uniqueDomains: number;
+  topDomainShare: number;
+}
+
+/** Computes neutral domain-diversity metrics without assigning trust or authority. */
+export function summarizeDomainDiversity(results: SearchResult[]): DomainDiversity {
+  const counts = new Map<string, number>();
+  for (const result of results) {
+    try {
+      const hostname = new URL(result.url).hostname.toLowerCase().replace(/^www\./, "");
+      if (hostname) counts.set(hostname, (counts.get(hostname) ?? 0) + 1);
+    } catch {
+      // Provider URLs are untrusted; malformed values do not contribute to diversity.
+    }
+  }
+  let largestCount = 0;
+  for (const count of counts.values()) largestCount = Math.max(largestCount, count);
+  return {
+    uniqueDomains: counts.size,
+    topDomainShare: results.length > 0 ? largestCount / results.length : 0,
+  };
 }
 
 /** Resolves the private, cross-session cache directory for a web tool. */
@@ -219,6 +245,7 @@ export class SearchRuntime {
       dropped: Math.max(0, results.length - count),
       freshness: params.freshness,
       truncated: truncation.truncated,
+      ...summarizeDomainDiversity(results),
     };
     let text = truncation.content;
     let fullOutputPath: string | undefined;

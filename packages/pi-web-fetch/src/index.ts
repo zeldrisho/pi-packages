@@ -15,6 +15,7 @@ import { executeWebFetch } from "./service";
 export { ExpiringLruCache } from "./cache";
 export type { FetchResult } from "./content";
 export { fetchRemoteContent, type FetchRemoteDependencies } from "./fetch";
+export { createDocumentOutline, type DocumentOutline, type OutlineHeading } from "./outline";
 export {
   executeWebFetch,
   type WebFetchDetails,

@@ -9,6 +9,7 @@ import { ExpiringLruCache, stableKeyHash, type CachePersistence } from "./cache"
 import { sliceCompleteDocument, type CompleteDocument } from "./content";
 import { fetchCompleteDocument, type FetchRemoteDependencies } from "./fetch";
 import { InflightCoalescer } from "./inflight";
+import { createDocumentOutline, type DocumentOutline } from "./outline";
 import {
   FETCH_DEFAULT_MAX_CHARACTERS,
   FETCH_DEFAULT_OFFSET,
@@ -351,6 +352,8 @@ export interface WebFetchDetails {
   contentKind: ContentKind;
   shellSuspected: boolean;
   confidence: FetchConfidence;
+  /** Bounded document-shape metadata. Heading text is untrusted remote content. */
+  outline: DocumentOutline;
   /** True when the returned content is the site's /llms.txt served instead of the requested page. */
   llmsTxtFallback: boolean;
   /** True when the returned content is the page's advertised Markdown version served instead of a low-quality page. */
@@ -492,6 +495,7 @@ export async function executeWebFetch(
       contentKind,
       shellSuspected,
       confidence,
+      outline: createDocumentOutline(document.markdown),
       llmsTxtFallback: Boolean(result.llmsTxtFallback),
       markdownAlternateFallback: Boolean(result.markdownAlternateFallback),
       llmsTxtUrl: result.llmsTxtIndexUrl,

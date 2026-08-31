@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import type { DefuddleResponse } from "defuddle/node";
-import { extractHtmlToMarkdown } from "../src/extract";
+import { extractHtmlToMarkdown, stripExtractedCssCruft } from "../src/extract";
 
 // Mock defuddle/node so we can induce failures. The factory keeps the real
 // implementation by default (the other tests exercise the real extractor) and
@@ -14,6 +14,74 @@ const articleHtml = (text: string): string =>
   `<html><head><title>Fixture</title></head><body><main><article><h1>Fixture</h1><p>${text}</p></article></main></body></html>`;
 
 const longText = (): string => Array.from({ length: 150 }, (_, index) => `word${index}`).join(" ");
+
+describe("extracted CSS cleanup", () => {
+  it("removes leaked style elements and standalone CSS rules", () => {
+    const markdown = [
+      "# Guide",
+      "<style>",
+      ".hidden { display: none; }",
+      "</style>",
+      ".mw-parser-output .infobox { float: right; margin: 0; }",
+      "Readable prose remains.",
+    ].join("\n");
+
+    expect(stripExtractedCssCruft(markdown)).toBe("# Guide\n\nReadable prose remains.");
+  });
+
+  it("does not recreate style elements when nested fragments are removed", () => {
+    const markdown = "Before.\n<sty<style>discard</style>le>discard</style>\nAfter.";
+
+    expect(stripExtractedCssCruft(markdown)).toBe("Before.\n\nAfter.");
+  });
+
+  it("does not close a longer fence with a shorter or suffixed delimiter", () => {
+    const markdown = [
+      "````css",
+      ".first { display: block; }",
+      "```",
+      ".second { display: block; }",
+      "```` not a close",
+      ".third { display: block; }",
+      "````",
+      ".outside { display: none; }",
+    ].join("\n");
+
+    expect(stripExtractedCssCruft(markdown)).toBe(markdown.split("\n").slice(0, -1).join("\n"));
+  });
+
+  it("removes nested block at-rules", () => {
+    const markdown = [
+      "Before.",
+      "@media (min-width: 40rem) {",
+      "  .card { display: grid; }",
+      "}",
+      "After.",
+    ].join("\n");
+
+    expect(stripExtractedCssCruft(markdown)).toBe("Before.\nAfter.");
+  });
+
+  it("preserves fenced stylesheet examples and prose mentioning CSS", () => {
+    const markdown = [
+      "Use @media queries for responsive layouts.",
+      "",
+      "```css",
+      ".card { display: grid; }",
+      "@media (min-width: 40rem) { .card { grid-template-columns: 1fr 1fr; } }",
+      "```",
+    ].join("\n");
+
+    expect(stripExtractedCssCruft(markdown)).toBe(markdown);
+  });
+
+  it("is idempotent", () => {
+    const markdown = "Intro.\n.foo { color: red; }\nOutro.";
+    const cleaned = stripExtractedCssCruft(markdown);
+
+    expect(stripExtractedCssCruft(cleaned)).toBe(cleaned);
+  });
+});
 
 describe("HTML extraction", () => {
   it("discards malformed schema.org data without writing through Pi's TUI", async () => {
@@ -58,18 +126,33 @@ schema"}</script></head><body><main><article><h1>Fixture</h1><p>${articleText}</
     const words = Array.from({ length: 150 }, (_, index) => `word${index}`);
     words[10] =
       'see <a href="/voidzero-dev/setup-vp">the project</a> and <a href="/login">sign in</a>';
-    const html = `<html><head><title>Releases · voidzero-dev/setup-vp</title></head><body><main><article><h1>Releases</h1><p>${words.join(" ")}</p></article></main></body></html>`;
+    const html = `<html><head><title>Releases · voidzero-dev/setup-vp</title><meta property="og:url" content="/voidzero-dev/setup-vp/releases"></head><body><main><article><h1>Releases</h1><p>${words.join(" ")}</p></article></main></body></html>`;
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    const result = await extractHtmlToMarkdown(
-      html,
-      new URL("https://github.com/voidzero-dev/setup-vp/releases"),
-    );
+    try {
+      const result = await extractHtmlToMarkdown(
+        html,
+        new URL("https://github.com/voidzero-dev/setup-vp/releases"),
+      );
+
+      expect(result.extractor).toBe("defuddle");
+      expect(result.markdown).toContain("word149");
+      // Relative links must resolve against the full origin, proving the absolute
+      // URL reached Defuddle instead of a stripped pathname.
+      expect(result.markdown).toContain("https://github.com/voidzero-dev/setup-vp");
+      expect(consoleWarn).not.toHaveBeenCalled();
+    } finally {
+      consoleWarn.mockRestore();
+    }
+  });
+
+  it("ignores malformed page URL metadata without abandoning Defuddle", async () => {
+    const html = `<html><head><title>Fixture</title><meta property="og:url" content="http://["><link rel="canonical" href="http://["></head><body><main><article><h1>Fixture</h1><p>${longText()}</p></article></main></body></html>`;
+
+    const result = await extractHtmlToMarkdown(html, new URL("https://example.com/article"));
 
     expect(result.extractor).toBe("defuddle");
     expect(result.markdown).toContain("word149");
-    // Relative links must resolve against the full origin, proving the absolute
-    // URL reached Defuddle instead of a stripped pathname.
-    expect(result.markdown).toContain("https://github.com/voidzero-dev/setup-vp");
   });
 
   it("falls back to the basic extractor when Defuddle rejects", async () => {

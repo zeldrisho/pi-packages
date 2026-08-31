@@ -17,6 +17,7 @@
     "pack:dry-run": "for package in packages/*; do (cd \"$package\" && vp pm pack -- --dry-run) || exit; done",
     "test:contracts": "vp test tests/repository-contract.test.ts",
     "test:packages": "node tests/package-smoke-test.ts",
+    "benchmark:web-fetch-extraction": "vp exec jiti packages/pi-web-fetch/scripts/benchmark-extraction.ts",
     "prepare": "vp config"
   },
   "devDependencies": {

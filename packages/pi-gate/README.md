@@ -48,10 +48,25 @@ After editing, run `/reload` to apply the new rules in the current session.
 ## Behavior
 
 - Only the built-in `bash` tool is gated. Other tools pass through unchanged.
-- `prompt` rules ask the user with a two-button confirmation (`Allow` / `Deny`).
-- `block` rules never ask and always deny.
+- `prompt` rules ask the user with a two-button confirmation (`Allow` / `Deny`). The dialog identifies the matched rule.
+- `block` rules never ask and always deny. The warning identifies the matched rule.
 - `allow` rules are explicit pass-throughs, useful for carving out exceptions.
 - In non-interactive modes (`-p`, JSON), `prompt` and `block` rules both block the command instead of auto-approving.
+
+### What the agent sees
+
+The confirmation dialog and your choice are not sent directly to the agent.
+
+- If you allow a `prompt` rule, the command runs and the agent receives its normal bash result.
+- If you deny or dismiss a `prompt`, the agent receives an error result naming the matched rule and saying the user denied it.
+- If a `block` rule matches, the agent receives an error result naming that rule.
+- If a `prompt` rule matches without an available UI, the agent receives an error explaining that the matched rule required a prompt.
+
+For example, a blocked `sudo apt update` call reports:
+
+```text
+pi-gate: command blocked by rule "sudo": "block"
+```
 
 ## Uninstall
 

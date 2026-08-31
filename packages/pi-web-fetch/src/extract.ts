@@ -85,6 +85,31 @@ export function assertAbsoluteHttpUrl(value: string | URL): URL {
   return url;
 }
 
+/** Resolves page-URL metadata that Defuddle otherwise parses without a base URL. */
+function resolveDocumentRelativeMetadataUrls(document: Document, pageUrl: URL): void {
+  for (const meta of document.querySelectorAll<HTMLMetaElement>("meta[content]")) {
+    const key = (meta.getAttribute("property") ?? meta.getAttribute("name"))?.toLowerCase();
+    if (key !== "og:url" && key !== "twitter:url") continue;
+    const content = meta.getAttribute("content");
+    if (!content) continue;
+    try {
+      meta.setAttribute("content", new URL(content, pageUrl).href);
+    } catch {
+      meta.removeAttribute("content");
+    }
+  }
+
+  for (const link of document.querySelectorAll<HTMLLinkElement>('link[rel="canonical"][href]')) {
+    const href = link.getAttribute("href");
+    if (!href) continue;
+    try {
+      link.setAttribute("href", new URL(href, pageUrl).href);
+    } catch {
+      link.removeAttribute("href");
+    }
+  }
+}
+
 /**
  * Type guard that checks if an unknown value is a string.
  *
@@ -146,6 +171,104 @@ function deduplicateAdjacentLinks(markdown: string): string {
   }
   // Also collapse duplicate adjacent blocks like a repeated vite-plus tag link paragraph.
   return out.join("\n").replace(/(\[[^\n]+?\([^)]+\)[^\n]*\n)\1/g, "$1");
+}
+
+const CSS_BLOCK_AT_RULE = /^\s*@(container|font-face|keyframes|layer|media|page|supports)\b/i;
+const STANDALONE_CSS_RULE =
+  /^\s*(?:[.#][-_a-zA-Z]|\*\s*[.#:[>+~]|(?:html|body|main|article|nav|header|footer|aside)(?:\b|[.#:[>+~]))[^{}]*\{[^{}]*\}\s*$/i;
+const COMPLETE_STYLE_ELEMENT = /<style\b[^>]*>[\s\S]*?<\/style\s*>/gi;
+const CLOSING_STYLE_ELEMENT = /<\/style\s*>/i;
+const OPENING_STYLE_ELEMENT = /<style\b[^>]*>/i;
+
+/**
+ * Iteratively removes complete style elements from a string to prevent nested fragment recreation.
+ *
+ * @param value - The string to strip style elements from
+ * @returns The string with all complete style elements removed
+ */
+function stripCompleteStyleElements(value: string): string {
+  let cleaned = value;
+  while (true) {
+    const next = cleaned.replace(COMPLETE_STYLE_ELEMENT, "");
+    if (next === cleaned) return cleaned;
+    cleaned = next;
+  }
+}
+
+/**
+ * Calculates the net brace depth change in a string (opening braces minus closing braces).
+ *
+ * @param value - The string to analyze
+ * @returns The difference between opening and closing brace counts
+ */
+function braceDelta(value: string): number {
+  return (value.match(/{/g)?.length ?? 0) - (value.match(/}/g)?.length ?? 0);
+}
+
+/**
+ * Removes leaked stylesheet fragments from extracted Markdown while preserving fenced examples.
+ *
+ * The matcher is deliberately conservative: it removes style elements, recognized block at-rules,
+ * and complete standalone selector/declaration lines. Prose that merely discusses CSS and fenced
+ * CSS/SCSS/Less examples remain untouched.
+ */
+export function stripExtractedCssCruft(markdown: string): string {
+  const output: string[] = [];
+  let fence: { character: string; length: number } | undefined;
+  let styleElement = false;
+  let cssBlockDepth = 0;
+
+  for (const originalLine of markdown.split("\n")) {
+    const fenceMatch = /^[ \t]{0,3}(`{3,}|~{3,})/.exec(originalLine);
+    if (!fence && fenceMatch) {
+      fence = { character: fenceMatch[1][0], length: fenceMatch[1].length };
+      output.push(originalLine);
+      continue;
+    }
+    if (fence) {
+      output.push(originalLine);
+      if (
+        fenceMatch &&
+        fenceMatch[1][0] === fence.character &&
+        fenceMatch[1].length >= fence.length &&
+        !originalLine.slice(fenceMatch[0].length).trim()
+      ) {
+        fence = undefined;
+      }
+      continue;
+    }
+
+    let line = originalLine;
+    if (styleElement) {
+      const close = CLOSING_STYLE_ELEMENT.exec(line);
+      if (!close) continue;
+      line = line.slice(close.index + close[0].length);
+      styleElement = false;
+    }
+    line = stripCompleteStyleElements(line);
+    const open = OPENING_STYLE_ELEMENT.exec(line);
+    if (open) {
+      line = line.slice(0, open.index);
+      styleElement = true;
+    }
+
+    if (cssBlockDepth > 0) {
+      cssBlockDepth += braceDelta(line);
+      if (cssBlockDepth < 0) cssBlockDepth = 0;
+      continue;
+    }
+    if (CSS_BLOCK_AT_RULE.test(line)) {
+      cssBlockDepth = Math.max(0, braceDelta(line));
+      continue;
+    }
+    if (STANDALONE_CSS_RULE.test(line)) continue;
+    output.push(line);
+  }
+
+  return output
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 /**
@@ -273,6 +396,10 @@ export async function extractHtmlToMarkdown(
   try {
     assertAbsoluteHttpUrl(baseUrl);
     const { document } = parseHTML(html);
+    // Defuddle parses URL metadata without using its explicit page URL as the
+    // base. Resolve relative values first so it does not log ERR_INVALID_URL
+    // through Pi's TUI even though extraction succeeds.
+    resolveDocumentRelativeMetadataUrls(document, baseUrl);
     removeMalformedSchemaOrgData(document);
     normalizeSelectorUnsafeIds(document);
     stripChromeWrappers(document, baseUrl);
@@ -281,7 +408,9 @@ export async function extractHtmlToMarkdown(
     // `/owner/repo/releases`) and metadata against the real origin instead of
     // dropping the scheme and host and constructing `new URL(pathname)`.
     const result = await runDefuddle(document, baseUrl.href);
-    const markdown = deduplicateAdjacentLinks(result?.content?.trim() ?? "");
+    const markdown = stripExtractedCssCruft(
+      deduplicateAdjacentLinks(result?.content?.trim() ?? ""),
+    );
     const trimmedTitle = result?.title?.trim();
     if (markdown) {
       return {
@@ -294,5 +423,9 @@ export async function extractHtmlToMarkdown(
   } catch {
     // Fall through to the basic converter for malformed or unsupported pages.
   }
-  return { markdown: htmlToMarkdownFallback(html), extractor: "basic", ...advertised };
+  return {
+    markdown: stripExtractedCssCruft(htmlToMarkdownFallback(html)),
+    extractor: "basic",
+    ...advertised,
+  };
 }

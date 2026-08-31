@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { classifyResultQuality } from "../src/brave";
+import { summarizeDomainDiversity } from "../src/search";
 import { createSearchTool, jsonResponse } from "./harness";
 
 describe("classifyResultQuality", () => {
@@ -14,6 +15,23 @@ describe("classifyResultQuality", () => {
 
   it("flags empty results as low", () => {
     expect(classifyResultQuality({ title: "", snippet: "" })).toBe("low");
+  });
+});
+
+describe("search domain diversity", () => {
+  it("normalizes www hosts and reports the dominant-domain share", () => {
+    expect(
+      summarizeDomainDiversity([
+        { title: "A", url: "https://www.example.com/a", snippet: "", quality: "medium" },
+        { title: "B", url: "https://example.com/b", snippet: "", quality: "medium" },
+        { title: "C", url: "https://other.example/c", snippet: "", quality: "medium" },
+        { title: "D", url: "not a URL", snippet: "", quality: "medium" },
+      ]),
+    ).toEqual({ uniqueDomains: 2, topDomainShare: 0.5 });
+  });
+
+  it("reports zero diversity for no results", () => {
+    expect(summarizeDomainDiversity([])).toEqual({ uniqueDomains: 0, topDomainShare: 0 });
   });
 });
 
@@ -48,6 +66,8 @@ describe("web_search honest-evidence details", () => {
       dropped: 0,
       freshness: undefined,
       truncated: false,
+      uniqueDomains: 1,
+      topDomainShare: 1,
     });
     expect(result.details.results.map((item) => item.quality)).toEqual(["high", "medium", "low"]);
   });

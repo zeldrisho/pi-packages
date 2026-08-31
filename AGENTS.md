@@ -2,7 +2,8 @@
 
 ## Package Manager
 
-- Use **vp**: `vp install`
+- Use **Vite+**: `vp install`.
+- Use `vp run <name>` for project scripts; `vp <name>` invokes a built-in command.
 
 ## Project Layout
 
@@ -37,5 +38,6 @@
 | Architecture                | `docs/architecture.md`        |
 | Security invariants         | `docs/security-invariants.md` |
 | Git automation              | `docs/git.md`                 |
+| Vite+ guidance              | `docs/vite-plus.md`           |
 | Package behavior and setup  | `packages/*/README.md`        |
 | Releases                    | `docs/release.md`             |

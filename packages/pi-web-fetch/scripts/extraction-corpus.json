@@ -1,0 +1,23 @@
+[
+  {
+    "name": "example article",
+    "category": "html",
+    "url": "https://example.com/",
+    "requiredMarkers": ["documentation examples", "Learn more"],
+    "minimumCharacters": 100
+  },
+  {
+    "name": "Node.js URL documentation",
+    "category": "documentation",
+    "url": "https://nodejs.org/api/url.html",
+    "requiredMarkers": ["URL", "WHATWG URL API"],
+    "minimumCharacters": 5000
+  },
+  {
+    "name": "raw GitHub source",
+    "category": "source",
+    "url": "https://raw.githubusercontent.com/nodejs/node/main/LICENSE",
+    "requiredMarkers": ["Node.js is licensed for use", "MIT license"],
+    "minimumCharacters": 1000
+  }
+]

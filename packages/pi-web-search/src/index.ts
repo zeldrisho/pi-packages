@@ -19,6 +19,8 @@ import { SearchRuntime } from "./search";
 export { ExpiringLruCache } from "./cache";
 export {
   SearchRuntime,
+  summarizeDomainDiversity,
+  type DomainDiversity,
   type SearchDetails,
   type SearchParameters,
   type SearchTruncationDetails,
