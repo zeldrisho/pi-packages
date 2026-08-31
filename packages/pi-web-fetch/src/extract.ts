@@ -166,6 +166,18 @@ function deduplicateAdjacentLinks(markdown: string): string {
 const CSS_BLOCK_AT_RULE = /^\s*@(container|font-face|keyframes|layer|media|page|supports)\b/i;
 const STANDALONE_CSS_RULE =
   /^\s*(?:[.#][-_a-zA-Z]|\*\s*[.#:[>+~]|(?:html|body|main|article|nav|header|footer|aside)(?:\b|[.#:[>+~]))[^{}]*\{[^{}]*\}\s*$/i;
+const COMPLETE_STYLE_ELEMENT = /<style\b[^>]*>[\s\S]*?<\/style\s*>/gi;
+const CLOSING_STYLE_ELEMENT = /<\/style\s*>/i;
+const OPENING_STYLE_ELEMENT = /<style\b[^>]*>/i;
+
+function stripCompleteStyleElements(value: string): string {
+  let cleaned = value;
+  while (true) {
+    const next = cleaned.replace(COMPLETE_STYLE_ELEMENT, "");
+    if (next === cleaned) return cleaned;
+    cleaned = next;
+  }
+}
 
 function braceDelta(value: string): number {
   return (value.match(/{/g)?.length ?? 0) - (value.match(/}/g)?.length ?? 0);
@@ -200,15 +212,15 @@ export function stripExtractedCssCruft(markdown: string): string {
 
     let line = originalLine;
     if (styleElement) {
-      const close = line.search(/<\/style\s*>/i);
-      if (close === -1) continue;
-      line = line.slice(close).replace(/^<\/style\s*>/i, "");
+      const close = CLOSING_STYLE_ELEMENT.exec(line);
+      if (!close) continue;
+      line = line.slice(close.index + close[0].length);
       styleElement = false;
     }
-    line = line.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, "");
-    const open = line.search(/<style\b[^>]*>/i);
-    if (open !== -1) {
-      line = line.slice(0, open);
+    line = stripCompleteStyleElements(line);
+    const open = OPENING_STYLE_ELEMENT.exec(line);
+    if (open) {
+      line = line.slice(0, open.index);
       styleElement = true;
     }
 

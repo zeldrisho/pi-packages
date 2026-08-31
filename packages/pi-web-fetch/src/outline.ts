@@ -1,4 +1,3 @@
-const ATX_HEADING = /^[ \t]{0,3}(#{1,6})[ \t]+(.+?)[ \t]*$/;
 const FENCE = /^[ \t]{0,3}(`{3,}|~{3,})/;
 const MAX_FALLBACK_HEADING_CHARACTERS = 60;
 export const MAX_OUTLINE_HEADINGS = 12;
@@ -32,6 +31,30 @@ interface HeadingCollection {
   total: number;
 }
 
+interface ParsedAtxHeading {
+  level: number;
+  text: string;
+}
+
+function isSpaceOrTab(character: string | undefined): boolean {
+  return character === " " || character === "\t";
+}
+
+/** Parses the bounded ATX prefix with a linear scan to avoid backtracking on remote input. */
+function parseAtxHeading(line: string): ParsedAtxHeading | undefined {
+  let index = 0;
+  while (index < 3 && isSpaceOrTab(line[index])) index += 1;
+  if (isSpaceOrTab(line[index])) return undefined;
+
+  const markerStart = index;
+  while (line[index] === "#") index += 1;
+  const level = index - markerStart;
+  if (level < 1 || level > 6 || !isSpaceOrTab(line[index])) return undefined;
+
+  while (isSpaceOrTab(line[index])) index += 1;
+  return { level, text: line.slice(index) };
+}
+
 function countWords(value: string): number {
   const trimmed = value.trim();
   return trimmed ? trimmed.split(/\s+/).length : 0;
@@ -47,16 +70,23 @@ function countDocumentWords(lines: string[]): number {
       else if (fenceCharacter === character) fenceCharacter = undefined;
       return total + countWords(line);
     }
-    const heading = fenceCharacter ? undefined : ATX_HEADING.exec(line);
-    return total + countWords(heading ? cleanHeading(heading[2]) : line);
+    const heading = fenceCharacter ? undefined : parseAtxHeading(line);
+    return total + countWords(heading ? cleanHeading(heading.text) : line);
   }, 0);
 }
 
 function cleanHeading(value: string): string {
-  return value
-    .replace(/[ \t]+#+[ \t]*$/, "")
-    .trim()
-    .slice(0, MAX_OUTLINE_HEADING_CHARACTERS);
+  let contentEnd = value.length;
+  while (contentEnd > 0 && isSpaceOrTab(value[contentEnd - 1])) contentEnd -= 1;
+
+  let markerStart = contentEnd;
+  while (markerStart > 0 && value[markerStart - 1] === "#") markerStart -= 1;
+  if (markerStart < contentEnd && markerStart > 0 && isSpaceOrTab(value[markerStart - 1])) {
+    contentEnd = markerStart - 1;
+    while (contentEnd > 0 && isSpaceOrTab(value[contentEnd - 1])) contentEnd -= 1;
+  }
+
+  return value.slice(0, contentEnd).trim().slice(0, MAX_OUTLINE_HEADING_CHARACTERS);
 }
 
 function collectAtxHeadings(lines: string[]): HeadingCollection {
@@ -73,13 +103,13 @@ function collectAtxHeadings(lines: string[]): HeadingCollection {
       continue;
     }
     if (fenceCharacter) continue;
-    const match = ATX_HEADING.exec(line);
-    if (!match) continue;
-    const text = cleanHeading(match[2]);
+    const heading = parseAtxHeading(line);
+    if (!heading) continue;
+    const text = cleanHeading(heading.text);
     if (!text) continue;
     total += 1;
     if (locations.length <= MAX_OUTLINE_HEADINGS) {
-      locations.push({ level: match[1].length, text, line: lineNumber, inferred: false });
+      locations.push({ level: heading.level, text, line: lineNumber, inferred: false });
     }
   }
   return { locations, total };

@@ -31,6 +31,23 @@ describe("document outlines", () => {
     });
   });
 
+  it("parses whitespace and closing markers without backtracking", () => {
+    const outline = createDocumentOutline(
+      [
+        "\t# Tab-indented",
+        "Body.",
+        "### Heading\t###\t",
+        "More body.",
+        `${"\t".repeat(100_000)}x`,
+      ].join("\n"),
+    );
+
+    expect(outline.headings).toEqual([
+      { level: 1, text: "Tab-indented", words: 1, inferred: false },
+      { level: 3, text: "Heading", words: 3, inferred: false },
+    ]);
+  });
+
   it("ignores heading syntax inside backtick and tilde fences", () => {
     const outline = createDocumentOutline(
       [

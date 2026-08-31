@@ -29,6 +29,12 @@ describe("extracted CSS cleanup", () => {
     expect(stripExtractedCssCruft(markdown)).toBe("# Guide\n\nReadable prose remains.");
   });
 
+  it("does not recreate style elements when nested fragments are removed", () => {
+    const markdown = "Before.\n<sty<style>discard</style>le>discard</style>\nAfter.";
+
+    expect(stripExtractedCssCruft(markdown)).toBe("Before.\n\nAfter.");
+  });
+
   it("removes nested block at-rules", () => {
     const markdown = [
       "Before.",
