@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-01
+
 ### Added
 
 - Add optional deterministic query-focused extraction that selects matching source sections from the complete cached document, preserves source order, supports continuation over the focused view, and reports honest selection evidence in `details.focus`
@@ -127,7 +129,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.7.1...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.8.0...HEAD
+[0.8.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.7.1...pi-web-fetch-v0.8.0
 [0.7.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.7.0...pi-web-fetch-v0.7.1
 [0.7.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.6.1...pi-web-fetch-v0.7.0
 [0.6.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.6.0...pi-web-fetch-v0.6.1

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-01
+
 ### Added
 
 - Add neutral domain-diversity evidence with unique-domain counts and the dominant domain's share of returned results
@@ -71,7 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded Brave web search ([cbc9491](https://github.com/zeldrisho/pi-packages/commit/cbc9491dce36555ab91b6bef203ec8b380596a89))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.6.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.7.0...HEAD
+[0.7.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.6.0...pi-web-search-v0.7.0
 [0.6.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.5.0...pi-web-search-v0.6.0
 [0.5.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.4.2...pi-web-search-v0.5.0
 [0.4.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.4.1...pi-web-search-v0.4.2
