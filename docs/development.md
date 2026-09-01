@@ -53,7 +53,29 @@ vp run benchmark:web-fetch-extraction
 
 The benchmark checks stable content markers and minimum extracted sizes while reporting extractor choice and latency. Use `-- --filter <category>` for a subset or `-- --json` for machine-readable output. Network or upstream-content failures make the benchmark fail, so it is diagnostic rather than part of `validate`.
 
+Before changing focused-section ranking, record the deterministic heading, phrase, and stemming baseline:
+
+```bash
+vp run benchmark:web-fetch-focus
+```
+
+A known miss is useful baseline evidence; do not tune ranking from one fixture or silently redefine expected markers to make the benchmark pass.
+
 To load a local package in an isolated Pi session, run `pi -e ./packages/<name>` and disable globally installed extensions as needed so they cannot interfere with manual verification.
+
+## Regression and review discipline
+
+Turn production failures and fixed issues into deterministic regression fixtures, retaining the issue
+identifier in the test name or fixture when it helps future diagnosis. For stateful operations, cover
+both the expected path and state that moves, disappears, times out, is killed, or is refused between
+inspection and mutation. For extraction and ranking, preserve representative malformed, noisy, and
+false-positive inputs; use the live corpus to evaluate quality changes, not as a replacement for
+repeatable tests.
+
+Before review, inspect the final diff for behavior beyond the requested scope, especially implicit
+mutation, forceful fallbacks, new network paths, cache-semantic changes, or hidden output growth. Run
+package-focused tests while iterating, then `vp check --fix`, any required normalization task, and
+`vp run validate` once code and documentation are final.
 
 ## Dependency reviews
 

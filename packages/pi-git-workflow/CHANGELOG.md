@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-01
+
+### Fixed
+
+- Fail closed when Git commands are killed or time out, with coverage for disappearing candidate refs and branches whose upstream still exists
+
 ## [0.2.0] - 2026-08-27
 
 ### Added
@@ -28,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - gate regular branch deletion (`git branch -d`) by merge and upstream checks with interactive confirmation
 - report dirty working tree status without aborting checkout
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-git-workflow-v0.2.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-git-workflow-v0.2.1...HEAD
+[0.2.1]: https://github.com/zeldrisho/pi-packages/compare/pi-git-workflow-v0.2.0...pi-git-workflow-v0.2.1
 [0.2.0]: https://github.com/zeldrisho/pi-packages/compare/pi-git-workflow-v0.1.0...pi-git-workflow-v0.2.0
 [0.1.0]: https://github.com/zeldrisho/pi-packages/releases/tag/pi-git-workflow-v0.1.0

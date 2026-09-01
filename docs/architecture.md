@@ -33,15 +33,33 @@ flowchart LR
   H -- no --> I[Bound response bytes and media type]
   I --> J[Extract HTML or decode text]
   J --> K[Cache complete document]
-  K --> L[Slice continuation]
-  L --> M[Wrap and bound untrusted output]
+  K --> L[Optional deterministic selection]
+  L --> M[Slice continuation]
+  M --> N[Wrap and bound untrusted output]
 ```
 
 The validated address is passed to the transport, while the original hostname remains available for
 TLS and HTTP host validation. Every redirect restarts validation and receives a new pinned target.
 Timeout and caller cancellation cover resolution, transport, and extraction. The cache stores the
-complete extracted document so continuation offsets remain stable; each caller still has independent
-cancellation through the in-flight coalescer.
+complete extracted document; optional query-focused selection derives a separate view without
+mutating that canonical entry. Continuation offsets remain stable within the selected view, and each
+caller still has independent cancellation through the in-flight coalescer.
+
+Cache freshness and retention are separate. Fresh representations are hits; stale representations
+remain available only for a bounded revalidation window and send `ETag` or `Last-Modified`
+validators through the same validated and pinned transport. A `304` refreshes the canonical entry,
+while a changed or validator-less representation is a miss. Result evidence distinguishes hits,
+revalidations, and misses rather than collapsing all cache use into one boolean.
+
+Origin coordination bounds concurrent request starts. Retryable `429` and `503` responses honor a
+capped `Retry-After` value or use capped jittered backoff, with a fixed attempt limit. Queuing and
+backoff remain abortable per caller, and retry response bodies are discarded rather than consumed
+without a bound.
+
+HTML evidence reports separate JavaScript-required, bot-wall, consent-interstitial, and
+sparse-extraction diagnostics. It may also expose a bounded, normalized set of internal and external
+HTTP(S) links with bounded anchor text and omitted counts. Unsafe schemes and credential-bearing
+links are rejected, and links remain metadata: acquisition never traverses them implicitly.
 
 The blocked-address table is maintained in `packages/pi-web-fetch/src/network-policy.ts` against the
 [IANA IPv4](https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml)
@@ -74,6 +92,23 @@ returns normalized provider links and snippets. Context mode uses only Brave's c
 does not fetch result URLs. Identical requests coalesce, but cancellation remains per caller. Large
 formatted results are written under a package-owned temporary directory and removed after write
 failure or session shutdown.
+
+## Data acquisition and derived views
+
+Keep acquisition, canonical storage, selection, and presentation as separate stages. Cache complete
+bounded source representations rather than query-specific projections; derive focused, ranked, or
+otherwise reduced views locally so another request can recover omitted context without another
+network fetch. Derived views must preserve source order when practical and report what was selected
+or omitted. Relevance and extraction-quality signals describe processing behavior, not source truth
+or calibrated answer confidence. Evaluate ranking changes against deterministic heading, phrase,
+and stemming cases before modifying selection; preserve source order and continuation semantics,
+and retain known misses in the baseline until an intentional ranking change addresses them.
+
+Network optimizations—including revalidation, retries, metadata probes, and redirect handling—must
+reuse the package's complete transport security boundary. Do not introduce an auxiliary HTTP client
+that bypasses address validation, pinning, response limits, cancellation, or redirect revalidation.
+Expensive rendering or autonomous multi-page traversal should not become an implicit fallback in a
+small fetch or search operation.
 
 ## Release automation
 

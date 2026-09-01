@@ -20,6 +20,8 @@ The `web_fetch` tool accepts public HTTP and HTTPS URLs. It supports textual con
 
 For safety, the tool blocks URLs containing credentials, local hostnames, private or reserved network targets, unsafe redirects, raw responses larger than 5 MiB, and unsupported content types. The `maxCharacters` parameter controls returned Markdown length; it does not change the raw download limit.
 
+For long pages, the optional `query` parameter returns a deterministic focused view containing source sections that match the query. Filtering is performed locally after the complete page has been fetched and cached; it does not use an LLM or alter the cached document. Matching sections retain source order, and `details.focus` reports matched, total, and omitted section counts plus original and focused character counts. Continuation offsets apply to the focused view when `query` is present. Omit `query` to read the complete document, especially when verifying context or when no sections match.
+
 In Pi's interactive UI, fetched content uses Pi's standard collapsed preview; use the configured tool-expansion shortcut (`Ctrl+O` by default) to show all visible tool output. Output sent to the agent remains bounded: each call returns at most `maxCharacters` characters of extracted Markdown (default 6,000) and is additionally capped by Pi's 2,000-line / 50 KiB tool-output limit, so fetching cannot bloat the conversation context. The `offset` parameter is a character offset into extracted content, not a byte range into the remote response. When a result is truncated, call the tool again with the returned `nextOffset` as `offset` to continue reading. Fetched and extracted pages are cached in byte-bounded memory for a limited time so continuation requests can reuse the same content. Concurrent requests for the same URL share one fetch; cancelling one caller does not cancel work still needed by another.
 
 Every result includes `details.truncation`. Complete output reports `{ truncated: false, strategy: "none" }`. Truncated output reports `strategy: "continuation"` and a valid `nextOffset`. The existing top-level `details.truncated` and `details.nextOffset` fields remain available.
@@ -54,11 +56,17 @@ Directory and tree listings (`https://github.com/<owner>/<repo>/tree/...`) are a
 
 ### Caching and evidence
 
-Fetched and extracted pages are cached in byte-bounded memory and also persisted to a private, cross-session disk cache (24h TTL, files created `0700`/`0600`) so identical requests reuse the same content across Pi sessions. Concurrent requests for the same URL share one fetch; cancelling one caller does not cancel work still needed by another.
+Fetched and extracted pages are cached in byte-bounded memory and also persisted to a private, cross-session disk cache (files created `0700`/`0600`). Entries are fresh for 24 hours and retained stale for bounded conditional revalidation. Stale entries use their `ETag` and `Last-Modified` validators through the same URL validation, DNS pinning, redirect, timeout, and response-limit boundary as an initial fetch. `details.cacheStatus` distinguishes `hit`, `revalidated` (HTTP 304), and `miss`; the compatibility `cached` flag is true for hits and revalidations.
 
-Each result includes honest-evidence `details`: `requestedUrl` and `finalUrl` (after any rewrite or redirect), `contentKind` (a coarse classification such as `article`, `code-file`, `repository-readme`, `raw-text`, or `markup-shell`), `shellSuspected` (true when the page looks like an app shell, bot wall, or consent page), and `confidence` (`high`/`medium`/`low`) derived from the extractor, content length, and `shellSuspected`.
+Requests are coordinated per origin. Responses with status `429` or `503` are retried at most twice, honoring a bounded `Retry-After` value or using bounded jittered exponential backoff. Each caller retains independent cancellation while queued or backing off.
+
+Each result includes honest-evidence `details`: `requestedUrl` and `finalUrl` (after any rewrite or redirect), `contentKind` (a coarse classification such as `article`, `code-file`, `repository-readme`, `raw-text`, or `markup-shell`), and `confidence` (`high`/`medium`/`low`). For HTML, `details.extractionDiagnostics` separately reports JavaScript requirements, bot walls, consent interstitials, and sparse extraction; `shellSuspected` remains only as a deprecated compatibility summary.
+
+`details.links` exposes at most 16 normalized internal and 16 external HTTP(S) links with bounded anchor text and omitted counts. Unsafe schemes and credential-bearing URLs are rejected. Links are evidence from the fetched document only; `web_fetch` never fetches linked pages implicitly.
 
 `details.outline` provides bounded document-shape metadata: total words, heading count, the first 12 headings with section word counts, and the number of omitted headings. It ignores headings inside fenced code and conservatively infers short title lines only when extraction produced no Markdown headings. Heading text is untrusted remote content and is capped before being exposed.
+
+Extraction regressions cover tables, malformed issue-like markup, and app-shell false positives. Before changing focused-section ranking, run `vp exec jiti scripts/benchmark-focus.ts` to record heading, phrase, and stemming baselines.
 
 ## Uninstall
 

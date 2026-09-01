@@ -7,15 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-01
+
 ### Added
 
+- Add optional deterministic query-focused extraction that selects matching source sections from the complete cached document, preserves source order, supports continuation over the focused view, and reports honest selection evidence in `details.focus`
 - Add bounded, fence-aware document outlines to result details, including total words, section word counts, omitted-heading counts, and conservative fallback headings for structure lost during extraction
 - Add an opt-in live extraction-quality corpus that checks expected markers and content size while reporting extractor choice and latency
+- Revalidate stale cache entries with `ETag` and `Last-Modified`, reporting cache hits, HTTP 304 revalidations, and misses separately
+- Add explicit bounded diagnostics for JavaScript requirements, bot walls, consent interstitials, and sparse extraction
+- Expose bounded normalized internal and external links with anchor text and omitted counts without fetching linked pages
+- Coordinate requests per origin and retry `429`/`503` responses with bounded `Retry-After` handling or jittered backoff
+- Add focused-ranking baselines for heading, phrase, and stemming experiments
 
 ### Fixed
 
 - Resolve relative Open Graph, Twitter, and canonical page URLs before Defuddle metadata extraction so successful GitHub release fetches no longer leak `ERR_INVALID_URL` warnings into Pi's TUI
 - Remove leaked style elements, standalone CSS rules, and block at-rules from extracted Markdown while preserving fenced stylesheet examples
+- Expand extraction regressions for GFM tables, malformed issue markup, and content-rich app shells
 
 ## [0.7.1] - 2026-08-28
 
@@ -120,7 +129,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.7.1...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.8.0...HEAD
+[0.8.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.7.1...pi-web-fetch-v0.8.0
 [0.7.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.7.0...pi-web-fetch-v0.7.1
 [0.7.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.6.1...pi-web-fetch-v0.7.0
 [0.6.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.6.0...pi-web-fetch-v0.6.1

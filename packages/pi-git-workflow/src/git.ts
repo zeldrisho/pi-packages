@@ -42,7 +42,15 @@ export async function git(
   args: string[],
   timeout = GIT_TIMEOUT_MS,
 ): Promise<ExecResult> {
-  return pi.exec("git", args, { cwd, timeout });
+  try {
+    return await pi.exec("git", args, { cwd, timeout });
+  } catch (error) {
+    throw new GitInspectionError(
+      "git_command_failed",
+      "Git command failed or timed out",
+      error instanceof Error ? sanitizeGitOutput(error.message) : undefined,
+    );
+  }
 }
 
 /**
@@ -80,6 +88,13 @@ export function sanitizeGitOutput(value: string, max = 600): string | undefined 
  * @throws {GitInspectionError} When output exceeds the maximum allowed size
  */
 export function requireBoundedOutput(result: ExecResult, operation: string): void {
+  if (result.killed) {
+    throw new GitInspectionError(
+      "git_command_killed",
+      `${operation} was killed or timed out`,
+      sanitizeGitOutput(result.stderr),
+    );
+  }
   if (
     Buffer.byteLength(result.stdout, "utf8") > MAX_GIT_OUTPUT_BYTES ||
     Buffer.byteLength(result.stderr, "utf8") > MAX_GIT_OUTPUT_BYTES

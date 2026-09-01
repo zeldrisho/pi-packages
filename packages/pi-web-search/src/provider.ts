@@ -17,6 +17,15 @@ export function normalizeText(value: string, maxLength: number): string {
   return text.length <= maxLength ? text : `${text.slice(0, maxLength - 1)}…`;
 }
 
+/**
+ * Reads response body bytes with size limits and optional truncation.
+ *
+ * @param response - HTTP response to read
+ * @param maxBytes - Maximum bytes to read
+ * @param truncate - Whether to truncate at limit or throw error
+ * @returns Promise resolving to the response bytes
+ * @throws {Error} When response exceeds maxBytes and truncate is false
+ */
 async function readResponseBytes(
   response: Response,
   maxBytes: number,
@@ -63,6 +72,15 @@ async function readResponseBytes(
   return output;
 }
 
+/**
+ * Reads and decodes response body as UTF-8 text with size limits.
+ *
+ * @param response - HTTP response to read
+ * @param maxBytes - Maximum bytes to read
+ * @param truncate - Whether to truncate at limit or throw error
+ * @returns Promise resolving to the decoded text
+ * @throws {Error} When response exceeds maxBytes and truncate is false
+ */
 async function readResponseText(
   response: Response,
   maxBytes: number,
@@ -71,6 +89,15 @@ async function readResponseText(
   return new TextDecoder().decode(await readResponseBytes(response, maxBytes, truncate));
 }
 
+/**
+ * Performs an HTTP request and parses the response as JSON with timeout and size limits.
+ *
+ * @param url - URL to request
+ * @param init - Fetch request init options
+ * @param signal - Optional abort signal for cancellation
+ * @returns Promise resolving to the parsed JSON response
+ * @throws {Error} When request times out, is cancelled, or response is too large
+ */
 export async function requestJson<T>(
   url: string | URL,
   init: RequestInit,

@@ -7,7 +7,12 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { ExpiringLruCache, stableKeyHash, type CachePersistence } from "./cache";
 import { sliceCompleteDocument, type CompleteDocument } from "./content";
-import { fetchCompleteDocument, type FetchRemoteDependencies } from "./fetch";
+import {
+  fetchCompleteDocument,
+  revalidateCompleteDocument,
+  type FetchRemoteDependencies,
+} from "./fetch";
+import { focusMarkdown, type FocusDetails } from "./focus";
 import { InflightCoalescer } from "./inflight";
 import { createDocumentOutline, type DocumentOutline } from "./outline";
 import {
@@ -15,10 +20,12 @@ import {
   FETCH_DEFAULT_OFFSET,
   FETCH_MAX_CHARACTERS,
   FETCH_MAX_OFFSET_CHARACTERS,
+  FETCH_MAX_QUERY_CHARACTERS,
   FETCH_MIN_MAX_CHARACTERS,
 } from "./limits";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
+const CACHE_STALE_RETENTION_MS = 7 * CACHE_TTL_MS;
 const CACHE_MAX_ENTRIES = 100;
 const CACHE_MAX_MARKDOWN_BYTES = 20 * 1_024 * 1_024;
 const MAX_INFLIGHT_REQUESTS = 100;
@@ -39,6 +46,8 @@ export type ContentKind =
 
 /** Confidence that the returned content faithfully represents the source page. */
 export type FetchConfidence = "high" | "medium" | "low";
+/** Cache evidence for this call. */
+export type CacheStatus = "hit" | "revalidated" | "miss";
 
 function safeUrl(value: string): URL | undefined {
   try {
@@ -330,6 +339,8 @@ function resolveCacheDirectory(name: string): string {
 /** Parameters for a web fetch operation. */
 export interface WebFetchParameters {
   url: string;
+  /** Optional query used to select matching Markdown sections before continuation slicing. */
+  query?: string;
   offset?: number;
   maxCharacters?: number;
 }
@@ -350,17 +361,24 @@ export interface WebFetchDetails {
   title?: string;
   extractor: CompleteDocument["extractor"];
   contentKind: ContentKind;
+  /** @deprecated Use extractionDiagnostics for explicit quality evidence. */
   shellSuspected: boolean;
+  extractionDiagnostics?: CompleteDocument["extractionDiagnostics"];
+  links?: CompleteDocument["links"];
   confidence: FetchConfidence;
-  /** Bounded document-shape metadata. Heading text is untrusted remote content. */
+  /** Bounded document-shape metadata for the complete, unfiltered document. Heading text is untrusted remote content. */
   outline: DocumentOutline;
+  /** Deterministic focused-extraction evidence when a query was supplied. */
+  focus?: FocusDetails;
   /** True when the returned content is the site's /llms.txt served instead of the requested page. */
   llmsTxtFallback: boolean;
   /** True when the returned content is the page's advertised Markdown version served instead of a low-quality page. */
   markdownAlternateFallback: boolean;
   /** The site's /llms.txt index URL when one exists and the returned content is not that index itself. */
   llmsTxtUrl?: string;
+  /** True for a fresh cache hit or a successful 304 revalidation. */
   cached: boolean;
+  cacheStatus: CacheStatus;
   truncated: boolean;
   offset: number;
   nextOffset?: number;
@@ -388,7 +406,11 @@ const fetchCache = new ExpiringLruCache<string, CompleteDocument>(
   undefined,
   fetchCachePersistence,
 );
-const inflightFetches = new InflightCoalescer<string, CompleteDocument>(MAX_INFLIGHT_REQUESTS);
+interface FetchAcquisition {
+  document: CompleteDocument;
+  cacheStatus: Exclude<CacheStatus, "hit">;
+}
+const inflightFetches = new InflightCoalescer<string, FetchAcquisition>(MAX_INFLIGHT_REQUESTS);
 
 /**
  * Fetches a web page and returns formatted content with pagination and truncation metadata.
@@ -420,34 +442,66 @@ export async function executeWebFetch(
       `web_fetch maxCharacters must be an integer between ${FETCH_MIN_MAX_CHARACTERS} and ${FETCH_MAX_CHARACTERS}.`,
     );
   }
+  if (
+    params.query !== undefined &&
+    (params.query.trim().length === 0 || params.query.length > FETCH_MAX_QUERY_CHARACTERS)
+  ) {
+    throw new Error(
+      `web_fetch query must contain between 1 and ${FETCH_MAX_QUERY_CHARACTERS} characters.`,
+    );
+  }
   let document = fetchCache.get(params.url);
-  const cached = document !== undefined;
+  const now = Date.now();
+  const fresh = Boolean(
+    document && (document.cachedAt === undefined || now - document.cachedAt < CACHE_TTL_MS),
+  );
+  let cacheStatus: CacheStatus = fresh ? "hit" : "miss";
   onUpdate?.({
     content: [
       {
         type: "text",
-        text: cached ? `Using cached content for ${params.url}…` : `Fetching ${params.url}…`,
+        text: fresh
+          ? `Using cached content for ${params.url}…`
+          : document
+            ? `Revalidating cached content for ${params.url}…`
+            : `Fetching ${params.url}…`,
       },
     ],
     details: {},
   });
-  if (!document) {
-    document = await inflightFetches.run(
+  if (!fresh) {
+    const stale = document;
+    const acquisition = await inflightFetches.run(
       params.url,
       async (sharedSignal) => {
-        const fetched = await fetchDocumentWithLlmsTxtSupport(
-          params.url,
-          sharedSignal,
-          dependencies,
-        );
-        fetchCache.set(params.url, fetched, Date.now() + CACHE_TTL_MS);
-        return fetched;
+        let fetched: CompleteDocument;
+        let acquisitionStatus: FetchAcquisition["cacheStatus"] = "miss";
+        if (stale?.validators && !stale.llmsTxtFallback && !stale.markdownAlternateFallback) {
+          const outcome = await revalidateCompleteDocument(
+            params.url,
+            stale,
+            sharedSignal,
+            dependencies,
+          );
+          fetched = outcome.document;
+          acquisitionStatus = outcome.revalidated ? "revalidated" : "miss";
+        } else {
+          fetched = await fetchDocumentWithLlmsTxtSupport(params.url, sharedSignal, dependencies);
+        }
+        fetchCache.set(params.url, fetched, Date.now() + CACHE_STALE_RETENTION_MS);
+        return { document: fetched, cacheStatus: acquisitionStatus };
       },
       signal,
       "web_fetch was cancelled.",
     );
+    document = acquisition.document;
+    cacheStatus = acquisition.cacheStatus;
   }
-  const result = sliceCompleteDocument(document, offset, maxCharacters);
+  if (!document) throw new Error("web_fetch failed to acquire a document.");
+  const focused =
+    params.query === undefined ? undefined : focusMarkdown(document.markdown, params.query);
+  const outputDocument = focused ? { ...document, markdown: focused.markdown } : document;
+  const result = sliceCompleteDocument(outputDocument, offset, maxCharacters);
   const requestedUrl = params.url;
   const finalUrl = result.url;
   const shellSuspected = result.shellSuspected;
@@ -474,8 +528,16 @@ export async function executeWebFetch(
           "",
         ]
       : []),
+    ...(focused
+      ? [
+          focused.details.matchedSections > 0
+            ? `[Showing ${focused.details.matchedSections} of ${focused.details.totalSections} source sections selected by the focus query. Offsets apply to this focused view; omit query to read the complete document.]`
+            : "[No source sections matched the focus query. Omit query to read the complete document.]",
+          "",
+        ]
+      : []),
     `<untrusted_web_content source=${JSON.stringify(result.url)}>`,
-    result.markdown || "[The page contained no readable text.]",
+    result.markdown || (focused ? "" : "[The page contained no readable text.]"),
     "</untrusted_web_content>",
   ].join("\n");
   const outputTruncation = truncateHead(output, {
@@ -494,12 +556,16 @@ export async function executeWebFetch(
       extractor: result.extractor,
       contentKind,
       shellSuspected,
+      extractionDiagnostics: result.extractionDiagnostics,
+      links: result.links,
       confidence,
       outline: createDocumentOutline(document.markdown),
+      focus: focused?.details,
       llmsTxtFallback: Boolean(result.llmsTxtFallback),
       markdownAlternateFallback: Boolean(result.markdownAlternateFallback),
       llmsTxtUrl: result.llmsTxtIndexUrl,
-      cached,
+      cached: cacheStatus !== "miss",
+      cacheStatus,
       truncated,
       offset: result.offset,
       nextOffset: result.nextOffset,

@@ -3,6 +3,13 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export const AGENTS_FILE = "AGENTS.md";
 
+/**
+ * Checks if a target path is contained within a root directory.
+ *
+ * @param root - Root directory path
+ * @param target - Target path to check
+ * @returns True if target is within root, false otherwise
+ */
 function isContained(root: string, target: string): boolean {
   const fromRoot = relative(root, target);
   return (

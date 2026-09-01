@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Dependency overrides need removal conditions · Issue #37</title>
+  </head>
+  <body>
+    <header><a href="/zeldrisho/pi-packages">pi-packages</a></header>
+    <main>
+      <article>
+        <h1>Dependency overrides need removal conditions</h1>
+        <p>
+          Repo-level overrides fork upstream dependency decisions. Without a removal condition they
+          persist silently and can break installs if upstream moves to a semver-incompatible
+          release.
+        </p>
+        <h2>Overrides (pnpm-workspace.yaml)</h2>
+        <ol>
+          <li>
+            <code>undici: "8.9.0"</code> because the coding agent pins an older release.
+            <ul>
+              <li>
+                <strong>Removal condition:</strong> drop when the coding agent repins undici at or
+                above 8.9.0.
+              </li>
+            </ul>
+          </li>
+          <li>
+            <code>brace-expansion: "5.0.9"</code>, arriving via minimatch below the fixed release.
+            <ul>
+              <li>
+                <strong>Removal condition:</strong> drop when every minimatch resolution uses
+                brace-expansion at or above 5.0.9.
+              </li>
+            </ul>
+          </li>
+        </ol>
+        <h2>Lifecycle rules</h2>
+        <ul>
+          <li>Re-check both removal conditions on every catalog or lockfile bump.</li>
+          <li>The repository contract test signals a removable override.</li>
+        </ul>
+      </article>
+    </main>
+  </body>
+</html>

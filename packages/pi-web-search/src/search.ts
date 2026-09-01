@@ -143,6 +143,11 @@ const inflightSearches = new InflightCoalescer<string, SearchResult[]>(MAX_INFLI
 export class SearchRuntime {
   readonly #tempDirectories = new Set<string>();
 
+  /**
+   * Cleans up all temporary directories created during search operations.
+   *
+   * @returns Promise that resolves when all cleanup is complete
+   */
   async shutdown(): Promise<void> {
     const directories = [...this.#tempDirectories];
     await Promise.allSettled(
@@ -151,6 +156,16 @@ export class SearchRuntime {
     this.#tempDirectories.clear();
   }
 
+  /**
+   * Executes a web search with caching, truncation, and progress updates.
+   *
+   * @param params - Search parameters including query, count, and filters
+   * @param signal - Optional abort signal for cancellation
+   * @param onUpdate - Optional callback for search progress updates
+   * @param cwd - Working directory for credential resolution
+   * @returns Promise resolving to search details with results and metadata
+   * @throws {Error} When query is empty or API key is missing
+   */
   async execute(
     params: SearchParameters,
     signal: AbortSignal | undefined,

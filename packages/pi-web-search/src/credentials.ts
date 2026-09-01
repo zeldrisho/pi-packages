@@ -36,6 +36,12 @@ export function extractKeyValue(text: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Reads and extracts the Brave API key from a .env file.
+ *
+ * @param path - Path to the .env file
+ * @returns The extracted API key or undefined if file cannot be read or key is not found
+ */
 async function readDotEnvKey(path: string): Promise<string | undefined> {
   let handle: Awaited<ReturnType<typeof open>> | undefined;
   try {

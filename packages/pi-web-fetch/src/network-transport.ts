@@ -60,6 +60,7 @@ async function requestOnce(
   address: string,
   signal: AbortSignal,
   attemptTimeoutMs: number,
+  headers: Readonly<Record<string, string>>,
 ): Promise<IncomingMessage> {
   const family = isIP(address);
   if (family !== 4 && family !== 6) throw new Error(`web_fetch could not resolve ${address}.`);
@@ -101,6 +102,7 @@ async function requestOnce(
         headers: {
           Accept: "text/markdown, text/html, text/plain, application/json;q=0.9, */*;q=0.1",
           "User-Agent": "Mozilla/5.0 (compatible; PiWebFetch/1.0; +https://pi.dev)",
+          ...headers,
         },
       },
       (response) => {
@@ -126,6 +128,8 @@ async function requestOnce(
 export interface RequestPinnedOptions {
   /** Per-address connect deadline used to fall back to the next address. */
   attemptTimeoutMs?: number;
+  /** Additional fixed request headers, used for conditional cache revalidation. */
+  headers?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -146,7 +150,7 @@ export async function requestPinned(
   let lastError: unknown;
   for (const address of addresses) {
     try {
-      return await requestOnce(target, address, signal, attemptTimeoutMs);
+      return await requestOnce(target, address, signal, attemptTimeoutMs, options.headers ?? {});
     } catch (error) {
       lastError = error;
       if (signal.aborted) throw error;

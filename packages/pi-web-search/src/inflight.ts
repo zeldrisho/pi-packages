@@ -5,6 +5,14 @@ interface InflightEntry<V> {
   waiters: number;
 }
 
+/**
+ * Wraps a promise to respect a caller's abort signal without cancelling the underlying operation.
+ *
+ * @param operation - Promise to wait for
+ * @param signal - Optional abort signal for this caller
+ * @param cancelledMessage - Error message to use when signal is aborted
+ * @returns Promise that rejects if signal aborts, otherwise resolves with operation result
+ */
 function waitForCaller<T>(
   operation: Promise<T>,
   signal: AbortSignal | undefined,
@@ -28,10 +36,24 @@ export class InflightCoalescer<K, V> {
 
   constructor(readonly maxEntries: number) {}
 
+  /**
+   * Gets the number of currently in-flight operations.
+   *
+   * @returns Count of active operations
+   */
   get size(): number {
     return this.#entries.size;
   }
 
+  /**
+   * Runs an operation, coalescing with any identical in-flight operation.
+   *
+   * @param key - Operation key for coalescing identical operations
+   * @param operation - Function that performs the operation
+   * @param signal - Optional abort signal for this caller
+   * @param cancelledMessage - Error message when signal is aborted
+   * @returns Promise resolving to the operation result
+   */
   async run(
     key: K,
     operation: (signal: AbortSignal | undefined) => Promise<V>,

@@ -75,6 +75,54 @@ describe("web_fetch caching", () => {
     expect(updates).toEqual([`Fetching ${url}…`, `Using cached content for ${url}…`]);
   });
 
+  it("derives focused views from the complete cached document", async () => {
+    const url = `${origin}/focused?request=${Date.now()}`;
+    const focused = await executeWebFetch(
+      { url, query: "caching" },
+      undefined,
+      undefined,
+      dependencies,
+    );
+    const complete = await executeWebFetch({ url }, undefined, undefined, dependencies);
+
+    expect(focused.content[0].text).toContain("Caching stores complete pages.");
+    expect(focused.content[0].text).not.toContain("Installation uses Vite+.");
+    expect(focused.details.focus).toMatchObject({
+      query: "caching",
+      matchedSections: 1,
+      totalSections: 3,
+      omittedSections: 2,
+    });
+    expect(focused.details.totalCharacters).toBe("Caching stores complete pages.".length);
+    expect(complete.details.cached).toBe(true);
+    expect(complete.details.focus).toBeUndefined();
+    expect(complete.content[0].text).toContain("Installation uses Vite+.");
+  });
+
+  it("reports an empty focused view without claiming the page had no readable text", async () => {
+    const result = await executeWebFetch(
+      { url: `${origin}/focused?none=${Date.now()}`, query: "quasar" },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.content[0].text).toContain("No source sections matched the focus query");
+    expect(result.content[0].text).not.toContain("page contained no readable text");
+    expect(result.details.focus?.matchedSections).toBe(0);
+  });
+
+  it("rejects invalid focus queries at the runtime boundary", async () => {
+    await expect(
+      executeWebFetch(
+        { url: `${origin}/focused`, query: "   " },
+        undefined,
+        undefined,
+        dependencies,
+      ),
+    ).rejects.toThrow("query must contain between 1 and 400 characters");
+  });
+
   it("coalesces concurrent fetches without letting one caller cancel another", async () => {
     fixture.resetCoalescedRequests();
     const url = `${origin}/coalesced?request=${Date.now()}`;
