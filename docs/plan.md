@@ -1,19 +1,15 @@
 # Remaining work
 
-The implemented package behavior is documented in [`packages/pi-git-workflow/README.md`](../packages/pi-git-workflow/README.md). Shared Git automation practices are documented in [`git.md`](git.md), with the security boundary summarized in [`security-invariants.md`](security-invariants.md).
+## Git workflow
 
-1. Add explicit unit coverage for:
-   - a candidate ref disappearing between inspection and deletion;
-   - Git commands timing out or returning a killed result; and
-   - an upstream-present branch being retained by automatic cleanup.
-2. Review the final diff for accidental target-preparation, checkout, remote-deletion, force-deletion, or reload behavior.
-3. Run final verification after all code and documentation edits:
+- Add explicit unit coverage for a candidate ref disappearing between inspection and deletion.
+- Add explicit unit coverage for timed-out and killed Git commands.
+- Add explicit unit coverage proving automatic cleanup retains a branch whose upstream still exists.
 
-   ```bash
-   vp test packages/pi-git-workflow/tests
-   vp check --fix
-   vp run format:changelog
-   vp run validate
-   ```
+## Web fetch
 
-4. Resolve any failures, then prepare the changes for review.
+1. Revalidate stale cached documents with `ETag` and `Last-Modified` through the existing validate–resolve–pin–redirect transport, and distinguish cache hits, revalidations, and misses in result evidence.
+2. Replace the opaque shell-suspicion signal with bounded extraction diagnostics for JavaScript requirements, bot walls, consent interstitials, and sparse extraction.
+3. Expose a bounded set of normalized internal and external links with anchor text and omitted counts; reject unsafe schemes and do not fetch linked pages implicitly.
+4. Coordinate requests per origin, honor `Retry-After`, and apply bounded jittered backoff for `429` and `503` responses without weakening per-caller cancellation.
+5. Expand extraction regressions for GFM tables, malformed markup, app-shell false positives, and real issue fixtures. Benchmark heading, phrase, and stemming improvements before changing focused-section ranking.

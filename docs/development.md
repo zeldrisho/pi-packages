@@ -55,6 +55,20 @@ The benchmark checks stable content markers and minimum extracted sizes while re
 
 To load a local package in an isolated Pi session, run `pi -e ./packages/<name>` and disable globally installed extensions as needed so they cannot interfere with manual verification.
 
+## Regression and review discipline
+
+Turn production failures and fixed issues into deterministic regression fixtures, retaining the issue
+identifier in the test name or fixture when it helps future diagnosis. For stateful operations, cover
+both the expected path and state that moves, disappears, times out, is killed, or is refused between
+inspection and mutation. For extraction and ranking, preserve representative malformed, noisy, and
+false-positive inputs; use the live corpus to evaluate quality changes, not as a replacement for
+repeatable tests.
+
+Before review, inspect the final diff for behavior beyond the requested scope, especially implicit
+mutation, forceful fallbacks, new network paths, cache-semantic changes, or hidden output growth. Run
+package-focused tests while iterating, then `vp check --fix`, any required normalization task, and
+`vp run validate` once code and documentation are final.
+
 ## Dependency reviews
 
 Dependency updates are opened manually. Inspect upstream release notes and the lockfile, confirm GitHub
