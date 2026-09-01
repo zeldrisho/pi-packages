@@ -173,6 +173,49 @@ describe("origin coordination and retries", () => {
     await Promise.all(blockers);
   });
 
+  it("reserves a released origin slot for the queued waiter", async () => {
+    let active = 0;
+    let maximum = 0;
+    const releases: Array<() => void> = [];
+    const request = async (): Promise<IncomingMessage> => {
+      active += 1;
+      maximum = Math.max(maximum, active);
+      await new Promise<void>((resolve) => releases.push(resolve));
+      active -= 1;
+      return response(200);
+    };
+    const dependencies = { validateUrl: async (value: string | URL) => target(value), request };
+    const blockers = Array.from({ length: 4 }, (_, index) =>
+      requestFollowingRedirects(
+        `https://reserved.example.com/blocker-${index}`,
+        new AbortController().signal,
+        dependencies,
+      ),
+    );
+    await vi.waitFor(() => expect(releases).toHaveLength(4));
+    const queued = requestFollowingRedirects(
+      "https://reserved.example.com/queued",
+      new AbortController().signal,
+      dependencies,
+    );
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    releases.shift()?.();
+    const newcomer = requestFollowingRedirects(
+      "https://reserved.example.com/newcomer",
+      new AbortController().signal,
+      dependencies,
+    );
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(maximum).toBe(4);
+    while (releases.length > 0) {
+      releases.splice(0).forEach((release) => release());
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+    await Promise.all([...blockers, queued, newcomer]);
+  });
+
   it("limits concurrent request starts per origin", async () => {
     let active = 0;
     let maximum = 0;

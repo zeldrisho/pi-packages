@@ -37,10 +37,18 @@ function abortError(): Error {
 async function acquireOrigin(origin: string, signal: AbortSignal): Promise<() => void> {
   const state = origins.get(origin) ?? { active: 0, waiting: [] };
   origins.set(origin, state);
+  let reserved = false;
+  const release = () => {
+    state.active -= 1;
+    state.waiting.shift()?.();
+    if (state.active === 0 && state.waiting.length === 0) origins.delete(origin);
+  };
   if (state.active >= MAX_ORIGIN_CONCURRENCY) {
     await new Promise<void>((resolve, reject) => {
       const enter = () => {
         signal.removeEventListener("abort", cancel);
+        state.active += 1;
+        reserved = true;
         resolve();
       };
       const cancel = () => {
@@ -55,13 +63,12 @@ async function acquireOrigin(origin: string, signal: AbortSignal): Promise<() =>
       }
     });
   }
-  if (signal.aborted) throw abortError();
-  state.active += 1;
-  return () => {
-    state.active -= 1;
-    state.waiting.shift()?.();
-    if (state.active === 0 && state.waiting.length === 0) origins.delete(origin);
-  };
+  if (signal.aborted) {
+    if (reserved) release();
+    throw abortError();
+  }
+  if (!reserved) state.active += 1;
+  return release;
 }
 
 async function defaultSleep(milliseconds: number, signal: AbortSignal): Promise<void> {

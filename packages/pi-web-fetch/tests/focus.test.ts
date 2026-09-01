@@ -27,6 +27,16 @@ describe("query-focused Markdown", () => {
     });
   });
 
+  it("starts a section at every heading without requiring blank lines", () => {
+    const result = focusMarkdown(
+      "# Cache\nCaching is bounded.\n# Redirects\nRedirect targets are validated.",
+      "caching",
+    );
+
+    expect(result.markdown).toBe("# Cache\nCaching is bounded.");
+    expect(result.details).toMatchObject({ matchedSections: 1, totalSections: 2 });
+  });
+
   it("uses paragraphs as sections for headingless content", () => {
     const result = focusMarkdown(
       "Alpha covers installation.\n\nBeta explains cancellation.\n\nGamma covers cleanup.",

@@ -22,7 +22,7 @@ interface Section {
 }
 
 function tokens(value: string): string[] {
-  return (value.toLocaleLowerCase().match(WORD_PATTERN) ?? []).filter((token) => token.length > 1);
+  return (value.toLowerCase().match(WORD_PATTERN) ?? []).filter((token) => token.length > 1);
 }
 
 /**
@@ -37,20 +37,22 @@ function splitSections(markdown: string): Section[] {
     .filter(Boolean);
   if (blocks.length === 0) return [];
 
-  const hasHeadings = blocks.some((block) => HEADING_PATTERN.test(block));
+  const lines = markdown.split(/\r?\n/);
+  const hasHeadings = lines.some((line) => HEADING_PATTERN.test(line));
   if (!hasHeadings) return blocks.map((block) => ({ markdown: block, tokens: tokens(block) }));
 
   const sections: string[] = [];
-  let current = "";
-  for (const block of blocks) {
-    if (HEADING_PATTERN.test(block) && current) {
-      sections.push(current);
-      current = block;
-    } else {
-      current = current ? `${current}\n\n${block}` : block;
-    }
+  let current: string[] = [];
+  const flush = () => {
+    const section = current.join("\n").trim();
+    if (section) sections.push(section);
+    current = [];
+  };
+  for (const line of lines) {
+    if (HEADING_PATTERN.test(line)) flush();
+    current.push(line);
   }
-  if (current) sections.push(current);
+  flush();
   return sections.map((section) => ({ markdown: section, tokens: tokens(section) }));
 }
 
