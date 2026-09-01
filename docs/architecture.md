@@ -45,6 +45,22 @@ complete extracted document; optional query-focused selection derives a separate
 mutating that canonical entry. Continuation offsets remain stable within the selected view, and each
 caller still has independent cancellation through the in-flight coalescer.
 
+Cache freshness and retention are separate. Fresh representations are hits; stale representations
+remain available only for a bounded revalidation window and send `ETag` or `Last-Modified`
+validators through the same validated and pinned transport. A `304` refreshes the canonical entry,
+while a changed or validator-less representation is a miss. Result evidence distinguishes hits,
+revalidations, and misses rather than collapsing all cache use into one boolean.
+
+Origin coordination bounds concurrent request starts. Retryable `429` and `503` responses honor a
+capped `Retry-After` value or use capped jittered backoff, with a fixed attempt limit. Queuing and
+backoff remain abortable per caller, and retry response bodies are discarded rather than consumed
+without a bound.
+
+HTML evidence reports separate JavaScript-required, bot-wall, consent-interstitial, and
+sparse-extraction diagnostics. It may also expose a bounded, normalized set of internal and external
+HTTP(S) links with bounded anchor text and omitted counts. Unsafe schemes and credential-bearing
+links are rejected, and links remain metadata: acquisition never traverses them implicitly.
+
 The blocked-address table is maintained in `packages/pi-web-fetch/src/network-policy.ts` against the
 [IANA IPv4](https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml)
 and [IANA IPv6](https://www.iana.org/assignments/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml)
@@ -84,7 +100,9 @@ bounded source representations rather than query-specific projections; derive fo
 otherwise reduced views locally so another request can recover omitted context without another
 network fetch. Derived views must preserve source order when practical and report what was selected
 or omitted. Relevance and extraction-quality signals describe processing behavior, not source truth
-or calibrated answer confidence.
+or calibrated answer confidence. Evaluate ranking changes against deterministic heading, phrase,
+and stemming cases before modifying selection; preserve source order and continuation semantics,
+and retain known misses in the baseline until an intentional ranking change addresses them.
 
 Network optimizations—including revalidation, retries, metadata probes, and redirect handling—must
 reuse the package's complete transport security boundary. Do not introduce an auxiliary HTTP client

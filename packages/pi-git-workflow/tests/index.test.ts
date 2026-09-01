@@ -11,6 +11,7 @@ import {
 import piGitWorkflow, { extractBranchName } from "../src/index";
 import {
   detectTargetBranchInRepo,
+  git,
   GitInspectionError,
   requireBoundedOutput,
   sanitizeGitOutput,
@@ -101,6 +102,24 @@ describe("Git inspection helpers", () => {
       requireBoundedOutput(result({ stdout: "x".repeat(1_000_001) }), "inspection"),
     ).toThrow(/too much data/);
   });
+
+  it("fails closed when a Git command is killed", () => {
+    expect(() => requireBoundedOutput(result({ killed: true }), "branch inspection")).toThrow(
+      /killed or timed out/,
+    );
+  });
+
+  it("wraps a timed-out Git command as an inspection failure", async () => {
+    const pi = {
+      exec: vi.fn(async () => {
+        throw new Error("Command timed out after 30000ms");
+      }),
+    } as unknown as Pick<ExtensionAPI, "exec">;
+    await expect(git(pi, root, ["status"])).rejects.toMatchObject({
+      code: "git_command_failed",
+      details: "Command timed out after 30000ms",
+    });
+  });
 });
 
 describe("machine-readable parsing", () => {
@@ -167,6 +186,15 @@ describe("cleanupRepository", () => {
     expect(cleanup.review[0]?.reason).toContain("linked worktree");
   });
 
+  it("retains a branch whose upstream still exists", async () => {
+    const { pi, calls } = cleanupPi(
+      branchRecord("feature", branchCommit, "refs/remotes/origin/feature", ""),
+    );
+    const cleanup = await cleanupRepository(pi, { cwd: root, trusted: true });
+    expect(cleanup.retained).toContain("feature");
+    expect(calls.some((args) => args[0] === "branch" && args[1] === "--delete")).toBe(false);
+  });
+
   it("reverifies refs and retains a concurrently moved branch", async () => {
     const moved = "c".repeat(40);
     const { pi, calls } = cleanupPi(branchRecord("feature"), (args) =>
@@ -176,6 +204,15 @@ describe("cleanupRepository", () => {
     );
     const cleanup = await cleanupRepository(pi, { cwd: root, trusted: true });
     expect(cleanup.review[0]?.reason).toContain("moved");
+    expect(calls.some((args) => args[0] === "branch" && args[1] === "--delete")).toBe(false);
+  });
+
+  it("retains a candidate ref that disappears before deletion", async () => {
+    const { pi, calls } = cleanupPi(branchRecord("feature"), (args) =>
+      args.join(" ") === "rev-parse --verify refs/heads/feature^{commit}" ? { code: 1 } : undefined,
+    );
+    const cleanup = await cleanupRepository(pi, { cwd: root, trusted: true });
+    expect(cleanup.review[0]?.reason).toContain("disappeared");
     expect(calls.some((args) => args[0] === "branch" && args[1] === "--delete")).toBe(false);
   });
 

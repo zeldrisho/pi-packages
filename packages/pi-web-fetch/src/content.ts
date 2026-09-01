@@ -1,4 +1,5 @@
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@earendil-works/pi-coding-agent";
+import type { ExtractedLinks, ExtractionDiagnostics } from "./evidence";
 
 const CONTENT_LINE_BUDGET = Math.max(1, DEFAULT_MAX_LINES - 10);
 const CONTENT_BYTE_BUDGET = Math.max(1_024, DEFAULT_MAX_BYTES - 2_048);
@@ -16,8 +17,16 @@ export interface CompleteDocument {
   markdown: string;
   title?: string;
   extractor: "defuddle" | "basic" | "raw";
-  /** True when the page appears to be an app shell, bot wall, or consent page. */
+  /** @deprecated Use extractionDiagnostics for the individual quality signals. */
   shellSuspected: boolean;
+  /** Explicit bounded extraction-quality evidence for HTML documents. */
+  extractionDiagnostics?: ExtractionDiagnostics;
+  /** Bounded normalized links extracted from this document; linked pages were not fetched. */
+  links?: ExtractedLinks;
+  /** HTTP validators retained for stale-cache revalidation. */
+  validators?: { etag?: string; lastModified?: string };
+  /** Time at which this representation was fetched or successfully revalidated. */
+  cachedAt?: number;
   /** True when this document is the site's /llms.txt served instead of a low-quality page. */
   llmsTxtFallback?: boolean;
   /** Set when the site publishes a usable /llms.txt index and this document is not that index. */

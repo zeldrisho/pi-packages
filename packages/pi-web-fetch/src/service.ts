@@ -7,7 +7,11 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { ExpiringLruCache, stableKeyHash, type CachePersistence } from "./cache";
 import { sliceCompleteDocument, type CompleteDocument } from "./content";
-import { fetchCompleteDocument, type FetchRemoteDependencies } from "./fetch";
+import {
+  fetchCompleteDocument,
+  revalidateCompleteDocument,
+  type FetchRemoteDependencies,
+} from "./fetch";
 import { focusMarkdown, type FocusDetails } from "./focus";
 import { InflightCoalescer } from "./inflight";
 import { createDocumentOutline, type DocumentOutline } from "./outline";
@@ -21,6 +25,7 @@ import {
 } from "./limits";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
+const CACHE_STALE_RETENTION_MS = 7 * CACHE_TTL_MS;
 const CACHE_MAX_ENTRIES = 100;
 const CACHE_MAX_MARKDOWN_BYTES = 20 * 1_024 * 1_024;
 const MAX_INFLIGHT_REQUESTS = 100;
@@ -41,6 +46,8 @@ export type ContentKind =
 
 /** Confidence that the returned content faithfully represents the source page. */
 export type FetchConfidence = "high" | "medium" | "low";
+/** Cache evidence for this call. */
+export type CacheStatus = "hit" | "revalidated" | "miss";
 
 function safeUrl(value: string): URL | undefined {
   try {
@@ -354,7 +361,10 @@ export interface WebFetchDetails {
   title?: string;
   extractor: CompleteDocument["extractor"];
   contentKind: ContentKind;
+  /** @deprecated Use extractionDiagnostics for explicit quality evidence. */
   shellSuspected: boolean;
+  extractionDiagnostics?: CompleteDocument["extractionDiagnostics"];
+  links?: CompleteDocument["links"];
   confidence: FetchConfidence;
   /** Bounded document-shape metadata for the complete, unfiltered document. Heading text is untrusted remote content. */
   outline: DocumentOutline;
@@ -366,7 +376,9 @@ export interface WebFetchDetails {
   markdownAlternateFallback: boolean;
   /** The site's /llms.txt index URL when one exists and the returned content is not that index itself. */
   llmsTxtUrl?: string;
+  /** True for a fresh cache hit or a successful 304 revalidation. */
   cached: boolean;
+  cacheStatus: CacheStatus;
   truncated: boolean;
   offset: number;
   nextOffset?: number;
@@ -394,7 +406,11 @@ const fetchCache = new ExpiringLruCache<string, CompleteDocument>(
   undefined,
   fetchCachePersistence,
 );
-const inflightFetches = new InflightCoalescer<string, CompleteDocument>(MAX_INFLIGHT_REQUESTS);
+interface FetchAcquisition {
+  document: CompleteDocument;
+  cacheStatus: Exclude<CacheStatus, "hit">;
+}
+const inflightFetches = new InflightCoalescer<string, FetchAcquisition>(MAX_INFLIGHT_REQUESTS);
 
 /**
  * Fetches a web page and returns formatted content with pagination and truncation metadata.
@@ -435,32 +451,53 @@ export async function executeWebFetch(
     );
   }
   let document = fetchCache.get(params.url);
-  const cached = document !== undefined;
+  const now = Date.now();
+  const fresh = Boolean(
+    document && (document.cachedAt === undefined || now - document.cachedAt < CACHE_TTL_MS),
+  );
+  let cacheStatus: CacheStatus = fresh ? "hit" : "miss";
   onUpdate?.({
     content: [
       {
         type: "text",
-        text: cached ? `Using cached content for ${params.url}…` : `Fetching ${params.url}…`,
+        text: fresh
+          ? `Using cached content for ${params.url}…`
+          : document
+            ? `Revalidating cached content for ${params.url}…`
+            : `Fetching ${params.url}…`,
       },
     ],
     details: {},
   });
-  if (!document) {
-    document = await inflightFetches.run(
+  if (!fresh) {
+    const stale = document;
+    const acquisition = await inflightFetches.run(
       params.url,
       async (sharedSignal) => {
-        const fetched = await fetchDocumentWithLlmsTxtSupport(
-          params.url,
-          sharedSignal,
-          dependencies,
-        );
-        fetchCache.set(params.url, fetched, Date.now() + CACHE_TTL_MS);
-        return fetched;
+        let fetched: CompleteDocument;
+        let acquisitionStatus: FetchAcquisition["cacheStatus"] = "miss";
+        if (stale?.validators && !stale.llmsTxtFallback && !stale.markdownAlternateFallback) {
+          const outcome = await revalidateCompleteDocument(
+            params.url,
+            stale,
+            sharedSignal,
+            dependencies,
+          );
+          fetched = outcome.document;
+          acquisitionStatus = outcome.revalidated ? "revalidated" : "miss";
+        } else {
+          fetched = await fetchDocumentWithLlmsTxtSupport(params.url, sharedSignal, dependencies);
+        }
+        fetchCache.set(params.url, fetched, Date.now() + CACHE_STALE_RETENTION_MS);
+        return { document: fetched, cacheStatus: acquisitionStatus };
       },
       signal,
       "web_fetch was cancelled.",
     );
+    document = acquisition.document;
+    cacheStatus = acquisition.cacheStatus;
   }
+  if (!document) throw new Error("web_fetch failed to acquire a document.");
   const focused =
     params.query === undefined ? undefined : focusMarkdown(document.markdown, params.query);
   const outputDocument = focused ? { ...document, markdown: focused.markdown } : document;
@@ -519,13 +556,16 @@ export async function executeWebFetch(
       extractor: result.extractor,
       contentKind,
       shellSuspected,
+      extractionDiagnostics: result.extractionDiagnostics,
+      links: result.links,
       confidence,
       outline: createDocumentOutline(document.markdown),
       focus: focused?.details,
       llmsTxtFallback: Boolean(result.llmsTxtFallback),
       markdownAlternateFallback: Boolean(result.markdownAlternateFallback),
       llmsTxtUrl: result.llmsTxtIndexUrl,
-      cached,
+      cached: cacheStatus !== "miss",
+      cacheStatus,
       truncated,
       offset: result.offset,
       nextOffset: result.nextOffset,

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fail closed when Git commands are killed or time out, with coverage for disappearing candidate refs and branches whose upstream still exists
+
 ## [0.2.0] - 2026-08-27
 
 ### Added

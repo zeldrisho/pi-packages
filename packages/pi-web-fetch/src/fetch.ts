@@ -1,6 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import { awaitWithAbort } from "./abort";
 import { sliceCompleteDocument, type CompleteDocument, type FetchResult } from "./content";
+import { diagnoseExtraction, extractDocumentLinks, hasExtractionWarning } from "./evidence";
 import { extractHtmlToMarkdown } from "./extract";
 import { requestFollowingRedirects, type RedirectDependencies } from "./network-redirects";
 import type { ValidatedTarget } from "./network-policy";
@@ -56,37 +57,9 @@ export function normalizeGitHubRawUrl(rawUrl: string): string {
   }
 }
 
-const APP_SHELL_MARKERS = [
-  /please\s+enable\s+javascript/i,
-  /enable\s+javascript/i,
-  // Consent is only treated as an interstitial signal when it appears in a
-  // cookie/consent-banner phrase. A bare "consent" matches ordinary prose
-  // (e.g. privacy articles) and must not flag readable content as a shell.
-  /manage\s+(your\s+)?consent/i,
-  /your\s+(privacy\s+)?consent/i,
-  /consent\s+to\s+(our\s+use\s+of\s+cookies|cookies)/i,
-  /accept\s+(all\s+)?cookies/i,
-  /we\s+use\s+cookies/i,
-  /are\s+you\s+a\s+robot/i,
-  /verify\s+you\s+are\s+human/i,
-  /checking\s+your\s+browser/i,
-  /<title>\s*just\s+a\s+moment/i,
-];
-
-/**
- * Detects pages that are likely app shells, bot walls, or consent interstitials rather than
- * readable content.
- *
- * @param raw - The raw response body
- * @param markdown - The extracted Markdown
- * @returns True when the extracted text is suspiciously sparse relative to the raw page
- */
+/** @deprecated Prefer diagnoseExtraction for explicit extraction-quality signals. */
 export function detectAppShell(raw: string, markdown: string): boolean {
-  if (APP_SHELL_MARKERS.some((marker) => marker.test(raw))) return true;
-  // Require the extracted text to be both absolutely tiny and a very small
-  // fraction of the raw payload, so content-rich pages (e.g. React/Next.js SPAs
-  // whose raw HTML is dominated by inline scripts) are not mistaken for shells.
-  return raw.length > 4000 && markdown.length < 1024 && markdown.length < raw.length * 0.008;
+  return hasExtractionWarning(diagnoseExtraction(raw, markdown));
 }
 
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -238,10 +211,13 @@ async function documentFromResponse(
     }
   } else markdown = raw.trim();
 
-  const shellSuspected =
-    contentType === "text/html" || contentType === "application/xhtml+xml"
-      ? detectAppShell(raw, markdown)
-      : false;
+  const isHtml = contentType === "text/html" || contentType === "application/xhtml+xml";
+  const extractionDiagnostics = isHtml ? diagnoseExtraction(raw, markdown) : undefined;
+  const shellSuspected = extractionDiagnostics
+    ? hasExtractionWarning(extractionDiagnostics)
+    : false;
+  const etag = responseHeader(response, "etag");
+  const lastModified = responseHeader(response, "last-modified");
 
   return {
     url: target.url.toString(),
@@ -250,6 +226,10 @@ async function documentFromResponse(
     title,
     extractor,
     shellSuspected,
+    extractionDiagnostics,
+    links: isHtml ? extractDocumentLinks(raw, target.url) : undefined,
+    validators: etag || lastModified ? { etag, lastModified } : undefined,
+    cachedAt: Date.now(),
     llmsTxtDescribedBy: describedBy,
     markdownAlternateUrl,
   };
@@ -284,11 +264,12 @@ function assertAbsoluteHttpUrlForFetch(value: string): URL {
  * @returns The complete document with extracted markdown content
  * @throws If the request times out, is cancelled, or encounters an error
  */
-export async function fetchCompleteDocument(
+async function fetchDocument(
   rawUrl: string,
   signal: AbortSignal | undefined,
   dependencies: FetchRemoteDependencies,
-): Promise<CompleteDocument> {
+  cached?: CompleteDocument,
+): Promise<{ document: CompleteDocument; revalidated: boolean }> {
   assertAbsoluteHttpUrlForFetch(normalizeGitHubRawUrl(rawUrl));
   const controller = new AbortController();
   const timeoutMs = dependencies.timeoutMs ?? REQUEST_TIMEOUT_MS;
@@ -300,17 +281,36 @@ export async function fetchCompleteDocument(
   }, timeoutMs);
   const cancel = () => controller.abort();
   signal?.addEventListener("abort", cancel, { once: true });
+  const conditionalHeaders: Record<string, string> = {};
+  if (cached?.validators?.etag) conditionalHeaders["If-None-Match"] = cached.validators.etag;
+  if (cached?.validators?.lastModified)
+    conditionalHeaders["If-Modified-Since"] = cached.validators.lastModified;
 
   try {
     const { target, response } = await requestFollowingRedirects(
       normalizeGitHubRawUrl(rawUrl),
       controller.signal,
-      {
-        validateUrl: dependencies.validateUrl,
-        request: dependencies.request,
-      },
+      dependencies,
+      conditionalHeaders,
     );
-    return await documentFromResponse(target, response, controller.signal, extractHtml);
+    if (response.statusCode === 304 && cached) {
+      response.resume();
+      const etag = responseHeader(response, "etag") ?? cached.validators?.etag;
+      const lastModified =
+        responseHeader(response, "last-modified") ?? cached.validators?.lastModified;
+      return {
+        document: {
+          ...cached,
+          validators: etag || lastModified ? { etag, lastModified } : undefined,
+          cachedAt: Date.now(),
+        },
+        revalidated: true,
+      };
+    }
+    return {
+      document: await documentFromResponse(target, response, controller.signal, extractHtml),
+      revalidated: false,
+    };
   } catch (error) {
     if (timedOut) throw new Error(`web_fetch timed out after ${timeoutMs / 1000} seconds.`);
     if (signal?.aborted) throw new Error("web_fetch was cancelled.");
@@ -319,6 +319,24 @@ export async function fetchCompleteDocument(
     clearTimeout(timeout);
     signal?.removeEventListener("abort", cancel);
   }
+}
+
+export async function fetchCompleteDocument(
+  rawUrl: string,
+  signal: AbortSignal | undefined,
+  dependencies: FetchRemoteDependencies,
+): Promise<CompleteDocument> {
+  return (await fetchDocument(rawUrl, signal, dependencies)).document;
+}
+
+/** Revalidates a stale representation with its ETag and Last-Modified validators. */
+export async function revalidateCompleteDocument(
+  rawUrl: string,
+  cached: CompleteDocument,
+  signal: AbortSignal | undefined,
+  dependencies: FetchRemoteDependencies,
+): Promise<{ document: CompleteDocument; revalidated: boolean }> {
+  return fetchDocument(rawUrl, signal, dependencies, cached);
 }
 
 /**

@@ -15,11 +15,19 @@ import { executeWebFetch } from "./service";
 
 export { ExpiringLruCache } from "./cache";
 export type { FetchResult } from "./content";
+export {
+  diagnoseExtraction,
+  extractDocumentLinks,
+  type ExtractedLink,
+  type ExtractedLinks,
+  type ExtractionDiagnostics,
+} from "./evidence";
 export { fetchRemoteContent, type FetchRemoteDependencies } from "./fetch";
 export { focusMarkdown, type FocusDetails, type FocusResult } from "./focus";
 export { createDocumentOutline, type DocumentOutline, type OutlineHeading } from "./outline";
 export {
   executeWebFetch,
+  type CacheStatus,
   type WebFetchDetails,
   type WebFetchParameters,
   type WebFetchTruncationDetails,

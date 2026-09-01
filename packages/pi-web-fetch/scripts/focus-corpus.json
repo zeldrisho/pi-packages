@@ -1,0 +1,23 @@
+[
+  {
+    "name": "heading match",
+    "dimension": "heading",
+    "query": "cache revalidation",
+    "markdown": "# Installation\n\nInstall the package.\n\n# Cache revalidation\n\nValidators avoid downloading unchanged pages.",
+    "expectedMarker": "Validators avoid"
+  },
+  {
+    "name": "exact phrase",
+    "dimension": "phrase",
+    "query": "retry after",
+    "markdown": "# Timeouts\n\nAbort stalled requests.\n\n# Rate limits\n\nHonor Retry-After before another attempt.",
+    "expectedMarker": "Honor Retry-After"
+  },
+  {
+    "name": "inflection",
+    "dimension": "stemming",
+    "query": "validated redirects",
+    "markdown": "# Redirect policy\n\nValidation runs again for every redirect target.\n\n# Output\n\nContent is bounded.",
+    "expectedMarker": "Validation runs"
+  }
+]

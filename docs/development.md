@@ -53,6 +53,14 @@ vp run benchmark:web-fetch-extraction
 
 The benchmark checks stable content markers and minimum extracted sizes while reporting extractor choice and latency. Use `-- --filter <category>` for a subset or `-- --json` for machine-readable output. Network or upstream-content failures make the benchmark fail, so it is diagnostic rather than part of `validate`.
 
+Before changing focused-section ranking, record the deterministic heading, phrase, and stemming baseline:
+
+```bash
+vp run benchmark:web-fetch-focus
+```
+
+A known miss is useful baseline evidence; do not tune ranking from one fixture or silently redefine expected markers to make the benchmark pass.
+
 To load a local package in an isolated Pi session, run `pi -e ./packages/<name>` and disable globally installed extensions as needed so they cannot interfere with manual verification.
 
 ## Regression and review discipline
