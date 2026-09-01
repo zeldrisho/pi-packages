@@ -28,6 +28,14 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
     return;
   }
 
+  if (request.url?.startsWith("/focused")) {
+    response.setHeader("content-type", "text/plain");
+    response.end(
+      "Installation uses Vite+.\n\nCaching stores complete pages.\n\nRedirect targets are validated.",
+    );
+    return;
+  }
+
   if (request.url?.startsWith("/owner/repo/")) {
     // Stands in for the rewritten raw.githubusercontent.com file path produced by
     // normalizeGitHubRawUrl so the end-to-end fetch can return clean plain text.

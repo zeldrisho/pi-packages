@@ -8,6 +8,7 @@ import {
 import { ExpiringLruCache, stableKeyHash, type CachePersistence } from "./cache";
 import { sliceCompleteDocument, type CompleteDocument } from "./content";
 import { fetchCompleteDocument, type FetchRemoteDependencies } from "./fetch";
+import { focusMarkdown, type FocusDetails } from "./focus";
 import { InflightCoalescer } from "./inflight";
 import { createDocumentOutline, type DocumentOutline } from "./outline";
 import {
@@ -15,6 +16,7 @@ import {
   FETCH_DEFAULT_OFFSET,
   FETCH_MAX_CHARACTERS,
   FETCH_MAX_OFFSET_CHARACTERS,
+  FETCH_MAX_QUERY_CHARACTERS,
   FETCH_MIN_MAX_CHARACTERS,
 } from "./limits";
 
@@ -330,6 +332,8 @@ function resolveCacheDirectory(name: string): string {
 /** Parameters for a web fetch operation. */
 export interface WebFetchParameters {
   url: string;
+  /** Optional query used to select matching Markdown sections before continuation slicing. */
+  query?: string;
   offset?: number;
   maxCharacters?: number;
 }
@@ -352,8 +356,10 @@ export interface WebFetchDetails {
   contentKind: ContentKind;
   shellSuspected: boolean;
   confidence: FetchConfidence;
-  /** Bounded document-shape metadata. Heading text is untrusted remote content. */
+  /** Bounded document-shape metadata for the complete, unfiltered document. Heading text is untrusted remote content. */
   outline: DocumentOutline;
+  /** Deterministic focused-extraction evidence when a query was supplied. */
+  focus?: FocusDetails;
   /** True when the returned content is the site's /llms.txt served instead of the requested page. */
   llmsTxtFallback: boolean;
   /** True when the returned content is the page's advertised Markdown version served instead of a low-quality page. */
@@ -420,6 +426,14 @@ export async function executeWebFetch(
       `web_fetch maxCharacters must be an integer between ${FETCH_MIN_MAX_CHARACTERS} and ${FETCH_MAX_CHARACTERS}.`,
     );
   }
+  if (
+    params.query !== undefined &&
+    (params.query.trim().length === 0 || params.query.length > FETCH_MAX_QUERY_CHARACTERS)
+  ) {
+    throw new Error(
+      `web_fetch query must contain between 1 and ${FETCH_MAX_QUERY_CHARACTERS} characters.`,
+    );
+  }
   let document = fetchCache.get(params.url);
   const cached = document !== undefined;
   onUpdate?.({
@@ -447,7 +461,10 @@ export async function executeWebFetch(
       "web_fetch was cancelled.",
     );
   }
-  const result = sliceCompleteDocument(document, offset, maxCharacters);
+  const focused =
+    params.query === undefined ? undefined : focusMarkdown(document.markdown, params.query);
+  const outputDocument = focused ? { ...document, markdown: focused.markdown } : document;
+  const result = sliceCompleteDocument(outputDocument, offset, maxCharacters);
   const requestedUrl = params.url;
   const finalUrl = result.url;
   const shellSuspected = result.shellSuspected;
@@ -474,8 +491,16 @@ export async function executeWebFetch(
           "",
         ]
       : []),
+    ...(focused
+      ? [
+          focused.details.matchedSections > 0
+            ? `[Showing ${focused.details.matchedSections} of ${focused.details.totalSections} source sections selected by the focus query. Offsets apply to this focused view; omit query to read the complete document.]`
+            : "[No source sections matched the focus query. Omit query to read the complete document.]",
+          "",
+        ]
+      : []),
     `<untrusted_web_content source=${JSON.stringify(result.url)}>`,
-    result.markdown || "[The page contained no readable text.]",
+    result.markdown || (focused ? "" : "[The page contained no readable text.]"),
     "</untrusted_web_content>",
   ].join("\n");
   const outputTruncation = truncateHead(output, {
@@ -496,6 +521,7 @@ export async function executeWebFetch(
       shellSuspected,
       confidence,
       outline: createDocumentOutline(document.markdown),
+      focus: focused?.details,
       llmsTxtFallback: Boolean(result.llmsTxtFallback),
       markdownAlternateFallback: Boolean(result.markdownAlternateFallback),
       llmsTxtUrl: result.llmsTxtIndexUrl,

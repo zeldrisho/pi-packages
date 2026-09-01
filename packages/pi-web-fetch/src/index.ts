@@ -6,6 +6,7 @@ import {
   FETCH_DEFAULT_OFFSET,
   FETCH_MAX_CHARACTERS,
   FETCH_MAX_OFFSET_CHARACTERS,
+  FETCH_MAX_QUERY_CHARACTERS,
   FETCH_MAX_URL_CHARACTERS,
   FETCH_MIN_MAX_CHARACTERS,
 } from "./limits";
@@ -15,6 +16,7 @@ import { executeWebFetch } from "./service";
 export { ExpiringLruCache } from "./cache";
 export type { FetchResult } from "./content";
 export { fetchRemoteContent, type FetchRemoteDependencies } from "./fetch";
+export { focusMarkdown, type FocusDetails, type FocusResult } from "./focus";
 export { createDocumentOutline, type DocumentOutline, type OutlineHeading } from "./outline";
 export {
   executeWebFetch,
@@ -36,6 +38,14 @@ export const webFetchParameters = Type.Object({
     maxLength: FETCH_MAX_URL_CHARACTERS,
     description: "Public HTTP or HTTPS URL to fetch",
   }),
+  query: Type.Optional(
+    Type.String({
+      minLength: 1,
+      maxLength: FETCH_MAX_QUERY_CHARACTERS,
+      description:
+        "Optional focus query; returns matching source sections in document order (offsets apply to the focused view)",
+    }),
+  ),
   offset: Type.Optional(
     Type.Integer({
       minimum: 0,

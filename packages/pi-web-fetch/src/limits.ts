@@ -13,5 +13,8 @@ export const FETCH_MAX_CHARACTERS = 30_000;
 /** Maximum allowed offset for content extraction (characters). */
 export const FETCH_MAX_OFFSET_CHARACTERS = 20_000_000;
 
+/** Maximum allowed length for an optional focus query (characters). */
+export const FETCH_MAX_QUERY_CHARACTERS = 400;
+
 /** Maximum allowed length for input URLs (characters). */
 export const FETCH_MAX_URL_CHARACTERS = 2_048;
