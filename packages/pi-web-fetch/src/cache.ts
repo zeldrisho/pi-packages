@@ -40,6 +40,12 @@ export function resolveCachePath(directory: string, keyPath: string): string {
   return full;
 }
 
+/**
+ * Encodes an expiration timestamp as an 8-byte big-endian buffer.
+ *
+ * @param expiresAt - Expiration timestamp in milliseconds
+ * @returns 8-byte buffer containing the encoded timestamp
+ */
 function encodeExpiresAt(expiresAt: number): Uint8Array {
   const out = new Uint8Array(8);
   let value = BigInt(Math.round(expiresAt));
@@ -50,6 +56,12 @@ function encodeExpiresAt(expiresAt: number): Uint8Array {
   return out;
 }
 
+/**
+ * Decodes an 8-byte big-endian buffer to an expiration timestamp.
+ *
+ * @param bytes - 8-byte buffer containing the encoded timestamp
+ * @returns Expiration timestamp in milliseconds
+ */
 function decodeExpiresAt(bytes: Uint8Array): number {
   let value = 0n;
   for (let index = 0; index < 8; index += 1) value = (value << 8n) | BigInt(bytes[index]);
@@ -69,14 +81,30 @@ export class ExpiringLruCache<K, V> {
     readonly persistence?: CachePersistence<K, V>,
   ) {}
 
+  /**
+   * Gets the total byte size of all cached values.
+   *
+   * @returns Current aggregate byte size
+   */
   get byteSize(): number {
     return this.#byteSize;
   }
 
+  /**
+   * Gets the number of cached entries.
+   *
+   * @returns Current entry count
+   */
   get size(): number {
     return this.#entries.size;
   }
 
+  /**
+   * Retrieves a value from the cache, loading from disk if needed.
+   *
+   * @param key - Cache key
+   * @returns Cached value or undefined if not found or expired
+   */
   get(key: K): V | undefined {
     const entry = this.#entries.get(key);
     if (entry) {
@@ -95,6 +123,14 @@ export class ExpiringLruCache<K, V> {
     return undefined;
   }
 
+  /**
+   * Stores a value in the cache with an expiration time.
+   *
+   * @param key - Cache key
+   * @param value - Value to store
+   * @param expiresAt - Expiration timestamp in milliseconds
+   * @returns True if the value was stored, false if it was too large
+   */
   set(key: K, value: V, expiresAt: number): boolean {
     this.#delete(key);
     const size = this.sizeOf(value);

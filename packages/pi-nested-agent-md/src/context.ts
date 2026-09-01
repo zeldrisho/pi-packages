@@ -9,15 +9,34 @@ interface ContentBlock {
   text?: string;
 }
 
+/**
+ * Calculates the UTF-8 byte length of a string.
+ *
+ * @param value - String to measure
+ * @returns Byte length of the UTF-8 encoded string
+ */
 function byteLength(value: string): number {
   return encoder.encode(value).byteLength;
 }
 
+/**
+ * Counts the number of lines in a string.
+ *
+ * @param value - String to count lines in
+ * @returns Number of lines (newline-separated segments)
+ */
 function lineCount(value: string): number {
   if (value.length === 0) return 0;
   return value.split("\n").length;
 }
 
+/**
+ * Truncates a string to fit within a UTF-8 byte limit without breaking characters.
+ *
+ * @param value - String to truncate
+ * @param maxBytes - Maximum byte length
+ * @returns Object with truncated text and truncation flag
+ */
 function truncateUtf8(value: string, maxBytes: number) {
   const bytes = encoder.encode(value);
   if (bytes.byteLength <= maxBytes) return { text: value, truncated: false };
@@ -28,12 +47,25 @@ function truncateUtf8(value: string, maxBytes: number) {
   return { text, truncated: true };
 }
 
+/**
+ * Truncates a string to a maximum number of lines.
+ *
+ * @param value - String to truncate
+ * @param maxLines - Maximum number of lines
+ * @returns Object with truncated text and truncation flag
+ */
 function truncateLines(value: string, maxLines: number) {
   const lines = value.split("\n");
   if (lines.length <= maxLines) return { text: value, truncated: false };
   return { text: lines.slice(0, Math.max(0, maxLines)).join("\n"), truncated: true };
 }
 
+/**
+ * Sanitizes a path string by replacing control characters with replacement character.
+ *
+ * @param value - Path string to sanitize
+ * @returns Sanitized string with control characters replaced
+ */
 function safePathText(value: string): string {
   return value
     .split("")
@@ -44,6 +76,12 @@ function safePathText(value: string): string {
     .join("");
 }
 
+/**
+ * Escapes a string for safe use in XML attributes.
+ *
+ * @param value - String to escape
+ * @returns XML-safe escaped string
+ */
 function escapeXmlAttribute(value: string): string {
   return safePathText(value)
     .replace(/&/g, "&amp;")
@@ -53,6 +91,12 @@ function escapeXmlAttribute(value: string): string {
     .replace(/>/g, "&gt;");
 }
 
+/**
+ * Extracts and concatenates text content from content blocks.
+ *
+ * @param content - Array of content blocks
+ * @returns Newline-joined text from all text blocks
+ */
 function originalText(content: readonly ContentBlock[]): string {
   return content
     .filter(
@@ -63,6 +107,15 @@ function originalText(content: readonly ContentBlock[]): string {
     .join("\n");
 }
 
+/**
+ * Formats nested AGENTS.md content with XML tags and metadata.
+ *
+ * @param root - Repository root path
+ * @param path - Path to the AGENTS.md file
+ * @param content - File content to include
+ * @param truncated - Whether content was truncated
+ * @returns Formatted XML context block with file metadata
+ */
 function formatContext(root: string, path: string, content: string, truncated: boolean): string {
   const displayPath = safePathText(relative(root, path) || basename(path));
   const scope = safePathText(relative(root, dirname(path)) || ".");
@@ -101,10 +154,22 @@ export class ContextAccumulator {
     this.linesLeft = Math.max(0, DEFAULT_MAX_LINES - lineCount(existing));
   }
 
+  /**
+   * Gets the accumulated context text.
+   *
+   * @returns Accumulated context additions
+   */
   get text(): string {
     return this.addition;
   }
 
+  /**
+   * Calculates remaining capacity for a file context block.
+   *
+   * @param root - Repository root path
+   * @param path - File path
+   * @returns Object with remaining bytes and lines capacity
+   */
   private capacity(root: string, path: string) {
     const reservedWrapper = formatContext(root, path, "", true);
     return {
@@ -113,12 +178,24 @@ export class ContextAccumulator {
     };
   }
 
+  /**
+   * Checks if there is remaining capacity for a file context block.
+   *
+   * @param root - Repository root path
+   * @param path - File path
+   * @returns True if capacity remains, false otherwise
+   */
   hasCapacity(root: string, path: string): boolean {
     const capacity = this.capacity(root, path);
     return capacity.bytes > 0 && capacity.lines > 0;
   }
 
-  /** Appends a short diagnostic line when capacity remains; returns whether it fit. */
+  /**
+   * Appends a short diagnostic line when capacity remains.
+   *
+   * @param raw - Warning text to append
+   * @returns True if the warning fit within remaining capacity, false otherwise
+   */
   warn(raw: string): boolean {
     const section = raw;
     const sectionBytes = byteLength(section);
@@ -131,6 +208,14 @@ export class ContextAccumulator {
     return true;
   }
 
+  /**
+   * Appends a file's context, truncating if needed to fit within remaining capacity.
+   *
+   * @param root - Repository root path
+   * @param path - File path
+   * @param content - File content to append
+   * @returns True if the content fit (possibly truncated), false if no capacity remains
+   */
   append(root: string, path: string, content: string): boolean {
     const capacity = this.capacity(root, path);
     if (capacity.bytes <= 0 || capacity.lines <= 0) return false;

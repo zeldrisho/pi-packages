@@ -1,5 +1,11 @@
 import type { Provider, SearchMode, SearchResult } from "./brave";
 
+/**
+ * Escapes special characters in Markdown link text.
+ *
+ * @param value - Text to escape
+ * @returns Escaped text safe for use in Markdown link labels
+ */
 function escapeMarkdownLinkText(value: string): string {
   return value.replace(/([\\[\]])/g, "\\$1");
 }

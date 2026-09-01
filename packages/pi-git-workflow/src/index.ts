@@ -40,6 +40,14 @@ export function extractBranchName(command: string): string | undefined {
   return command.match(BRANCH_NAME_FROM_DELETE_RE)?.[1]?.trim();
 }
 
+/**
+ * Pi extension for Git workflow management and branch deletion safety.
+ *
+ * Automatically inspects and cleans up merged local branches, and gates
+ * force-delete operations to prevent accidental data loss.
+ *
+ * @param pi - Extension API instance
+ */
 export default function piGitWorkflow(pi: ExtensionAPI): void {
   const visibleFingerprints = new Map<string, string>();
 
@@ -147,6 +155,14 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
   });
 }
 
+/**
+ * Checks if a branch's configured upstream is marked as gone after pruning.
+ *
+ * @param pi - Git command runner interface
+ * @param root - Repository root directory
+ * @param branch - Branch name to check
+ * @returns Promise resolving to true if upstream is gone, false otherwise
+ */
 async function upstreamGoneInRepo(
   pi: Pick<ExtensionAPI, "exec">,
   root: string,
@@ -167,6 +183,13 @@ async function upstreamGoneInRepo(
   return Boolean(metadata?.upstream && metadata.tracking.trim() === "[gone]");
 }
 
+/**
+ * Creates a tool call block result with a formatted reason.
+ *
+ * @param branch - Branch name being deleted
+ * @param reason - Reason for blocking the deletion
+ * @returns Block result object for tool call interception
+ */
 function blocked(branch: string, reason: string) {
   return {
     block: true,
@@ -174,10 +197,22 @@ function blocked(branch: string, reason: string) {
   };
 }
 
+/**
+ * Formats a branch name for display, truncating if too long and JSON-escaping.
+ *
+ * @param branch - Branch name to format
+ * @returns JSON-escaped branch name, truncated to 300 characters if needed
+ */
 function formatBranch(branch: string): string {
   return JSON.stringify(branch.length > 300 ? `${branch.slice(0, 300)}…` : branch);
 }
 
+/**
+ * Formats an error from Git inspection for user-facing messages.
+ *
+ * @param error - Error to format
+ * @returns Formatted error message with sanitized details
+ */
 function formatInspectionFailure(error: Error): string {
   if (error instanceof GitInspectionError) {
     return `${error.message}${error.details ? ` (${error.details})` : ""}`;

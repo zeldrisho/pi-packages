@@ -55,6 +55,12 @@ export function diagnoseExtraction(raw: string, markdown: string): ExtractionDia
   };
 }
 
+/**
+ * Checks if extraction diagnostics indicate any warning conditions.
+ *
+ * @param diagnostics - Extraction diagnostics to check
+ * @returns True if any warning condition is present, false otherwise
+ */
 export function hasExtractionWarning(diagnostics: ExtractionDiagnostics): boolean {
   return (
     diagnostics.javascriptRequired ||
@@ -64,6 +70,12 @@ export function hasExtractionWarning(diagnostics: ExtractionDiagnostics): boolea
   );
 }
 
+/**
+ * Normalizes and truncates anchor text for link extraction.
+ *
+ * @param value - Raw anchor text
+ * @returns Normalized text, truncated to MAX_ANCHOR_CHARACTERS if needed
+ */
 function normalizedAnchor(value: string): string {
   const text = value.replace(/\s+/g, " ").trim();
   return text.length > MAX_ANCHOR_CHARACTERS
