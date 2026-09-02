@@ -320,6 +320,8 @@ async function inspectCurrentBranchSync(
   const branch = branches.find((item) => item.name === current);
   if (!branch) return { branch: current, state: "unknown" };
   if (!branch.upstream) return { branch: current, state: "untracked" };
+  if (!branch.upstream.startsWith("refs/remotes/origin/"))
+    return { branch: current, upstream: branch.upstream, state: "unknown" };
 
   const upstreamCommit = await exactRefCommit(pi, root, branch.upstream);
   if (!upstreamCommit) return { branch: current, upstream: branch.upstream, state: "unknown" };

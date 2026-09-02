@@ -185,7 +185,13 @@ for (const packageName of packageNames) {
       (extension?.handlers.size ?? 0) +
       (extension?.tools.size ?? 0) +
       (extension?.commands.size ?? 0);
-    if (!extension || (registrations === 0 && !deprecatedNoopPackages.has(packageName))) {
+    if (!extension) {
+      throw new Error(\`\${packageName} did not load as a Pi extension\`);
+    }
+    if (deprecatedNoopPackages.has(packageName) && registrations !== 0) {
+      throw new Error(\`\${packageName} registered handlers despite being a deprecated no-op\`);
+    }
+    if (!deprecatedNoopPackages.has(packageName) && registrations === 0) {
       throw new Error(\`\${packageName} did not register a Pi extension\`);
     }
     await new Promise((resolve) => setImmediate(resolve));

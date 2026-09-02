@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- terminate the current agent turn when a command is blocked, denied, dismissed, or times out
+- request termination of the current agent turn when a command is blocked, denied, dismissed, or times out; mixed parallel batches containing allowed calls may continue
 - auto-deny interactive prompts after a configurable `promptTimeoutMs` (30 seconds by default)
 - create `pi-gate.json` directly on first load with the default timeout and starter prompt/block/allow rules instead of writing an example file
 

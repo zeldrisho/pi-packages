@@ -47,8 +47,8 @@ After editing, run `/reload` to apply the new rules in the current session.
 - `prompt` rules ask the user with a two-button confirmation (`Allow` / `Deny`). The dialog identifies the matched rule and auto-denies after `promptTimeoutMs` instead of waiting indefinitely.
 - `block` rules never ask and always deny. The warning identifies the matched rule.
 - `allow` rules are explicit pass-throughs, useful for carving out exceptions.
-- Blocked, denied, dismissed, and timed-out calls request early termination of the current agent turn instead of letting the agent react and try another command.
-- In non-interactive modes (`-p`, JSON), `prompt` and `block` rules both block and terminate the turn instead of auto-approving.
+- Blocked, denied, dismissed, and timed-out calls request early termination. Pi ends the turn only when every finalized result in the tool-call batch requests termination; a mixed parallel batch containing allowed calls may continue.
+- In non-interactive modes (`-p`, JSON), `prompt` and `block` rules both block and request termination instead of auto-approving.
 
 ### What the agent sees
 

@@ -21,8 +21,9 @@
  * operation rules is written to `~/.pi/agent/pi-gate.json`.
  *
  * Non-UI modes (print, JSON) never auto-approve. A `prompt` or `block` rule
- * in non-UI mode always blocks and terminates the agent turn. Interactive
- * prompts auto-deny after `promptTimeoutMs` rather than waiting indefinitely.
+ * in non-UI mode always blocks and requests termination of the agent turn.
+ * Interactive prompts auto-deny after `promptTimeoutMs` rather than waiting
+ * indefinitely.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
