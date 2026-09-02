@@ -4,11 +4,12 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import { isToolCallEventType, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import piGate, {
-  ensureExampleConfig,
+  ensureConfig,
   loadConfig,
   parseConfig,
   resolveAction,
   resolveRule,
+  DEFAULT_PROMPT_TIMEOUT_MS,
   type Action,
 } from "../src/index";
 
@@ -26,7 +27,7 @@ interface ReadToolCallEvent {
 
 type ToolCallEvent = BashToolCallEvent | ReadToolCallEvent;
 
-type ToolCallResult = { block: true; reason: string } | undefined;
+type ToolCallResult = { block: true; reason: string; terminate: true } | undefined;
 
 interface SessionStartEvent {
   reason: string;
@@ -37,14 +38,22 @@ type NotifyLevel = "info" | "warning" | "error";
 
 interface UiState {
   notifyCalls: Array<{ text: string; level: NotifyLevel }>;
-  selectCalls: Array<{ prompt: string; options: readonly string[] }>;
-  selectResponse: string | null;
+  selectCalls: Array<{
+    prompt: string;
+    options: readonly string[];
+    settings: { timeout?: number } | undefined;
+  }>;
+  selectResponse: string | undefined;
 }
 
 interface FakeUi {
   hasUI: boolean;
   notify: (text: string, level: NotifyLevel) => void;
-  select: (prompt: string, options: readonly string[]) => Promise<string | null>;
+  select: (
+    prompt: string,
+    options: readonly string[],
+    settings?: { timeout?: number },
+  ) => Promise<string | undefined>;
 }
 
 interface FakeContext {
@@ -89,8 +98,8 @@ function createUi(state: UiState, hasUI: boolean): FakeUi {
     notify: (text, level) => {
       state.notifyCalls.push({ text, level });
     },
-    select: async (prompt, options) => {
-      state.selectCalls.push({ prompt, options });
+    select: async (prompt, options, settings) => {
+      state.selectCalls.push({ prompt, options, settings });
       return state.selectResponse;
     },
   };
@@ -100,7 +109,7 @@ function createExtensionContext(hasUI: boolean): ContextWithUi {
   const uiState: UiState = {
     notifyCalls: [],
     selectCalls: [],
-    selectResponse: null,
+    selectResponse: undefined,
   };
   const ctx: FakeContext = { ui: createUi(uiState, hasUI), hasUI };
   return { ctx, uiState };
@@ -164,25 +173,41 @@ afterEach(() => {
 });
 
 describe("parseConfig", () => {
+  const emptyConfig = { operations: {}, promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS };
+
   it("returns an empty configuration for invalid JSON", () => {
-    expect(parseConfig("{not valid")).toEqual({ operations: {} });
+    expect(parseConfig("{not valid")).toEqual(emptyConfig);
   });
 
   it("returns an empty configuration for a non-object root", () => {
-    expect(parseConfig('"a string"')).toEqual({ operations: {} });
-    expect(parseConfig("42")).toEqual({ operations: {} });
-    expect(parseConfig("null")).toEqual({ operations: {} });
-    expect(parseConfig("[1, 2, 3]")).toEqual({ operations: {} });
+    expect(parseConfig('"a string"')).toEqual(emptyConfig);
+    expect(parseConfig("42")).toEqual(emptyConfig);
+    expect(parseConfig("null")).toEqual(emptyConfig);
+    expect(parseConfig("[1, 2, 3]")).toEqual(emptyConfig);
   });
 
   it("returns an empty configuration when operations is missing", () => {
-    expect(parseConfig("{}")).toEqual({ operations: {} });
-    expect(parseConfig('{"other": []}')).toEqual({ operations: {} });
+    expect(parseConfig("{}")).toEqual(emptyConfig);
+    expect(parseConfig('{"other": []}')).toEqual(emptyConfig);
   });
 
   it("returns an empty configuration when operations is not an object", () => {
-    expect(parseConfig('{"operations": []}')).toEqual({ operations: {} });
-    expect(parseConfig('{"operations": "nope"}')).toEqual({ operations: {} });
+    expect(parseConfig('{"operations": []}')).toEqual(emptyConfig);
+    expect(parseConfig('{"operations": "nope"}')).toEqual(emptyConfig);
+  });
+
+  it("accepts a positive prompt timeout up to one day", () => {
+    expect(parseConfig('{"promptTimeoutMs":15000,"operations":{}}').promptTimeoutMs).toBe(15000);
+    expect(parseConfig('{"promptTimeoutMs":86400000,"operations":{}}').promptTimeoutMs).toBe(
+      86_400_000,
+    );
+  });
+
+  it("uses the default prompt timeout for invalid values", () => {
+    for (const value of [0, -1, 1.5, 86_400_001, "1000", null]) {
+      const config = parseConfig(JSON.stringify({ promptTimeoutMs: value, operations: {} }));
+      expect(config.promptTimeoutMs).toBe(DEFAULT_PROMPT_TIMEOUT_MS);
+    }
   });
 
   it("preserves valid rules", () => {
@@ -218,17 +243,23 @@ describe("parseConfig", () => {
 
 describe("loadConfig", () => {
   it("returns an empty configuration when the file is missing", () => {
-    expect(loadConfig()).toEqual({ operations: {} });
+    expect(loadConfig()).toEqual({
+      operations: {},
+      promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS,
+    });
   });
 
   it("returns the parsed configuration when the file is present", () => {
-    setConfig(JSON.stringify({ operations: { sudo: "block" } }));
-    expect(loadConfig()).toEqual({ operations: { sudo: "block" } });
+    setConfig(JSON.stringify({ operations: { sudo: "block" }, promptTimeoutMs: 5000 }));
+    expect(loadConfig()).toEqual({ operations: { sudo: "block" }, promptTimeoutMs: 5000 });
   });
 
   it("returns an empty configuration when the file is malformed", () => {
     setConfig("{ not valid");
-    expect(loadConfig()).toEqual({ operations: {} });
+    expect(loadConfig()).toEqual({
+      operations: {},
+      promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS,
+    });
   });
 });
 
@@ -283,19 +314,27 @@ describe("resolveAction", () => {
   });
 });
 
-describe("ensureExampleConfig", () => {
-  it("writes the example on first run", () => {
-    ensureExampleConfig();
-    const path = join(workDir, "pi-gate.json.example");
+describe("ensureConfig", () => {
+  it("writes the default configuration on first run", () => {
+    ensureConfig();
+    const path = join(workDir, "pi-gate.json");
     expect(existsSync(path)).toBe(true);
-    const contents = JSON.parse(readFileSync(path, "utf-8"));
-    expect(contents).toHaveProperty("operations");
+    expect(JSON.parse(readFileSync(path, "utf-8"))).toEqual({
+      promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS,
+      operations: {
+        "rm -rf": "prompt",
+        sudo: "prompt",
+        "sudo apt update": "allow",
+        "chmod 777": "block",
+        "corepack enable": "block",
+      },
+    });
   });
 
-  it("does not overwrite an existing example", () => {
-    const path = join(workDir, "pi-gate.json.example");
+  it("does not overwrite an existing configuration", () => {
+    const path = join(workDir, "pi-gate.json");
     writeFileSync(path, '{"operations":{"x":"block"}}', "utf-8");
-    ensureExampleConfig();
+    ensureConfig();
     expect(readFileSync(path, "utf-8")).toBe('{"operations":{"x":"block"}}');
   });
 });
@@ -310,12 +349,22 @@ describe("piGate extension", () => {
   });
 
   describe("session_start notification", () => {
-    it("warns when the config file is missing", async () => {
+    it("creates and loads a default config with starter rules when the file is missing", async () => {
       const { ctx, uiState, handlers } = makeExtension().install();
       await handlers.sessionStart!({ reason: "startup" }, ctx);
       expect(uiState.notifyCalls).toHaveLength(1);
-      expect(uiState.notifyCalls[0]?.level).toBe("warning");
-      expect(uiState.notifyCalls[0]?.text).toContain("no configuration found");
+      expect(uiState.notifyCalls[0]?.level).toBe("info");
+      expect(uiState.notifyCalls[0]?.text).toContain("5 operation rules");
+      expect(loadConfig()).toEqual({
+        promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS,
+        operations: {
+          "rm -rf": "prompt",
+          sudo: "prompt",
+          "sudo apt update": "allow",
+          "chmod 777": "block",
+          "corepack enable": "block",
+        },
+      });
     });
 
     it("warns when the config file exists but has no rules", async () => {
@@ -382,6 +431,7 @@ describe("piGate extension", () => {
       expect(result).toEqual({
         block: true,
         reason: 'pi-gate: command blocked by rule "sudo": "block"',
+        terminate: true,
       });
       expect(uiState.notifyCalls).toEqual([
         { text: 'pi-gate: command blocked by rule "sudo": "block"', level: "warning" },
@@ -396,6 +446,7 @@ describe("piGate extension", () => {
       expect(result).toEqual({
         block: true,
         reason: 'pi-gate: command blocked by rule "sudo": "block"',
+        terminate: true,
       });
       expect(uiState.notifyCalls).toHaveLength(0);
     });
@@ -411,6 +462,7 @@ describe("piGate extension", () => {
           prompt:
             'pi-gate: allow this command?\n\n  rm -rf node_modules\n\nMatched rule: "rm -rf": "prompt"',
           options: ["Allow", "Deny"],
+          settings: { timeout: DEFAULT_PROMPT_TIMEOUT_MS },
         },
       ]);
     });
@@ -422,7 +474,22 @@ describe("piGate extension", () => {
       const result = await handlers.toolCall!(bashEvent("rm -rf node_modules"), ctx);
       expect(result).toEqual({
         block: true,
-        reason: 'pi-gate: command denied by user after matching rule "rm -rf": "prompt"',
+        reason:
+          'pi-gate: command denied, dismissed, or timed out after matching rule "rm -rf": "prompt"',
+        terminate: true,
+      });
+    });
+
+    it("auto-denies after the configured prompt timeout", async () => {
+      setConfig(JSON.stringify({ operations: { "rm -rf": "prompt" }, promptTimeoutMs: 12_500 }));
+      const { ctx, uiState, handlers } = makeExtension().install();
+      const result = await handlers.toolCall!(bashEvent("rm -rf node_modules"), ctx);
+      expect(uiState.selectCalls[0]?.settings).toEqual({ timeout: 12_500 });
+      expect(result).toEqual({
+        block: true,
+        reason:
+          'pi-gate: command denied, dismissed, or timed out after matching rule "rm -rf": "prompt"',
+        terminate: true,
       });
     });
 
@@ -435,6 +502,7 @@ describe("piGate extension", () => {
         block: true,
         reason:
           'pi-gate: command blocked because rule "rm -rf": "prompt" requires a prompt, but no UI is available',
+        terminate: true,
       });
       expect(uiState.selectCalls).toHaveLength(0);
     });
@@ -457,6 +525,7 @@ describe("piGate extension", () => {
       expect(blocked).toEqual({
         block: true,
         reason: 'pi-gate: command blocked by rule "sudo apt update": "block"',
+        terminate: true,
       });
       const allowed = await handlers.toolCall!(bashEvent("sudo apt install foo"), ctx);
       expect(allowed).toBeUndefined();
@@ -478,6 +547,7 @@ describe("piGate extension", () => {
       expect(result).toEqual({
         block: true,
         reason: 'pi-gate: command blocked by rule "sudo": "block"',
+        terminate: true,
       });
     });
   });

@@ -2,14 +2,13 @@
  * pi-gate Extension
  *
  * Intercepts the built-in `bash` tool and gates each command against a
- * user-provided JSON configuration. Without a configuration file, every
- * command is allowed and the extension posts a warning on `session_start`
- * reminding the user to create one.
+ * user-provided JSON configuration. Without a configuration file, the
+ * extension creates one with starter rules and a default prompt timeout.
  *
  * Configuration file: `~/.pi/agent/pi-gate.json`
  *
- * The configuration has a single section, `operations`, which maps a
- * substring pattern to one of three actions:
+ * The configuration has an `operations` section, which maps a substring
+ * pattern to one of three actions, and an optional `promptTimeoutMs` setting:
  *
  * - `prompt` - ask the user to allow or deny the command
  * - `block`  - deny the command without asking
@@ -18,11 +17,12 @@
  * When multiple patterns match a command, the longest pattern wins, so a
  * narrow `allow` rule can override a broader `prompt` or `block` rule.
  *
- * On first run, an example configuration is written next to the real one
- * at `~/.pi/agent/pi-gate.json.example` to document the format.
+ * On first run, a configuration with the default prompt timeout and starter
+ * operation rules is written to `~/.pi/agent/pi-gate.json`.
  *
  * Non-UI modes (print, JSON) never auto-approve. A `prompt` or `block` rule
- * in non-UI mode always blocks the command.
+ * in non-UI mode always blocks and terminates the agent turn. Interactive
+ * prompts auto-deny after `promptTimeoutMs` rather than waiting indefinitely.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -34,6 +34,7 @@ export type Action = "prompt" | "block" | "allow";
 
 export interface GateConfig {
   operations: Record<string, Action>;
+  promptTimeoutMs: number;
 }
 
 export interface RuleMatch {
@@ -42,14 +43,18 @@ export interface RuleMatch {
 }
 
 const CONFIG_FILE_NAME = "pi-gate.json";
-const EXAMPLE_FILE_NAME = "pi-gate.json.example";
 const ACTIONS: readonly Action[] = ["prompt", "block", "allow"] as const;
+export const DEFAULT_PROMPT_TIMEOUT_MS = 30_000;
+const MAX_PROMPT_TIMEOUT_MS = 86_400_000;
 
-const EXAMPLE_CONFIG: GateConfig = {
+const DEFAULT_CONFIG: GateConfig = {
+  promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS,
   operations: {
     "rm -rf": "prompt",
     sudo: "prompt",
+    "sudo apt update": "allow",
     "chmod 777": "block",
+    "corepack enable": "block",
   },
 };
 
@@ -69,15 +74,6 @@ function agentDir(): string {
  */
 function configPath(): string {
   return join(agentDir(), CONFIG_FILE_NAME);
-}
-
-/**
- * Returns the full path to the example pi-gate configuration file.
- *
- * @returns The absolute path to pi-gate.json.example
- */
-function examplePath(): string {
-  return join(agentDir(), EXAMPLE_FILE_NAME);
 }
 
 /**
@@ -122,21 +118,30 @@ export function parseConfig(content: string): GateConfig {
   try {
     parsed = JSON.parse(content);
   } catch {
-    return { operations: rules };
+    return { operations: rules, promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS };
   }
   if (!isJsonObject(parsed)) {
-    return { operations: rules };
+    return { operations: rules, promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS };
   }
+  const configuredTimeout = parsed["promptTimeoutMs"];
+  const promptTimeoutMs =
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- validate the optional numeric field at the untrusted JSON boundary before applying range checks
+    typeof configuredTimeout === "number" &&
+    Number.isInteger(configuredTimeout) &&
+    configuredTimeout > 0 &&
+    configuredTimeout <= MAX_PROMPT_TIMEOUT_MS
+      ? configuredTimeout
+      : DEFAULT_PROMPT_TIMEOUT_MS;
   const operations = parsed["operations"];
   if (!isJsonObject(operations)) {
-    return { operations: rules };
+    return { operations: rules, promptTimeoutMs };
   }
   for (const [pattern, action] of Object.entries(operations)) {
     if (isAction(action)) {
       rules[pattern] = action;
     }
   }
-  return { operations: rules };
+  return { operations: rules, promptTimeoutMs };
 }
 
 /**
@@ -146,35 +151,35 @@ export function parseConfig(content: string): GateConfig {
 export function loadConfig(): GateConfig {
   const path = configPath();
   if (!existsSync(path)) {
-    return { operations: {} };
+    return { operations: {}, promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS };
   }
   let content: string;
   try {
     content = readFileSync(path, "utf-8");
   } catch {
-    return { operations: {} };
+    return { operations: {}, promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS };
   }
   return parseConfig(content);
 }
 
 /**
- * Writes the example configuration next to the real one. Existing example
- * files are left alone so the user can rely on them to track the latest
- * supported shape.
+ * Writes the default configuration on first run. Existing configuration files
+ * are never overwritten.
  */
-export function ensureExampleConfig(): void {
-  const path = examplePath();
+export function ensureConfig(): void {
+  const path = configPath();
   if (existsSync(path)) return;
   try {
     mkdirSync(agentDir(), { recursive: true });
   } catch {
     return;
   }
-  const example = JSON.stringify(EXAMPLE_CONFIG, null, 2) + "\n";
+  const content = JSON.stringify(DEFAULT_CONFIG, null, 2) + "\n";
   try {
-    writeFileSync(path, example, "utf-8");
+    writeFileSync(path, content, { encoding: "utf-8", flag: "wx", mode: 0o600 });
   } catch {
-    // Best-effort: the warning banner still surfaces the missing config.
+    // Best-effort: another process may have created it, or the warning banner
+    // will surface that no configuration is active.
   }
 }
 
@@ -218,7 +223,7 @@ function formatRule(match: RuleMatch): string {
 
 /** Gate the built-in `bash` tool against the user-provided rules. */
 export default function piGate(pi: ExtensionAPI): void {
-  ensureExampleConfig();
+  ensureConfig();
   const config = loadConfig();
 
   pi.on("session_start", (_event, ctx) => {
@@ -238,7 +243,7 @@ export default function piGate(pi: ExtensionAPI): void {
       }
     } else {
       ctx.ui.notify(
-        `pi-gate: no configuration found at ${path}; all commands are allowed. Copy ${examplePath()} to ${path} to start gating.`,
+        `pi-gate: could not create configuration at ${path}; all commands are allowed until that file is created.`,
         "warning",
       );
     }
@@ -257,7 +262,7 @@ export default function piGate(pi: ExtensionAPI): void {
       if (ctx.hasUI) {
         ctx.ui.notify(reason, "warning");
       }
-      return { block: true, reason };
+      return { block: true, reason, terminate: true };
     }
 
     // action === "prompt"
@@ -265,14 +270,20 @@ export default function piGate(pi: ExtensionAPI): void {
       return {
         block: true,
         reason: `pi-gate: command blocked because rule ${rule} requires a prompt, but no UI is available`,
+        terminate: true,
       };
     }
     const choice = await ctx.ui.select(
       `pi-gate: allow this command?\n\n  ${command}\n\nMatched rule: ${rule}`,
       ["Allow", "Deny"],
+      { timeout: config.promptTimeoutMs },
     );
     if (choice !== "Allow") {
-      return { block: true, reason: `pi-gate: command denied by user after matching rule ${rule}` };
+      return {
+        block: true,
+        reason: `pi-gate: command denied, dismissed, or timed out after matching rule ${rule}`,
+        terminate: true,
+      };
     }
     return undefined;
   });
