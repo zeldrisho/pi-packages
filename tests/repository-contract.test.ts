@@ -8,6 +8,12 @@ const packageDirectories = (await readdir(packagesDirectory, { withFileTypes: tr
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
+const deprecatedPackageDirectories = new Set([
+  "pi-cloudflare",
+  "pi-file-remove",
+  "pi-file-search",
+  "pi-vite-plus",
+]);
 const readme = await readFile(join(root, "README.md"), "utf8");
 const workspace = await readFile(join(root, "pnpm-workspace.yaml"), "utf8");
 const lockfile = await readFile(join(root, "pnpm-lock.yaml"), "utf8");
@@ -135,15 +141,18 @@ describe("repository contracts", () => {
     }
   });
 
-  it("README catalog matches packages/", () => {
+  it("README catalog matches active packages", () => {
     const documentedDirectories = [...readme.matchAll(/\]\(packages\/([A-Za-z0-9._-]+)\)/g)].map(
       (match) => match[1],
     );
-    if (!sameValues(documentedDirectories, packageDirectories)) {
+    const activeDirectories = packageDirectories.filter(
+      (directory) => !deprecatedPackageDirectories.has(directory),
+    );
+    if (!sameValues(documentedDirectories, activeDirectories)) {
       fail(
-        `README package catalog does not match packages/: documented=${documentedDirectories
+        `README package catalog does not match active packages: documented=${documentedDirectories
           .sort((left, right) => left.localeCompare(right))
-          .join(",")} actual=${packageDirectories.join(",")}`,
+          .join(",")} actual=${activeDirectories.join(",")}`,
       );
     }
   });
@@ -271,7 +280,10 @@ describe("repository contracts", () => {
       if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(["./src/index.ts"])) {
         fail(`${manifest.name} must expose only ./src/index.ts as its Pi extension`);
       }
-      if (!readme.includes(`pi install npm:${manifest.name}`)) {
+      if (
+        !deprecatedPackageDirectories.has(directory) &&
+        !readme.includes(`pi install npm:${manifest.name}`)
+      ) {
         fail(`README package catalog is missing the install command for ${manifest.name}`);
       }
     }

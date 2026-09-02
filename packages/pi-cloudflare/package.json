@@ -1,7 +1,7 @@
 {
   "name": "@zeldrisho/pi-cloudflare",
-  "version": "0.1.0",
-  "description": "Pi extension that guides agents to retrieve current Cloudflare Workers documentation",
+  "version": "0.1.1",
+  "description": "Deprecated no-op formerly providing Cloudflare Workers prompt guidance",
   "keywords": [
     "agents-md",
     "cloudflare",

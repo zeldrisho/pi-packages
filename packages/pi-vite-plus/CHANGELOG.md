@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-09-02
+
+### Deprecated
+
+- Replace unconditional system-prompt injection with a no-op and direct users to project context and documentation
+
 ## [0.5.2] - 2026-07-30
 
 ### Fixed
@@ -43,7 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add Vite+ workflow guidance ([a7fbc7a](https://github.com/zeldrisho/pi-packages/commit/a7fbc7aa3acbf4286f9f3473d1746ca0936de9cf))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-vite-plus-v0.5.2...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-vite-plus-v0.5.3...HEAD
+[0.5.3]: https://github.com/zeldrisho/pi-packages/compare/pi-vite-plus-v0.5.2...pi-vite-plus-v0.5.3
 [0.5.2]: https://github.com/zeldrisho/pi-packages/compare/pi-vite-plus-v0.5.1...pi-vite-plus-v0.5.2
 [0.5.1]: https://github.com/zeldrisho/pi-packages/compare/pi-vite-plus-v0.5.0...pi-vite-plus-v0.5.1
 [0.5.0]: https://github.com/zeldrisho/pi-packages/compare/pi-vite-plus-v0.4.0...pi-vite-plus-v0.5.0
