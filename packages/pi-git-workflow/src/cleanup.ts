@@ -31,11 +31,21 @@ export interface ReviewBranch {
   reason: string;
 }
 
+export type SyncState = "current" | "ahead" | "behind" | "diverged" | "untracked" | "unknown";
+
+/** Synchronization state of the currently checked-out branch after fetch. */
+export interface CurrentBranchSync {
+  branch: string;
+  upstream?: string;
+  state: SyncState;
+}
+
 /** Result of a repository cleanup operation. */
 export interface CleanupResult {
   root: string;
   target: string;
   targetCommit: string;
+  sync: CurrentBranchSync;
   deleted: string[];
   review: ReviewBranch[];
   retained: string[];
@@ -239,6 +249,7 @@ async function cleanupLocked(pi: Pick<ExtensionAPI, "exec">, root: string): Prom
   );
   const branches = parseLocalBranches(refs.stdout);
   const occupied = parseWorktreeBranches(worktrees.stdout);
+  const sync = await inspectCurrentBranchSync(pi, root, current, branches);
   const candidates: LocalBranch[] = [];
   const review: ReviewBranch[] = [];
   const retained: string[] = [];
@@ -295,7 +306,52 @@ async function cleanupLocked(pi: Pick<ExtensionAPI, "exec">, root: string): Prom
         toReview(branch, `Git refused ordinary deletion${formatDetails(deletion.stderr)}`),
       );
   }
-  return { root, target, targetCommit, deleted, review, retained };
+  return { root, target, targetCommit, sync, deleted, review, retained };
+}
+
+/** Determine current-branch freshness against its fetched upstream without changing the worktree. */
+async function inspectCurrentBranchSync(
+  pi: Pick<ExtensionAPI, "exec">,
+  root: string,
+  current: string,
+  branches: LocalBranch[],
+): Promise<CurrentBranchSync> {
+  if (!current) return { branch: "HEAD", state: "unknown" };
+  const branch = branches.find((item) => item.name === current);
+  if (!branch) return { branch: current, state: "unknown" };
+  if (!branch.upstream) return { branch: current, state: "untracked" };
+
+  const upstreamCommit = await exactRefCommit(pi, root, branch.upstream);
+  if (!upstreamCommit) return { branch: current, upstream: branch.upstream, state: "unknown" };
+  if (branch.commit === upstreamCommit)
+    return { branch: current, upstream: branch.upstream, state: "current" };
+
+  const localIsAncestor = await git(pi, root, [
+    "merge-base",
+    "--is-ancestor",
+    branch.commit,
+    upstreamCommit,
+  ]);
+  requireBoundedOutput(localIsAncestor, "current branch synchronization inspection");
+  if (localIsAncestor.code === 0)
+    return { branch: current, upstream: branch.upstream, state: "behind" };
+  if (localIsAncestor.code !== 1)
+    return { branch: current, upstream: branch.upstream, state: "unknown" };
+
+  const upstreamIsAncestor = await git(pi, root, [
+    "merge-base",
+    "--is-ancestor",
+    upstreamCommit,
+    branch.commit,
+  ]);
+  requireBoundedOutput(upstreamIsAncestor, "current branch synchronization inspection");
+  if (upstreamIsAncestor.code === 0)
+    return { branch: current, upstream: branch.upstream, state: "ahead" };
+  return {
+    branch: current,
+    upstream: branch.upstream,
+    state: upstreamIsAncestor.code === 1 ? "diverged" : "unknown",
+  };
 }
 
 /**
@@ -357,6 +413,19 @@ export function formatCleanupContext(review: ReviewBranch[]): string | undefined
     message = lines.join("\n");
   }
   return message;
+}
+
+/** Format actionable context when the current branch needs explicit synchronization. */
+export function formatSyncContext(sync: CurrentBranchSync): string | undefined {
+  if (sync.state !== "behind" && sync.state !== "diverged") return undefined;
+  const branch = encodeUntrusted(sync.branch);
+  const upstream = encodeUntrusted(sync.upstream ?? "its upstream");
+  return [
+    "<!-- pi-git-workflow synchronization -->",
+    `The fetched Git state shows that current branch ${branch} is ${sync.state} relative to ${upstream}.`,
+    "Before modifying files, tell the user and synchronize using an explicit, user-approved strategy.",
+    "Do not automatically merge, rebase, reset, or force-update the branch.",
+  ].join("\n");
 }
 
 /**

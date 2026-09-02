@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-02
+
+### Added
+
+- Detect checked-out branches that are behind or diverged after fetch, then inject actionable hidden context and a deduplicated warning before editing
+
 ## [0.2.1] - 2026-09-01
 
 ### Fixed
@@ -34,7 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - gate regular branch deletion (`git branch -d`) by merge and upstream checks with interactive confirmation
 - report dirty working tree status without aborting checkout
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-git-workflow-v0.2.1...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-git-workflow-v0.3.0...HEAD
+[0.3.0]: https://github.com/zeldrisho/pi-packages/compare/pi-git-workflow-v0.2.1...pi-git-workflow-v0.3.0
 [0.2.1]: https://github.com/zeldrisho/pi-packages/compare/pi-git-workflow-v0.2.0...pi-git-workflow-v0.2.1
 [0.2.0]: https://github.com/zeldrisho/pi-packages/compare/pi-git-workflow-v0.1.0...pi-git-workflow-v0.2.0
 [0.1.0]: https://github.com/zeldrisho/pi-packages/releases/tag/pi-git-workflow-v0.1.0

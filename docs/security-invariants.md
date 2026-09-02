@@ -14,17 +14,13 @@ Use this checklist when reviewing extension runtime behavior, tool schemas, netw
 
 ## Git automation
 
-Extensions that execute Git must require project trust before invoking repository-controlled configuration, remotes, or hooks; pin a canonical worktree root and exact refs before mutation; pass untrusted repository data only as fixed arguments; bound all parsed and reported output; and fail closed when inspection or state verification is uncertain.
+Extensions that execute Git must require project trust before invoking repository-controlled configuration, remotes, or hooks; pin a canonical worktree root and exact refs before mutation; pass untrusted repository data only as fixed arguments; bound all parsed and reported output; and fail closed when inspection or state verification is uncertain. Git synchronization checks may fetch, but must not automatically choose a merge, rebase, reset, or pull strategy for a behind or diverged branch.
 
 Follow the shared inspection, mutation, reporting, and testing practices in [`git.md`](git.md).
 
 ## Filesystem and project context
 
 - `pi-nested-agent-md` must reject paths outside the project, including traversal and symlink escapes; preserve outermost-to-innermost instruction ordering, deduplication, and bounded reinjection after context resets.
-- `pi-file-remove` must remain prompt-only and must not execute or intercept removal commands. Its `gomi` preference applies only to the user's local development machine, not CI, containers, production, or other shared or automated environments.
-- `pi-file-search` must remain prompt-only and must never execute, intercept, or block discovery commands or silently broaden Pi's tool permissions.
-- `pi-vite-plus` must remain prompt-only and must never intercept commands, change package-manager metadata, or run migration, install, or publish commands itself.
-- `pi-cloudflare` must remain prompt-only and must not execute or intercept Cloudflare API calls. Its guidance applies only to retrieving current Workers documentation and limits.
 
 ## Web fetch
 
