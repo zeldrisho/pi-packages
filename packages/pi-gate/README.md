@@ -16,42 +16,39 @@ pi install -l npm:@zeldrisho/pi-gate
 
 ## Configure
 
-The extension ships with **no default rules**. On first load, an example configuration is written to `~/.pi/agent/pi-gate.json.example` and a warning notifies you that no configuration is active. Every bash command is allowed until you create a configuration.
+On first load, the extension creates `~/.pi/agent/pi-gate.json` with a default 30-second prompt timeout and starter rules. Existing configuration files are never overwritten.
 
-Copy the example and edit it:
-
-```bash
-cp ~/.pi/agent/pi-gate.json.example ~/.pi/agent/pi-gate.json
-```
-
-Then edit `~/.pi/agent/pi-gate.json` to add your rules. Each rule is a substring pattern and one of three actions:
+Edit `~/.pi/agent/pi-gate.json` to customize the rules. `promptTimeoutMs` controls how long a confirmation remains open (30 seconds by default if omitted, with a maximum of one day). Each rule is a substring pattern and one of three actions:
 
 - `prompt` — ask the user to allow or deny the command
 - `block` — deny the command without asking
-- `allow` — explicitly allow (use to carve out an exception to a broader rule)
+- `allow` — explicitly allow an exception to a broader matching rule
 
 ```json
 {
+  "promptTimeoutMs": 30000,
   "operations": {
     "rm -rf": "prompt",
     "sudo": "prompt",
+    "sudo apt update": "allow",
     "chmod 777": "block",
     "corepack enable": "block"
   }
 }
 ```
 
-Patterns use simple substring matching. When several patterns match the same command, the longest pattern wins, so a narrow `allow` rule can override a broader `block` or `prompt` rule.
+Patterns use simple substring matching. Commands with no matching rule are allowed automatically. The explicit `allow` action is only needed to carve out an exception: in the starter configuration, `sudo apt update` is allowed even though the broader `sudo` rule prompts. When several patterns match, the longest pattern wins.
 
 After editing, run `/reload` to apply the new rules in the current session.
 
 ## Behavior
 
 - Only the built-in `bash` tool is gated. Other tools pass through unchanged.
-- `prompt` rules ask the user with a two-button confirmation (`Allow` / `Deny`). The dialog identifies the matched rule.
+- `prompt` rules ask the user with a two-button confirmation (`Allow` / `Deny`). The dialog identifies the matched rule and auto-denies after `promptTimeoutMs` instead of waiting indefinitely.
 - `block` rules never ask and always deny. The warning identifies the matched rule.
 - `allow` rules are explicit pass-throughs, useful for carving out exceptions.
-- In non-interactive modes (`-p`, JSON), `prompt` and `block` rules both block the command instead of auto-approving.
+- Blocked, denied, dismissed, and timed-out calls request early termination. Pi ends the turn only when every finalized result in the tool-call batch requests termination; a mixed parallel batch containing allowed calls may continue.
+- In non-interactive modes (`-p`, JSON), `prompt` and `block` rules both block and request termination instead of auto-approving.
 
 ### What the agent sees
 

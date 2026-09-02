@@ -104,6 +104,21 @@ describe("real Git cleanup", () => {
     );
   });
 
+  it("does not classify an upstream from an unfetched second remote", async () => {
+    const { root } = await fixture();
+    const secondary = join(root, "..", "secondary.git");
+    await command(root, ["init", "--bare", "--initial-branch=main", secondary]);
+    await command(root, ["remote", "add", "secondary", secondary]);
+    await command(root, ["push", "--set-upstream", "secondary", "main"]);
+
+    const result = await cleanupRepository(realPi(), { cwd: root, trusted: true });
+    expect(result.sync).toEqual({
+      branch: "main",
+      upstream: "refs/remotes/secondary/main",
+      state: "unknown",
+    });
+  });
+
   it("retains a merged branch checked out in another worktree", async () => {
     const { root } = await fixture();
     await createTrackedBranch(root, "occupied");

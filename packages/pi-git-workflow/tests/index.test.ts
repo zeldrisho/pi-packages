@@ -4,6 +4,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
   cleanupRepository,
   formatCleanupContext,
+  formatSyncContext,
   parseLocalBranches,
   parseWorktreeBranches,
   withRepoQueue,
@@ -161,6 +162,29 @@ describe("cleanupRepository", () => {
     expect(calls.findIndex((args) => args[0] === "fetch")).toBeLessThan(
       calls.findIndex((args) => args[0] === "symbolic-ref"),
     );
+  });
+
+  it("reports when the current branch is behind its fetched upstream", async () => {
+    const { pi } = cleanupPi(
+      branchRecord("main", branchCommit, "refs/remotes/origin/main", "[behind 1]"),
+    );
+    const cleanup = await cleanupRepository(pi, { cwd: root, trusted: true });
+    expect(cleanup.sync).toEqual({
+      branch: "main",
+      upstream: "refs/remotes/origin/main",
+      state: "behind",
+    });
+    expect(formatSyncContext(cleanup.sync)).toContain("Before modifying files");
+  });
+
+  it("reports a diverged current branch without choosing an integration strategy", async () => {
+    const { pi } = cleanupPi(
+      branchRecord("main", branchCommit, "refs/remotes/origin/main", "[ahead 1, behind 1]"),
+      (args) => (args[0] === "merge-base" ? { code: 1 } : undefined),
+    );
+    const cleanup = await cleanupRepository(pi, { cwd: root, trusted: true });
+    expect(cleanup.sync.state).toBe("diverged");
+    expect(formatSyncContext(cleanup.sync)).toContain("Do not automatically merge, rebase, reset");
   });
 
   it("retains no-upstream and unmerged upstream-gone branches for review", async () => {
@@ -395,6 +419,29 @@ describe("extension registration and gate", () => {
     expect(second.message.content).toContain("feature");
     expect(notify).toHaveBeenCalledTimes(1);
     expect(reload).not.toHaveBeenCalled();
+  });
+
+  it("injects and deduplicates a warning when the current branch needs synchronization", async () => {
+    const { pi } = cleanupPi(
+      branchRecord("main", branchCommit, "refs/remotes/origin/main", "[behind 1]"),
+    );
+    const before = captureHandlers(pi).get("before_agent_start")!;
+    const notify = vi.fn();
+    const ctx = {
+      cwd: root,
+      hasUI: true,
+      isProjectTrusted: () => true,
+      ui: { notify },
+    };
+    const first = await before({}, ctx);
+    const second = await before({}, ctx);
+    expect(first.message.content).toContain(
+      "synchronize using an explicit, user-approved strategy",
+    );
+    expect(second.message.content).toContain(
+      "synchronize using an explicit, user-approved strategy",
+    );
+    expect(notify).toHaveBeenCalledTimes(1);
   });
 
   it("returns no hidden context when cleanup has no review candidates", async () => {

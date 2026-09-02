@@ -32,6 +32,8 @@ Each candidate ref is checked again immediately before deletion. Cleanup is seri
 
 Branches with no upstream, unmerged or squash/rebase-like history, and other unresolved states are listed in bounded hidden agent context. The agent is instructed to tell the user and never force-delete automatically. Interactive notifications are concise and repeat only when the candidate set changes.
 
+After fetching, the extension also compares the checked-out branch with its configured upstream. If it is behind or diverged, Pi receives bounded hidden context requiring the agent to tell the user and synchronize before modifying files. The extension warns once per observed state, but does not choose or run a merge, rebase, reset, or pull strategy automatically.
+
 Git hooks, including reference-transaction hooks, may run with the user's permissions during trusted-repository Git commands. The extension never checks out files and never reloads Pi resources.
 
 ### Remote branches

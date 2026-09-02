@@ -7,6 +7,7 @@ import {
 import {
   cleanupRepository,
   formatCleanupContext,
+  formatSyncContext,
   parseLocalBranches,
   reviewFingerprint,
 } from "./cleanup";
@@ -50,6 +51,7 @@ export function extractBranchName(command: string): string | undefined {
  */
 export default function piGitWorkflow(pi: ExtensionAPI): void {
   const visibleFingerprints = new Map<string, string>();
+  const visibleSyncStates = new Map<string, string>();
 
   pi.on("before_agent_start", async (_event, ctx: ExtensionContext) => {
     try {
@@ -69,7 +71,24 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
       } else if (result.review.length === 0) {
         visibleFingerprints.delete(result.root);
       }
-      const content = formatCleanupContext(result.review);
+      const syncContext = formatSyncContext(result.sync);
+      const syncFingerprint = `${result.sync.branch}\0${result.sync.upstream ?? ""}\0${result.sync.state}`;
+      if (syncContext && visibleSyncStates.get(result.root) !== syncFingerprint) {
+        if (ctx.hasUI) {
+          const relationship = result.sync.state === "behind" ? "is behind" : "has diverged from";
+          ctx.ui.notify(
+            `pi-git-workflow: current branch ${relationship} its fetched upstream; synchronize before editing.`,
+            "warning",
+          );
+          visibleSyncStates.set(result.root, syncFingerprint);
+        }
+      } else if (!syncContext) {
+        visibleSyncStates.delete(result.root);
+      }
+
+      const content = [formatCleanupContext(result.review), syncContext]
+        .filter(Boolean)
+        .join("\n\n");
       if (!content) return;
       return {
         message: { customType: "pi-git-workflow-cleanup", content, display: false },

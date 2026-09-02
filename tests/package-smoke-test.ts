@@ -17,6 +17,12 @@ const piEcosystemDependencies = [
   "@earendil-works/pi-tui",
 ] as const;
 const smokeDependencies = [...piEcosystemDependencies, "typebox"] as const;
+const deprecatedNoopPackages = new Set([
+  "@zeldrisho/pi-cloudflare",
+  "@zeldrisho/pi-file-remove",
+  "@zeldrisho/pi-file-search",
+  "@zeldrisho/pi-vite-plus",
+]);
 
 /**
  * Resolves the dependency version used by the smoke-test fixture.
@@ -118,6 +124,7 @@ import { discoverAndLoadExtensions } from "@earendil-works/pi-coding-agent";
 import childProcess from "node:child_process";
 
 const packageNames = ${JSON.stringify(packageNames)};
+const deprecatedNoopPackages = new Set(${JSON.stringify([...deprecatedNoopPackages])});
 for (const packageName of packageNames) {
   const createdProcesses = new Set<string>();
   const originalSpawn = childProcess.spawn;
@@ -178,7 +185,13 @@ for (const packageName of packageNames) {
       (extension?.handlers.size ?? 0) +
       (extension?.tools.size ?? 0) +
       (extension?.commands.size ?? 0);
-    if (!extension || registrations === 0) {
+    if (!extension) {
+      throw new Error(\`\${packageName} did not load as a Pi extension\`);
+    }
+    if (deprecatedNoopPackages.has(packageName) && registrations !== 0) {
+      throw new Error(\`\${packageName} registered handlers despite being a deprecated no-op\`);
+    }
+    if (!deprecatedNoopPackages.has(packageName) && registrations === 0) {
       throw new Error(\`\${packageName} did not register a Pi extension\`);
     }
     await new Promise((resolve) => setImmediate(resolve));
