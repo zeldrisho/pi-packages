@@ -125,6 +125,7 @@ function isJsonObject(value: unknown): value is Record<string, unknown> {
  */
 export function parseConfig(content: string): GateConfig {
   const rules: Record<string, Action> = {};
+  let acceptedRuleCount = 0;
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
@@ -148,10 +149,11 @@ export function parseConfig(content: string): GateConfig {
     return { operations: rules, promptTimeoutMs };
   }
   for (const [pattern, action] of Object.entries(operations)) {
-    if (Object.keys(rules).length >= MAX_RULE_COUNT) break;
+    if (acceptedRuleCount >= MAX_RULE_COUNT) break;
     if (pattern.length === 0 || pattern.length > MAX_RULE_PATTERN_LENGTH) continue;
     if (isAction(action)) {
       rules[pattern] = action;
+      acceptedRuleCount += 1;
     }
   }
   return { operations: rules, promptTimeoutMs };

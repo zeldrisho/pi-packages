@@ -3,17 +3,30 @@ const SENSITIVE_QUERY_KEYS = new Set([
   "api_key",
   "apikey",
   "auth",
+  "client_secret",
   "code",
   "jwt",
   "key",
   "passwd",
   "password",
+  "refresh_token",
   "secret",
   "session",
   "sig",
   "signature",
   "token",
 ]);
+
+function redactSensitiveParams(params: URLSearchParams): boolean {
+  let redacted = false;
+  for (const key of params.keys()) {
+    if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
+      params.set(key, "REDACTED");
+      redacted = true;
+    }
+  }
+  return redacted;
+}
 
 /**
  * Returns a URL safe to show in tool progress, results, and errors.
@@ -32,8 +45,10 @@ export function redactUrlForDisplay(value: string | URL): string {
 
   url.username = "";
   url.password = "";
-  for (const key of url.searchParams.keys()) {
-    if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) url.searchParams.set(key, "REDACTED");
+  redactSensitiveParams(url.searchParams);
+  if (url.hash.length > 1) {
+    const fragmentParams = new URLSearchParams(url.hash.slice(1));
+    if (redactSensitiveParams(fragmentParams)) url.hash = fragmentParams.toString();
   }
   return url.href;
 }

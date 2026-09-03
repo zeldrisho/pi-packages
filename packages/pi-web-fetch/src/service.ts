@@ -504,6 +504,20 @@ export async function executeWebFetch(
     params.query === undefined ? undefined : focusMarkdown(document.markdown, params.query);
   const outputDocument = focused ? { ...document, markdown: focused.markdown } : document;
   const result = sliceCompleteDocument(outputDocument, offset, maxCharacters);
+  const displayLinks =
+    result.links === undefined
+      ? undefined
+      : {
+          ...result.links,
+          internal: result.links.internal.map((link) => ({
+            ...link,
+            url: redactUrlForDisplay(link.url),
+          })),
+          external: result.links.external.map((link) => ({
+            ...link,
+            url: redactUrlForDisplay(link.url),
+          })),
+        };
   const requestedUrl = displayRequestedUrl;
   const rawFinalUrl = result.url;
   const finalUrl = redactUrlForDisplay(rawFinalUrl);
@@ -560,7 +574,7 @@ export async function executeWebFetch(
       contentKind,
       shellSuspected,
       extractionDiagnostics: result.extractionDiagnostics,
-      links: result.links,
+      links: displayLinks,
       confidence,
       outline: createDocumentOutline(document.markdown),
       focus: focused?.details,

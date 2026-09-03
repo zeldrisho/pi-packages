@@ -12,17 +12,33 @@ describe("redactUrlForDisplay", () => {
 
   it("redacts common credential-bearing query parameters case-insensitively", () => {
     const output = redactUrlForDisplay(
-      "https://example.com/page?token=secret-token&API_KEY=secret-key&page=2",
+      "https://example.com/page?token=secret-token&API_KEY=secret-key&client_secret=oauth-secret&refresh_token=refresh-secret&page=2",
     );
 
-    expect(output).toBe("https://example.com/page?token=REDACTED&API_KEY=REDACTED&page=2");
+    expect(output).toBe(
+      "https://example.com/page?token=REDACTED&API_KEY=REDACTED&client_secret=REDACTED&refresh_token=REDACTED&page=2",
+    );
     expect(output).not.toContain("secret-token");
     expect(output).not.toContain("secret-key");
+    expect(output).not.toContain("oauth-secret");
+    expect(output).not.toContain("refresh-secret");
   });
 
-  it("preserves ordinary query parameters", () => {
-    expect(redactUrlForDisplay("https://example.com/search?q=pi&lang=en")).toBe(
-      "https://example.com/search?q=pi&lang=en",
+  it("redacts credential-bearing fragment parameters case-insensitively", () => {
+    const output = redactUrlForDisplay(
+      "https://example.com/callback#access_token=secret-token&CLIENT_SECRET=oauth-secret&state=ok",
+    );
+
+    expect(output).toBe(
+      "https://example.com/callback#access_token=REDACTED&CLIENT_SECRET=REDACTED&state=ok",
+    );
+    expect(output).not.toContain("secret-token");
+    expect(output).not.toContain("oauth-secret");
+  });
+
+  it("preserves ordinary query parameters and fragments", () => {
+    expect(redactUrlForDisplay("https://example.com/search?q=pi&lang=en#section-1")).toBe(
+      "https://example.com/search?q=pi&lang=en#section-1",
     );
   });
 
