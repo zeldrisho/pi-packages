@@ -1,6 +1,12 @@
 packages:
   - "packages/*"
 
+# Delay newly published dependencies long enough for ecosystem review and block
+# less trustworthy resolution paths or provenance downgrades.
+minimumReleaseAge: 10080
+trustPolicy: no-downgrade
+blockExoticSubdeps: true
+
 allowBuilds:
   "@google/genai": false
   koffi: false

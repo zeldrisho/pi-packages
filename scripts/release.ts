@@ -33,11 +33,6 @@ export interface ReleaseAutomationOptions {
   stdout?: (value: string) => void;
 }
 
-/** Escapes a literal value before interpolation into a regular expression. */
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 /**
  * Creates release-tooling operations for the repository.
  *
@@ -117,9 +112,13 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
     const pkg = (await packageCatalog()).find((candidate) => candidate.path === packagePath);
     if (!pkg) throw new Error(`Unknown package path: ${packagePath}`);
     const changelog = await readFile(pkg.changelogPath, "utf8");
-    const heading = new RegExp(`^##\\s+\\[?${escapeRegExp(pkg.version)}(?:\\]|\\s|$)`, "m");
-    const start = changelog.search(heading);
-    if (start < 0) throw new Error(`Changelog does not contain ${pkg.name}@${pkg.version}`);
+    const heading = [...changelog.matchAll(/^##\s+\[?(\d+\.\d+\.\d+)(?:\]|\s|$)/gm)].find(
+      (match) => match[1] === pkg.version,
+    );
+    if (heading?.index === undefined) {
+      throw new Error(`Changelog does not contain ${pkg.name}@${pkg.version}`);
+    }
+    const start = heading.index;
     const remainder = changelog.slice(start);
     const nextHeading = remainder.slice(1).search(/^##\s+/m);
     const notes = nextHeading < 0 ? remainder : remainder.slice(0, nextHeading + 1);
