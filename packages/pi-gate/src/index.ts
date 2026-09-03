@@ -44,13 +44,15 @@ export interface RuleMatch {
 }
 
 const CONFIG_FILE_NAME = "pi-gate.json";
+export const CONFIG_SCHEMA_URL =
+  "https://raw.githubusercontent.com/zeldrisho/pi-packages/main/packages/pi-gate/config.schema.json";
 const ACTIONS: readonly Action[] = ["prompt", "block", "allow"] as const;
 export const DEFAULT_PROMPT_TIMEOUT_MS = 30_000;
 export const MAX_RULE_COUNT = 1_000;
 export const MAX_RULE_PATTERN_LENGTH = 1_024;
 export const MAX_DISPLAY_COMMAND_CHARACTERS = 2_000;
 export const MAX_DISPLAY_COMMAND_LINES = 20;
-const MAX_PROMPT_TIMEOUT_MS = 86_400_000;
+export const MAX_PROMPT_TIMEOUT_MS = 86_400_000;
 const DISPLAY_TRUNCATION_MARKER = "\n  … [command display truncated]";
 const BIDI_CONTROL_CODE_POINTS = new Set([
   0x061c, 0x200e, 0x200f, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069,
@@ -185,7 +187,7 @@ export function ensureConfig(): void {
   } catch {
     return;
   }
-  const content = JSON.stringify(DEFAULT_CONFIG, null, 2) + "\n";
+  const content = JSON.stringify({ $schema: CONFIG_SCHEMA_URL, ...DEFAULT_CONFIG }, null, 2) + "\n";
   try {
     writeFileSync(path, content, { encoding: "utf-8", flag: "wx", mode: 0o600 });
   } catch {

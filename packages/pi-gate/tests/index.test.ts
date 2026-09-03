@@ -10,6 +10,7 @@ import piGate, {
   parseConfig,
   resolveAction,
   resolveRule,
+  CONFIG_SCHEMA_URL,
   DEFAULT_PROMPT_TIMEOUT_MS,
   MAX_DISPLAY_COMMAND_CHARACTERS,
   MAX_DISPLAY_COMMAND_LINES,
@@ -371,6 +372,7 @@ describe("ensureConfig", () => {
     const path = join(workDir, "pi-gate.json");
     expect(existsSync(path)).toBe(true);
     expect(JSON.parse(readFileSync(path, "utf-8"))).toEqual({
+      $schema: CONFIG_SCHEMA_URL,
       promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS,
       operations: {
         "rm -rf": "prompt",

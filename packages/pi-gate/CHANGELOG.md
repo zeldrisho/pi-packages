@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- ship a JSON Schema for `pi-gate.json` and reference it from newly seeded configurations for editor completion and validation
+
 ### Changed
 
 - escape terminal and bidirectional control characters and bound long or multiline command text in confirmation dialogs without changing the command executed

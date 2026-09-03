@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/zeldrisho/pi-packages/main/packages/pi-gate/config.schema.json",
+  "title": "pi-gate configuration",
+  "description": "Rules used by @zeldrisho/pi-gate to allow, block, or confirm bash commands.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["operations"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri-reference",
+      "description": "Optional JSON Schema reference for editor validation."
+    },
+    "promptTimeoutMs": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 86400000,
+      "default": 30000,
+      "description": "Maximum time to wait for an interactive confirmation, in milliseconds."
+    },
+    "operations": {
+      "type": "object",
+      "description": "Command substring patterns mapped to actions. When multiple patterns match, the longest wins.",
+      "maxProperties": 1000,
+      "propertyNames": {
+        "minLength": 1,
+        "maxLength": 1024
+      },
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["prompt", "block", "allow"]
+      }
+    }
+  }
+}

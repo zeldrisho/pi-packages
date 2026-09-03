@@ -16,7 +16,9 @@ pi install -l npm:@zeldrisho/pi-gate
 
 ## Configure
 
-On first load, the extension creates `~/.pi/agent/pi-gate.json` with a default 30-second prompt timeout and starter rules. Existing configuration files are never overwritten.
+On first load, the extension creates `~/.pi/agent/pi-gate.json` with a default 30-second prompt timeout, starter rules, and a `$schema` reference for editor validation. Existing configuration files are never overwritten.
+
+The published package includes [`config.schema.json`](config.schema.json). New configurations reference its canonical URL automatically; existing configurations can add the same `$schema` property shown below to enable completion and validation in compatible editors.
 
 Edit `~/.pi/agent/pi-gate.json` to customize the rules. `promptTimeoutMs` controls how long a confirmation remains open (30 seconds by default if omitted, with a maximum of one day). Each rule is a substring pattern and one of three actions:
 
@@ -26,6 +28,7 @@ Edit `~/.pi/agent/pi-gate.json` to customize the rules. `promptTimeoutMs` contro
 
 ```json
 {
+  "$schema": "https://raw.githubusercontent.com/zeldrisho/pi-packages/main/packages/pi-gate/config.schema.json",
   "promptTimeoutMs": 30000,
   "operations": {
     "rm -rf": "prompt",

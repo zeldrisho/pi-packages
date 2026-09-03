@@ -19,6 +19,7 @@ const workspace = await readFile(join(root, "pnpm-workspace.yaml"), "utf8");
 const lockfile = await readFile(join(root, "pnpm-lock.yaml"), "utf8");
 const releaseWorkflow = await readFile(join(root, ".github/workflows/release.yml"), "utf8");
 const expectedFiles = ["src", "README.md", "CHANGELOG.md", "LICENSE"];
+const packageSpecificFiles = new Map([["pi-gate", ["config.schema.json"]]]);
 const expectedScripts = {
   check: "vp check",
   test: "vp test",
@@ -272,9 +273,10 @@ describe("repository contracts", () => {
           `${manifest.name} tsconfig.json must extend the base config and include src and tests`,
         );
       }
-      if (!sameValues(manifest.files ?? [], expectedFiles)) {
+      const packageFiles = [...expectedFiles, ...(packageSpecificFiles.get(directory) ?? [])];
+      if (!sameValues(manifest.files ?? [], packageFiles)) {
         fail(
-          `${manifest.name} files must contain only ${expectedFiles.join(", ")}; received ${(manifest.files ?? []).join(", ")}`,
+          `${manifest.name} files must contain only ${packageFiles.join(", ")}; received ${(manifest.files ?? []).join(", ")}`,
         );
       }
       if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(["./src/index.ts"])) {
