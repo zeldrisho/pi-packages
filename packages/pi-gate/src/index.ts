@@ -238,31 +238,95 @@ function escapeUnsafeDisplayCharacter(character: string): string {
   return character;
 }
 
-/**
- * Produces bounded terminal-safe text for a command without changing the command that is executed.
- */
-export function formatCommandForDisplay(command: string): string {
-  const normalized = command.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+interface MatchRange {
+  start: number;
+  end: number;
+}
+
+/** Finds non-overlapping raw match ranges before any display escaping occurs. */
+function findMatchRanges(command: string, pattern?: string): MatchRange[] {
+  if (!pattern) return [];
+  const ranges: MatchRange[] = [];
+  let offset = 0;
+  while (offset <= command.length - pattern.length) {
+    const start = command.indexOf(pattern, offset);
+    if (start === -1) break;
+    ranges.push({ start, end: start + pattern.length });
+    offset = start + pattern.length;
+  }
+  return ranges;
+}
+
+/** Produces bounded terminal-safe text, optionally marking raw matched spans. */
+function renderCommandForDisplay(command: string, pattern?: string): string {
+  const ranges = findMatchRanges(command, pattern);
+  let rangeIndex = 0;
+  let activeRange: MatchRange | undefined;
   let output = "";
   let lineCount = 1;
+  let offset = 0;
 
-  for (const character of normalized) {
-    if (character === "\n") {
-      if (lineCount >= MAX_DISPLAY_COMMAND_LINES) return output + DISPLAY_TRUNCATION_MARKER;
+  const truncate = (closeActiveRange = activeRange !== undefined): string =>
+    output + (closeActiveRange ? "«" : "") + DISPLAY_TRUNCATION_MARKER;
+
+  while (offset < command.length) {
+    const rawStart = offset;
+    let rawEnd: number;
+    let rendered: string;
+    const codePoint = command.codePointAt(offset);
+    if (codePoint === 0x0d) {
+      rawEnd = offset + (command.codePointAt(offset + 1) === 0x0a ? 2 : 1);
+      rendered = "\n";
+    } else {
+      const character = String.fromCodePoint(codePoint!);
+      rawEnd = offset + character.length;
+      rendered = character === "\n" ? character : escapeUnsafeDisplayCharacter(character);
+    }
+
+    const nextRange = ranges[rangeIndex];
+    const wasInsideRange = activeRange !== undefined;
+    const opensRange =
+      activeRange === undefined &&
+      nextRange !== undefined &&
+      nextRange.start < rawEnd &&
+      nextRange.end > rawStart;
+    if (opensRange) activeRange = nextRange;
+    const closesRange = activeRange !== undefined && activeRange.end <= rawEnd;
+    const decorated = `${opensRange ? "»" : ""}${rendered}${closesRange ? "«" : ""}`;
+
+    if (rendered === "\n") {
+      if (lineCount >= MAX_DISPLAY_COMMAND_LINES) return truncate(wasInsideRange);
       lineCount += 1;
     }
-    const rendered = character === "\n" ? character : escapeUnsafeDisplayCharacter(character);
-    if (output.length + rendered.length > MAX_DISPLAY_COMMAND_CHARACTERS) {
-      return output + DISPLAY_TRUNCATION_MARKER;
+    if (output.length + decorated.length > MAX_DISPLAY_COMMAND_CHARACTERS) {
+      return truncate(wasInsideRange);
     }
-    output += rendered;
+
+    output += decorated;
+    if (closesRange) {
+      activeRange = undefined;
+      rangeIndex += 1;
+    }
+    offset = rawEnd;
   }
   return output;
 }
 
+/**
+ * Produces bounded terminal-safe text for a command without changing the command that is executed.
+ */
+export function formatCommandForDisplay(command: string): string {
+  return renderCommandForDisplay(command);
+}
+
+/** Marks raw matched-rule occurrences while producing terminal-safe command text. */
+export function highlightRuleForDisplay(command: string, pattern: string): string {
+  return renderCommandForDisplay(command, pattern);
+}
+
 /** Indents every line of terminal-safe command text for the confirmation dialog. */
-function formatPromptCommand(command: string): string {
-  return formatCommandForDisplay(command)
+function formatPromptCommand(command: string, pattern: string): string {
+  return highlightRuleForDisplay(command, pattern)
     .split("\n")
     .map((line) => `  ${line}`)
     .join("\n");
@@ -333,7 +397,7 @@ export default function piGate(pi: ExtensionAPI): void {
       };
     }
     const choice = await ctx.ui.select(
-      `pi-gate: allow this command?\n\n${formatPromptCommand(command)}\n\nMatched rule: ${rule}`,
+      `pi-gate: allow this command?\n\n${formatPromptCommand(command, match.pattern)}\n\nMatched rule: ${rule}\nMatched command text is wrapped in »…«`,
       ["Allow", "Deny"],
       { timeout: config.promptTimeoutMs },
     );

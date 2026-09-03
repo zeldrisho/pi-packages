@@ -47,7 +47,7 @@ After editing, run `/reload` to apply the new rules in the current session.
 ## Behavior
 
 - Only the built-in `bash` tool is gated. Other tools pass through unchanged.
-- `prompt` rules ask the user with a two-button confirmation (`Allow` / `Deny`). The dialog identifies the matched rule and auto-denies after `promptTimeoutMs` instead of waiting indefinitely. Commands are normalized and terminal control characters are escaped for display; prompts show at most 2,000 command characters and 20 lines, but an allowed command always executes in full and unchanged.
+- `prompt` rules ask the user with a two-button confirmation (`Allow` / `Deny`). The dialog identifies the matched rule, wraps its visible occurrences in `»…«`, and auto-denies after `promptTimeoutMs` instead of waiting indefinitely. Commands are normalized and terminal control characters are escaped for display; prompts show at most 2,000 command characters and 20 lines, but an allowed command always executes in full and unchanged.
 - `block` rules never ask and always deny. The warning identifies the matched rule.
 - `allow` rules are explicit pass-throughs, useful for carving out exceptions.
 - Blocked, denied, dismissed, and timed-out calls request early termination. Pi ends the turn only when every finalized result in the tool-call batch requests termination; a mixed parallel batch containing allowed calls may continue.

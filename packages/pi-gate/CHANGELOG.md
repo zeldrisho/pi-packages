@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- wrap visible matched-rule occurrences in confirmation-dialog command text so guarded operations are easier to identify
 - escape terminal and bidirectional control characters and bound long or multiline command text in confirmation dialogs without changing the command executed
 - ignore empty or oversized rule patterns and load at most 1,000 valid rules
 - document and test RPC-host confirmation behavior

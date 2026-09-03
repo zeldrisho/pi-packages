@@ -6,6 +6,7 @@ import { isToolCallEventType, type ExtensionAPI } from "@earendil-works/pi-codin
 import piGate, {
   ensureConfig,
   formatCommandForDisplay,
+  highlightRuleForDisplay,
   loadConfig,
   parseConfig,
   resolveAction,
@@ -293,6 +294,34 @@ describe("formatCommandForDisplay", () => {
   });
 });
 
+describe("highlightRuleForDisplay", () => {
+  it("wraps every visible occurrence of the matched rule", () => {
+    expect(highlightRuleForDisplay("sudo echo sudo", "sudo")).toBe("»sudo« echo »sudo«");
+  });
+
+  it("highlights terminal-safe text without restoring control characters", () => {
+    expect(highlightRuleForDisplay("dangerous\x1b[31m", "dangerous")).toBe(
+      "»dangerous«\\u{001b}[31m",
+    );
+  });
+
+  it("distinguishes a raw control-character match from its literal escaped representation", () => {
+    expect(highlightRuleForDisplay("actual \x1b literal \\u{001b}", "\x1b")).toBe(
+      "actual »\\u{001b}« literal \\u{001b}",
+    );
+  });
+
+  it("does not highlight words in the generated truncation notice", () => {
+    const result = highlightRuleForDisplay(
+      `command ${"x".repeat(MAX_DISPLAY_COMMAND_CHARACTERS)}`,
+      "command",
+    );
+    expect(result).toContain("»command«");
+    expect(result).toContain("[command display truncated]");
+    expect(result).not.toContain("[»command« display truncated]");
+  });
+});
+
 describe("loadConfig", () => {
   it("returns an empty configuration when the file is missing", () => {
     expect(loadConfig()).toEqual({
@@ -513,7 +542,7 @@ describe("piGate extension", () => {
       expect(uiState.selectCalls).toEqual([
         {
           prompt:
-            'pi-gate: allow this command?\n\n  rm -rf node_modules\n\nMatched rule: "rm -rf": "prompt"',
+            'pi-gate: allow this command?\n\n  »rm -rf« node_modules\n\nMatched rule: "rm -rf": "prompt"\nMatched command text is wrapped in »…«',
           options: ["Allow", "Deny"],
           settings: { timeout: DEFAULT_PROMPT_TIMEOUT_MS },
         },
@@ -537,7 +566,7 @@ describe("piGate extension", () => {
       const command = `dangerous \x1b[31m${"x".repeat(MAX_DISPLAY_COMMAND_CHARACTERS)}`;
 
       expect(await handlers.toolCall!(bashEvent(command), ctx)).toBeUndefined();
-      expect(uiState.selectCalls[0]?.prompt).toContain("\\u{001b}[31m");
+      expect(uiState.selectCalls[0]?.prompt).toContain("»dangerous« \\u{001b}[31m");
       expect(uiState.selectCalls[0]?.prompt).toContain("[command display truncated]");
       expect(uiState.selectCalls[0]?.prompt).not.toContain("\x1b");
     });
