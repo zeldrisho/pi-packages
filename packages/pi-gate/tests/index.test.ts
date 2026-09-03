@@ -5,11 +5,16 @@ import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import { isToolCallEventType, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import piGate, {
   ensureConfig,
+  formatCommandForDisplay,
   loadConfig,
   parseConfig,
   resolveAction,
   resolveRule,
   DEFAULT_PROMPT_TIMEOUT_MS,
+  MAX_DISPLAY_COMMAND_CHARACTERS,
+  MAX_DISPLAY_COMMAND_LINES,
+  MAX_RULE_COUNT,
+  MAX_RULE_PATTERN_LENGTH,
   type Action,
 } from "../src/index";
 
@@ -59,6 +64,7 @@ interface FakeUi {
 interface FakeContext {
   ui: FakeUi;
   hasUI: boolean;
+  mode: "tui" | "rpc" | "json" | "print";
 }
 
 // SAFETY: pi.on accepts variably-typed handlers across many event overloads; the
@@ -105,13 +111,16 @@ function createUi(state: UiState, hasUI: boolean): FakeUi {
   };
 }
 
-function createExtensionContext(hasUI: boolean): ContextWithUi {
+function createExtensionContext(
+  hasUI: boolean,
+  mode: FakeContext["mode"] = hasUI ? "tui" : "print",
+): ContextWithUi {
   const uiState: UiState = {
     notifyCalls: [],
     selectCalls: [],
     selectResponse: undefined,
   };
-  const ctx: FakeContext = { ui: createUi(uiState, hasUI), hasUI };
+  const ctx: FakeContext = { ui: createUi(uiState, hasUI), hasUI, mode };
   return { ctx, uiState };
 }
 
@@ -238,6 +247,48 @@ describe("parseConfig", () => {
       }),
     );
     expect(result.operations).toEqual({ "rm -rf": "prompt" });
+  });
+
+  it("skips empty and excessively long patterns", () => {
+    const tooLong = "x".repeat(MAX_RULE_PATTERN_LENGTH + 1);
+    const result = parseConfig(
+      JSON.stringify({ operations: { "": "block", valid: "prompt", [tooLong]: "allow" } }),
+    );
+    expect(result.operations).toEqual({ valid: "prompt" });
+  });
+
+  it("caps the number of accepted rules", () => {
+    const operations = Object.fromEntries(
+      Array.from({ length: MAX_RULE_COUNT + 5 }, (_, index) => [`rule-${index}`, "block"]),
+    );
+    expect(Object.keys(parseConfig(JSON.stringify({ operations })).operations)).toHaveLength(
+      MAX_RULE_COUNT,
+    );
+  });
+});
+
+describe("formatCommandForDisplay", () => {
+  it("normalizes line endings and visibly escapes terminal and bidi controls", () => {
+    expect(formatCommandForDisplay("one\r\ntwo\r\x1b[31m\u202Etxt\0")).toBe(
+      "one\ntwo\n\\u{001b}[31m\\u{202e}txt\\u{0000}",
+    );
+  });
+
+  it("bounds displayed command characters without changing the prefix", () => {
+    const result = formatCommandForDisplay("x".repeat(MAX_DISPLAY_COMMAND_CHARACTERS + 1));
+    expect(result).toContain("x".repeat(MAX_DISPLAY_COMMAND_CHARACTERS));
+    expect(result).toContain("[command display truncated]");
+  });
+
+  it("bounds displayed command lines", () => {
+    const result = formatCommandForDisplay(
+      Array.from({ length: MAX_DISPLAY_COMMAND_LINES + 1 }, (_, index) => `line-${index}`).join(
+        "\n",
+      ),
+    );
+    expect(result.split("\n")).toHaveLength(MAX_DISPLAY_COMMAND_LINES + 1);
+    expect(result).toContain("[command display truncated]");
+    expect(result).not.toContain(`line-${MAX_DISPLAY_COMMAND_LINES}`);
   });
 });
 
@@ -465,6 +516,28 @@ describe("piGate extension", () => {
           settings: { timeout: DEFAULT_PROMPT_TIMEOUT_MS },
         },
       ]);
+    });
+
+    it("uses host-native selection in RPC mode", async () => {
+      setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
+      const { handlers } = makeExtension().install();
+      const { ctx, uiState } = createExtensionContext(true, "rpc");
+      uiState.selectResponse = "Allow";
+
+      expect(await handlers.toolCall!(bashEvent("sudo apt update"), ctx)).toBeUndefined();
+      expect(uiState.selectCalls).toHaveLength(1);
+    });
+
+    it("escapes controls and bounds only the command shown in the prompt", async () => {
+      setConfig(JSON.stringify({ operations: { dangerous: "prompt" } }));
+      const { ctx, uiState, handlers } = makeExtension().install();
+      uiState.selectResponse = "Allow";
+      const command = `dangerous \x1b[31m${"x".repeat(MAX_DISPLAY_COMMAND_CHARACTERS)}`;
+
+      expect(await handlers.toolCall!(bashEvent(command), ctx)).toBeUndefined();
+      expect(uiState.selectCalls[0]?.prompt).toContain("\\u{001b}[31m");
+      expect(uiState.selectCalls[0]?.prompt).toContain("[command display truncated]");
+      expect(uiState.selectCalls[0]?.prompt).not.toContain("\x1b");
     });
 
     it("prompts with the user and blocks on Deny", async () => {

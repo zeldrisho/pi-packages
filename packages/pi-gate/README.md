@@ -37,18 +37,18 @@ Edit `~/.pi/agent/pi-gate.json` to customize the rules. `promptTimeoutMs` contro
 }
 ```
 
-Patterns use simple substring matching. Commands with no matching rule are allowed automatically. The explicit `allow` action is only needed to carve out an exception: in the starter configuration, `sudo apt update` is allowed even though the broader `sudo` rule prompts. When several patterns match, the longest pattern wins.
+Patterns use simple substring matching. Empty patterns and patterns longer than 1,024 characters are ignored, and at most 1,000 valid rules are loaded. Commands with no matching rule are allowed automatically. The explicit `allow` action is only needed to carve out an exception: in the starter configuration, `sudo apt update` is allowed even though the broader `sudo` rule prompts. When several patterns match, the longest pattern wins.
 
 After editing, run `/reload` to apply the new rules in the current session.
 
 ## Behavior
 
 - Only the built-in `bash` tool is gated. Other tools pass through unchanged.
-- `prompt` rules ask the user with a two-button confirmation (`Allow` / `Deny`). The dialog identifies the matched rule and auto-denies after `promptTimeoutMs` instead of waiting indefinitely.
+- `prompt` rules ask the user with a two-button confirmation (`Allow` / `Deny`). The dialog identifies the matched rule and auto-denies after `promptTimeoutMs` instead of waiting indefinitely. Commands are normalized and terminal control characters are escaped for display; prompts show at most 2,000 command characters and 20 lines, but an allowed command always executes in full and unchanged.
 - `block` rules never ask and always deny. The warning identifies the matched rule.
 - `allow` rules are explicit pass-throughs, useful for carving out exceptions.
 - Blocked, denied, dismissed, and timed-out calls request early termination. Pi ends the turn only when every finalized result in the tool-call batch requests termination; a mixed parallel batch containing allowed calls may continue.
-- In non-interactive modes (`-p`, JSON), `prompt` and `block` rules both block and request termination instead of auto-approving.
+- RPC hosts use their native selection dialog. In non-interactive modes (`-p`, JSON), `prompt` and `block` rules both block and request termination instead of auto-approving.
 
 ### What the agent sees
 

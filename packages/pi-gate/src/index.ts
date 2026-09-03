@@ -46,7 +46,15 @@ export interface RuleMatch {
 const CONFIG_FILE_NAME = "pi-gate.json";
 const ACTIONS: readonly Action[] = ["prompt", "block", "allow"] as const;
 export const DEFAULT_PROMPT_TIMEOUT_MS = 30_000;
+export const MAX_RULE_COUNT = 1_000;
+export const MAX_RULE_PATTERN_LENGTH = 1_024;
+export const MAX_DISPLAY_COMMAND_CHARACTERS = 2_000;
+export const MAX_DISPLAY_COMMAND_LINES = 20;
 const MAX_PROMPT_TIMEOUT_MS = 86_400_000;
+const DISPLAY_TRUNCATION_MARKER = "\n  … [command display truncated]";
+const BIDI_CONTROL_CODE_POINTS = new Set([
+  0x061c, 0x200e, 0x200f, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069,
+]);
 
 const DEFAULT_CONFIG: GateConfig = {
   promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS,
@@ -138,6 +146,8 @@ export function parseConfig(content: string): GateConfig {
     return { operations: rules, promptTimeoutMs };
   }
   for (const [pattern, action] of Object.entries(operations)) {
+    if (Object.keys(rules).length >= MAX_RULE_COUNT) break;
+    if (pattern.length === 0 || pattern.length > MAX_RULE_PATTERN_LENGTH) continue;
     if (isAction(action)) {
       rules[pattern] = action;
     }
@@ -212,14 +222,60 @@ export function resolveAction(command: string, rules: Record<string, Action>): A
   return resolveRule(command, rules)?.action ?? null;
 }
 
+/** Converts terminal controls and bidirectional formatting characters to visible escapes. */
+function escapeUnsafeDisplayCharacter(character: string): string {
+  const codePoint = character.codePointAt(0);
+  if (codePoint === undefined) return "";
+  if (
+    codePoint < 0x20 ||
+    (codePoint >= 0x7f && codePoint <= 0x9f) ||
+    BIDI_CONTROL_CODE_POINTS.has(codePoint)
+  ) {
+    return `\\u{${codePoint.toString(16).padStart(4, "0")}}`;
+  }
+  return character;
+}
+
 /**
- * Formats a rule match as a human-readable string for display in prompts and notifications.
+ * Produces bounded terminal-safe text for a command without changing the command that is executed.
+ */
+export function formatCommandForDisplay(command: string): string {
+  const normalized = command.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+  let output = "";
+  let lineCount = 1;
+
+  for (const character of normalized) {
+    if (character === "\n") {
+      if (lineCount >= MAX_DISPLAY_COMMAND_LINES) return output + DISPLAY_TRUNCATION_MARKER;
+      lineCount += 1;
+    }
+    const rendered = character === "\n" ? character : escapeUnsafeDisplayCharacter(character);
+    if (output.length + rendered.length > MAX_DISPLAY_COMMAND_CHARACTERS) {
+      return output + DISPLAY_TRUNCATION_MARKER;
+    }
+    output += rendered;
+  }
+  return output;
+}
+
+/** Indents every line of terminal-safe command text for the confirmation dialog. */
+function formatPromptCommand(command: string): string {
+  return formatCommandForDisplay(command)
+    .split("\n")
+    .map((line) => `  ${line}`)
+    .join("\n");
+}
+
+/**
+ * Formats a rule match as a terminal-safe, human-readable string.
  *
  * @param match - The rule match to format
  * @returns A string representation showing the pattern and action
  */
 function formatRule(match: RuleMatch): string {
-  return `${JSON.stringify(match.pattern)}: ${JSON.stringify(match.action)}`;
+  return formatCommandForDisplay(
+    `${JSON.stringify(match.pattern)}: ${JSON.stringify(match.action)}`,
+  );
 }
 
 /** Gate the built-in `bash` tool against the user-provided rules. */
@@ -275,7 +331,7 @@ export default function piGate(pi: ExtensionAPI): void {
       };
     }
     const choice = await ctx.ui.select(
-      `pi-gate: allow this command?\n\n  ${command}\n\nMatched rule: ${rule}`,
+      `pi-gate: allow this command?\n\n${formatPromptCommand(command)}\n\nMatched rule: ${rule}`,
       ["Allow", "Deny"],
       { timeout: config.promptTimeoutMs },
     );
