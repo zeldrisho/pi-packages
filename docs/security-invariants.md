@@ -26,7 +26,7 @@ Follow the shared inspection, mutation, reporting, and testing practices in [`gi
 
 Changes to `pi-web-fetch` must preserve:
 
-- HTTP(S)-only URLs and rejection of embedded credentials;
+- HTTP(S)-only URLs, rejection of embedded credentials, and redaction of common credential-bearing query parameters from displayed URLs and result metadata;
 - DNS validation that rejects local, private, and reserved targets;
 - validation of every redirect target;
 - redirect, timeout, extraction-time, and response-size bounds;

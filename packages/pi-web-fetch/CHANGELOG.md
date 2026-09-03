@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- redact URL user information and common credential-bearing query parameters from progress messages, rendered calls, content source labels, and result URL metadata
+
 ## [0.8.0] - 2026-09-01
 
 ### Added

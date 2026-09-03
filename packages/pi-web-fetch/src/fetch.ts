@@ -5,6 +5,7 @@ import { diagnoseExtraction, extractDocumentLinks, hasExtractionWarning } from "
 import { extractHtmlToMarkdown } from "./extract";
 import { requestFollowingRedirects, type RedirectDependencies } from "./network-redirects";
 import type { ValidatedTarget } from "./network-policy";
+import { redactUrlForDisplay } from "./redact";
 import {
   decodeResponse,
   FETCH_MAX_BYTES,
@@ -247,10 +248,10 @@ function assertAbsoluteHttpUrlForFetch(value: string): URL {
   try {
     url = new URL(value);
   } catch {
-    throw new Error(`Invalid URL: ${value}`);
+    throw new Error("web_fetch received an invalid URL.");
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error(`web_fetch only supports http(s) URLs: ${value}`);
+    throw new Error(`web_fetch only supports http(s) URLs: ${redactUrlForDisplay(url)}`);
   }
   return url;
 }

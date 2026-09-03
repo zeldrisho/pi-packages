@@ -230,6 +230,33 @@ describe("web_fetch honest-evidence details", () => {
     });
   });
 
+  it("redacts credential-bearing query values from progress and result evidence", async () => {
+    const requested = `https://credentials.example.com/page-${process.pid}?token=secret-token&page=2`;
+    const redacted = `https://credentials.example.com/page-${process.pid}?token=REDACTED&page=2`;
+    const updates: string[] = [];
+    const fetchDependencies: FetchRemoteDependencies = {
+      validateUrl: async (value) => {
+        const url = value instanceof URL ? value : new URL(value);
+        return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
+      },
+      request: async () => fakeTextResponse("credential-safe content"),
+    };
+
+    const result = await executeWebFetch(
+      { url: requested },
+      undefined,
+      (update) => updates.push(update.content[0]?.text ?? ""),
+      fetchDependencies,
+    );
+
+    expect(updates).toEqual([`Fetching ${redacted}…`]);
+    expect(result.details.url).toBe(redacted);
+    expect(result.details.requestedUrl).toBe(redacted);
+    expect(result.details.finalUrl).toBe(redacted);
+    expect(result.content[0]?.text).toContain(`source=${JSON.stringify(redacted)}`);
+    expect(JSON.stringify(result)).not.toContain("secret-token");
+  });
+
   it("classifies plain text as raw-text with high confidence", async () => {
     const result = await executeWebFetch(
       { url: `${origin}/continuation` },
