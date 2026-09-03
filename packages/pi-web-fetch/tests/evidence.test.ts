@@ -5,8 +5,8 @@ import { classifyContentKind, classifyConfidence } from "../src/service";
 import { detectAppShell, normalizeGitHubRawUrl } from "../src/fetch";
 import { createFetchHarness } from "./harness";
 
-/** Builds a minimal text/plain HTTP response for offline fetch testing. */
-function fakeTextResponse(body: string): IncomingMessage {
+/** Builds a minimal HTTP response for offline fetch testing. */
+function fakeTextResponse(body: string, contentType = "text/plain"): IncomingMessage {
   const buffer = Buffer.from(body);
   const iterator = {
     async *[Symbol.asyncIterator]() {
@@ -17,7 +17,7 @@ function fakeTextResponse(body: string): IncomingMessage {
   // fields the tests read (statusCode, headers) immediately above.
   return {
     statusCode: 200,
-    headers: { "content-type": "text/plain" },
+    headers: { "content-type": contentType },
     destroy() {},
     ...iterator,
   } as IncomingMessage;
@@ -228,6 +228,69 @@ describe("web_fetch honest-evidence details", () => {
       headings: [{ level: 2, text: "Hello", inferred: false }],
       omittedHeadings: 0,
     });
+  });
+
+  it("redacts credential-bearing query values from progress and result evidence", async () => {
+    const requested = `https://credentials.example.com/page-${process.pid}?token=secret-token&page=2`;
+    const redacted = `https://credentials.example.com/page-${process.pid}?token=REDACTED&page=2`;
+    const updates: string[] = [];
+    const transportedUrls: string[] = [];
+    const fetchDependencies: FetchRemoteDependencies = {
+      validateUrl: async (value) => {
+        const url = value instanceof URL ? value : new URL(value);
+        return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
+      },
+      request: async (target) => {
+        transportedUrls.push(target.url.href);
+        return fakeTextResponse("credential-safe content");
+      },
+    };
+
+    const result = await executeWebFetch(
+      { url: requested },
+      undefined,
+      (update) => updates.push(update.content[0]?.text ?? ""),
+      fetchDependencies,
+    );
+
+    expect(transportedUrls[0]).toBe(requested);
+    expect(updates).toEqual([`Fetching ${redacted}…`]);
+    expect(result.details.url).toBe(redacted);
+    expect(result.details.requestedUrl).toBe(redacted);
+    expect(result.details.finalUrl).toBe(redacted);
+    expect(result.content[0]?.text).toContain(`source=${JSON.stringify(redacted)}`);
+    expect(JSON.stringify(result)).not.toContain("secret-token");
+  });
+
+  it("redacts credential-bearing query values from extracted link details", async () => {
+    const requested = `https://links.example.com/page-${process.pid}`;
+    const fetchDependencies: FetchRemoteDependencies = {
+      validateUrl: async (value) => {
+        const url = value instanceof URL ? value : new URL(value);
+        return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
+      },
+      request: async () =>
+        fakeTextResponse(
+          '<a href="/internal?token=internal-secret">Internal</a><a href="https://external.example.com/page?client_secret=external-secret">External</a>',
+          "text/html",
+        ),
+    };
+
+    const result = await executeWebFetch(
+      { url: requested },
+      undefined,
+      undefined,
+      fetchDependencies,
+    );
+
+    expect(result.details.links?.internal[0]?.url).toBe(
+      "https://links.example.com/internal?token=REDACTED",
+    );
+    expect(result.details.links?.external[0]?.url).toBe(
+      "https://external.example.com/page?client_secret=REDACTED",
+    );
+    expect(JSON.stringify(result.details.links)).not.toContain("internal-secret");
+    expect(JSON.stringify(result.details.links)).not.toContain("external-secret");
   });
 
   it("classifies plain text as raw-text with high confidence", async () => {

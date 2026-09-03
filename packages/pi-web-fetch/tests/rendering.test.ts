@@ -80,6 +80,17 @@ describe("web_fetch rendering", () => {
     expect(
       tool.renderCall({ url: "https://example.com" }, renderTheme).render(200).join("\n"),
     ).toContain("web_fetch https://example.com");
+    const credentialedCall = tool
+      .renderCall(
+        { url: "https://user:password@example.com/page?token=secret&page=2" },
+        renderTheme,
+      )
+      .render(200)
+      .join("\n");
+    expect(credentialedCall).toContain("web_fetch https://example.com/page?token=REDACTED&page=2");
+    expect(credentialedCall).not.toContain("user");
+    expect(credentialedCall).not.toContain("password");
+    expect(credentialedCall).not.toContain("secret");
     expect(
       tool
         .renderResult(result, { expanded: false, isPartial: true }, renderTheme)

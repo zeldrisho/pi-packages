@@ -10,6 +10,7 @@ import {
   FETCH_MAX_URL_CHARACTERS,
   FETCH_MIN_MAX_CHARACTERS,
 } from "./limits";
+import { redactUrlForDisplay } from "./redact";
 import { formatCollapsibleOutput } from "./render";
 import { executeWebFetch } from "./service";
 
@@ -25,6 +26,7 @@ export {
 export { fetchRemoteContent, type FetchRemoteDependencies } from "./fetch";
 export { focusMarkdown, type FocusDetails, type FocusResult } from "./focus";
 export { createDocumentOutline, type DocumentOutline, type OutlineHeading } from "./outline";
+export { redactUrlForDisplay } from "./redact";
 export {
   executeWebFetch,
   type CacheStatus,
@@ -94,7 +96,7 @@ export default function (pi: ExtensionAPI) {
 
     renderCall(args, theme) {
       return new Text(
-        `${theme.fg("toolTitle", theme.bold("web_fetch"))} ${theme.fg("accent", args.url)}`,
+        `${theme.fg("toolTitle", theme.bold("web_fetch"))} ${theme.fg("accent", redactUrlForDisplay(args.url))}`,
         0,
         0,
       );

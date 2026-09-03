@@ -24,6 +24,7 @@
   },
   "files": [
     "src",
+    "config.schema.json",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"

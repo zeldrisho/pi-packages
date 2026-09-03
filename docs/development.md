@@ -37,7 +37,7 @@ Run the complete validation suite:
 vp run validate
 ```
 
-The shared task runs formatting, linting, type checking, coverage tests, repository contract tests, tarball inspection, and packaged extension smoke tests. Every dry-run tarball must contain only `CHANGELOG.md`, `LICENSE`, `package.json`, `README.md`, and the package's runtime files under `src/`. The packaged smoke test installs each tarball in an isolated fixture and loads it through Pi's extension loader.
+The shared task runs formatting, linting, type checking, coverage tests, repository contract tests, tarball inspection, and packaged extension smoke tests. Every dry-run tarball must contain only `CHANGELOG.md`, `LICENSE`, `package.json`, `README.md`, the package's runtime files under `src/`, and explicitly contracted package metadata such as `pi-gate`'s `config.schema.json`. The packaged smoke test installs each tarball in an isolated fixture and loads it through Pi's extension loader.
 
 The tests use deterministic local fixtures and mocked Brave responses. Manually verify behavior affected by a change:
 

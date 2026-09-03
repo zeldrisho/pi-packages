@@ -44,9 +44,19 @@ export interface RuleMatch {
 }
 
 const CONFIG_FILE_NAME = "pi-gate.json";
+export const CONFIG_SCHEMA_URL =
+  "https://raw.githubusercontent.com/zeldrisho/pi-packages/main/packages/pi-gate/config.schema.json";
 const ACTIONS: readonly Action[] = ["prompt", "block", "allow"] as const;
 export const DEFAULT_PROMPT_TIMEOUT_MS = 30_000;
-const MAX_PROMPT_TIMEOUT_MS = 86_400_000;
+export const MAX_RULE_COUNT = 1_000;
+export const MAX_RULE_PATTERN_LENGTH = 1_024;
+export const MAX_DISPLAY_COMMAND_CHARACTERS = 2_000;
+export const MAX_DISPLAY_COMMAND_LINES = 20;
+export const MAX_PROMPT_TIMEOUT_MS = 86_400_000;
+const DISPLAY_TRUNCATION_MARKER = "\n  … [command display truncated]";
+const BIDI_CONTROL_CODE_POINTS = new Set([
+  0x061c, 0x200e, 0x200f, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069,
+]);
 
 const DEFAULT_CONFIG: GateConfig = {
   promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS,
@@ -115,6 +125,7 @@ function isJsonObject(value: unknown): value is Record<string, unknown> {
  */
 export function parseConfig(content: string): GateConfig {
   const rules: Record<string, Action> = {};
+  let acceptedRuleCount = 0;
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
@@ -138,8 +149,11 @@ export function parseConfig(content: string): GateConfig {
     return { operations: rules, promptTimeoutMs };
   }
   for (const [pattern, action] of Object.entries(operations)) {
+    if (acceptedRuleCount >= MAX_RULE_COUNT) break;
+    if (pattern.length === 0 || pattern.length > MAX_RULE_PATTERN_LENGTH) continue;
     if (isAction(action)) {
       rules[pattern] = action;
+      acceptedRuleCount += 1;
     }
   }
   return { operations: rules, promptTimeoutMs };
@@ -175,7 +189,7 @@ export function ensureConfig(): void {
   } catch {
     return;
   }
-  const content = JSON.stringify(DEFAULT_CONFIG, null, 2) + "\n";
+  const content = JSON.stringify({ $schema: CONFIG_SCHEMA_URL, ...DEFAULT_CONFIG }, null, 2) + "\n";
   try {
     writeFileSync(path, content, { encoding: "utf-8", flag: "wx", mode: 0o600 });
   } catch {
@@ -212,14 +226,124 @@ export function resolveAction(command: string, rules: Record<string, Action>): A
   return resolveRule(command, rules)?.action ?? null;
 }
 
+/** Converts terminal controls and bidirectional formatting characters to visible escapes. */
+function escapeUnsafeDisplayCharacter(character: string): string {
+  const codePoint = character.codePointAt(0);
+  if (codePoint === undefined) return "";
+  if (
+    codePoint < 0x20 ||
+    (codePoint >= 0x7f && codePoint <= 0x9f) ||
+    BIDI_CONTROL_CODE_POINTS.has(codePoint)
+  ) {
+    return `\\u{${codePoint.toString(16).padStart(4, "0")}}`;
+  }
+  return character;
+}
+
+interface MatchRange {
+  start: number;
+  end: number;
+}
+
+/** Finds non-overlapping raw match ranges before any display escaping occurs. */
+function findMatchRanges(command: string, pattern?: string): MatchRange[] {
+  if (!pattern) return [];
+  const ranges: MatchRange[] = [];
+  let offset = 0;
+  while (offset <= command.length - pattern.length) {
+    const start = command.indexOf(pattern, offset);
+    if (start === -1) break;
+    ranges.push({ start, end: start + pattern.length });
+    offset = start + pattern.length;
+  }
+  return ranges;
+}
+
+/** Produces bounded terminal-safe text, optionally marking raw matched spans. */
+function renderCommandForDisplay(command: string, pattern?: string): string {
+  const ranges = findMatchRanges(command, pattern);
+  let rangeIndex = 0;
+  let activeRange: MatchRange | undefined;
+  let output = "";
+  let lineCount = 1;
+  let offset = 0;
+
+  const truncate = (closeActiveRange = activeRange !== undefined): string =>
+    output + (closeActiveRange ? "«" : "") + DISPLAY_TRUNCATION_MARKER;
+
+  while (offset < command.length) {
+    const rawStart = offset;
+    let rawEnd: number;
+    let rendered: string;
+    const codePoint = command.codePointAt(offset);
+    if (codePoint === 0x0d) {
+      rawEnd = offset + (command.codePointAt(offset + 1) === 0x0a ? 2 : 1);
+      rendered = "\n";
+    } else {
+      const character = String.fromCodePoint(codePoint!);
+      rawEnd = offset + character.length;
+      rendered = character === "\n" ? character : escapeUnsafeDisplayCharacter(character);
+    }
+
+    const nextRange = ranges[rangeIndex];
+    const wasInsideRange = activeRange !== undefined;
+    const opensRange =
+      activeRange === undefined &&
+      nextRange !== undefined &&
+      nextRange.start < rawEnd &&
+      nextRange.end > rawStart;
+    if (opensRange) activeRange = nextRange;
+    const closesRange = activeRange !== undefined && activeRange.end <= rawEnd;
+    const decorated = `${opensRange ? "»" : ""}${rendered}${closesRange ? "«" : ""}`;
+
+    if (rendered === "\n") {
+      if (lineCount >= MAX_DISPLAY_COMMAND_LINES) return truncate(wasInsideRange);
+      lineCount += 1;
+    }
+    if (output.length + decorated.length > MAX_DISPLAY_COMMAND_CHARACTERS) {
+      return truncate(wasInsideRange);
+    }
+
+    output += decorated;
+    if (closesRange) {
+      activeRange = undefined;
+      rangeIndex += 1;
+    }
+    offset = rawEnd;
+  }
+  return output;
+}
+
 /**
- * Formats a rule match as a human-readable string for display in prompts and notifications.
+ * Produces bounded terminal-safe text for a command without changing the command that is executed.
+ */
+export function formatCommandForDisplay(command: string): string {
+  return renderCommandForDisplay(command);
+}
+
+/** Marks raw matched-rule occurrences while producing terminal-safe command text. */
+export function highlightRuleForDisplay(command: string, pattern: string): string {
+  return renderCommandForDisplay(command, pattern);
+}
+
+/** Indents every line of terminal-safe command text for the confirmation dialog. */
+function formatPromptCommand(command: string, pattern: string): string {
+  return highlightRuleForDisplay(command, pattern)
+    .split("\n")
+    .map((line) => `  ${line}`)
+    .join("\n");
+}
+
+/**
+ * Formats a rule match as a terminal-safe, human-readable string.
  *
  * @param match - The rule match to format
  * @returns A string representation showing the pattern and action
  */
 function formatRule(match: RuleMatch): string {
-  return `${JSON.stringify(match.pattern)}: ${JSON.stringify(match.action)}`;
+  return formatCommandForDisplay(
+    `${JSON.stringify(match.pattern)}: ${JSON.stringify(match.action)}`,
+  );
 }
 
 /** Gate the built-in `bash` tool against the user-provided rules. */
@@ -275,7 +399,7 @@ export default function piGate(pi: ExtensionAPI): void {
       };
     }
     const choice = await ctx.ui.select(
-      `pi-gate: allow this command?\n\n  ${command}\n\nMatched rule: ${rule}`,
+      `pi-gate: allow this command?\n\n${formatPromptCommand(command, match.pattern)}\n\nMatched rule: ${rule}\nMatched command text is wrapped in »…«`,
       ["Allow", "Deny"],
       { timeout: config.promptTimeoutMs },
     );
