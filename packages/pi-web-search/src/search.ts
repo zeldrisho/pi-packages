@@ -12,6 +12,9 @@ import {
   searchBraveContext,
   searchBraveWeb,
   validateProviderRequest,
+  type BraveQueryMeta,
+  type ContextDepth,
+  type ContextThresholdMode,
   type Freshness,
   type Provider,
   type SafesearchMode,
@@ -39,6 +42,24 @@ export interface SearchEvidence {
   truncated: boolean;
   uniqueDomains: number;
   topDomainShare: number;
+  /** Brave's spellcheck rewrite of the query, when it corrected the request. */
+  alteredQuery?: string;
+  /** Whether Brave disabled spellcheck for the request. */
+  spellcheckOff?: boolean;
+  /** True when strict SafeSearch hid results. */
+  showStrictWarning?: boolean;
+  /** True when more result pages exist (`offset` can page further). */
+  moreResultsAvailable?: boolean;
+  /** Whether Brave applied search operators from the query. */
+  operatorsApplied?: boolean;
+  /** Domains extracted from `site:` operators, when Brave reports them. */
+  operatorSites?: string[];
+  /** Context-mode relevance threshold that was used. */
+  threshold?: ContextThresholdMode;
+  /** Context-mode token-budget preset that was used. */
+  depth?: ContextDepth;
+  /** Web-mode result offset that was used. */
+  offset?: number;
 }
 
 export interface DomainDiversity {
@@ -83,6 +104,24 @@ export interface SearchParameters {
   country?: string;
   safesearch?: SafesearchMode;
   extraSnippets?: boolean;
+  /** Apply Brave search operators (`site:`, `filetype:`, quotes, `AND/OR/NOT`); web mode only. */
+  operators?: boolean;
+  /** Auto-correct the query; set false for exact code identifiers and error strings. */
+  spellcheck?: boolean;
+  /** Comma-separated `result_filter` values (e.g. `web,discussions,faq`); web mode only. */
+  resultFilter?: string;
+  /** Single Goggle URL or inline definition for custom ranking; both modes. */
+  goggles?: string;
+  /** Result page offset (0-9); web mode only. */
+  offset?: number;
+  /** UI language code (e.g. `en-US`); web mode only. */
+  uiLang?: string;
+  /** Custom freshness range (`YYYY-MM-DDtoYYYY-MM-DD`); web mode only, exclusive with `freshness`. */
+  dateRange?: string;
+  /** Relevance threshold for extracted context; context mode only. */
+  threshold?: ContextThresholdMode;
+  /** Token-budget preset for extracted context (`quick`/`standard`/`deep`); context mode only. */
+  depth?: ContextDepth;
 }
 
 /** Details about search result truncation and overflow handling. */
@@ -117,22 +156,33 @@ interface SearchUpdate {
   details: Record<string, never>;
 }
 
-const searchCachePersistence: CachePersistence<string, SearchResult[]> = {
+/** Cached provider payload: normalized results plus echoed query metadata. */
+interface CachedSearch {
+  results: SearchResult[];
+  meta: BraveQueryMeta;
+}
+
+const searchCachePersistence: CachePersistence<string, CachedSearch> = {
   directory: resolveCacheDirectory("pi-web-search"),
-  serialize: (results) => encoder.encode(JSON.stringify(results)),
-  // SAFETY: cache entries are written by this same serializer, so the decoded
-  // JSON always matches the SearchResult[] shape.
-  deserialize: (bytes) => JSON.parse(new TextDecoder().decode(bytes)) as SearchResult[],
+  serialize: (entry) => encoder.encode(JSON.stringify(entry)),
+  deserialize: (bytes) => {
+    // SAFETY: cache entries are written by this same serializer as a
+    // `{ results, meta }` object; older disk entries stored a bare
+    // SearchResult[] array and are upgraded here to empty metadata.
+    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as CachedSearch | SearchResult[];
+    if (Array.isArray(parsed)) return { results: parsed, meta: {} };
+    return parsed;
+  },
   keyToPath: (key) => stableKeyHash(key),
 };
-const searchCache = new ExpiringLruCache<string, SearchResult[]>(
+const searchCache = new ExpiringLruCache<string, CachedSearch>(
   CACHE_MAX_ENTRIES,
   CACHE_MAX_RESULT_BYTES,
   (results) => encoder.encode(JSON.stringify(results)).byteLength,
   undefined,
   searchCachePersistence,
 );
-const inflightSearches = new InflightCoalescer<string, SearchResult[]>(MAX_INFLIGHT_REQUESTS);
+const inflightSearches = new InflightCoalescer<string, CachedSearch>(MAX_INFLIGHT_REQUESTS);
 
 /**
  * Runtime environment for web search operations.
@@ -177,12 +227,38 @@ export class SearchRuntime {
 
     const count = params.count ?? SEARCH_DEFAULT_RESULT_COUNT;
     const mode = params.mode ?? "web";
-    const extras = {
+    const webExtras = {
       country: params.country,
       safesearch: params.safesearch,
       extraSnippets: params.extraSnippets,
+      operators: params.operators,
+      spellcheck: params.spellcheck,
+      resultFilter: params.resultFilter,
+      goggles: params.goggles,
+      offset: params.offset,
+      uiLang: params.uiLang,
+      dateRange: params.dateRange,
     };
-    validateProviderRequest(query, count, mode, extras);
+    const contextExtras = {
+      country: params.country,
+      safesearch: params.safesearch,
+      spellcheck: params.spellcheck,
+      goggles: params.goggles,
+      threshold: params.threshold,
+      depth: params.depth,
+    };
+    validateProviderRequest(query, count, mode, {
+      ...webExtras,
+      ...contextExtras,
+      extraSnippets: params.extraSnippets,
+      operators: params.operators,
+      resultFilter: params.resultFilter,
+      offset: params.offset,
+      uiLang: params.uiLang,
+      dateRange: params.dateRange,
+      threshold: params.threshold,
+      depth: params.depth,
+    });
     const credentials = await resolveApiKey(cwd);
     if (!credentials) {
       throw new Error(
@@ -200,9 +276,19 @@ export class SearchRuntime {
       country: params.country,
       safesearch: params.safesearch,
       extraSnippets: params.extraSnippets,
+      operators: params.operators,
+      spellcheck: params.spellcheck,
+      resultFilter: params.resultFilter,
+      goggles: params.goggles,
+      offset: params.offset,
+      uiLang: params.uiLang,
+      dateRange: params.dateRange,
+      threshold: params.threshold,
+      depth: params.depth,
       cwd,
     });
-    const cachedEntry = searchCache.get(cacheKey);
+    const cachedPayload = searchCache.get(cacheKey);
+    const cachedEntry = cachedPayload?.results;
     const cached = cachedEntry !== undefined;
     onUpdate?.({
       content: [
@@ -216,8 +302,8 @@ export class SearchRuntime {
       details: {},
     });
 
-    let results =
-      cachedEntry ??
+    const payload =
+      cachedPayload ??
       (await inflightSearches.run(
         cacheKey,
         async (sharedSignal) => {
@@ -230,6 +316,7 @@ export class SearchRuntime {
                   params.language,
                   sharedSignal,
                   credentials.key,
+                  contextExtras,
                 )
               : await searchBraveWeb(
                   query,
@@ -238,17 +325,19 @@ export class SearchRuntime {
                   params.language,
                   sharedSignal,
                   credentials.key,
-                  extras,
+                  webExtras,
                 );
-          const bounded = found.filter((result) => result.url).slice(0, count);
-          searchCache.set(cacheKey, bounded, Date.now() + CACHE_TTL_MS);
-          return bounded;
+          const bounded = found.results.filter((result) => result.url).slice(0, count);
+          const entry: CachedSearch = { results: bounded, meta: found.meta };
+          searchCache.set(cacheKey, entry, Date.now() + CACHE_TTL_MS);
+          return entry;
         },
         signal,
         "Web search was cancelled.",
       ));
 
-    results = results.filter((result) => result.url).slice(0, count);
+    const meta = payload.meta;
+    let results = payload.results.filter((result) => result.url).slice(0, count);
     const output = formatResults(query, provider, mode, results);
     const truncation = truncateHead(output, {
       maxLines: DEFAULT_MAX_LINES,
@@ -262,6 +351,16 @@ export class SearchRuntime {
       truncated: truncation.truncated,
       ...summarizeDomainDiversity(results),
     };
+    if (meta.altered !== undefined) evidence.alteredQuery = meta.altered;
+    if (meta.spellcheckOff !== undefined) evidence.spellcheckOff = meta.spellcheckOff;
+    if (meta.showStrictWarning !== undefined) evidence.showStrictWarning = meta.showStrictWarning;
+    if (meta.moreResultsAvailable !== undefined)
+      evidence.moreResultsAvailable = meta.moreResultsAvailable;
+    if (meta.operatorsApplied !== undefined) evidence.operatorsApplied = meta.operatorsApplied;
+    if (meta.operatorSites !== undefined) evidence.operatorSites = meta.operatorSites;
+    if (mode === "context" && params.threshold !== undefined) evidence.threshold = params.threshold;
+    if (mode === "context" && params.depth !== undefined) evidence.depth = params.depth;
+    if (mode === "web" && params.offset !== undefined) evidence.offset = params.offset;
     let text = truncation.content;
     let fullOutputPath: string | undefined;
 
