@@ -8,12 +8,6 @@ const packageDirectories = (await readdir(packagesDirectory, { withFileTypes: tr
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
-const deprecatedPackageDirectories = new Set([
-  "pi-cloudflare",
-  "pi-file-remove",
-  "pi-file-search",
-  "pi-vite-plus",
-]);
 const readme = await readFile(join(root, "README.md"), "utf8");
 const workspace = await readFile(join(root, "pnpm-workspace.yaml"), "utf8");
 const lockfile = await readFile(join(root, "pnpm-lock.yaml"), "utf8");
@@ -146,9 +140,7 @@ describe("repository contracts", () => {
     const documentedDirectories = [...readme.matchAll(/\]\(packages\/([A-Za-z0-9._-]+)\)/g)].map(
       (match) => match[1],
     );
-    const activeDirectories = packageDirectories.filter(
-      (directory) => !deprecatedPackageDirectories.has(directory),
-    );
+    const activeDirectories = packageDirectories;
     if (!sameValues(documentedDirectories, activeDirectories)) {
       fail(
         `README package catalog does not match active packages: documented=${documentedDirectories
@@ -282,10 +274,7 @@ describe("repository contracts", () => {
       if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(["./src/index.ts"])) {
         fail(`${manifest.name} must expose only ./src/index.ts as its Pi extension`);
       }
-      if (
-        !deprecatedPackageDirectories.has(directory) &&
-        !readme.includes(`pi install npm:${manifest.name}`)
-      ) {
+      if (!readme.includes(`pi install npm:${manifest.name}`)) {
         fail(`README package catalog is missing the install command for ${manifest.name}`);
       }
     }
