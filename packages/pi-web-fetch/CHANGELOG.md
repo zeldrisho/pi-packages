@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-09-07
+
 ### Security
 
 - redact URL user information and common credential-bearing query parameters from progress messages, rendered calls, content source labels, and result URL metadata
@@ -133,7 +135,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.8.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.8.1...HEAD
+[0.8.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.8.0...pi-web-fetch-v0.8.1
 [0.8.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.7.1...pi-web-fetch-v0.8.0
 [0.7.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.7.0...pi-web-fetch-v0.7.1
 [0.7.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.6.1...pi-web-fetch-v0.7.0
