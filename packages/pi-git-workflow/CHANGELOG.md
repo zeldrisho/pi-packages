@@ -7,15 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Run branch cleanup fully silently with no interactive notifications; deferred branches, behind/diverged state, and inspection failures stay as hidden agent guidance only and are mentioned only if the user asks about Git cleanup
+
 ### Fixed
 
 - Run `git fetch --prune origin` outside the per-repository queue lock so a hung or unreachable fetch cannot block subsequent cleanups past the 2-second logical deadline; only ref inspection and deletion stay serialized, and stale late-arriving fetch results can never authorize deletion
 - Share the 60-second retry pause between automatic cleanup and explicit branch-deletion checks so `git branch -d` fails fast (still blocked) while the remote is known unreachable instead of spending another fetch; failed gate inspections pause automatic cleanup too, while negative verdicts never trigger backoff
 - Key the retry pause by canonical repository root (with a cached cwd to root mapping) so sibling subdirectories of one monorepo share a single cooldown; unresolvable roots fall back to a working-directory key instead of skipping backoff
-
-### Changed
-
-- Run branch cleanup fully silently with no interactive notifications; deferred branches, behind/diverged state, and inspection failures stay as hidden agent guidance only and are mentioned only if the user asks about Git cleanup
+- Emit one structured telemetry line per inspection on already-emitted hidden context (phase, outcome, duration, queue wait, hashed repo/cwd, fetch result) with no raw paths or branch names; the extension API exposes no log channel and fully clean runs stay silent
 
 ## [0.3.1] - 2026-09-07
 

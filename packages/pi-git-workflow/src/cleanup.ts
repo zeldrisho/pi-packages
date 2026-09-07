@@ -59,9 +59,14 @@ export interface CleanupResult {
  *
  * @param root - Canonical repository root path
  * @param run - Async operation to execute exclusively
+ * @param onQueueWait - Optional callback receiving milliseconds spent waiting for the lock
  * @returns Promise resolving to the operation result
  */
-export async function withRepoQueue<T>(root: string, run: () => Promise<T>): Promise<T> {
+export async function withRepoQueue<T>(
+  root: string,
+  run: () => Promise<T>,
+  onQueueWait?: (waitMs: number) => void,
+): Promise<T> {
   const previous = queues.get(root) ?? Promise.resolve();
   let release = (): void => {};
   const current = new Promise<void>((resolve) => {
@@ -69,7 +74,9 @@ export async function withRepoQueue<T>(root: string, run: () => Promise<T>): Pro
   });
   const tail = previous.catch(() => undefined).then(() => current);
   queues.set(root, tail);
+  const queuedAt = Date.now();
   await previous.catch(() => undefined);
+  onQueueWait?.(Date.now() - queuedAt);
   try {
     return await run();
   } finally {
@@ -236,6 +243,21 @@ export async function cleanupRepository(
 }
 
 /**
+ * Timing and outcome details collected during one cleanup run.
+ *
+ * All fields stay unset when the deadline fires before the corresponding
+ * phase completes, which itself tells the story (see `outcome`).
+ */
+export interface CleanupTelemetry {
+  /** Milliseconds spent waiting to acquire the per-root queue lock. */
+  queueWaitMs?: number;
+  /** Whether the fetch phase completed and how it ended. */
+  fetchOutcome?: "ok" | "failed";
+  /** Milliseconds spent in the fetch phase. */
+  fetchMs?: number;
+}
+
+/**
  * Clean up a repository whose canonical root is already resolved.
  *
  * Lets callers resolve (and cache) the root once for backoff keying, then run
@@ -243,14 +265,35 @@ export async function cleanupRepository(
  *
  * @param pi - Extension API with exec capability
  * @param root - Canonical repository root path
+ * @param telemetry - Optional sink for queue-wait and fetch timing
  * @returns Promise resolving to cleanup result with deleted/review/retained branches
  */
 export async function cleanupRepositoryAtRoot(
   pi: Pick<ExtensionAPI, "exec">,
   root: string,
+  telemetry?: CleanupTelemetry,
 ): Promise<CleanupResult> {
-  await fetchPrune(pi, root);
-  return withRepoQueue(root, () => cleanupAfterFetch(pi, root));
+  const fetchStarted = Date.now();
+  try {
+    await fetchPrune(pi, root);
+  } catch (error) {
+    if (telemetry) {
+      telemetry.fetchOutcome = "failed";
+      telemetry.fetchMs = Date.now() - fetchStarted;
+    }
+    throw error;
+  }
+  if (telemetry) {
+    telemetry.fetchOutcome = "ok";
+    telemetry.fetchMs = Date.now() - fetchStarted;
+  }
+  return withRepoQueue(
+    root,
+    () => cleanupAfterFetch(pi, root),
+    (waitMs) => {
+      if (telemetry) telemetry.queueWaitMs = waitMs;
+    },
+  );
 }
 
 /**

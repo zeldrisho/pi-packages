@@ -7,8 +7,72 @@ export const GIT_TIMEOUT_MS = 30_000;
 /** Total time allowed for each extension-triggered Git inspection. */
 export const GIT_INSPECTION_TIMEOUT_MS = 2_000;
 
-/** Delay before retrying failed automatic cleanup in the same working directory. */
+/** Delay before retrying failed inspection for the same repository root. */
 export const AUTOMATIC_CLEANUP_RETRY_MS = 60_000;
+
+/** Telemetry phase identifying which inspection path produced a line. */
+export type InspectionPhase = "auto" | "gate";
+
+/**
+ * Compute a short non-reversible discriminator for a repository root.
+ *
+ * Telemetry must correlate attempts per repository (e.g. prove sibling
+ * subdirectories share one backoff) without widening the paths exposed in
+ * agent context, so roots are logged as FNV-1a hashes, never raw paths.
+ *
+ * @param root - Canonical repository root (or any opaque string)
+ * @returns 8 lowercase hex characters
+ */
+export function hashRepoRoot(root: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < root.length; index++) {
+    hash ^= root.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+/**
+ * Constrain a telemetry token to a safe alphabet and length.
+ *
+ * @param value - Raw token value
+ * @returns Sanitized token using [A-Za-z0-9_.:-], capped at 64 chars
+ */
+function sanitizeToken(value: string): string {
+  const clean = value.replace(/[^A-Za-z0-9_.:-]/g, "_");
+  return clean.length > 64 ? `${clean.slice(0, 64)}` : clean;
+}
+
+/**
+ * Format one structured telemetry line for hidden agent context.
+ *
+ * Single line, no prose, no branch names, no raw paths — only hashed
+ * repository/cwd discriminators plus outcome and timing fields.
+ *
+ * @param fields - Telemetry fields to format
+ * @returns Single HTML-comment line carrying the telemetry
+ */
+export function formatTelemetryLine(fields: {
+  phase: InspectionPhase;
+  outcome: string;
+  durationMs: number;
+  queueWaitMs?: number;
+  repo: string;
+  cwd: string;
+  fetch: string;
+}): string {
+  const queue =
+    fields.queueWaitMs === undefined
+      ? ""
+      : ` queue_wait_ms=${Math.max(0, Math.round(fields.queueWaitMs))}`;
+  return (
+    `<!-- pi-git-workflow telemetry phase=${sanitizeToken(fields.phase)}` +
+    ` outcome=${sanitizeToken(fields.outcome)}` +
+    ` duration_ms=${Math.max(0, Math.round(fields.durationMs))}${queue}` +
+    ` repo=${sanitizeToken(fields.repo)} cwd=${sanitizeToken(fields.cwd)}` +
+    ` fetch=${sanitizeToken(fields.fetch)} -->`
+  );
+}
 
 /** Maximum size in bytes for Git command output to prevent memory exhaustion. */
 export const MAX_GIT_OUTPUT_BYTES = 1_000_000;

@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
   cleanupRepository,
+  cleanupRepositoryAtRoot,
+  type CleanupTelemetry,
   formatCleanupContext,
   formatSyncContext,
   parseLocalBranches,
@@ -16,6 +18,7 @@ import {
   detectTargetBranchInRepo,
   git,
   GitInspectionError,
+  hashRepoRoot,
   requireBoundedOutput,
   sanitizeGitOutput,
   withGitDeadline,
@@ -74,6 +77,16 @@ interface ExecResult {
 
 function result(partial: Partial<ExecResult> = {}): ExecResult {
   return { code: 0, stdout: "", stderr: "", killed: false, ...partial };
+}
+
+function captureHandlers(pi: Pick<ExtensionAPI, "exec">) {
+  const handlers = new Map<string, (event: any, ctx: any) => Promise<any>>();
+  const extension = pi as ExtensionAPI;
+  extension.on = vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
+    handlers.set(name, handler);
+  }) as any;
+  piGitWorkflow(extension);
+  return handlers;
 }
 
 describe("Git inspection helpers", () => {
@@ -377,16 +390,6 @@ describe("bounded review context", () => {
 });
 
 describe("extension registration and gate", () => {
-  function captureHandlers(pi: Pick<ExtensionAPI, "exec">) {
-    const handlers = new Map<string, (event: any, ctx: any) => Promise<any>>();
-    const extension = pi as ExtensionAPI;
-    extension.on = vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
-      handlers.set(name, handler);
-    }) as any;
-    piGitWorkflow(extension);
-    return handlers;
-  }
-
   it("registers no command or agent-callable tool", () => {
     const pi = {
       on: vi.fn(),
@@ -846,5 +849,122 @@ describe("extension registration and gate", () => {
         },
       ),
     ).toBeUndefined();
+  });
+});
+
+describe("telemetry", () => {
+  function telemetryOf(content: string): Map<string, string> {
+    const line = content.split("\n").find((entry) => entry.includes("pi-git-workflow telemetry"));
+    expect(line).toBeDefined();
+    const fields = new Map<string, string>();
+    for (const part of line!.slice(0, -3).split(" ").slice(3)) {
+      const [key = "", value = ""] = part.split("=");
+      fields.set(key, value);
+    }
+    return fields;
+  }
+
+  it("hashes repository discriminators deterministically without raw paths", () => {
+    expect(hashRepoRoot(root)).toMatch(/^[0-9a-f]{8}$/);
+    expect(hashRepoRoot(root)).toBe(hashRepoRoot(root));
+    expect(hashRepoRoot(`${root}/a`)).not.toBe(hashRepoRoot(`${root}/b`));
+  });
+
+  it("emits one structured line per failed automatic inspection", async () => {
+    const { pi } = cleanupPi("", (args) =>
+      args[0] === "fetch" ? { code: 1, stderr: "offline" } : undefined,
+    );
+    const before = captureHandlers(pi).get("before_agent_start")!;
+    const content = (await before({}, { cwd: root, hasUI: false, isProjectTrusted: () => true }))
+      .message.content as string;
+    const fields = telemetryOf(content);
+    expect(fields.get("phase")).toBe("auto");
+    expect(fields.get("outcome")).toBe("fetch_failed");
+    expect(fields.get("fetch")).toBe("failed");
+    expect(fields.get("duration_ms")).toMatch(/^\d+$/);
+    // Fetch runs before the queue is acquired, so a fetch failure never
+    // waits on the lock: the field is absent rather than zero.
+    expect(fields.get("queue_wait_ms")).toBeUndefined();
+    expect(fields.get("repo")).toMatch(/^[0-9a-f]{8}$/);
+    // No raw paths or branch names leak through telemetry.
+    expect(content).not.toContain(root);
+    expect(content.split("\n").filter((entry) => entry.includes("telemetry"))).toHaveLength(1);
+  });
+
+  it("correlates sibling subdirectories by repo hash with distinct cwd hashes", async () => {
+    const { pi } = cleanupPi("", (args) =>
+      args[0] === "fetch" ? { code: 1, stderr: "offline" } : undefined,
+    );
+    const handlers = captureHandlers(pi);
+    const before = handlers.get("before_agent_start")!;
+    const first = (
+      await before({}, { cwd: `${root}/a`, hasUI: false, isProjectTrusted: () => true })
+    ).message.content as string;
+    const second = (
+      await before({}, { cwd: `${root}/b`, hasUI: false, isProjectTrusted: () => true })
+    ).message.content as string;
+    const a = telemetryOf(first);
+    const b = telemetryOf(second);
+    expect(a.get("repo")).toBe(b.get("repo"));
+    expect(a.get("cwd")).not.toBe(b.get("cwd"));
+    expect(b.get("outcome")).toBe("backoff-paused");
+    expect(b.get("fetch")).toBe("skipped-paused");
+  });
+
+  it("marks paused deletion gates as skipped without a fetch", async () => {
+    const { pi, calls } = cleanupPi("", (args) =>
+      args[0] === "fetch" ? { code: 1, stderr: "offline" } : undefined,
+    );
+    const handlers = captureHandlers(pi);
+    const ctx = { cwd: root, hasUI: false, isProjectTrusted: () => true };
+    await handlers.get("before_agent_start")!({}, ctx);
+    const fetches = calls.filter((args) => args[0] === "fetch").length;
+    const blocked = await handlers.get("tool_call")!(
+      { toolName: "bash", input: { command: "git branch -d feature" } },
+      ctx,
+    );
+    expect(blocked.block).toBe(true);
+    expect(calls.filter((args) => args[0] === "fetch")).toHaveLength(fetches);
+    const fields = telemetryOf(blocked.reason as string);
+    expect(fields.get("phase")).toBe("gate");
+    expect(fields.get("outcome")).toBe("backoff-paused");
+    expect(fields.get("fetch")).toBe("skipped-paused");
+  });
+
+  it("marks blocked deletion verdicts distinctly from inspection failures", async () => {
+    const { pi } = cleanupPi(branchRecord("feature"), (args) =>
+      args[0] === "merge-base" ? { code: 1 } : undefined,
+    );
+    const tool = captureHandlers(pi).get("tool_call")!;
+    const blocked = await tool(
+      { toolName: "bash", input: { command: "git branch -d feature" } },
+      { cwd: root, isProjectTrusted: () => true },
+    );
+    expect(blocked.block).toBe(true);
+    const fields = telemetryOf(blocked.reason as string);
+    expect(fields.get("phase")).toBe("gate");
+    expect(fields.get("outcome")).toBe("blocked");
+    expect(fields.get("fetch")).toBe("ok");
+  });
+
+  it("captures queue wait and fetch timing through cleanupRepositoryAtRoot", async () => {
+    const { pi } = cleanupPi(
+      branchRecord("main", mainCommit, "refs/remotes/origin/main", "") + branchRecord("feature"),
+    );
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const telemetry: CleanupTelemetry = {};
+    const held = withRepoQueue(root, () => gate);
+    const pending = cleanupRepositoryAtRoot(pi, root, telemetry);
+    await vi.waitFor(() => expect(telemetry.queueWaitMs).toBeUndefined());
+    release();
+    await held;
+    const cleanup = await pending;
+    expect(cleanup.deleted).toEqual(["feature"]);
+    expect(telemetry.fetchOutcome).toBe("ok");
+    expect(telemetry.fetchMs).toEqual(expect.any(Number));
+    expect(telemetry.queueWaitMs).toEqual(expect.any(Number));
   });
 });

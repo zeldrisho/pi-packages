@@ -40,6 +40,16 @@ After fetching, the extension also compares the checked-out branch with its conf
 
 Git hooks, including reference-transaction hooks, may run with the user's permissions during trusted-repository Git commands. The extension never checks out files and never reloads Pi resources.
 
+### Inspection telemetry
+
+The Pi extension API exposes no log channel, so each inspection appends a single structured line to hidden agent context it already emits:
+
+```
+<!-- pi-git-workflow telemetry phase=auto outcome=fetch_failed duration_ms=2003 queue_wait_ms=0 repo=a1b2c3d4 cwd=e5f6a7b8 fetch=failed -->
+```
+
+Fields: `phase` (`auto` or `gate`), `outcome` (`ok`, `blocked`, `backoff-paused`, or the Git error code), `duration_ms`, `queue_wait_ms` (automatic cleanup only, once the per-root lock is reached — absent when fetch fails first), `repo`/`cwd` (FNV-1a hashes of the canonical root and working directory, never raw paths, so backoff sharing across sibling directories is verifiable without exposing paths), and `fetch` (`ok`, `failed`, `skipped-paused`, or `unknown` when the deadline fired first). No branch names are logged. Fully clean runs emit nothing: there is no channel for them that would not add per-turn noise.
+
 ### Remote branches
 
 The extension never pushes or deletes remote refs. Remote head-branch deletion remains owned by GitHub's **Automatically delete head branches** repository setting. `fetch --prune` only removes stale local remote-tracking refs.

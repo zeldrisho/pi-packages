@@ -6,6 +6,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import {
   cleanupRepositoryAtRoot,
+  type CleanupTelemetry,
   formatCleanupContext,
   formatSyncContext,
   parseLocalBranches,
@@ -14,9 +15,11 @@ import {
   AUTOMATIC_CLEANUP_RETRY_MS,
   detectTargetBranchInRepo,
   exactRefCommit,
+  formatTelemetryLine,
   git,
   GitInspectionError,
   type GitRunner,
+  hashRepoRoot,
   requireBoundedOutput,
   requireGitOk,
   resolveRepoRoot,
@@ -175,14 +178,22 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
 
   pi.on("before_agent_start", async (_event, ctx: ExtensionContext) => {
     if (!ctx.isProjectTrusted()) return;
+    // The Pi extension API exposes no log channel, so telemetry rides along
+    // as a single structured line on messages already being emitted. Fully
+    // clean runs stay silent by design — no per-turn noise.
+    const started = Date.now();
+    const telemetry: CleanupTelemetry = {};
+    let repoHash = "unknown";
+    const cwdHash = hashRepoRoot(ctx.cwd);
     try {
       const result = await withGitDeadline(
         pi,
         async (runner) => {
           const root = await resolveCheckedRoot(runner, state, ctx.cwd);
+          repoHash = hashRepoRoot(root);
           state.failures.delete(rootKey(root));
           state.failures.delete(cwdKey(ctx.cwd));
-          return cleanupRepositoryAtRoot(runner, root);
+          return cleanupRepositoryAtRoot(runner, root, telemetry);
         },
         ctx.signal,
       );
@@ -192,8 +203,21 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
         .filter(Boolean)
         .join("\n\n");
       if (!content) return;
+      const line = formatTelemetryLine({
+        phase: "auto",
+        outcome: "ok",
+        durationMs: Date.now() - started,
+        queueWaitMs: telemetry.queueWaitMs,
+        repo: repoHash,
+        cwd: cwdHash,
+        fetch: telemetry.fetchOutcome ?? "unknown",
+      });
       return {
-        message: { customType: "pi-git-workflow-cleanup", content, display: false },
+        message: {
+          customType: "pi-git-workflow-cleanup",
+          content: `${content}\n${line}`,
+          display: false,
+        },
       };
     } catch (caught) {
       const error = caught instanceof Error ? caught : new Error("unknown Git inspection failure");
@@ -202,9 +226,29 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
         (error.code === "not_git_worktree" || error.code === "untrusted_project")
       )
         return;
-      if (!state.failures.has(recordKey(state, ctx.cwd))) {
-        noteBackoff(state.failures, recordKey(state, ctx.cwd), error);
+      // The root may be known (cached) even when the operation threw before
+      // reporting it, e.g. a pause replayed during resolution.
+      const cachedRoot = state.rootCache.get(ctx.cwd);
+      if (cachedRoot) repoHash = hashRepoRoot(cachedRoot);
+      const key = recordKey(state, ctx.cwd);
+      const replayedPause = state.failures.get(key)?.error === error;
+      if (!state.failures.has(key)) {
+        noteBackoff(state.failures, key, error);
       }
+      const outcome = replayedPause
+        ? "backoff-paused"
+        : error instanceof GitInspectionError
+          ? error.code
+          : "unknown-error";
+      const line = formatTelemetryLine({
+        phase: "auto",
+        outcome,
+        durationMs: Date.now() - started,
+        queueWaitMs: telemetry.queueWaitMs,
+        repo: repoHash,
+        cwd: cwdHash,
+        fetch: replayedPause ? "skipped-paused" : (telemetry.fetchOutcome ?? "unknown"),
+      });
       const message = `${formatInspectionFailure(error)}. Automatic cleanup retries are paused for up to 60 seconds.`;
       return {
         message: {
@@ -215,6 +259,7 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
             "Some earlier cleanup steps may have completed; inspect refs before retrying deletion.",
             `Reason: ${message}`,
             "Do not mention this to the user unless they ask about Git cleanup. Do not force-delete branches automatically.",
+            line,
           ].join("\n"),
           display: false,
         },
@@ -243,20 +288,30 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
     // repository the remote is already known to be unreachable, so fail fast
     // (still blocked) instead of spending another 2-second fetch. The pause
     // never authorizes deletion — only successful fresh inspection allows it.
+    const started = Date.now();
+    let repoHash = "unknown";
+    let fetch: "not-started" | "ok" | "failed" = "not-started";
     try {
-      return await withGitDeadline(
+      const verdict = await withGitDeadline(
         pi,
         async (runner) => {
           const root = await resolveCheckedRoot(runner, state, ctx.cwd);
+          repoHash = hashRepoRoot(root);
           state.failures.delete(rootKey(root));
           state.failures.delete(cwdKey(ctx.cwd));
-          await requireGitOk(
-            runner,
-            root,
-            ["fetch", "--prune", "origin"],
-            "fetch_failed",
-            "git fetch --prune origin failed",
-          );
+          try {
+            await requireGitOk(
+              runner,
+              root,
+              ["fetch", "--prune", "origin"],
+              "fetch_failed",
+              "git fetch --prune origin failed",
+            );
+          } catch (fetchError) {
+            fetch = "failed";
+            throw fetchError;
+          }
+          fetch = "ok";
           const target = await detectTargetBranchInRepo(runner, root);
           const branchRef = `refs/heads/${branch}`;
           const branchCommit = await exactRefCommit(runner, root, branchRef);
@@ -283,8 +338,24 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
         },
         ctx.signal,
       );
+      // Allowed deletions stay silent: success needs no diagnosis and there
+      // is no other channel that would not add per-tool-call noise.
+      if (!verdict) return;
+      return {
+        ...verdict,
+        reason: `${verdict.reason}\n${formatTelemetryLine({
+          phase: "gate",
+          outcome: "blocked",
+          durationMs: Date.now() - started,
+          repo: repoHash,
+          cwd: hashRepoRoot(ctx.cwd),
+          fetch,
+        })}`,
+      };
     } catch (caught) {
       const error = caught instanceof Error ? caught : new Error("unknown Git inspection failure");
+      const cachedRoot = state.rootCache.get(ctx.cwd);
+      if (cachedRoot) repoHash = hashRepoRoot(cachedRoot);
       // A failed gate inspection (e.g. unreachable remote) pauses retries for
       // automatic cleanup too. Successful-but-negative verdicts return above
       // and never reach this path, so they never trigger backoff. A replayed
@@ -295,12 +366,26 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
       if (isBackoffable(error) && !state.failures.has(key)) {
         noteBackoff(state.failures, key, error);
       }
-      return replayedPause
+      const outcome = replayedPause
+        ? "backoff-paused"
+        : error instanceof GitInspectionError
+          ? error.code
+          : "unknown-error";
+      const line = formatTelemetryLine({
+        phase: "gate",
+        outcome,
+        durationMs: Date.now() - started,
+        repo: repoHash,
+        cwd: hashRepoRoot(ctx.cwd),
+        fetch: replayedPause ? "skipped-paused" : fetch,
+      });
+      const verdict = replayedPause
         ? blocked(
             branch,
             `a recent Git inspection failed (${formatInspectionFailure(error)}) and retries are paused; retry after the backoff window`,
           )
         : blocked(branch, `safety inspection failed: ${formatInspectionFailure(error)}`);
+      return { ...verdict, reason: `${verdict.reason}\n${line}` };
     }
   });
 }
