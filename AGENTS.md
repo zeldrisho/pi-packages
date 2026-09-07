@@ -31,13 +31,12 @@
 
 ## External References
 
-| Need                        | File                          |
-| --------------------------- | ----------------------------- |
-| Package catalog             | `README.md`                   |
-| Development and conventions | `docs/development.md`         |
-| Architecture                | `docs/architecture.md`        |
-| Security invariants         | `docs/security-invariants.md` |
-| Git automation              | `docs/git.md`                 |
-| Vite+ guidance              | `docs/vite-plus.md`           |
-| Package behavior and setup  | `packages/*/README.md`        |
-| Releases                    | `docs/release.md`             |
+| Need                        | File                   |
+| --------------------------- | ---------------------- |
+| Package catalog             | `README.md`            |
+| Development and conventions | `docs/development.md`  |
+| Architecture                | `docs/architecture.md` |
+| Git automation              | `docs/git.md`          |
+| Vite+ guidance              | `docs/vite-plus.md`    |
+| Package behavior and setup  | `packages/*/README.md` |
+| Releases                    | `docs/release.md`      |

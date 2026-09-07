@@ -2,8 +2,8 @@
 
 This repository publishes independent Pi extensions from `packages/*`. Each package is loaded directly
 from TypeScript, owns its runtime dependencies, and can be installed without the rest of the workspace.
-For setup and package behavior, use the package READMEs. For trust-boundary requirements, see
-[security invariants](security-invariants.md); for publishing mechanics, see the
+For setup and package behavior, use the package READMEs. For contribution practices, see the
+[development guide](development.md); for publishing mechanics, see the
 [release guide](release.md).
 
 ## Package boundaries
