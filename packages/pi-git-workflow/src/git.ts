@@ -36,6 +36,12 @@ export class GitInspectionError extends Error {
 /**
  * Bound the entire inspection, including queue waits. Abort the active
  * command and prevent later commands even if an executor settles after timeout.
+ *
+ * @param pi - Git command runner interface
+ * @param operation - Async operation to execute with deadline-bound runner
+ * @param signal - Optional abort signal to propagate cancellation
+ * @returns Promise resolving to the operation result
+ * @throws {GitInspectionError} When inspection exceeds timeout or is cancelled
  */
 export async function withGitDeadline<T>(
   pi: GitRunner,
