@@ -103,7 +103,7 @@ export const webSearchParameters = Type.Object({
       minLength: 1,
       maxLength: SEARCH_MAX_RESULT_FILTER_CHARACTERS,
       description:
-        "Comma-separated result-type filter, e.g. web,discussions,faq (web mode only; values: discussions, faq, infobox, news, query, videos, web, locations)",
+        "Comma-separated result-type filter, e.g. web,discussions,faq (web mode only; values: discussions, faq, infobox, news, query, videos, web, locations; must include web)",
     }),
   ),
   goggles: Type.Optional(

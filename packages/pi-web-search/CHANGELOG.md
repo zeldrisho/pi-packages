@@ -9,8 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add code-search options: web-mode `operators`, `resultFilter` (`web,discussions,faq,…`), `offset` pagination, `uiLang`, and `dateRange` (`YYYY-MM-DDtoYYYY-MM-DD`, exclusive with `freshness`); shared `spellcheck` (set `false` for exact identifiers) and `goggles` custom ranking in both modes; context-mode `threshold` (`strict`/`balanced`/`lenient`/`disabled`) and `depth` budget presets (`quick`/`standard`/`deep`); `country` now accepts `ALL` in both modes and context results scale to 50
+- Add code-search options: web-mode `operators`, `resultFilter` (`web,discussions,faq,…`), `offset` pagination, `uiLang`, and `dateRange` (`YYYY-MM-DDtoYYYY-MM-DD`, exclusive with `freshness`); shared `spellcheck` (set `false` for exact identifiers) and `goggles` custom ranking in both modes; context-mode `threshold` (`strict`/`balanced`/`lenient`/`disabled`) and `depth` budget presets (`quick`/`standard`/`deep`)
 - Surface Brave query metadata in `details.evidence`: `alteredQuery`, `spellcheckOff`, `showStrictWarning`, `moreResultsAvailable`, `operatorsApplied`, and `operatorSites`, plus the effective `threshold`/`depth`/`offset`
+
+### Changed
+
+- `country` now accepts `ALL` in both modes and context results scale to 50
 
 ## [0.7.0] - 2026-09-01
 

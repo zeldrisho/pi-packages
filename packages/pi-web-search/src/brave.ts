@@ -291,10 +291,11 @@ export function normalizeResultFilter(value: string): string {
   if (
     unique.length === 0 ||
     value.length > SEARCH_MAX_RESULT_FILTER_CHARACTERS ||
-    unique.some((item) => !allowed.has(item))
+    unique.some((item) => !allowed.has(item)) ||
+    !unique.includes("web")
   ) {
     throw new Error(
-      `Search resultFilter must be a comma-separated list of: ${SEARCH_RESULT_FILTER_VALUES.join(", ")}.`,
+      `Search resultFilter must be a comma-separated list of: ${SEARCH_RESULT_FILTER_VALUES.join(", ")}, and must include "web" (only web results are mapped).`,
     );
   }
   return unique.join(",");

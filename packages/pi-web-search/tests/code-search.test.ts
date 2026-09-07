@@ -128,6 +128,7 @@ describe("web_search code-search options", () => {
     expect(() => normalizeResultFilter("web,discussions,faq")).not.toThrow();
     expect(() => normalizeResultFilter("web,bogus")).toThrow("resultFilter");
     expect(() => normalizeResultFilter("")).toThrow("resultFilter");
+    expect(() => normalizeResultFilter("news")).toThrow('must include "web"');
     expect(mapFreshness("week", undefined)).toBe("pw");
     expect(mapFreshness(undefined, "2025-01-01to2025-06-30")).toBe("2025-01-01to2025-06-30");
     expect(() => mapFreshness("week", "2025-01-01to2025-06-30")).toThrow("mutually exclusive");
