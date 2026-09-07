@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Bound automatic cleanup to a two-second total deadline and pause failed retries for one minute so slow Git fetches do not repeatedly stall prompt startup
+- Abort timed-out automatic inspection and prevent subsequent cleanup commands without weakening explicit branch-deletion checks
+- Bound mid-conversation branch-deletion inspections to two seconds and honor agent cancellation so stalled Git checks do not hold up queued steering or abort completion
+
 ## [0.3.0] - 2026-09-02
 
 ### Added

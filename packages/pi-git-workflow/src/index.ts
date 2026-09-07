@@ -12,6 +12,7 @@ import {
   reviewFingerprint,
 } from "./cleanup";
 import {
+  AUTOMATIC_CLEANUP_RETRY_MS,
   detectTargetBranchInRepo,
   exactRefCommit,
   git,
@@ -20,6 +21,7 @@ import {
   requireGitOk,
   resolveRepoRoot,
   sanitizeGitOutput,
+  withGitDeadline,
 } from "./git";
 
 const BRANCH_DELETE_FORCE_RE =
@@ -52,13 +54,19 @@ export function extractBranchName(command: string): string | undefined {
 export default function piGitWorkflow(pi: ExtensionAPI): void {
   const visibleFingerprints = new Map<string, string>();
   const visibleSyncStates = new Map<string, string>();
+  const failures = new Map<string, { retryAt: number; error: Error }>();
 
   pi.on("before_agent_start", async (_event, ctx: ExtensionContext) => {
+    if (!ctx.isProjectTrusted()) return;
     try {
-      const result = await cleanupRepository(pi, {
-        cwd: ctx.cwd,
-        trusted: ctx.isProjectTrusted(),
-      });
+      const previous = failures.get(ctx.cwd);
+      if (previous && Date.now() < previous.retryAt) throw previous.error;
+      failures.delete(ctx.cwd);
+      const result = await withGitDeadline(
+        pi,
+        (runner) => cleanupRepository(runner, { cwd: ctx.cwd, trusted: true }),
+        ctx.signal,
+      );
       const fingerprint = reviewFingerprint(result.review);
       if (result.review.length > 0 && visibleFingerprints.get(result.root) !== fingerprint) {
         if (ctx.hasUI) {
@@ -100,8 +108,11 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
         (error.code === "not_git_worktree" || error.code === "untrusted_project")
       )
         return;
+      if (!failures.has(ctx.cwd)) {
+        failures.set(ctx.cwd, { retryAt: Date.now() + AUTOMATIC_CLEANUP_RETRY_MS, error });
+      }
       const fingerprint = `${ctx.cwd}:${error instanceof GitInspectionError ? error.code : "unknown"}`;
-      const message = formatInspectionFailure(error);
+      const message = `${formatInspectionFailure(error)}. Automatic cleanup retries are paused for up to 60 seconds.`;
       if (ctx.hasUI && visibleFingerprints.get(ctx.cwd) !== fingerprint) {
         ctx.ui.notify(`pi-git-workflow: ${message}`, "warning");
         visibleFingerprints.set(ctx.cwd, fingerprint);
@@ -111,7 +122,8 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
           customType: "pi-git-workflow-cleanup",
           content: [
             "<!-- pi-git-workflow cleanup -->",
-            "Git branch cleanup inspection was incomplete; no branches were deleted.",
+            "Git branch cleanup inspection was incomplete; cleanup and upstream freshness are not verified.",
+            "Some earlier cleanup steps may have completed; inspect refs before retrying deletion.",
             `Reason: ${message}`,
             "Tell the user cleanup could not be verified. Do not force-delete branches automatically.",
           ].join("\n"),
@@ -139,34 +151,43 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
       return blocked(branch, "project is not trusted, so deletion safety cannot be inspected");
 
     try {
-      const root = await resolveRepoRoot(pi, ctx.cwd);
-      await requireGitOk(
+      return await withGitDeadline(
         pi,
-        root,
-        ["fetch", "--prune", "origin"],
-        "fetch_failed",
-        "git fetch --prune origin failed",
+        async (runner) => {
+          const root = await resolveRepoRoot(runner, ctx.cwd);
+          await requireGitOk(
+            runner,
+            root,
+            ["fetch", "--prune", "origin"],
+            "fetch_failed",
+            "git fetch --prune origin failed",
+          );
+          const target = await detectTargetBranchInRepo(runner, root);
+          const branchRef = `refs/heads/${branch}`;
+          const branchCommit = await exactRefCommit(runner, root, branchRef);
+          if (!branchCommit) return blocked(branch, "the local branch ref is missing or ambiguous");
+          const targetCommit = await exactRefCommit(runner, root, `refs/remotes/origin/${target}`);
+          if (!targetCommit) return blocked(branch, "the fetched target ref is missing");
+          const merged = await git(runner, root, [
+            "merge-base",
+            "--is-ancestor",
+            branchCommit,
+            targetCommit,
+          ]);
+          requireBoundedOutput(merged, "merge relationship inspection");
+          if (merged.code !== 0) {
+            return blocked(branch, `it is not proven merged into the refreshed target ${target}`);
+          }
+          if (!(await upstreamGoneInRepo(runner, root, branch))) {
+            return blocked(
+              branch,
+              "its configured upstream is not confirmed gone after fetch --prune",
+            );
+          }
+          return;
+        },
+        ctx.signal,
       );
-      const target = await detectTargetBranchInRepo(pi, root);
-      const branchRef = `refs/heads/${branch}`;
-      const branchCommit = await exactRefCommit(pi, root, branchRef);
-      if (!branchCommit) return blocked(branch, "the local branch ref is missing or ambiguous");
-      const targetCommit = await exactRefCommit(pi, root, `refs/remotes/origin/${target}`);
-      if (!targetCommit) return blocked(branch, "the fetched target ref is missing");
-      const merged = await git(pi, root, [
-        "merge-base",
-        "--is-ancestor",
-        branchCommit,
-        targetCommit,
-      ]);
-      requireBoundedOutput(merged, "merge relationship inspection");
-      if (merged.code !== 0) {
-        return blocked(branch, `it is not proven merged into the refreshed target ${target}`);
-      }
-      if (!(await upstreamGoneInRepo(pi, root, branch))) {
-        return blocked(branch, "its configured upstream is not confirmed gone after fetch --prune");
-      }
-      return;
     } catch (caught) {
       const error = caught instanceof Error ? caught : new Error("unknown Git inspection failure");
       return blocked(branch, `safety inspection failed: ${formatInspectionFailure(error)}`);

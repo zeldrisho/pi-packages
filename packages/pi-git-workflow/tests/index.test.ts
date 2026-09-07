@@ -11,11 +11,14 @@ import {
 } from "../src/cleanup";
 import piGitWorkflow, { extractBranchName } from "../src/index";
 import {
+  AUTOMATIC_CLEANUP_RETRY_MS,
+  GIT_INSPECTION_TIMEOUT_MS,
   detectTargetBranchInRepo,
   git,
   GitInspectionError,
   requireBoundedOutput,
   sanitizeGitOutput,
+  withGitDeadline,
 } from "../src/git";
 
 const root = process.cwd();
@@ -74,6 +77,40 @@ function result(partial: Partial<ExecResult> = {}): ExecResult {
 }
 
 describe("Git inspection helpers", () => {
+  it("cancels deadline-bound work and does not start commands after cancellation", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const pi = { exec: vi.fn() };
+    await expect(
+      withGitDeadline(pi, (runner) => runner.exec("git", ["status"]), controller.signal),
+    ).rejects.toMatchObject({ code: "inspection_aborted" });
+    expect(pi.exec).not.toHaveBeenCalled();
+  });
+
+  it("expires while queued and never starts delayed commands", async () => {
+    vi.useFakeTimers();
+    try {
+      let release!: () => void;
+      const queued = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const pi = { exec: vi.fn() };
+      const pending = withGitDeadline(pi, async (runner) => {
+        await queued;
+        return runner.exec("git", ["fetch", "--prune", "origin"]);
+      });
+      const rejected = expect(pending).rejects.toMatchObject({ code: "inspection_timeout" });
+      await vi.advanceTimersByTimeAsync(GIT_INSPECTION_TIMEOUT_MS);
+      await rejected;
+      release();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(pi.exec).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("uses bounded target fallbacks and rejects detached fallback", async () => {
     function targetPi(available: "main" | "master" | "current" | "detached") {
       return {
@@ -383,6 +420,74 @@ describe("extension registration and gate", () => {
     expect(trackedResult.reason).toContain("not confirmed gone");
   });
 
+  it.each(["timeout", "abort"])(
+    "releases a stalled mid-conversation deletion check on %s without allowing deletion",
+    async (stop) => {
+      vi.useFakeTimers();
+      try {
+        const { pi } = cleanupPi(branchRecord("feature"));
+        const exec = pi.exec;
+        const controller = new AbortController();
+        let started!: () => void;
+        let release!: (value: ExecResult) => void;
+        let fetchSignal: AbortSignal | undefined;
+        const fetchStarted = new Promise<void>((resolve) => {
+          started = resolve;
+        });
+        const fetch = new Promise<ExecResult>((resolve) => {
+          release = resolve;
+        });
+        pi.exec = vi.fn((command, args, options) => {
+          if (args[0] === "fetch") {
+            fetchSignal = options?.signal;
+            started();
+            // Deliberately ignore abort to exercise the caller's hard deadline.
+            return fetch;
+          }
+          return exec(command, args, options);
+        });
+        const tool = captureHandlers(pi).get("tool_call")!;
+        const ctx = { cwd: root, isProjectTrusted: () => true, signal: controller.signal };
+        const pending = tool(
+          { toolName: "bash", input: { command: "git branch -d feature" } },
+          ctx,
+        );
+        await fetchStarted;
+        if (stop === "abort") controller.abort();
+        else await vi.advanceTimersByTimeAsync(GIT_INSPECTION_TIMEOUT_MS);
+        const response = await pending;
+        expect(response.block).toBe(true);
+        expect(response.reason).toContain(stop === "abort" ? "cancelled" : "2-second budget");
+        expect(fetchSignal?.aborted).toBe(true);
+        // Unrelated commands still require no Git inspection.
+        const count = vi.mocked(pi.exec).mock.calls.length;
+        expect(
+          await tool({ toolName: "bash", input: { command: "git status" } }, ctx),
+        ).toBeUndefined();
+        release(result());
+        await vi.advanceTimersByTimeAsync(0);
+        expect(pi.exec).toHaveBeenCalledTimes(count);
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it("does not inspect an already-cancelled deletion call", async () => {
+    const { pi } = cleanupPi(branchRecord("feature"));
+    const tool = captureHandlers(pi).get("tool_call")!;
+    const controller = new AbortController();
+    controller.abort();
+    const response = await tool(
+      { toolName: "bash", input: { command: "git branch -d feature" } },
+      { cwd: root, isProjectTrusted: () => true, signal: controller.signal },
+    );
+    expect(response.block).toBe(true);
+    expect(response.reason).toContain("cancelled");
+    expect(pi.exec).not.toHaveBeenCalled();
+  });
+
   it("fails closed for untrusted projects and failed refreshed inspection", async () => {
     const { pi } = cleanupPi(branchRecord("feature"), (args) =>
       args[0] === "fetch" ? { code: 1, stderr: "offline" } : undefined,
@@ -459,6 +564,83 @@ describe("extension registration and gate", () => {
     expect(result).toBeUndefined();
   });
 
+  it("releases prompt startup on a hung fetch and prevents late cleanup mutations", async () => {
+    vi.useFakeTimers();
+    try {
+      const { pi, calls } = cleanupPi(branchRecord("feature"));
+      const exec = pi.exec;
+      let releaseFetch!: (value: ExecResult) => void;
+      let started!: () => void;
+      let fetchSignal: AbortSignal | undefined;
+      const fetchStarted = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      const pendingFetch = new Promise<ExecResult>((resolve) => {
+        releaseFetch = resolve;
+      });
+      pi.exec = vi.fn((command, args, options) => {
+        if (args[0] === "fetch") {
+          fetchSignal = options?.signal;
+          started();
+          return pendingFetch;
+        }
+        return exec(command, args, options);
+      });
+      const before = captureHandlers(pi).get("before_agent_start")!;
+      const notify = vi.fn();
+      const ctx = { cwd: root, hasUI: true, isProjectTrusted: () => true, ui: { notify } };
+      const pending = before({}, ctx);
+      await fetchStarted;
+      await vi.advanceTimersByTimeAsync(GIT_INSPECTION_TIMEOUT_MS);
+      const response = await pending;
+      expect(response.message.content).toContain("2-second budget");
+      expect(response.message.content).toContain("upstream freshness are not verified");
+      expect(fetchSignal?.aborted).toBe(true);
+      const callCount = vi.mocked(pi.exec).mock.calls.length;
+      expect((await before({}, ctx)).message.content).toContain("2-second budget");
+      expect(pi.exec).toHaveBeenCalledTimes(callCount);
+      expect(notify).toHaveBeenCalledTimes(1);
+      releaseFetch(result());
+      await vi.advanceTimersByTimeAsync(0);
+      expect(calls.some((args) => args[0] === "symbolic-ref")).toBe(false);
+      expect(calls.some((args) => args[1] === "--delete")).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("backs off failed fetches, retries after cooldown, and keeps deletion checks fresh", async () => {
+    vi.useFakeTimers();
+    try {
+      let offline = true;
+      const { pi, calls } = cleanupPi(
+        branchRecord("main", mainCommit, "refs/remotes/origin/main", ""),
+        (args) => (args[0] === "fetch" && offline ? { killed: true } : undefined),
+      );
+      const handlers = captureHandlers(pi);
+      const before = handlers.get("before_agent_start")!;
+      const ctx = { cwd: root, hasUI: false, isProjectTrusted: () => true };
+      expect((await before({}, ctx)).message.content).toContain("killed or timed out");
+      const count = calls.length;
+      await before({}, ctx);
+      expect(calls).toHaveLength(count);
+      const blocked = await handlers.get("tool_call")!(
+        { toolName: "bash", input: { command: "git branch -d feature" } },
+        ctx,
+      );
+      expect(blocked.block).toBe(true);
+      expect(calls.filter((args) => args[0] === "fetch")).toHaveLength(2);
+      offline = false;
+      await vi.advanceTimersByTimeAsync(AUTOMATIC_CLEANUP_RETRY_MS);
+      expect(await before({}, ctx)).toBeUndefined();
+      expect(calls.filter((args) => args[0] === "fetch")).toHaveLength(3);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("reports bounded inspection failures but skips non-repositories", async () => {
     const failed = cleanupPi("", (args) =>
       args[0] === "fetch" ? { code: 1, stderr: "network\nerror" } : undefined,
@@ -474,7 +656,7 @@ describe("extension registration and gate", () => {
         ui: { notify },
       },
     );
-    expect(result.message.content).toContain("no branches were deleted");
+    expect(result.message.content).toContain("cleanup and upstream freshness are not verified");
     expect(notify).toHaveBeenCalledTimes(1);
 
     const outside = {

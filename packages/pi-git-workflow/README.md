@@ -16,7 +16,7 @@ pi install -l npm:@zeldrisho/pi-git-workflow
 
 ## Behavior
 
-No commands or tools are registered. The extension runs cleanup before each agent turn and gates branch deletion in agent `bash` calls.
+No commands or tools are registered. The extension attempts cleanup before each agent turn and gates branch deletion in agent `bash` calls.
 
 ### Automatic local cleanup
 
@@ -27,6 +27,10 @@ For trusted, non-bare Git worktrees, the extension:
 3. detects and pins the fetched target branch;
 4. inspects local refs and linked worktrees with machine-readable Git output; and
 5. attempts ordinary `git branch --delete` only for non-current, non-target branches whose configured upstream is gone and whose pinned commit is an ancestor of the fetched target.
+
+Automatic cleanup has a **2-second total deadline**, including repository queue waits, so a slow or unreachable remote cannot hold prompt startup for the usual 30-second Git timeout. On expiry, the active command is signalled to abort and no subsequent cleanup commands are started. Failed automatic inspections pause retries in the same working directory for **60 seconds**; hidden context continues to report that cleanup and upstream freshness are unverified. Explicit agent branch-deletion checks still require a fresh successful fetch; the retry pause never authorizes deletion from cached state.
+
+A deadline or cancellation can occur after earlier cleanup steps completed; it does not roll them back. If fetch times out, check network access and Git authentication outside Pi (for example, run `git fetch --prune origin` in a terminal), then submit another prompt after the retry pause.
 
 Each candidate ref is checked again immediately before deletion. Cleanup is serialized per repository root within the Pi process. Branches are retained if a ref moves, inspection is uncertain, another worktree uses the branch, Git refuses deletion, or a hook fails.
 
@@ -45,6 +49,8 @@ The extension never pushes or deletes remote refs. Remote head-branch deletion r
 The extension always blocks agent calls using `git branch -D`, `--force --delete`, or `--delete --force`.
 
 For ordinary `git branch -d` / `--delete`, it refreshes `origin`, resolves exact refs, and allows the command only when the branch is proven merged into the fetched target and its configured upstream is confirmed gone. Failed or ambiguous inspection is blocked. Ordinary deletion still uses Git's native non-force safety checks.
+
+The entire deletion safety inspection also has a **2-second deadline** and honors the active agent's abort signal (Escape in the TUI). Timeout or cancellation aborts the inspection and blocks deletion. This bounds the extension's mid-conversation tool-preflight wait, which otherwise delays queued steering messages and completion of an abort. It does not change Pi's normal message queueing or bound the execution time of agent tools themselves.
 
 The extension never resets, rebases, merges, stashes, cleans, switches branches, force-deletes, pushes, or calls `ctx.reload()`.
 
