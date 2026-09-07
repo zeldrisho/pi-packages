@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Run branch cleanup fully silently with no interactive notifications; deferred branches, behind/diverged state, and inspection failures stay as hidden agent guidance only and are mentioned only if the user asks about Git cleanup
+
 ## [0.3.1] - 2026-09-07
 
 ### Fixed

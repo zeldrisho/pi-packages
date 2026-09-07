@@ -9,7 +9,6 @@ import {
   formatCleanupContext,
   formatSyncContext,
   parseLocalBranches,
-  reviewFingerprint,
 } from "./cleanup";
 import {
   AUTOMATIC_CLEANUP_RETRY_MS,
@@ -52,8 +51,6 @@ export function extractBranchName(command: string): string | undefined {
  * @param pi - Extension API instance
  */
 export default function piGitWorkflow(pi: ExtensionAPI): void {
-  const visibleFingerprints = new Map<string, string>();
-  const visibleSyncStates = new Map<string, string>();
   const failures = new Map<string, { retryAt: number; error: Error }>();
 
   pi.on("before_agent_start", async (_event, ctx: ExtensionContext) => {
@@ -67,32 +64,7 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
         (runner) => cleanupRepository(runner, { cwd: ctx.cwd, trusted: true }),
         ctx.signal,
       );
-      const fingerprint = reviewFingerprint(result.review);
-      if (result.review.length > 0 && visibleFingerprints.get(result.root) !== fingerprint) {
-        if (ctx.hasUI) {
-          ctx.ui.notify(
-            `pi-git-workflow: ${result.review.length} local ${result.review.length === 1 ? "branch requires" : "branches require"} cleanup review.`,
-            "warning",
-          );
-          visibleFingerprints.set(result.root, fingerprint);
-        }
-      } else if (result.review.length === 0) {
-        visibleFingerprints.delete(result.root);
-      }
       const syncContext = formatSyncContext(result.sync);
-      const syncFingerprint = `${result.sync.branch}\0${result.sync.upstream ?? ""}\0${result.sync.state}`;
-      if (syncContext && visibleSyncStates.get(result.root) !== syncFingerprint) {
-        if (ctx.hasUI) {
-          const relationship = result.sync.state === "behind" ? "is behind" : "has diverged from";
-          ctx.ui.notify(
-            `pi-git-workflow: current branch ${relationship} its fetched upstream; synchronize before editing.`,
-            "warning",
-          );
-          visibleSyncStates.set(result.root, syncFingerprint);
-        }
-      } else if (!syncContext) {
-        visibleSyncStates.delete(result.root);
-      }
 
       const content = [formatCleanupContext(result.review), syncContext]
         .filter(Boolean)
@@ -111,12 +83,7 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
       if (!failures.has(ctx.cwd)) {
         failures.set(ctx.cwd, { retryAt: Date.now() + AUTOMATIC_CLEANUP_RETRY_MS, error });
       }
-      const fingerprint = `${ctx.cwd}:${error instanceof GitInspectionError ? error.code : "unknown"}`;
       const message = `${formatInspectionFailure(error)}. Automatic cleanup retries are paused for up to 60 seconds.`;
-      if (ctx.hasUI && visibleFingerprints.get(ctx.cwd) !== fingerprint) {
-        ctx.ui.notify(`pi-git-workflow: ${message}`, "warning");
-        visibleFingerprints.set(ctx.cwd, fingerprint);
-      }
       return {
         message: {
           customType: "pi-git-workflow-cleanup",
@@ -125,7 +92,7 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
             "Git branch cleanup inspection was incomplete; cleanup and upstream freshness are not verified.",
             "Some earlier cleanup steps may have completed; inspect refs before retrying deletion.",
             `Reason: ${message}`,
-            "Tell the user cleanup could not be verified. Do not force-delete branches automatically.",
+            "Do not mention this to the user unless they ask about Git cleanup. Do not force-delete branches automatically.",
           ].join("\n"),
           display: false,
         },

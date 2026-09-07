@@ -211,7 +211,7 @@ describe("cleanupRepository", () => {
       upstream: "refs/remotes/origin/main",
       state: "behind",
     });
-    expect(formatSyncContext(cleanup.sync)).toContain("Before modifying files");
+    expect(formatSyncContext(cleanup.sync)).toContain("Avoid modifying files until synchronized");
   });
 
   it("reports a diverged current branch without choosing an integration strategy", async () => {
@@ -504,7 +504,7 @@ describe("extension registration and gate", () => {
     expect(await tool({ toolName: "bash", input: { command: "git status" } }, {})).toBeUndefined();
   });
 
-  it("deduplicates visible review notices and never reloads", async () => {
+  it("leaves deferred branches silently and never reloads", async () => {
     const { pi } = cleanupPi(branchRecord("feature"), (args) =>
       args[0] === "merge-base" ? { code: 1 } : undefined,
     );
@@ -522,11 +522,12 @@ describe("extension registration and gate", () => {
     const second = await before({}, ctx);
     expect(first.message.content).toContain("feature");
     expect(second.message.content).toContain("feature");
-    expect(notify).toHaveBeenCalledTimes(1);
+    expect(first.message.content).not.toContain("Tell the user");
+    expect(notify).not.toHaveBeenCalled();
     expect(reload).not.toHaveBeenCalled();
   });
 
-  it("injects and deduplicates a warning when the current branch needs synchronization", async () => {
+  it("injects silent guidance when the current branch needs synchronization", async () => {
     const { pi } = cleanupPi(
       branchRecord("main", branchCommit, "refs/remotes/origin/main", "[behind 1]"),
     );
@@ -540,13 +541,10 @@ describe("extension registration and gate", () => {
     };
     const first = await before({}, ctx);
     const second = await before({}, ctx);
-    expect(first.message.content).toContain(
-      "synchronize using an explicit, user-approved strategy",
-    );
-    expect(second.message.content).toContain(
-      "synchronize using an explicit, user-approved strategy",
-    );
-    expect(notify).toHaveBeenCalledTimes(1);
+    expect(first.message.content).toContain("Avoid modifying files until synchronized");
+    expect(second.message.content).toContain("Avoid modifying files until synchronized");
+    expect(first.message.content).not.toContain("tell the user");
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it("returns no hidden context when cleanup has no review candidates", async () => {
@@ -599,7 +597,7 @@ describe("extension registration and gate", () => {
       const callCount = vi.mocked(pi.exec).mock.calls.length;
       expect((await before({}, ctx)).message.content).toContain("2-second budget");
       expect(pi.exec).toHaveBeenCalledTimes(callCount);
-      expect(notify).toHaveBeenCalledTimes(1);
+      expect(notify).not.toHaveBeenCalled();
       releaseFetch(result());
       await vi.advanceTimersByTimeAsync(0);
       expect(calls.some((args) => args[0] === "symbolic-ref")).toBe(false);
@@ -657,7 +655,8 @@ describe("extension registration and gate", () => {
       },
     );
     expect(result.message.content).toContain("cleanup and upstream freshness are not verified");
-    expect(notify).toHaveBeenCalledTimes(1);
+    expect(result.message.content).toContain("Do not mention this to the user");
+    expect(notify).not.toHaveBeenCalled();
 
     const outside = {
       exec: vi.fn(async () => ({ code: 128, stdout: "", stderr: "", killed: false })),
