@@ -332,6 +332,34 @@ describe("cleanupRepository", () => {
     await Promise.all([first, second]);
     expect(order).toEqual(["first-start", "first-end", "second"]);
   });
+
+  it("does not hold the repo queue while fetching", async () => {
+    const { pi, calls } = cleanupPi(
+      branchRecord("main", mainCommit, "refs/remotes/origin/main", "") + branchRecord("feature"),
+    );
+    const inner = vi.mocked(pi.exec);
+    const fetchReleases: ((value: ExecResult) => void)[] = [];
+    (pi as { exec: unknown }).exec = vi.fn((command: string, args: string[]) => {
+      if (args[0] === "fetch") {
+        calls.push(args);
+        return new Promise<ExecResult>((resolve) => {
+          fetchReleases.push(resolve);
+        });
+      }
+      return inner(command, args);
+    });
+    const first = cleanupRepository(pi, { cwd: root, trusted: true });
+    await vi.waitFor(() => expect(fetchReleases).toHaveLength(1));
+    // The second cleanup must issue its own fetch without waiting for the
+    // first fetch to settle: fetches run outside the per-root queue.
+    const second = cleanupRepository(pi, { cwd: root, trusted: true });
+    await vi.waitFor(() => expect(fetchReleases).toHaveLength(2));
+    for (const release of fetchReleases) release(result());
+    const [a, b] = await Promise.all([first, second]);
+    expect(a.deleted).toEqual(["feature"]);
+    expect(b.deleted).toEqual(["feature"]);
+    expect(calls.filter((args) => args[0] === "fetch")).toHaveLength(2);
+  });
 });
 
 describe("bounded review context", () => {
@@ -473,6 +501,55 @@ describe("extension registration and gate", () => {
       }
     },
   );
+
+  it("keeps overlapping deletion checks independent and ignores stale fetch results", async () => {
+    vi.useFakeTimers();
+    try {
+      const { pi } = cleanupPi(branchRecord("feature"));
+      const exec = pi.exec;
+      const releases: ((value: ExecResult) => void)[] = [];
+      let fetchCount = 0;
+      let bothStarted!: () => void;
+      const bothFetchesInFlight = new Promise<void>((resolve) => {
+        bothStarted = resolve;
+      });
+      pi.exec = vi.fn((command, args, options) => {
+        if (args[0] === "fetch") {
+          fetchCount += 1;
+          if (fetchCount === 2) bothStarted();
+          // Deliberately ignore abort: the stale completion below must not
+          // authorize anything once the checks have timed out.
+          return new Promise<ExecResult>((resolve) => {
+            releases.push(resolve);
+          });
+        }
+        return exec(command, args, options);
+      });
+      const tool = captureHandlers(pi).get("tool_call")!;
+      const ctx = { cwd: root, isProjectTrusted: () => true };
+      const first = tool({ toolName: "bash", input: { command: "git branch -d feature" } }, ctx);
+      const second = tool({ toolName: "bash", input: { command: "git branch -d feature" } }, ctx);
+      await bothFetchesInFlight;
+      // Each check runs its own fetch concurrently; neither waits on the other.
+      expect(fetchCount).toBe(2);
+      await vi.advanceTimersByTimeAsync(GIT_INSPECTION_TIMEOUT_MS);
+      const [firstResult, secondResult] = await Promise.all([first, second]);
+      expect(firstResult.block).toBe(true);
+      expect(firstResult.reason).toContain("2-second budget");
+      expect(secondResult.block).toBe(true);
+      expect(secondResult.reason).toContain("2-second budget");
+      // A late-arriving fetch success must not trigger further Git work or
+      // allow deletion: the timed-out checks stay failed-closed.
+      const settledCalls = vi.mocked(pi.exec).mock.calls.length;
+      for (const release of releases) release(result());
+      await vi.advanceTimersByTimeAsync(0);
+      expect(vi.mocked(pi.exec).mock.calls).toHaveLength(settledCalls);
+      expect(vi.mocked(pi.exec).mock.calls.some((call) => call[1]?.[1] === "--delete")).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it("does not inspect an already-cancelled deletion call", async () => {
     const { pi } = cleanupPi(branchRecord("feature"));

@@ -51,10 +51,11 @@ export interface CleanupResult {
 }
 
 /**
- * Execute an operation with exclusive access to a repository.
+ * Execute a ref inspection/mutation phase with exclusive access to a repository.
  *
- * Ensures only one cleanup operation runs at a time per repository root
- * by queuing operations and waiting for previous ones to complete.
+ * Serializes only the ref read/delete phase per canonical repository root;
+ * network fetches run outside this lock (see {@link fetchPrune}) so a hung
+ * fetch cannot hold the queue past the inspection deadline.
  *
  * @param root - Canonical repository root path
  * @param run - Async operation to execute exclusively
@@ -171,6 +172,38 @@ export function parseWorktreeBranches(output: string): Set<string> {
 }
 
 /**
+ * Run `git fetch --prune origin` without holding any repository lock.
+ *
+ * Fetch runs outside {@link withRepoQueue} on purpose: a hung or unreachable
+ * remote must not hold the per-root lock past the inspection deadline. Two
+ * concurrent fetches for the same root are safe — fetch only rewrites
+ * remote-tracking refs (atomically per ref) from identical remote state, so
+ * last-writer-wins is benign. The queued ref/mutation phase re-verifies every
+ * candidate ref immediately before deletion, so a torn read caused by a
+ * concurrent fetch can only retain a branch for review, never delete it.
+ *
+ * Each caller awaits its own fetch promise directly and never shares fetch
+ * results: a late-settling fetch from a timed-out attempt cannot authorize a
+ * different check's deletion. Combined with the deadline runner (which refuses
+ * to start post-timeout commands), a stale fetch completion performs no
+ * further Git work.
+ *
+ * @param pi - Extension API with exec capability
+ * @param root - Canonical repository root path
+ * @returns Promise resolving when the fetch succeeds
+ * @throws {GitInspectionError} When the fetch fails or is killed
+ */
+export async function fetchPrune(pi: Pick<ExtensionAPI, "exec">, root: string): Promise<void> {
+  await requireGitOk(
+    pi,
+    root,
+    ["fetch", "--prune", "origin"],
+    "fetch_failed",
+    "git fetch --prune origin failed",
+  );
+}
+
+/**
  * Clean up merged local branches from a Git repository.
  *
  * Safely deletes local branches that:
@@ -179,6 +212,9 @@ export function parseWorktreeBranches(output: string): Set<string> {
  * - Are not currently checked out in any worktree
  *
  * Requires the project to be trusted. Returns branches that need manual review.
+ *
+ * The fetch runs before the per-root queue is acquired (see {@link fetchPrune});
+ * only the ref inspection and deletion phase below holds the lock.
  *
  * @param pi - Extension API with exec capability
  * @param context - Cleanup context with working directory and trust status
@@ -196,24 +232,24 @@ export async function cleanupRepository(
     );
   }
   const root = await resolveRepoRoot(pi, context.cwd);
-  return withRepoQueue(root, () => cleanupLocked(pi, root));
+  await fetchPrune(pi, root);
+  return withRepoQueue(root, () => cleanupAfterFetch(pi, root));
 }
 
 /**
- * Performs the cleanup operation with exclusive repository access.
+ * Performs the ref inspection and deletion phase with exclusive repository access.
+ *
+ * Must only run after a successful {@link fetchPrune} by the same caller; the
+ * fetched state it reads belongs to that caller's own fetch.
  *
  * @param pi - Extension API with exec capability
  * @param root - Canonical repository root path
  * @returns Promise resolving to cleanup result with deleted/review/retained branches
  */
-async function cleanupLocked(pi: Pick<ExtensionAPI, "exec">, root: string): Promise<CleanupResult> {
-  await requireGitOk(
-    pi,
-    root,
-    ["fetch", "--prune", "origin"],
-    "fetch_failed",
-    "git fetch --prune origin failed",
-  );
+async function cleanupAfterFetch(
+  pi: Pick<ExtensionAPI, "exec">,
+  root: string,
+): Promise<CleanupResult> {
   const target = await detectTargetBranchInRepo(pi, root);
   const targetRef = `refs/remotes/origin/${target}`;
   const targetCommit = await exactRefCommit(pi, root, targetRef);

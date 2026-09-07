@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Run `git fetch --prune origin` outside the per-repository queue lock so a hung or unreachable fetch cannot block subsequent cleanups past the 2-second logical deadline; only ref inspection and deletion stay serialized, and stale late-arriving fetch results can never authorize deletion
+
 ### Changed
 
 - Run branch cleanup fully silently with no interactive notifications; deferred branches, behind/diverged state, and inspection failures stay as hidden agent guidance only and are mentioned only if the user asks about Git cleanup
