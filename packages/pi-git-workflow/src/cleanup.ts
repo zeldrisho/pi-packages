@@ -232,6 +232,23 @@ export async function cleanupRepository(
     );
   }
   const root = await resolveRepoRoot(pi, context.cwd);
+  return cleanupRepositoryAtRoot(pi, root);
+}
+
+/**
+ * Clean up a repository whose canonical root is already resolved.
+ *
+ * Lets callers resolve (and cache) the root once for backoff keying, then run
+ * the fetch plus the queued ref phase without resolving twice.
+ *
+ * @param pi - Extension API with exec capability
+ * @param root - Canonical repository root path
+ * @returns Promise resolving to cleanup result with deleted/review/retained branches
+ */
+export async function cleanupRepositoryAtRoot(
+  pi: Pick<ExtensionAPI, "exec">,
+  root: string,
+): Promise<CleanupResult> {
   await fetchPrune(pi, root);
   return withRepoQueue(root, () => cleanupAfterFetch(pi, root));
 }

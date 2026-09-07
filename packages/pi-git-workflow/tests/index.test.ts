@@ -739,6 +739,59 @@ describe("extension registration and gate", () => {
     expect(calls).toHaveLength(count);
   });
 
+  it("shares the retry pause across subdirectories of the same repository", async () => {
+    const { pi, calls } = cleanupPi(
+      branchRecord("main", mainCommit, "refs/remotes/origin/main", ""),
+      (args) => (args[0] === "fetch" ? { killed: true } : undefined),
+    );
+    const handlers = captureHandlers(pi);
+    const before = handlers.get("before_agent_start")!;
+    const ctxA = { cwd: `${root}/a`, hasUI: false, isProjectTrusted: () => true };
+    const ctxB = { cwd: `${root}/b`, hasUI: false, isProjectTrusted: () => true };
+    expect((await before({}, ctxA)).message.content).toContain("killed or timed out");
+    expect(calls.filter((args) => args[0] === "fetch")).toHaveLength(1);
+    // A sibling subdirectory resolves to the same canonical root and shares
+    // the cooldown: only cheap local canonicalization runs, no second fetch.
+    const replay = await before({}, ctxB);
+    expect(replay.message.content).toContain("killed or timed out");
+    expect(calls.filter((args) => args[0] === "fetch")).toHaveLength(1);
+  });
+
+  it("fails deletion checks fast from a sibling subdirectory while paused", async () => {
+    const { pi, calls } = cleanupPi(
+      branchRecord("main", mainCommit, "refs/remotes/origin/main", ""),
+      (args) => (args[0] === "fetch" ? { killed: true } : undefined),
+    );
+    const handlers = captureHandlers(pi);
+    const before = handlers.get("before_agent_start")!;
+    const ctxA = { cwd: `${root}/a`, hasUI: false, isProjectTrusted: () => true };
+    const ctxB = { cwd: `${root}/b`, hasUI: false, isProjectTrusted: () => true };
+    expect((await before({}, ctxA)).message.content).toContain("killed or timed out");
+    const blocked = await handlers.get("tool_call")!(
+      { toolName: "bash", input: { command: "git branch -d feature" } },
+      ctxB,
+    );
+    expect(blocked.block).toBe(true);
+    expect(blocked.reason).toContain("retries are paused");
+    expect(calls.filter((args) => args[0] === "fetch")).toHaveLength(1);
+  });
+
+  it("still backs off when the repository root cannot be canonicalized", async () => {
+    const { pi, calls } = cleanupPi("", (args) =>
+      args.join(" ") === "rev-parse --show-toplevel"
+        ? { stdout: "/definitely-not-a-repo-root-xyz\n" }
+        : undefined,
+    );
+    const handlers = captureHandlers(pi);
+    const before = handlers.get("before_agent_start")!;
+    const ctx = { cwd: root, hasUI: false, isProjectTrusted: () => true };
+    expect((await before({}, ctx)).message.content).toContain("canonicalize");
+    // The root was never learned, so the pause is keyed by cwd — but a retry
+    // from the same cwd still fails fast without new Git calls.
+    const count = calls.length;
+    expect((await before({}, ctx)).message.content).toContain("canonicalize");
+    expect(calls).toHaveLength(count);
+  });
   it("does not pause retries after a negative deletion verdict", async () => {
     const { pi, calls } = cleanupPi(branchRecord("feature"), (args) =>
       args[0] === "merge-base" ? { code: 1 } : undefined,

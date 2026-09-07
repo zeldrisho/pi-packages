@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Run `git fetch --prune origin` outside the per-repository queue lock so a hung or unreachable fetch cannot block subsequent cleanups past the 2-second logical deadline; only ref inspection and deletion stay serialized, and stale late-arriving fetch results can never authorize deletion
 - Share the 60-second retry pause between automatic cleanup and explicit branch-deletion checks so `git branch -d` fails fast (still blocked) while the remote is known unreachable instead of spending another fetch; failed gate inspections pause automatic cleanup too, while negative verdicts never trigger backoff
+- Key the retry pause by canonical repository root (with a cached cwd to root mapping) so sibling subdirectories of one monorepo share a single cooldown; unresolvable roots fall back to a working-directory key instead of skipping backoff
 
 ### Changed
 

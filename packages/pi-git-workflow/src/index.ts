@@ -5,7 +5,7 @@ import {
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import {
-  cleanupRepository,
+  cleanupRepositoryAtRoot,
   formatCleanupContext,
   formatSyncContext,
   parseLocalBranches,
@@ -16,6 +16,7 @@ import {
   exactRefCommit,
   git,
   GitInspectionError,
+  type GitRunner,
   requireBoundedOutput,
   requireGitOk,
   resolveRepoRoot,
@@ -85,6 +86,82 @@ function isBackoffable(error: Error): boolean {
   );
 }
 
+/** Shared retry-pause and root-cache state, one instance per extension registration. */
+interface BackoffState {
+  failures: BackoffMap;
+  rootCache: Map<string, string>;
+}
+
+/** Backoff key for a resolved canonical repository root. */
+function rootKey(root: string): string {
+  return `root:${root}`;
+}
+
+/** Fallback backoff key for a cwd whose root could not be resolved. */
+function cwdKey(cwd: string): string {
+  return `cwd:${cwd}`;
+}
+
+/**
+ * Resolve the canonical root for `cwd`, honoring the shared retry pause.
+ *
+ * Reuses a cached cwd → root mapping so repeat visits cost no Git calls.
+ * Throws the stored pause error when the root (or, for never-resolved cwds,
+ * the cwd) is inside its backoff window. A backoffable canonicalization
+ * failure records cwd-keyed backoff before rethrowing, so it cannot bypass
+ * the pause entirely; non-backoffable states (outside a worktree) propagate
+ * without recording.
+ *
+ * @param runner - Deadline-bound Git runner
+ * @param state - Shared backoff and root-cache state
+ * @param cwd - Working directory to resolve
+ * @returns Promise resolving to the canonical repository root
+ * @throws The stored pause error, or the canonicalization failure
+ */
+async function resolveCheckedRoot(
+  runner: GitRunner,
+  state: BackoffState,
+  cwd: string,
+): Promise<string> {
+  const cached = state.rootCache.get(cwd);
+  if (cached) {
+    const paused = getBackoff(state.failures, rootKey(cached));
+    if (paused) throw paused;
+    return cached;
+  }
+  const pausedCwd = getBackoff(state.failures, cwdKey(cwd));
+  if (pausedCwd) throw pausedCwd;
+  let root: string;
+  try {
+    root = await resolveRepoRoot(runner, cwd);
+  } catch (caught) {
+    const error = caught instanceof Error ? caught : new Error("unknown Git inspection failure");
+    if (isBackoffable(error) && !state.failures.has(cwdKey(cwd))) {
+      noteBackoff(state.failures, cwdKey(cwd), error);
+    }
+    throw error;
+  }
+  state.rootCache.set(cwd, root);
+  const pausedRoot = getBackoff(state.failures, rootKey(root));
+  if (pausedRoot) throw pausedRoot;
+  return root;
+}
+
+/**
+ * Derive the backoff key for recording a failure from `cwd`.
+ *
+ * Prefers the cached canonical root so sibling subdirectories share one
+ * cooldown; falls back to the cwd key when the root was never resolved.
+ *
+ * @param state - Shared backoff and root-cache state
+ * @param cwd - Working directory that failed
+ * @returns Backoff key to record under
+ */
+function recordKey(state: BackoffState, cwd: string): string {
+  const cached = state.rootCache.get(cwd);
+  return cached ? rootKey(cached) : cwdKey(cwd);
+}
+
 /**
  * Pi extension for Git workflow management and branch deletion safety.
  *
@@ -94,17 +171,19 @@ function isBackoffable(error: Error): boolean {
  * @param pi - Extension API instance
  */
 export default function piGitWorkflow(pi: ExtensionAPI): void {
-  const failures = new Map<string, { retryAt: number; error: Error }>();
+  const state: BackoffState = { failures: new Map(), rootCache: new Map() };
 
   pi.on("before_agent_start", async (_event, ctx: ExtensionContext) => {
     if (!ctx.isProjectTrusted()) return;
     try {
-      const paused = getBackoff(failures, ctx.cwd);
-      if (paused) throw paused;
-      failures.delete(ctx.cwd);
       const result = await withGitDeadline(
         pi,
-        (runner) => cleanupRepository(runner, { cwd: ctx.cwd, trusted: true }),
+        async (runner) => {
+          const root = await resolveCheckedRoot(runner, state, ctx.cwd);
+          state.failures.delete(rootKey(root));
+          state.failures.delete(cwdKey(ctx.cwd));
+          return cleanupRepositoryAtRoot(runner, root);
+        },
         ctx.signal,
       );
       const syncContext = formatSyncContext(result.sync);
@@ -123,8 +202,8 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
         (error.code === "not_git_worktree" || error.code === "untrusted_project")
       )
         return;
-      if (!failures.has(ctx.cwd)) {
-        noteBackoff(failures, ctx.cwd, error);
+      if (!state.failures.has(recordKey(state, ctx.cwd))) {
+        noteBackoff(state.failures, recordKey(state, ctx.cwd), error);
       }
       const message = `${formatInspectionFailure(error)}. Automatic cleanup retries are paused for up to 60 seconds.`;
       return {
@@ -161,22 +240,16 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
       return blocked(branch, "project is not trusted, so deletion safety cannot be inspected");
 
     // Share the automatic-cleanup backoff: while a pause is active for this
-    // directory the remote is already known to be unreachable, so fail fast
+    // repository the remote is already known to be unreachable, so fail fast
     // (still blocked) instead of spending another 2-second fetch. The pause
     // never authorizes deletion — only successful fresh inspection allows it.
-    const paused = getBackoff(failures, ctx.cwd);
-    if (paused) {
-      return blocked(
-        branch,
-        `a recent Git inspection failed (${formatInspectionFailure(paused)}) and retries are paused; retry after the backoff window`,
-      );
-    }
-
     try {
       return await withGitDeadline(
         pi,
         async (runner) => {
-          const root = await resolveRepoRoot(runner, ctx.cwd);
+          const root = await resolveCheckedRoot(runner, state, ctx.cwd);
+          state.failures.delete(rootKey(root));
+          state.failures.delete(cwdKey(ctx.cwd));
           await requireGitOk(
             runner,
             root,
@@ -214,11 +287,20 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
       const error = caught instanceof Error ? caught : new Error("unknown Git inspection failure");
       // A failed gate inspection (e.g. unreachable remote) pauses retries for
       // automatic cleanup too. Successful-but-negative verdicts return above
-      // and never reach this path, so they never trigger backoff.
-      if (isBackoffable(error) && !failures.has(ctx.cwd)) {
-        noteBackoff(failures, ctx.cwd, error);
+      // and never reach this path, so they never trigger backoff. A replayed
+      // pause keeps its distinct wording so the agent sees "paused" rather
+      // than a fresh failure.
+      const key = recordKey(state, ctx.cwd);
+      const replayedPause = state.failures.get(key)?.error === error;
+      if (isBackoffable(error) && !state.failures.has(key)) {
+        noteBackoff(state.failures, key, error);
       }
-      return blocked(branch, `safety inspection failed: ${formatInspectionFailure(error)}`);
+      return replayedPause
+        ? blocked(
+            branch,
+            `a recent Git inspection failed (${formatInspectionFailure(error)}) and retries are paused; retry after the backoff window`,
+          )
+        : blocked(branch, `safety inspection failed: ${formatInspectionFailure(error)}`);
     }
   });
 }
