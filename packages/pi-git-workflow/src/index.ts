@@ -42,6 +42,49 @@ export function extractBranchName(command: string): string | undefined {
   return command.match(BRANCH_NAME_FROM_DELETE_RE)?.[1]?.trim();
 }
 
+/** Shared retry-pause state: key -> { retryAt, error }. Keyed by cwd for now. */
+type BackoffMap = Map<string, { retryAt: number; error: Error }>;
+
+/**
+ * Return the stored error if `key` is inside its retry-pause window.
+ *
+ * @param failures - Shared backoff state
+ * @param key - Backoff key to inspect
+ * @returns The stored error while paused, undefined otherwise
+ */
+function getBackoff(failures: BackoffMap, key: string): Error | undefined {
+  const previous = failures.get(key);
+  if (previous && Date.now() < previous.retryAt) return previous.error;
+  return undefined;
+}
+
+/**
+ * Record a retry pause for `key`.
+ *
+ * @param failures - Shared backoff state
+ * @param key - Backoff key to pause
+ * @param error - Failure that triggered the pause
+ */
+function noteBackoff(failures: BackoffMap, key: string, error: Error): void {
+  failures.set(key, { retryAt: Date.now() + AUTOMATIC_CLEANUP_RETRY_MS, error });
+}
+
+/**
+ * Decide whether an inspection failure should pause retries.
+ *
+ * Non-repository directories and untrusted projects are stable states, not
+ * transient remote failures, so they never trigger backoff.
+ *
+ * @param error - Inspection failure to classify
+ * @returns True when the failure should pause retries
+ */
+function isBackoffable(error: Error): boolean {
+  return (
+    !(error instanceof GitInspectionError) ||
+    (error.code !== "not_git_worktree" && error.code !== "untrusted_project")
+  );
+}
+
 /**
  * Pi extension for Git workflow management and branch deletion safety.
  *
@@ -56,8 +99,8 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
   pi.on("before_agent_start", async (_event, ctx: ExtensionContext) => {
     if (!ctx.isProjectTrusted()) return;
     try {
-      const previous = failures.get(ctx.cwd);
-      if (previous && Date.now() < previous.retryAt) throw previous.error;
+      const paused = getBackoff(failures, ctx.cwd);
+      if (paused) throw paused;
       failures.delete(ctx.cwd);
       const result = await withGitDeadline(
         pi,
@@ -81,7 +124,7 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
       )
         return;
       if (!failures.has(ctx.cwd)) {
-        failures.set(ctx.cwd, { retryAt: Date.now() + AUTOMATIC_CLEANUP_RETRY_MS, error });
+        noteBackoff(failures, ctx.cwd, error);
       }
       const message = `${formatInspectionFailure(error)}. Automatic cleanup retries are paused for up to 60 seconds.`;
       return {
@@ -116,6 +159,18 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
     if (!branch) return;
     if (!ctx.isProjectTrusted())
       return blocked(branch, "project is not trusted, so deletion safety cannot be inspected");
+
+    // Share the automatic-cleanup backoff: while a pause is active for this
+    // directory the remote is already known to be unreachable, so fail fast
+    // (still blocked) instead of spending another 2-second fetch. The pause
+    // never authorizes deletion — only successful fresh inspection allows it.
+    const paused = getBackoff(failures, ctx.cwd);
+    if (paused) {
+      return blocked(
+        branch,
+        `a recent Git inspection failed (${formatInspectionFailure(paused)}) and retries are paused; retry after the backoff window`,
+      );
+    }
 
     try {
       return await withGitDeadline(
@@ -157,6 +212,12 @@ export default function piGitWorkflow(pi: ExtensionAPI): void {
       );
     } catch (caught) {
       const error = caught instanceof Error ? caught : new Error("unknown Git inspection failure");
+      // A failed gate inspection (e.g. unreachable remote) pauses retries for
+      // automatic cleanup too. Successful-but-negative verdicts return above
+      // and never reach this path, so they never trigger backoff.
+      if (isBackoffable(error) && !failures.has(ctx.cwd)) {
+        noteBackoff(failures, ctx.cwd, error);
+      }
       return blocked(branch, `safety inspection failed: ${formatInspectionFailure(error)}`);
     }
   });

@@ -685,7 +685,7 @@ describe("extension registration and gate", () => {
     }
   });
 
-  it("backs off failed fetches, retries after cooldown, and keeps deletion checks fresh", async () => {
+  it("backs off failed fetches, shares the pause with deletion checks, and retries after cooldown", async () => {
     vi.useFakeTimers();
     try {
       let offline = true;
@@ -700,20 +700,63 @@ describe("extension registration and gate", () => {
       const count = calls.length;
       await before({}, ctx);
       expect(calls).toHaveLength(count);
+      // The deletion gate shares the pause: it fails fast (still blocked)
+      // without spending another fetch while the remote is known unreachable.
       const blocked = await handlers.get("tool_call")!(
         { toolName: "bash", input: { command: "git branch -d feature" } },
         ctx,
       );
       expect(blocked.block).toBe(true);
-      expect(calls.filter((args) => args[0] === "fetch")).toHaveLength(2);
+      expect(blocked.reason).toContain("retries are paused");
+      expect(calls).toHaveLength(count);
+      expect(calls.filter((args) => args[0] === "fetch")).toHaveLength(1);
       offline = false;
       await vi.advanceTimersByTimeAsync(AUTOMATIC_CLEANUP_RETRY_MS);
       expect(await before({}, ctx)).toBeUndefined();
-      expect(calls.filter((args) => args[0] === "fetch")).toHaveLength(3);
+      expect(calls.filter((args) => args[0] === "fetch")).toHaveLength(2);
       expect(vi.getTimerCount()).toBe(0);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("pauses automatic cleanup after a failed deletion-gate fetch", async () => {
+    const { pi, calls } = cleanupPi(branchRecord("feature"), (args) =>
+      args[0] === "fetch" ? { code: 1, stderr: "offline" } : undefined,
+    );
+    const handlers = captureHandlers(pi);
+    const ctx = { cwd: root, hasUI: false, isProjectTrusted: () => true };
+    const blocked = await handlers.get("tool_call")!(
+      { toolName: "bash", input: { command: "git branch -d feature" } },
+      ctx,
+    );
+    expect(blocked.block).toBe(true);
+    expect(blocked.reason).toContain("offline");
+    const count = calls.length;
+    // The gate failure replays as a fast pause instead of another fetch.
+    const paused = await handlers.get("before_agent_start")!({}, ctx);
+    expect(paused.message.content).toContain("offline");
+    expect(calls).toHaveLength(count);
+  });
+
+  it("does not pause retries after a negative deletion verdict", async () => {
+    const { pi, calls } = cleanupPi(branchRecord("feature"), (args) =>
+      args[0] === "merge-base" ? { code: 1 } : undefined,
+    );
+    const handlers = captureHandlers(pi);
+    const ctx = { cwd: root, hasUI: false, isProjectTrusted: () => true };
+    const verdict = await handlers.get("tool_call")!(
+      { toolName: "bash", input: { command: "git branch -d feature" } },
+      ctx,
+    );
+    expect(verdict.block).toBe(true);
+    expect(verdict.reason).toContain("not proven merged");
+    // A successful inspection with a negative verdict is not a remote
+    // failure: automatic cleanup still runs its own fetch afterwards.
+    const fetches = calls.filter((args) => args[0] === "fetch").length;
+    const cleanup = await handlers.get("before_agent_start")!({}, ctx);
+    expect(cleanup.message.content).toContain("feature");
+    expect(calls.filter((args) => args[0] === "fetch")).toHaveLength(fetches + 1);
   });
 
   it("reports bounded inspection failures but skips non-repositories", async () => {
