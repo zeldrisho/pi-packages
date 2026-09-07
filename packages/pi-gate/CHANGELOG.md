@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-07
+
 ### Added
 
 - ship a JSON Schema for `pi-gate.json` and reference it from newly seeded configurations for editor completion and validation
@@ -42,7 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - support `prompt`, `block`, and `allow` actions, with longest-pattern-wins resolution
 - block rather than auto-approve in non-UI modes
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.2.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.3.0...HEAD
+[0.3.0]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.2.0...pi-gate-v0.3.0
 [0.2.0]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.1.1...pi-gate-v0.2.0
 [0.1.1]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.1.0...pi-gate-v0.1.1
 [0.1.0]: https://github.com/zeldrisho/pi-packages/releases/tag/pi-gate-v0.1.0

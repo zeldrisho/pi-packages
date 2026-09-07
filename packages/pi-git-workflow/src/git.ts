@@ -4,6 +4,12 @@ import type { ExtensionAPI, ExecResult } from "@earendil-works/pi-coding-agent";
 /** Default timeout in milliseconds for Git operations. */
 export const GIT_TIMEOUT_MS = 30_000;
 
+/** Total time allowed for each extension-triggered Git inspection. */
+export const GIT_INSPECTION_TIMEOUT_MS = 2_000;
+
+/** Delay before retrying failed automatic cleanup in the same working directory. */
+export const AUTOMATIC_CLEANUP_RETRY_MS = 60_000;
+
 /** Maximum size in bytes for Git command output to prevent memory exhaustion. */
 export const MAX_GIT_OUTPUT_BYTES = 1_000_000;
 
@@ -24,6 +30,56 @@ export class GitInspectionError extends Error {
   ) {
     super(message);
     this.name = "GitInspectionError";
+  }
+}
+
+/**
+ * Bound the entire inspection, including queue waits. Abort the active
+ * command and prevent later commands even if an executor settles after timeout.
+ *
+ * @param pi - Git command runner interface
+ * @param operation - Async operation to execute with deadline-bound runner
+ * @param signal - Optional abort signal to propagate cancellation
+ * @returns Promise resolving to the operation result
+ * @throws {GitInspectionError} When inspection exceeds timeout or is cancelled
+ */
+export async function withGitDeadline<T>(
+  pi: GitRunner,
+  operation: (runner: GitRunner) => Promise<T>,
+  signal?: AbortSignal,
+): Promise<T> {
+  const controller = new AbortController();
+  const failure = new GitInspectionError(
+    "inspection_timeout",
+    "Git inspection exceeded its 2-second budget; safety could not be verified",
+  );
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  const stopped = new Promise<never>((_resolve, reject) => {
+    onAbort = () => {
+      controller.abort();
+      reject(new GitInspectionError("inspection_aborted", "Git inspection was cancelled"));
+    };
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(failure);
+    }, GIT_INSPECTION_TIMEOUT_MS);
+    signal?.addEventListener("abort", onAbort, { once: true });
+    if (signal?.aborted) onAbort();
+  });
+  const runner: GitRunner = {
+    async exec(command, args, options) {
+      controller.signal.throwIfAborted();
+      const result = await pi.exec(command, args, { ...options, signal: controller.signal });
+      controller.signal.throwIfAborted();
+      return result;
+    },
+  };
+  try {
+    return await Promise.race([stopped, operation(runner)]);
+  } finally {
+    clearTimeout(timer);
+    if (onAbort) signal?.removeEventListener("abort", onAbort);
   }
 }
 

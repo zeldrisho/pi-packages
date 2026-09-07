@@ -25,9 +25,9 @@ Browse the [Pi package directory](https://pi.dev/packages) for examples of publi
 - Keep Pi-provided imports in `peerDependencies` with `"*"` ranges. Put other runtime libraries in `dependencies`.
 - Keep each package's npm contents restricted by its `files` allowlist.
 
-## Security invariants
+## Security and trust boundaries
 
-Read [`security-invariants.md`](security-invariants.md) before changing extension runtime behavior, tool schemas, network access, filesystem access, credentials, caching, or output rendering. Follow [`git.md`](git.md) when an extension inspects or mutates a Git repository.
+When changing extension runtime behavior, tool schemas, network access, filesystem access, credentials, caching, or output rendering: validate inputs at the boundary and never construct shell commands from untrusted strings; propagate cancellation and failures without reporting partial work as success; keep temporary files private, bounded, and removed on every exit path; and add boundary and failure-path tests whenever a trust boundary changes. Follow [`git.md`](git.md) when an extension inspects or mutates a Git repository.
 
 ## Verification
 
