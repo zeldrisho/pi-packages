@@ -70,7 +70,7 @@ interface FakeContext {
 }
 
 // SAFETY: pi.on accepts variably-typed handlers across many event overloads; the
-// monorepo test convention (pi-nested-agent-md) captures them as `any` and replays
+// monorepo test convention captures them as `any` and replays
 // with hand-built inputs. We narrow to typed handlers only at the call site.
 type CapturedHandler = (event: any, context: any) => any;
 

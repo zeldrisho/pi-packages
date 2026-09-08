@@ -41,9 +41,8 @@ The shared task runs formatting, linting, type checking, coverage tests, reposit
 
 The tests use deterministic local fixtures and mocked Brave responses. Manually verify behavior affected by a change:
 
-- `pi-web-search`: missing-key errors, web/context modes, filters, byte-bounded caching, request coalescing, cancellation, truncation, and temporary-file cleanup;
-- `pi-web-fetch`: supported formats, redirects, blocked local/private targets, oversized responses, caching, request coalescing, and offset continuation; and
-- `pi-nested-agent-md`: ancestor ordering, direct reads, deduplication, paths outside the working directory, output bounds, and reinjection after compaction.
+- `pi-web-search`: missing-key errors, web/context modes, filters, byte-bounded caching, request coalescing, cancellation, truncation, and temporary-file cleanup; and
+- `pi-web-fetch`: supported formats, redirects, blocked local/private targets, oversized responses, caching, request coalescing, and offset continuation.
 
 For extraction changes, run the opt-in live quality corpus separately from deterministic validation:
 
