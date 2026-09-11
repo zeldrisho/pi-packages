@@ -28,7 +28,7 @@ pi remove -l npm:@zeldrisho/pi-gate
 
 ## Development
 
-See the [development guide](docs/development.md) for setup, package conventions, and verification commands. The [architecture guide](docs/architecture.md) describes package boundaries and the web and release data flows.
+See the [development guide](docs/development.md) for contributor setup and verification.
 
 ## License
 

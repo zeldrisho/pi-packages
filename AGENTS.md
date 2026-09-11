@@ -33,8 +33,6 @@
 | Package catalog                                 | `README.md`                           |
 | Setup, conventions, security, dependency policy | `docs/development.md`                 |
 | Architecture and network trust boundaries       | `docs/architecture.md`                |
-| Git automation policy                           | `docs/git.md`                         |
-| Toolchain guidance                              | `docs/vite-plus.md`                   |
 | Release process                                 | `docs/release.md`                     |
 | Gate behavior and configuration                 | `packages/pi-gate/README.md`          |
 | Gate configuration schema                       | `packages/pi-gate/config.schema.json` |
