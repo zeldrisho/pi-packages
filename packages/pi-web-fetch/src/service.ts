@@ -1,5 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { Type } from "typebox";
+import { Check } from "typebox/value";
 import {
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
@@ -181,11 +183,17 @@ interface LlmsTxtProbe {
 const MAX_LLMS_TXT_PROBE_ENTRIES = 512;
 /** Deepest ancestor-directory `/llms.txt` probed, e.g. `/r2/x/y` probes `/r2/llms.txt`. */
 const MAX_LLMS_TXT_DIRECTORY_DEPTH = 1;
-const llmsTxtProbes = new Map<string, LlmsTxtProbe>();
+const llmsTxtProbes = new ExpiringLruCache<string, LlmsTxtProbe>(
+  MAX_LLMS_TXT_PROBE_ENTRIES,
+  8 * 1024 * 1024,
+  (probe) => encoder.encode(JSON.stringify(probe)).byteLength,
+);
+const llmsTxtProbeRequests = new InflightCoalescer<string, LlmsTxtProbe>(
+  MAX_LLMS_TXT_PROBE_ENTRIES,
+);
 
 function rememberLlmsTxtProbe(origin: string, probe: LlmsTxtProbe): void {
-  if (llmsTxtProbes.size >= MAX_LLMS_TXT_PROBE_ENTRIES) llmsTxtProbes.clear();
-  llmsTxtProbes.set(origin, probe);
+  llmsTxtProbes.set(origin, probe, probe.expires);
 }
 
 function isUsableLlmsTxtIndex(document: CompleteDocument): boolean {
@@ -239,20 +247,33 @@ async function probeUsableRawText(
   dependencies: FetchRemoteDependencies,
 ): Promise<CompleteDocument | undefined> {
   const cached = llmsTxtProbes.get(candidate.href);
-  if (cached && cached.expires > Date.now()) return cached.document;
-  try {
-    const document = await fetchCompleteDocument(candidate.toString(), signal, dependencies);
-    const available = isUsableLlmsTxtIndex(document) ? document : undefined;
-    rememberLlmsTxtProbe(candidate.href, {
-      document: available,
-      expires: Date.now() + CACHE_TTL_MS,
-    });
-    return available;
-  } catch (error) {
-    if (signal?.aborted) throw error;
-    rememberLlmsTxtProbe(candidate.href, { expires: Date.now() + CACHE_TTL_MS });
-    return undefined;
-  }
+  if (cached) return cached.document;
+  const probe = await llmsTxtProbeRequests.run(
+    candidate.href,
+    async (sharedSignal) => {
+      const existing = llmsTxtProbes.get(candidate.href);
+      if (existing) return existing;
+      try {
+        const document = await fetchCompleteDocument(
+          candidate.toString(),
+          sharedSignal,
+          dependencies,
+        );
+        const available = isUsableLlmsTxtIndex(document) ? document : undefined;
+        const result = { document: available, expires: Date.now() + CACHE_TTL_MS };
+        rememberLlmsTxtProbe(candidate.href, result);
+        return result;
+      } catch (error) {
+        if (sharedSignal?.aborted) throw error;
+        const result = { expires: Date.now() + CACHE_TTL_MS };
+        rememberLlmsTxtProbe(candidate.href, result);
+        return result;
+      }
+    },
+    signal,
+    "web_fetch was cancelled.",
+  );
+  return probe.document;
 }
 
 /**
@@ -393,11 +414,27 @@ interface WebFetchUpdate {
   details: Record<string, never>;
 }
 
+const completeDocumentCacheSchema = Type.Object(
+  {
+    url: Type.String(),
+    contentType: Type.String(),
+    markdown: Type.String(),
+    extractor: Type.Union([Type.Literal("raw"), Type.Literal("basic"), Type.Literal("defuddle")]),
+    shellSuspected: Type.Boolean(),
+  },
+  { additionalProperties: true },
+);
+
+function isCompleteDocument(value: CompleteDocument): boolean {
+  return Check(completeDocumentCacheSchema, value);
+}
+
 const fetchCachePersistence: CachePersistence<string, CompleteDocument> = {
   directory: resolveCacheDirectory("pi-web-fetch"),
   serialize: (document) => encoder.encode(JSON.stringify(document)),
-  // SAFETY: cached documents are serialized with JSON.stringify(CompleteDocument); decoding restores the same shape.
+  // SAFETY: JSON is validated immediately below before entering the cache.
   deserialize: (bytes) => JSON.parse(new TextDecoder().decode(bytes)) as CompleteDocument,
+  validate: isCompleteDocument,
   keyToPath: (key) => stableKeyHash(key),
 };
 const fetchCache = new ExpiringLruCache<string, CompleteDocument>(

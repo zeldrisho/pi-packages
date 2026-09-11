@@ -1,4 +1,6 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { Type } from "typebox";
+import { Check } from "typebox/value";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -160,6 +162,25 @@ interface SearchUpdate {
 interface CachedSearch {
   results: SearchResult[];
   meta: BraveQueryMeta;
+  /** Number of provider results before local URL filtering and count bounding. */
+  availableCount: number;
+}
+
+const cachedSearchSchema = Type.Object({
+  results: Type.Array(
+    Type.Object({
+      title: Type.String(),
+      url: Type.String(),
+      snippet: Type.String(),
+      quality: Type.Union([Type.Literal("high"), Type.Literal("medium"), Type.Literal("low")]),
+    }),
+  ),
+  meta: Type.Record(Type.String(), Type.Unknown()),
+  availableCount: Type.Integer({ minimum: 0 }),
+});
+
+function isCachedSearch(value: CachedSearch): boolean {
+  return Check(cachedSearchSchema, value) && value.availableCount >= value.results.length;
 }
 
 const searchCachePersistence: CachePersistence<string, CachedSearch> = {
@@ -170,9 +191,10 @@ const searchCachePersistence: CachePersistence<string, CachedSearch> = {
     // `{ results, meta }` object; older disk entries stored a bare
     // SearchResult[] array and are upgraded here to empty metadata.
     const parsed = JSON.parse(new TextDecoder().decode(bytes)) as CachedSearch | SearchResult[];
-    if (Array.isArray(parsed)) return { results: parsed, meta: {} };
+    if (Array.isArray(parsed)) return { results: parsed, meta: {}, availableCount: parsed.length };
     return parsed;
   },
+  validate: isCachedSearch,
   keyToPath: (key) => stableKeyHash(key),
 };
 const searchCache = new ExpiringLruCache<string, CachedSearch>(
@@ -327,8 +349,9 @@ export class SearchRuntime {
                   credentials.key,
                   webExtras,
                 );
+          const availableCount = found.results.length;
           const bounded = found.results.filter((result) => result.url).slice(0, count);
-          const entry: CachedSearch = { results: bounded, meta: found.meta };
+          const entry: CachedSearch = { results: bounded, meta: found.meta, availableCount };
           searchCache.set(cacheKey, entry, Date.now() + CACHE_TTL_MS);
           return entry;
         },
@@ -346,7 +369,7 @@ export class SearchRuntime {
     const evidence: SearchEvidence = {
       requestedCount: count,
       returnedCount: results.length,
-      dropped: Math.max(0, results.length - count),
+      dropped: Math.max(0, payload.availableCount - results.length),
       freshness: params.freshness,
       truncated: truncation.truncated,
       ...summarizeDomainDiversity(results),
