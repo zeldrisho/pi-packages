@@ -421,6 +421,47 @@ const completeDocumentCacheSchema = Type.Object(
     markdown: Type.String(),
     extractor: Type.Union([Type.Literal("raw"), Type.Literal("basic"), Type.Literal("defuddle")]),
     shellSuspected: Type.Boolean(),
+    title: Type.Optional(Type.String()),
+    extractionDiagnostics: Type.Optional(
+      Type.Object({
+        javascriptRequired: Type.Boolean(),
+        botWall: Type.Boolean(),
+        consentInterstitial: Type.Boolean(),
+        sparseExtraction: Type.Boolean(),
+        rawCharacters: Type.Number(),
+        extractedCharacters: Type.Number(),
+      }),
+    ),
+    links: Type.Optional(
+      Type.Object({
+        internal: Type.Array(
+          Type.Object({
+            url: Type.String(),
+            anchorText: Type.String(),
+          }),
+        ),
+        external: Type.Array(
+          Type.Object({
+            url: Type.String(),
+            anchorText: Type.String(),
+          }),
+        ),
+        omittedInternal: Type.Number(),
+        omittedExternal: Type.Number(),
+      }),
+    ),
+    cachedAt: Type.Optional(Type.Number()),
+    validators: Type.Optional(
+      Type.Object({
+        etag: Type.Optional(Type.String()),
+        lastModified: Type.Optional(Type.String()),
+      }),
+    ),
+    llmsTxtFallback: Type.Optional(Type.Boolean()),
+    llmsTxtIndexUrl: Type.Optional(Type.String()),
+    llmsTxtDescribedBy: Type.Optional(Type.String()),
+    markdownAlternateUrl: Type.Optional(Type.String()),
+    markdownAlternateFallback: Type.Optional(Type.Boolean()),
   },
   { additionalProperties: true },
 );

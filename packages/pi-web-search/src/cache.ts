@@ -163,15 +163,21 @@ export class ExpiringLruCache<K, V> {
   #loadFromDisk(key: K): ExpiringCacheEntry<V> | undefined {
     let bytes: Uint8Array;
     const path = resolveCachePath(this.persistence!.directory, this.persistence!.keyToPath(key));
+    let fileSize: number;
     try {
       // Serialized metadata can exceed the value budget, but never allow an
       // unbounded cache file to be read into memory.
-      const fileSize = statSync(path).size;
-      if (fileSize < 8 || fileSize > this.maxBytes * 2 + 65_536)
-        throw new Error("oversized cache file");
+      fileSize = statSync(path).size;
+    } catch {
+      return undefined;
+    }
+    if (fileSize < 8 || fileSize > this.maxBytes * 2 + 65_536) {
+      this.#removeFromDisk(key);
+      return undefined;
+    }
+    try {
       bytes = readFileSync(path);
     } catch {
-      this.#removeFromDisk(key);
       return undefined;
     }
     let entry: ExpiringCacheEntry<V>;
