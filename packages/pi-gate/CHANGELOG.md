@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- report interactive approval prompts to Herdr when running inside a Herdr-managed TUI pane, while remaining a no-op for other users
+
 ## [0.3.0] - 2026-09-07
 
 ### Added

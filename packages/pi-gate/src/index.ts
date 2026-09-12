@@ -32,6 +32,31 @@ import { configPath, ensureConfig, loadConfig } from "./config";
 import { resolveRule } from "./rules";
 import { formatPromptCommand, formatRule } from "./display";
 
+const HERDR_BLOCKED_LABEL = "pi-gate: approval required";
+
+function reportHerdrBlocked(pi: ExtensionAPI, ctx: { mode?: string }, active: boolean): void {
+  if (
+    ctx.mode !== "tui" ||
+    process.env.HERDR_ENV !== "1" ||
+    !process.env.HERDR_SOCKET_PATH ||
+    !process.env.HERDR_PANE_ID
+  ) {
+    return;
+  }
+
+  // The Herdr integration consumes this event and reports it through its
+  // existing socket connection. Keep this optional integration best-effort so
+  // a missing or incompatible Herdr extension cannot affect command gating.
+  try {
+    pi.events.emit("herdr:blocked", {
+      active,
+      label: HERDR_BLOCKED_LABEL,
+    });
+  } catch {
+    // Herdr is an optional host integration.
+  }
+}
+
 export type { Action, GateConfig } from "./config";
 export {
   CONFIG_SCHEMA_URL,
@@ -104,11 +129,17 @@ export default function piGate(pi: ExtensionAPI): void {
         terminate: true,
       };
     }
-    const choice = await ctx.ui.select(
-      `pi-gate: allow this command?\n\n${formatPromptCommand(command, match.pattern)}\n\nMatched rule: ${rule}\nMatched command text is wrapped in »…«`,
-      ["Allow", "Deny"],
-      { timeout: config.promptTimeoutMs },
-    );
+    reportHerdrBlocked(pi, ctx, true);
+    let choice: string | undefined;
+    try {
+      choice = await ctx.ui.select(
+        `pi-gate: allow this command?\n\n${formatPromptCommand(command, match.pattern)}\n\nMatched rule: ${rule}\nMatched command text is wrapped in »…«`,
+        ["Allow", "Deny"],
+        { timeout: config.promptTimeoutMs },
+      );
+    } finally {
+      reportHerdrBlocked(pi, ctx, false);
+    }
     if (choice !== "Allow") {
       return {
         block: true,
