@@ -85,10 +85,16 @@ interface RecordedHandlers {
   toolCall: ToolCallHandler | undefined;
 }
 
+interface HerdrBlockedEvent {
+  active: boolean;
+  label: string;
+}
+
 interface ExtensionInstall {
   uiState: UiState;
   ctx: FakeContext;
   handlers: RecordedHandlers;
+  herdrEvents: HerdrBlockedEvent[];
 }
 
 interface ContextWithUi {
@@ -128,8 +134,14 @@ function createExtensionContext(
 
 function makeExtension(): ExtensionFactory {
   const handlers: RecordedHandlers = { sessionStart: undefined, toolCall: undefined };
+  const herdrEvents: HerdrBlockedEvent[] = [];
   // SAFETY: the test only exercises the `on` method; the rest of ExtensionAPI is unused.
   const pi = {
+    events: {
+      emit(name: string, data: HerdrBlockedEvent) {
+        if (name === "herdr:blocked") herdrEvents.push(data);
+      },
+    },
     on(name: string, handler: CapturedHandler) {
       if (name === "session_start") {
         // SAFETY: the extension registers a SessionStartHandler for `session_start`.
@@ -143,7 +155,7 @@ function makeExtension(): ExtensionFactory {
   const install = (): ExtensionInstall => {
     piGate(pi);
     const { ctx, uiState } = createExtensionContext(true);
-    return { ctx, uiState, handlers };
+    return { ctx, uiState, handlers, herdrEvents };
   };
   return { install };
 }
@@ -164,6 +176,9 @@ function setConfig(content: string | null): void {
 
 let workDir: string;
 const originalEnv = process.env.PI_CODING_AGENT_DIR;
+const originalHerdrEnv = process.env.HERDR_ENV;
+const originalHerdrSocketPath = process.env.HERDR_SOCKET_PATH;
+const originalHerdrPaneId = process.env.HERDR_PANE_ID;
 
 beforeEach(() => {
   workDir = mkdtempSync(join(tmpdir(), "pi-gate-test-"));
@@ -175,6 +190,14 @@ afterEach(() => {
     process.env.PI_CODING_AGENT_DIR = originalEnv;
   } else {
     delete process.env.PI_CODING_AGENT_DIR;
+  }
+  for (const [name, value] of [
+    ["HERDR_ENV", originalHerdrEnv],
+    ["HERDR_SOCKET_PATH", originalHerdrSocketPath],
+    ["HERDR_PANE_ID", originalHerdrPaneId],
+  ] as const) {
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
   }
   try {
     rmSync(workDir, { recursive: true, force: true });
@@ -547,6 +570,36 @@ describe("piGate extension", () => {
           settings: { timeout: DEFAULT_PROMPT_TIMEOUT_MS },
         },
       ]);
+    });
+
+    it("reports the approval popup to Herdr and clears it after the choice", async () => {
+      process.env.HERDR_ENV = "1";
+      process.env.HERDR_SOCKET_PATH = "/tmp/herdr.sock";
+      process.env.HERDR_PANE_ID = "w1:p1";
+      setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
+      const extension = makeExtension().install();
+      extension.uiState.selectResponse = "Allow";
+
+      expect(
+        await extension.handlers.toolCall!(bashEvent("sudo echo hi"), extension.ctx),
+      ).toBeUndefined();
+      expect(extension.herdrEvents).toEqual([
+        { active: true, label: "pi-gate: approval required" },
+        { active: false, label: "pi-gate: approval required" },
+      ]);
+    });
+
+    it("does not report to Herdr outside a TUI Herdr session", async () => {
+      process.env.HERDR_ENV = "1";
+      process.env.HERDR_SOCKET_PATH = "/tmp/herdr.sock";
+      process.env.HERDR_PANE_ID = "w1:p1";
+      setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
+      const extension = makeExtension().install();
+      const { ctx, uiState } = createExtensionContext(true, "rpc");
+      uiState.selectResponse = "Allow";
+
+      expect(await extension.handlers.toolCall!(bashEvent("sudo echo hi"), ctx)).toBeUndefined();
+      expect(extension.herdrEvents).toEqual([]);
     });
 
     it("uses host-native selection in RPC mode", async () => {

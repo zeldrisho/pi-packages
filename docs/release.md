@@ -4,15 +4,21 @@ Packages are versioned independently. The agent updates the manifest and changel
 
 ## Normal release
 
-1. Confirm the package and version.
-2. Bump `packages/<name>/package.json`.
-3. Add `## [version] - YYYY-MM-DD` to that package's `CHANGELOG.md`; run `vp run format:changelog`.
-4. Run `vp run validate`, then merge the pull request.
-5. From `main`, create and push `<package-directory>-v<version>`, for example `pi-web-search-v0.5.0`:
-   ```bash
-   git tag <name>-v<version> && git push origin <name>-v<version>
-   ```
-6. Confirm CI, the GitHub release, npm version, provenance, and tarball contents.
+A release starts by confirming the package and version, then updating
+`packages/<name>/package.json` and that package's `CHANGELOG.md`. The changelog
+entry uses the heading `## [version] - YYYY-MM-DD`; run `vp run format:changelog`
+after editing it.
+
+Run `vp run validate` and merge the pull request only after validation passes.
+From `main`, create and push a component tag whose name matches the package
+and manifest version, such as `pi-web-search-v0.5.0`:
+
+```bash
+git tag <name>-v<version> && git push origin <name>-v<version>
+```
+
+The tag starts the release workflow. After it completes, verify the CI result,
+GitHub release, npm version, provenance, and tarball contents.
 
 The tag name and manifest version must match. Publishing is automatic: the `publish` environment currently has no manual approval, so verify the package and version before pushing the tag. `scripts/release.ts notes <package> <file>` extracts the released changelog section for the release notes.
 

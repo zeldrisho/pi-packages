@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-12
+
+### Changed
+
+- report interactive approval prompts to Herdr when running inside a Herdr-managed TUI pane, while remaining a no-op for other users
+
 ## [0.3.0] - 2026-09-07
 
 ### Added
@@ -44,7 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - support `prompt`, `block`, and `allow` actions, with longest-pattern-wins resolution
 - block rather than auto-approve in non-UI modes
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.3.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.4.0...HEAD
+[0.4.0]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.3.0...pi-gate-v0.4.0
 [0.3.0]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.2.0...pi-gate-v0.3.0
 [0.2.0]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.1.1...pi-gate-v0.2.0
 [0.1.1]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.1.0...pi-gate-v0.1.1
