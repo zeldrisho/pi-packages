@@ -12,13 +12,6 @@ Monorepo for my personal Pi extensions.
 
 Install only the extensions you need using the commands above. See each package README for configuration, behavior, and usage.
 
-## Retired packages
-
-`@zeldrisho/pi-git-workflow` and `@zeldrisho/pi-nested-agent-md` are no longer maintained and have been removed from this repository. Published npm versions remain available but are deprecated; Git history, tags, and GitHub releases are preserved.
-
-- `pi-git-workflow`: use GitHub branch rulesets for server-side protection (they do not protect local Git operations) and ask the agent to clean up branches and worktrees on demand, confirming before anything destructive. Uninstall with `pi remove npm:@zeldrisho/pi-git-workflow` (or `pi remove -l npm:@zeldrisho/pi-git-workflow` for project-local installs).
-- `pi-nested-agent-md`: keep essential instructions in one root `AGENTS.md` linking to focused documentation. Uninstall with `pi remove npm:@zeldrisho/pi-nested-agent-md` (or `pi remove -l npm:@zeldrisho/pi-nested-agent-md` for project-local installs).
-
 ## Project-local installation
 
 Add `-l` to install a package only for the current project:
@@ -35,7 +28,7 @@ pi remove -l npm:@zeldrisho/pi-gate
 
 ## Development
 
-See the [development guide](docs/development.md) for setup, package conventions, and verification commands. The [architecture guide](docs/architecture.md) describes package boundaries and the web and release data flows.
+See the [development guide](docs/development.md) for contributor setup and verification.
 
 ## License
 

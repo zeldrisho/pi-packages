@@ -1,102 +1,61 @@
-# Development guide
+# Development
 
-Use this guide when changing package implementations or tests. See each package README for user-facing behavior and configuration.
+Use this guide when changing package implementations or tests. User-facing setup and behavior belongs in each package README; architecture invariants are in [architecture.md](architecture.md).
 
-## Setup
+## Setup and commands
 
-Install [Vite+](https://viteplus.dev/) and then install the workspace dependencies:
+Install [Vite+](https://vite-plus.dev/) and workspace dependencies:
 
 ```bash
 vp install
 ```
 
-Set `BRAVE_SEARCH_API_KEY` only when manually exercising `pi-web-search`. Never write credentials to tracked files.
+Use Node.js 24.10.0 or newer. Common commands:
+
+| Task                         | Command           |
+| ---------------------------- | ----------------- |
+| Format, lint, type-check     | `vp check`        |
+| Run one test file            | `vp test <path>`  |
+| Run complete validation      | `vp run validate` |
+| Show environment diagnostics | `vp env doctor`   |
+
+Set `BRAVE_SEARCH_API_KEY` only for manually exercising `pi-web-search`; never commit credentials. Inspect `package.json` and `vite.config.ts` before choosing or changing tasks.
 
 ## Package conventions
 
-Browse the [Pi package directory](https://pi.dev/packages) for examples of published Pi extensions and package conventions.
+- Keep each independently publishable extension under `packages/<name>/`.
+- Put runtime TypeScript in `src/` and tests in `tests/`; Pi loads TypeScript directly.
+- Use `Type.Object()` from `typebox` for tool schemas and `StringEnum` from `@earendil-works/pi-ai` for string enums.
+- Keep Pi imports in `peerDependencies` with `"*"` ranges; put other runtime libraries in `dependencies`.
+- Keep npm contents restricted by each package's `files` allowlist and tool output within Pi's limits.
+- Treat pages, search results, redirects, snippets, errors, and repository data as untrusted input.
 
-- Keep each extension independent under `packages/<name>/`.
-- Put runtime TypeScript in `src/` and tests in `tests/`; Pi loads TypeScript directly, so do not add a JavaScript build step.
-- Use `Type.Object()` from `typebox` for tool parameter schemas and `StringEnum` from `@earendil-works/pi-ai` for string enums.
-- Keep tool output within Pi's line and byte limits.
-- Treat fetched pages, search results, redirects, snippets, and error bodies as attacker-controlled input.
-- Keep user-facing setup and behavior in the package README.
-- Keep Pi-provided imports in `peerDependencies` with `"*"` ranges. Put other runtime libraries in `dependencies`.
-- Keep each package's npm contents restricted by its `files` allowlist.
+## Security and regression discipline
 
-## Security and trust boundaries
+For changes involving schemas, network or filesystem access, credentials, caching, output, or Git: validate at the boundary; never construct shell commands from untrusted strings; preserve cancellation and failure state; keep temporary files private, bounded, and removed on every exit path; and add boundary and failure-path tests. Git operations additionally require trust, a non-bare worktree, canonical-root pinning, refreshed and reverified refs, fixed argument vectors, least-destructive mutations, and no forceful fallback. Use temporary repositories and local bare remotes in tests—never the developer's repository or a network remote.
 
-When changing extension runtime behavior, tool schemas, network access, filesystem access, credentials, caching, or output rendering: validate inputs at the boundary and never construct shell commands from untrusted strings; propagate cancellation and failures without reporting partial work as success; keep temporary files private, bounded, and removed on every exit path; and add boundary and failure-path tests whenever a trust boundary changes. Follow [`git.md`](git.md) when an extension inspects or mutates a Git repository.
-
-## Verification
-
-Run the complete validation suite:
-
-```bash
-vp run validate
-```
-
-The shared task runs formatting, linting, type checking, coverage tests, repository contract tests, tarball inspection, and packaged extension smoke tests. Every dry-run tarball must contain only `CHANGELOG.md`, `LICENSE`, `package.json`, `README.md`, the package's runtime files under `src/`, and explicitly contracted package metadata such as `pi-gate`'s `config.schema.json`. The packaged smoke test installs each tarball in an isolated fixture and loads it through Pi's extension loader.
-
-The tests use deterministic local fixtures and mocked Brave responses. Manually verify behavior affected by a change:
-
-- `pi-web-search`: missing-key errors, web/context modes, filters, byte-bounded caching, request coalescing, cancellation, truncation, and temporary-file cleanup; and
-- `pi-web-fetch`: supported formats, redirects, blocked local/private targets, oversized responses, caching, request coalescing, and offset continuation.
-
-For extraction changes, run the opt-in live quality corpus separately from deterministic validation:
-
-```bash
-vp run benchmark:web-fetch-extraction
-```
-
-The benchmark checks stable content markers and minimum extracted sizes while reporting extractor choice and latency. Use `-- --filter <category>` for a subset or `-- --json` for machine-readable output. Network or upstream-content failures make the benchmark fail, so it is diagnostic rather than part of `validate`.
-
-Before changing focused-section ranking, record the deterministic heading, phrase, and stemming baseline:
+Turn production failures into deterministic regression fixtures. For stateful operations, test state changes, disappearance, timeout, termination, and refusal. Preserve malformed, noisy, and false-positive extraction cases. Before changing focused-section ranking, run:
 
 ```bash
 vp run benchmark:web-fetch-focus
 ```
 
-A known miss is useful baseline evidence; do not tune ranking from one fixture or silently redefine expected markers to make the benchmark pass.
+Keep source order and continuation semantics, and retain known misses as baseline evidence. The live extraction corpus is diagnostic and opt-in:
 
-To load a local package in an isolated Pi session, run `pi -e ./packages/<name>` and disable globally installed extensions as needed so they cannot interfere with manual verification.
+```bash
+vp run benchmark:web-fetch-extraction
+```
 
-## Regression and review discipline
+## Verification
 
-Turn production failures and fixed issues into deterministic regression fixtures, retaining the issue
-identifier in the test name or fixture when it helps future diagnosis. For stateful operations, cover
-both the expected path and state that moves, disappears, times out, is killed, or is refused between
-inspection and mutation. For extraction and ranking, preserve representative malformed, noisy, and
-false-positive inputs; use the live corpus to evaluate quality changes, not as a replacement for
-repeatable tests.
+`vp run validate` covers formatting, linting, type checking, tests, repository contracts, tarball inspection, and packaged smoke tests. Tarballs should contain only the package README, changelog, license, manifest, runtime `src/` files, and explicitly contracted metadata such as `pi-gate`'s schema.
 
-Before review, inspect the final diff for behavior beyond the requested scope, especially implicit
-mutation, forceful fallbacks, new network paths, cache-semantic changes, or hidden output growth. Run
-package-focused tests while iterating, then `vp check --fix`, any required normalization task, and
-`vp run validate` once code and documentation are final.
+The deterministic suites use local fixtures and mocked Brave responses. Manually verify affected behavior, including missing keys and both search modes; fetch formats, redirects, blocked targets, limits, caching, coalescing, cancellation, and continuation; and temporary-file cleanup. Load a package in an isolated session with `pi -e ./packages/<name>`.
 
-## Dependency reviews
+Before review, inspect the final diff for unrelated behavior, new network paths, cache changes, implicit mutation, forceful fallbacks, and output growth. Run focused tests, `vp check --fix`, required normalization tasks, and finally `vp run validate`.
 
-Dependency updates are opened manually. Inspect upstream release notes and the lockfile, confirm GitHub
-Actions use reviewed semantic major tags, and run `vp run validate`. Review Pi ecosystem packages
-together when they share an API release train. Keep Typebox, Vite+, TypeScript, and major toolchain
-updates separate; never combine a TypeScript major migration with routine dependency updates.
+## Dependencies
 
-Refresh the `@earendil-works/*` catalog at least once per release cycle so the workspace tracks the
-latest upstream Pi release. On every catalog or lockfile bump, re-check the override removal
-conditions annotated in `pnpm-workspace.yaml` (tracked in issue
-[#37](https://github.com/zeldrisho/pi-packages/issues/37)) and drop any satisfied override in the same
-change; `tests/repository-contract.test.ts` fails when an overridden package disappears from the
-dependency graph.
+Open dependency updates manually. Review upstream notes, lockfile changes, GitHub Action major tags, and run validation. Keep Typebox, Vite+, TypeScript, and major toolchain updates separate. Refresh the `@earendil-works/*` catalog at least once per release cycle; after catalog or lockfile changes, check the override conditions in `pnpm-workspace.yaml` and remove satisfied overrides. CI runs `vp pm audit -- --audit-level high`; production advisories are not allowlisted.
 
-CI runs `vp pm audit -- --audit-level high` on every pull request (`.github/workflows/ci.yml`).
-Production-path advisories are never allowlisted; the documented overrides in `pnpm-workspace.yaml`
-remain the only escape hatch for transitive runtime dependencies. Dev-only advisories are resolved by
-updating the toolchain or lockfile; if one cannot be resolved, it may be allowlisted in the audit
-command only with justification and a tracking issue.
-
-Before a Pi catalog bump, verify wildcard peer compatibility against the latest Pi APIs: run
-`PI_SMOKE_DEPENDENCIES=latest vp run test:packages` (or `vp run test:packages` alone to smoke-test
-against the locked workspace resolution) while retaining the locked Typebox version, so wildcard Pi
-peer incompatibilities are caught before the lockfile is updated.
+Before a catalog bump, smoke-test Pi's latest APIs with `PI_SMOKE_DEPENDENCIES=latest vp run test:packages` while retaining the locked Typebox version.

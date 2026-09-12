@@ -1,4 +1,16 @@
-import { chmodSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  closeSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readSync,
+  readdirSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { resolve, sep } from "node:path";
 import { createHash } from "node:crypto";
 
@@ -18,6 +30,8 @@ export interface CachePersistence<K, V> {
   deserialize(bytes: Uint8Array): V;
   /** Map a logical cache key to a safe, collision-resistant on-disk filename. */
   keyToPath(key: K): string;
+  /** Optionally reject structurally invalid payloads before they enter memory. */
+  validate?: (value: V) => boolean;
 }
 
 /** Hashes a cache key into a safe, collision-resistant filename segment. */
@@ -79,7 +93,9 @@ export class ExpiringLruCache<K, V> {
     readonly sizeOf: (value: V) => number,
     readonly now: () => number = Date.now,
     readonly persistence?: CachePersistence<K, V>,
-  ) {}
+  ) {
+    if (persistence) this.#maintainDisk();
+  }
 
   /**
    * Gets the total byte size of all cached values.
@@ -146,19 +162,34 @@ export class ExpiringLruCache<K, V> {
 
   #loadFromDisk(key: K): ExpiringCacheEntry<V> | undefined {
     let bytes: Uint8Array;
+    const path = resolveCachePath(this.persistence!.directory, this.persistence!.keyToPath(key));
+    let fileSize: number;
     try {
-      const path = resolveCachePath(this.persistence!.directory, this.persistence!.keyToPath(key));
+      // Serialized metadata can exceed the value budget, but never allow an
+      // unbounded cache file to be read into memory.
+      fileSize = statSync(path).size;
+    } catch {
+      return undefined;
+    }
+    if (fileSize < 8 || fileSize > this.maxBytes * 2 + 65_536) {
+      this.#removeFromDisk(key);
+      return undefined;
+    }
+    try {
       bytes = readFileSync(path);
     } catch {
       return undefined;
     }
     let entry: ExpiringCacheEntry<V>;
     try {
-      if (bytes.byteLength < 8) throw new Error("cache file too small");
       const expiresAt = decodeExpiresAt(bytes);
       const value = this.persistence!.deserialize(bytes.subarray(8));
+      if (this.persistence!.validate && !this.persistence!.validate(value)) {
+        throw new Error("invalid cache entry");
+      }
       const size = this.sizeOf(value);
-      if (size > this.maxBytes) throw new Error("oversized cache entry");
+      if (!Number.isFinite(size) || size < 0 || size > this.maxBytes)
+        throw new Error("oversized cache entry");
       entry = { expiresAt, size, value };
     } catch {
       this.#removeFromDisk(key);
@@ -180,11 +211,21 @@ export class ExpiringLruCache<K, V> {
       mkdirSync(directory, { recursive: true, mode: 0o700 });
       chmodSync(directory, 0o700);
       const payload = this.persistence!.serialize(value);
+      if (payload.byteLength > this.maxBytes * 2 + 65_536)
+        throw new Error("oversized cache payload");
       const path = resolveCachePath(directory, this.persistence!.keyToPath(key));
       const temp = `${path}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
-      writeFileSync(temp, Buffer.concat([encodeExpiresAt(expiresAt), payload]), { mode: 0o600 });
-      chmodSync(temp, 0o600);
-      renameSync(temp, path);
+      try {
+        writeFileSync(temp, Buffer.concat([encodeExpiresAt(expiresAt), payload]), { mode: 0o600 });
+        chmodSync(temp, 0o600);
+        renameSync(temp, path);
+      } finally {
+        try {
+          unlinkSync(temp);
+        } catch {
+          // The rename may already have removed the temporary path.
+        }
+      }
     } catch {
       // Best-effort persistence: a failed disk write never fails the caller.
     }
@@ -195,6 +236,62 @@ export class ExpiringLruCache<K, V> {
       unlinkSync(resolveCachePath(this.persistence!.directory, this.persistence!.keyToPath(key)));
     } catch {
       // Ignore missing or undeletable files; a cache miss is the correct outcome.
+    }
+  }
+
+  #maintainDisk(): void {
+    const persistence = this.persistence!;
+    try {
+      const files = readdirSync(persistence.directory);
+      const candidates: Array<{ path: string; size: number; mtime: number }> = [];
+      for (const file of files) {
+        const path = resolveCachePath(persistence.directory, file);
+        if (file.endsWith(".tmp")) {
+          try {
+            unlinkSync(path);
+          } catch {
+            // Best effort cleanup.
+          }
+          continue;
+        }
+        try {
+          const stat = statSync(path);
+          if (!stat.isFile() || stat.size < 8 || stat.size > this.maxBytes * 2 + 65_536) {
+            unlinkSync(path);
+            continue;
+          }
+          const descriptor = openSync(path, "r");
+          const header = new Uint8Array(8);
+          try {
+            if (
+              readSync(descriptor, header, 0, 8, 0) !== 8 ||
+              decodeExpiresAt(header) <= this.now()
+            ) {
+              unlinkSync(path);
+              continue;
+            }
+          } finally {
+            closeSync(descriptor);
+          }
+          candidates.push({ path, size: stat.size, mtime: stat.mtimeMs });
+        } catch {
+          // Ignore races and inaccessible files in this best-effort sweep.
+        }
+      }
+      candidates.sort((a, b) => a.mtime - b.mtime);
+      let total = candidates.reduce((sum, candidate) => sum + candidate.size, 0);
+      while (candidates.length > this.maxEntries || total > this.maxBytes * 2 + 65_536) {
+        const oldest = candidates.shift();
+        if (!oldest) break;
+        total -= oldest.size;
+        try {
+          unlinkSync(oldest.path);
+        } catch {
+          // Best effort eviction.
+        }
+      }
+    } catch {
+      // Persistence is best effort and the directory may not exist yet.
     }
   }
 

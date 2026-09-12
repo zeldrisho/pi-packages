@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Bound persistent cache reads and clean up expired, corrupt, oversized, and temporary cache files
+- Validate persisted documents before serving them and coalesce concurrent `/llms.txt` probes while retaining bounded LRU eviction
+
 ## [0.8.1] - 2026-09-07
 
 ### Security

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Bound persistent cache reads and clean up expired, corrupt, oversized, and temporary cache files
+- Validate persisted search entries and report provider results dropped by local filtering or count limits
+
 ## [0.8.0] - 2026-09-07
 
 ### Added
