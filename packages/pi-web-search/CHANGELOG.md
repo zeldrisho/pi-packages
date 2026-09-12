@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-09-12
+
 ### Fixed
 
 - Bound persistent cache reads and clean up expired, corrupt, oversized, and temporary cache files
@@ -89,7 +91,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded Brave web search ([cbc9491](https://github.com/zeldrisho/pi-packages/commit/cbc9491dce36555ab91b6bef203ec8b380596a89))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.8.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.8.1...HEAD
+[0.8.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.8.0...pi-web-search-v0.8.1
 [0.8.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.7.0...pi-web-search-v0.8.0
 [0.7.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.6.0...pi-web-search-v0.7.0
 [0.6.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.5.0...pi-web-search-v0.6.0
