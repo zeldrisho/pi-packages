@@ -454,6 +454,54 @@ describe("piGate extension", () => {
   });
 
   describe("session_start notification", () => {
+    it("allows commands when no config has ever existed and creation fails", async () => {
+      const blockedAgentDir = join(workDir, "not-a-directory");
+      writeFileSync(blockedAgentDir, "not a directory", "utf-8");
+      process.env.PI_CODING_AGENT_DIR = blockedAgentDir;
+      const { ctx, uiState, handlers } = makeExtension().install();
+
+      await handlers.sessionStart!({ reason: "startup" }, ctx);
+      expect(uiState.notifyCalls[0]).toEqual({
+        text: expect.stringContaining("no configuration found"),
+        level: "warning",
+      });
+      expect(
+        await handlers.toolCall!(
+          {
+            toolName: "bash",
+            toolCallId: "t1",
+            input: { command: "sudo rm -rf /" },
+          },
+          ctx,
+        ),
+      ).toBeUndefined();
+    });
+
+    it("prompts for every command when an existing config is malformed", async () => {
+      setConfig("{ not valid");
+      const { ctx, uiState, handlers } = makeExtension().install();
+
+      await handlers.sessionStart!({ reason: "startup" }, ctx);
+      expect(uiState.notifyCalls[0]).toEqual({
+        text: expect.stringContaining("configuration exists but could not be loaded"),
+        level: "warning",
+      });
+      const result = await handlers.toolCall!(
+        {
+          toolName: "bash",
+          toolCallId: "t1",
+          input: { command: "sudo rm -rf /" },
+        },
+        ctx,
+      );
+      expect(uiState.selectCalls).toHaveLength(1);
+      expect(result).toEqual({
+        block: true,
+        reason: expect.stringContaining("denied, dismissed, or timed out"),
+        terminate: true,
+      });
+    });
+
     it("creates and loads a default config with starter rules when the file is missing", async () => {
       const { ctx, uiState, handlers } = makeExtension().install();
       await handlers.sessionStart!({ reason: "startup" }, ctx);

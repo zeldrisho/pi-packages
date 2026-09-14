@@ -9,6 +9,13 @@ export interface GateConfig {
   promptTimeoutMs: number;
 }
 
+export type ConfigLoadStatus = "missing" | "loaded" | "failed";
+
+export interface ConfigLoadResult {
+  config: GateConfig;
+  status: ConfigLoadStatus;
+}
+
 const CONFIG_FILE_NAME = "pi-gate.json";
 export const CONFIG_SCHEMA_URL =
   "https://raw.githubusercontent.com/zeldrisho/pi-packages/main/packages/pi-gate/config.schema.json";
@@ -123,18 +130,32 @@ export function parseConfig(content: string): GateConfig {
  * Loads the configuration from disk. Returns an empty configuration when the
  * file is missing; returns the parsed configuration otherwise.
  */
-export function loadConfig(): GateConfig {
+export function loadConfigResult(): ConfigLoadResult {
+  const emptyConfig = { operations: {}, promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS };
   const path = configPath();
   if (!existsSync(path)) {
-    return { operations: {}, promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS };
+    return { config: emptyConfig, status: "missing" };
   }
   let content: string;
   try {
     content = readFileSync(path, "utf-8");
   } catch {
-    return { operations: {}, promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS };
+    return { config: emptyConfig, status: "failed" };
   }
-  return parseConfig(content);
+  try {
+    const parsed: unknown = JSON.parse(content);
+    if (!isJsonObject(parsed) || !isJsonObject(parsed["operations"])) {
+      return { config: parseConfig(content), status: "failed" };
+    }
+  } catch {
+    return { config: emptyConfig, status: "failed" };
+  }
+  return { config: parseConfig(content), status: "loaded" };
+}
+
+/** Loads the configuration, preserving the historical empty-config fallback. */
+export function loadConfig(): GateConfig {
+  return loadConfigResult().config;
 }
 
 /**

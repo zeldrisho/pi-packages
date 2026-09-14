@@ -26,9 +26,8 @@
  * indefinitely.
  */
 
-import { existsSync } from "node:fs";
 import { isToolCallEventType, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { configPath, ensureConfig, loadConfig } from "./config";
+import { configPath, ensureConfig, loadConfigResult } from "./config";
 import { resolveRule } from "./rules";
 import { formatPromptCommand, formatRule } from "./display";
 
@@ -66,8 +65,10 @@ export {
   MAX_RULE_PATTERN_LENGTH,
   ensureConfig,
   loadConfig,
+  loadConfigResult,
   parseConfig,
 } from "./config";
+export type { ConfigLoadResult, ConfigLoadStatus } from "./config";
 export type { RuleMatch } from "./rules";
 export { resolveAction, resolveRule } from "./rules";
 export {
@@ -80,12 +81,13 @@ export {
 /** Gate the built-in `bash` tool against the user-provided rules. */
 export default function piGate(pi: ExtensionAPI): void {
   ensureConfig();
-  const config = loadConfig();
+  const loadResult = loadConfigResult();
+  const { config } = loadResult;
 
   pi.on("session_start", (_event, ctx) => {
     const path = configPath();
     const ruleCount = Object.keys(config.operations).length;
-    if (existsSync(path)) {
+    if (loadResult.status === "loaded") {
       if (ruleCount === 0) {
         ctx.ui.notify(
           `pi-gate: ${path} is empty; no commands are gated. Add rules to the "operations" object to start gating.`,
@@ -97,9 +99,14 @@ export default function piGate(pi: ExtensionAPI): void {
           "info",
         );
       }
+    } else if (loadResult.status === "failed") {
+      ctx.ui.notify(
+        "pi-gate: configuration exists but could not be loaded; prompting for all commands until it is fixed.",
+        "warning",
+      );
     } else {
       ctx.ui.notify(
-        `pi-gate: could not create configuration at ${path}; all commands are allowed until that file is created.`,
+        `pi-gate: no configuration found at ${configPath()}; all commands are allowed until it is created.`,
         "warning",
       );
     }
@@ -109,7 +116,10 @@ export default function piGate(pi: ExtensionAPI): void {
     if (event.toolName !== "bash") return undefined;
     if (!isToolCallEventType("bash", event)) return undefined;
     const command = event.input.command;
-    const match = resolveRule(command, config.operations);
+    const match =
+      loadResult.status === "failed"
+        ? { pattern: "configuration unavailable", action: "prompt" as const }
+        : resolveRule(command, config.operations);
     if (match === null || match.action === "allow") return undefined;
     const rule = formatRule(match);
 

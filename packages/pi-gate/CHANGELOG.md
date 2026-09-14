@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- prompt for all commands when an existing configuration cannot be read or parsed instead of allowing every command through unblocked
+
 ## [0.4.0] - 2026-09-12
 
 ### Changed
