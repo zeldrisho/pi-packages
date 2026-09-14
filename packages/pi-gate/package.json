@@ -25,9 +25,7 @@
   "files": [
     "src",
     "config.schema.json",
-    "README.md",
-    "CHANGELOG.md",
-    "LICENSE"
+    "CHANGELOG.md"
   ],
   "type": "module",
   "publishConfig": {
