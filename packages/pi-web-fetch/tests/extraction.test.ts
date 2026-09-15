@@ -7,6 +7,7 @@ import { extractHtmlToMarkdown, stripExtractedCssCruft } from "../src/extract";
 // lets individual tests override `Defuddle` to simulate rejections.
 vi.mock("defuddle/node", async () => {
   const actual = await vi.importActual<typeof import("defuddle/node")>("defuddle/node");
+
   return { ...actual, Defuddle: vi.fn(actual.Defuddle) };
 });
 
@@ -84,10 +85,23 @@ describe("extracted CSS cleanup", () => {
 });
 
 describe("HTML extraction", () => {
+  it("records fragment offsets for headings and explicit anchors", async () => {
+    const result = await extractHtmlToMarkdown(
+      `<main><h1>Guide</h1><h2 id="get-started">Get started</h2><p>Install it.</p><h2>Next steps</h2></main>`,
+      new URL("https://example.com/guide"),
+    );
+
+    const offset = result.fragmentOffsets?.["get-started"];
+    expect(offset).toBeDefined();
+    expect(result.markdown.slice(offset)).toMatch(/^#+ Get started/m);
+  });
+
   it("discards malformed schema.org data without writing through Pi's TUI", async () => {
     const articleText = longText();
+
     const html = `<html><head><title>Fixture</title><script type="application/ld+json">{"@type":"Article","description":"invalid
 schema"}</script></head><body><main><article><h1>Fixture</h1><p>${articleText}</p></article></main></body></html>`;
+
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
     try {
@@ -176,6 +190,7 @@ schema"}</script></head><body><main><article><h1>Fixture</h1><p>${articleText}</
       setImmediate(() => {
         void Promise.reject(new Error("defuddle detached failure"));
       });
+
       // SAFETY: mock fixture only needs `content`/`title`; remaining DefuddleResponse
       // fields are unused by the caller.
       return { content: "ignored", title: "x" } as DefuddleResponse;
@@ -194,6 +209,7 @@ schema"}</script></head><body><main><article><h1>Fixture</h1><p>${articleText}</
     // must ignore that rejection (it does not mention Defuddle) and must not
     // force a spurious fallback to the basic extractor.
     const swallow = (): void => {};
+
     process.once("unhandledRejection", swallow);
     const { Defuddle } = await import("defuddle/node");
     vi.mocked(Defuddle).mockImplementation(async () => {
@@ -203,6 +219,7 @@ schema"}</script></head><body><main><article><h1>Fixture</h1><p>${articleText}</
       setImmediate(() => {
         void Promise.reject(new Error("unrelated concurrent failure"));
       });
+
       // SAFETY: mock fixture only needs `content`/`title`; remaining DefuddleResponse
       // fields are unused by the caller.
       return { content: "word149", title: "Fixture" } as DefuddleResponse;

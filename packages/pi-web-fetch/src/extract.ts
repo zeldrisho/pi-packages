@@ -3,6 +3,79 @@ import type { DefuddleResponse } from "defuddle/node";
 
 const RAW_ID_SELECTOR_SAFE = /^-?[_a-zA-Z][-_a-zA-Z0-9]*$/;
 
+function fragmentSlug(value: string): string {
+  return value
+    .replace(/<[^>]*>/g, "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{Letter}\p{Number} _-]/gu, "")
+    .trim()
+    .replace(/[ _]+/g, "-");
+}
+
+/** Finds the extracted Markdown position corresponding to HTML fragment IDs. */
+interface FragmentOffsets {
+  [fragment: string]: number;
+}
+
+function buildFragmentOffsets(document: Document, markdown: string): FragmentOffsets {
+  const lines = markdown.split("\n");
+
+  const headings = lines
+    .map((line, index) => {
+      const match = /^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/.exec(line);
+
+      return match
+        ? {
+            slug: fragmentSlug(match[1]),
+            offset: lines.slice(0, index).join("\n").length + (index ? 1 : 0),
+          }
+        : undefined;
+    })
+    .filter((heading): heading is { slug: string; offset: number } => Boolean(heading));
+
+  const offsets: Record<string, number> = {};
+  const used = new Set<number>();
+
+  for (const element of document.querySelectorAll<HTMLElement>("[id], a[name]")) {
+    const id = element.getAttribute("id") ?? element.getAttribute("name");
+
+    if (!id) continue;
+    const slug = fragmentSlug(id);
+    const textSlug = fragmentSlug(element.textContent ?? "");
+
+    const heading = headings.find(
+      (candidate) =>
+        candidate.slug === slug ||
+        (textSlug && candidate.slug === textSlug && !used.has(candidate.offset)),
+    );
+
+    if (heading) {
+      offsets[id] = heading.offset;
+      used.add(heading.offset);
+    } else {
+      const text = (element.textContent ?? "").trim();
+
+      if (text) {
+        const textOffset = markdown.toLowerCase().indexOf(text.toLowerCase());
+
+        if (textOffset >= 0) offsets[id] = textOffset;
+      }
+    }
+  }
+
+  // Most Markdown producers preserve headings but discard arbitrary HTML IDs.
+  // Resolve GitHub-style heading links even when no matching HTML ID survived.
+  for (const heading of headings) {
+    const base = heading.slug;
+
+    if (base && offsets[base] === undefined) offsets[base] = heading.offset;
+  }
+
+  return offsets;
+}
+
 /** Removes schema.org scripts that Defuddle would report directly to the process console. */
 function removeMalformedSchemaOrgData(document: Document): void {
   for (const script of document.querySelectorAll<HTMLScriptElement>(
@@ -13,6 +86,7 @@ function removeMalformedSchemaOrgData(document: Document): void {
       .replace(/^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/, "$1")
       .replace(/^\s*(\*\/|\/\*)\s*|\s*(\*\/|\/\*)\s*$/g, "")
       .trim();
+
     try {
       if (JSON.parse(jsonContent) === null) script.remove();
     } catch {
@@ -28,29 +102,38 @@ function removeMalformedSchemaOrgData(document: Document): void {
  */
 function normalizeSelectorUnsafeIds(document: Document): void {
   const replacements = new Map<string, string>();
+
   const occupiedIds = new Set(
     [...document.querySelectorAll<HTMLElement>("[id]")].map((element) => element.id),
   );
+
   let replacementIndex = 0;
 
   for (const element of document.querySelectorAll<HTMLElement>("[id]")) {
     const id = element.id;
+
     if (!id || RAW_ID_SELECTOR_SAFE.test(id)) continue;
 
     let replacement: string;
+
     do {
       replacement = `defuddle-safe-id-${replacementIndex++}`;
     } while (occupiedIds.has(replacement));
+
     occupiedIds.add(replacement);
+
     if (!replacements.has(id)) replacements.set(id, replacement);
     element.id = replacement;
   }
 
   if (replacements.size === 0) return;
+
   for (const anchor of document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]')) {
     const href = anchor.getAttribute("href");
+
     if (!href) continue;
     const replacement = replacements.get(href.slice(1));
+
     if (replacement) anchor.setAttribute("href", `#${replacement}`);
   }
 }
@@ -63,11 +146,13 @@ function normalizeSelectorUnsafeIds(document: Document): void {
  */
 export function htmlToMarkdownFallback(html: string): string {
   const { document } = parseHTML(html);
+
   for (const element of document.querySelectorAll(
     "script, style, svg, noscript, template, iframe, nav, header, footer, aside, form",
   )) {
     element.remove();
   }
+
   return document.body.textContent
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n[ \t]+/g, "\n")
@@ -79,9 +164,11 @@ export function htmlToMarkdownFallback(html: string): string {
 /** Asserts that a URL is absolute http(s) and returns it, or throws for bare pathnames. */
 export function assertAbsoluteHttpUrl(value: string | URL): URL {
   const url = value instanceof URL ? value : new URL(value);
+
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new TypeError(`Expected absolute http(s) URL, got ${url.protocol}: ${url.href}`);
   }
+
   return url;
 }
 
@@ -89,9 +176,12 @@ export function assertAbsoluteHttpUrl(value: string | URL): URL {
 function resolveDocumentRelativeMetadataUrls(document: Document, pageUrl: URL): void {
   for (const meta of document.querySelectorAll<HTMLMetaElement>("meta[content]")) {
     const key = (meta.getAttribute("property") ?? meta.getAttribute("name"))?.toLowerCase();
+
     if (key !== "og:url" && key !== "twitter:url") continue;
     const content = meta.getAttribute("content");
+
     if (!content) continue;
+
     try {
       meta.setAttribute("content", new URL(content, pageUrl).href);
     } catch {
@@ -101,7 +191,9 @@ function resolveDocumentRelativeMetadataUrls(document: Document, pageUrl: URL): 
 
   for (const link of document.querySelectorAll<HTMLLinkElement>('link[rel="canonical"][href]')) {
     const href = link.getAttribute("href");
+
     if (!href) continue;
+
     try {
       link.setAttribute("href", new URL(href, pageUrl).href);
     } catch {
@@ -124,12 +216,15 @@ function isString(value: unknown): value is string {
 /** Returns true when a rejection looks like `ERR_INVALID_URL` for a bare pathname. */
 function isBarePathnameInvalidUrl(cause: unknown): boolean {
   if (!(cause instanceof Error)) return false;
+
   if (!/Invalid URL/i.test(cause.message)) return false;
   // SAFETY: Node's ERR_INVALID_URL extends Error with an `input` string property holding the offending URL.
   const input = (cause as NodeJS.ErrnoException & { input?: unknown }).input;
+
   if (isString(input) && input.startsWith("/")) return true;
   // SAFETY: Error.stack is an optional string populated by V8; we coerce it for pattern matching.
   const detail = `${cause.message}\n${(cause as Error).stack ?? ""}`;
+
   // Node's ERR_INVALID_URL prints `input: '/path'` in the message/stack even when
   // `input` is not on the error instance in some Node versions.
   return /input:\s*'\/[^']*'/.test(detail);
@@ -145,7 +240,9 @@ function stripChromeWrappers(document: Document, baseUrl: URL): void {
   // Only strip chrome wrappers for GitHub release pages
   const isGitHubRelease =
     baseUrl.hostname === "github.com" && /\/releases(?:\/|$)/.test(baseUrl.pathname);
+
   if (!isGitHubRelease) return;
+
   for (const element of document.querySelectorAll("nav, header, footer, aside")) {
     element.remove();
   }
@@ -161,23 +258,31 @@ function deduplicateAdjacentLinks(markdown: string): string {
   const lines = markdown.split("\n");
   const out: string[] = [];
   let previousTrimmed: string | undefined;
+
   for (const line of lines) {
     const trimmed = line.trim();
+
     const isLinkLine =
       /^\[[^\]]+\]\(<[^>]+>\)$/.test(trimmed) || /^\[[^\]]+\]\([^)]+\)$/.test(trimmed);
+
     if (isLinkLine && trimmed === previousTrimmed) continue;
     out.push(line);
     previousTrimmed = isLinkLine ? trimmed : undefined;
   }
+
   // Also collapse duplicate adjacent blocks like a repeated vite-plus tag link paragraph.
   return out.join("\n").replace(/(\[[^\n]+?\([^)]+\)[^\n]*\n)\1/g, "$1");
 }
 
 const CSS_BLOCK_AT_RULE = /^\s*@(container|font-face|keyframes|layer|media|page|supports)\b/i;
+
 const STANDALONE_CSS_RULE =
   /^\s*(?:[.#][-_a-zA-Z]|\*\s*[.#:[>+~]|(?:html|body|main|article|nav|header|footer|aside)(?:\b|[.#:[>+~]))[^{}]*\{[^{}]*\}\s*$/i;
+
 const COMPLETE_STYLE_ELEMENT = /<style\b[^>]*>[\s\S]*?<\/style\s*>/gi;
+
 const CLOSING_STYLE_ELEMENT = /<\/style\s*>/i;
+
 const OPENING_STYLE_ELEMENT = /<style\b[^>]*>/i;
 
 /**
@@ -188,8 +293,10 @@ const OPENING_STYLE_ELEMENT = /<style\b[^>]*>/i;
  */
 function stripCompleteStyleElements(value: string): string {
   let cleaned = value;
+
   while (true) {
     const next = cleaned.replace(COMPLETE_STYLE_ELEMENT, "");
+
     if (next === cleaned) return cleaned;
     cleaned = next;
   }
@@ -220,13 +327,16 @@ export function stripExtractedCssCruft(markdown: string): string {
 
   for (const originalLine of markdown.split("\n")) {
     const fenceMatch = /^[ \t]{0,3}(`{3,}|~{3,})/.exec(originalLine);
+
     if (!fence && fenceMatch) {
       fence = { character: fenceMatch[1][0], length: fenceMatch[1].length };
       output.push(originalLine);
       continue;
     }
+
     if (fence) {
       output.push(originalLine);
+
       if (
         fenceMatch &&
         fenceMatch[1][0] === fence.character &&
@@ -235,18 +345,23 @@ export function stripExtractedCssCruft(markdown: string): string {
       ) {
         fence = undefined;
       }
+
       continue;
     }
 
     let line = originalLine;
+
     if (styleElement) {
       const close = CLOSING_STYLE_ELEMENT.exec(line);
+
       if (!close) continue;
       line = line.slice(close.index + close[0].length);
       styleElement = false;
     }
+
     line = stripCompleteStyleElements(line);
     const open = OPENING_STYLE_ELEMENT.exec(line);
+
     if (open) {
       line = line.slice(0, open.index);
       styleElement = true;
@@ -254,13 +369,16 @@ export function stripExtractedCssCruft(markdown: string): string {
 
     if (cssBlockDepth > 0) {
       cssBlockDepth += braceDelta(line);
+
       if (cssBlockDepth < 0) cssBlockDepth = 0;
       continue;
     }
+
     if (CSS_BLOCK_AT_RULE.test(line)) {
       cssBlockDepth = Math.max(0, braceDelta(line));
       continue;
     }
+
     if (STANDALONE_CSS_RULE.test(line)) continue;
     output.push(line);
   }
@@ -308,13 +426,18 @@ async function runDefuddle(
 ): Promise<DefuddleResponse | undefined> {
   let escapedRejection: unknown = undefined;
   let armed = true;
+
   const captureUnhandled = (cause: unknown): void => {
     if (!armed || escapedRejection !== undefined) return;
+
     const detail =
       cause instanceof Error ? `${cause.message}\n${cause.stack ?? ""}` : String(cause);
+
     if (/defuddle/i.test(detail) || isBarePathnameInvalidUrl(cause)) escapedRejection = cause;
   };
+
   process.on("unhandledRejection", captureUnhandled);
+
   try {
     const { Defuddle } = await import("defuddle/node");
     const result = await Defuddle(document, pageUrl, { markdown: true, useAsync: false });
@@ -322,7 +445,9 @@ async function runDefuddle(
     // rejection is observed by the guard instead of reaching the harness.
     await Promise.resolve();
     await new Promise<void>((resolve) => setImmediate(resolve));
+
     if (escapedRejection !== undefined) throw escapedRejection;
+
     return result;
   } catch {
     return undefined;
@@ -350,19 +475,25 @@ function readAdvertisedLinks(
 ): AdvertisedLinks {
   const resolve = (href: string | null): string | undefined => {
     if (!href) return undefined;
+
     try {
       return new URL(href, baseUrl.href).href;
     } catch {
       return undefined;
     }
   };
+
   let describedByLink: string | undefined;
   let markdownAlternateLink: string | undefined;
+
   for (const link of document.querySelectorAll("link")) {
     const href = resolve(link.getAttribute("href"));
+
     if (!href) continue;
     const tokens = (link.getAttribute("rel") ?? "").toLowerCase().split(/\s+/);
+
     if (!describedByLink && tokens.includes("describedby")) describedByLink = href;
+
     if (
       !markdownAlternateLink &&
       tokens.includes("alternate") &&
@@ -371,6 +502,7 @@ function readAdvertisedLinks(
       markdownAlternateLink = href;
     }
   }
+
   return { describedByLink, markdownAlternateLink };
 }
 
@@ -389,10 +521,12 @@ export async function extractHtmlToMarkdown(
   markdown: string;
   title?: string;
   extractor: "defuddle" | "basic";
+  fragmentOffsets?: Record<string, number>;
   describedByLink?: string;
   markdownAlternateLink?: string;
 }> {
   let advertised: AdvertisedLinks = {};
+
   try {
     assertAbsoluteHttpUrl(baseUrl);
     const { document } = parseHTML(html);
@@ -408,24 +542,39 @@ export async function extractHtmlToMarkdown(
     // `/owner/repo/releases`) and metadata against the real origin instead of
     // dropping the scheme and host and constructing `new URL(pathname)`.
     const result = await runDefuddle(document, baseUrl.href);
+
     const markdown = stripExtractedCssCruft(
       deduplicateAdjacentLinks(result?.content?.trim() ?? ""),
     );
+
     const trimmedTitle = result?.title?.trim();
+
     if (markdown) {
       return {
         markdown,
         title: trimmedTitle || undefined,
         extractor: "defuddle",
+        fragmentOffsets: buildFragmentOffsets(document, markdown),
         ...advertised,
       };
     }
   } catch {
     // Fall through to the basic converter for malformed or unsupported pages.
   }
+
+  const fallbackMarkdown = stripExtractedCssCruft(htmlToMarkdownFallback(html));
+  let fragmentOffsets: Record<string, number> = {};
+
+  try {
+    fragmentOffsets = buildFragmentOffsets(parseHTML(html).document, fallbackMarkdown);
+  } catch {
+    // Malformed HTML has already been reduced to plain text; no anchors are available.
+  }
+
   return {
-    markdown: stripExtractedCssCruft(htmlToMarkdownFallback(html)),
+    markdown: fallbackMarkdown,
     extractor: "basic",
+    fragmentOffsets,
     ...advertised,
   };
 }
