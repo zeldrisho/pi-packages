@@ -18,8 +18,8 @@ Intentional repository deviations:
 
 - Effect rules remain disabled because this repository has no direct `effect`
   dependency.
-- No dependency was added or changed: Vite+ already provides the Oxlint runtime,
-  and the repository's existing `@oxlint/plugins` dependency was preserved.
+- The anti-slop imports use Vite+'s `vite-plus/lint/plugins` export, avoiding a
+  separate direct Oxlint plugin dependency.
 - Existing Vite+ configuration, ignores, and the `no-runtime-typeof` option were
   preserved. All generic anti-slop rules, plus native `oxc/no-accumulating-spread`,
   are enabled at error severity.

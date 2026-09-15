@@ -4,7 +4,6 @@
 
 - Use **Vite+** (`vp install`) with the pnpm workspace and lockfile.
 - Use `vp run <name>` for project scripts; `vp <name>` invokes a built-in command.
-- Use Node.js 24.10.0 or newer.
 
 ## Commands
 
