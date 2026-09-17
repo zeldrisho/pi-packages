@@ -33,6 +33,7 @@ export interface RedirectDependencies {
   sleep?: (milliseconds: number, signal: AbortSignal) => Promise<void>;
 }
 
+/** Creates the consistent abort error used by redirect and retry coordination. */
 function abortError(): Error {
   const error = new Error("Operation aborted.");
   error.name = "AbortError";
@@ -40,6 +41,7 @@ function abortError(): Error {
   return error;
 }
 
+/** Reserves an origin-concurrency slot and returns a function that releases it. */
 async function acquireOrigin(origin: string, signal: AbortSignal): Promise<() => void> {
   const state = origins.get(origin) ?? { active: 0, waiting: [] };
   origins.set(origin, state);
@@ -86,6 +88,7 @@ async function acquireOrigin(origin: string, signal: AbortSignal): Promise<() =>
   return release;
 }
 
+/** Waits for a retry delay while allowing the caller to cancel immediately. */
 async function defaultSleep(milliseconds: number, signal: AbortSignal): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(done, milliseconds);
@@ -105,6 +108,7 @@ async function defaultSleep(milliseconds: number, signal: AbortSignal): Promise<
   });
 }
 
+/** Parses a Retry-After header into a bounded delay in milliseconds. */
 function retryAfterMilliseconds(value: string | undefined, now = Date.now()): number | undefined {
   if (!value) return undefined;
   const seconds = Number(value.trim());
@@ -118,6 +122,7 @@ function retryAfterMilliseconds(value: string | undefined, now = Date.now()): nu
   return Math.min(Math.max(0, date - now), MAX_RETRY_DELAY_MS);
 }
 
+/** Sends one origin-limited request and retries transient rate-limit responses. */
 async function coordinatedRequest(
   target: ValidatedTarget,
   signal: AbortSignal,

@@ -587,6 +587,7 @@ function resolveFragmentOffset(document: CompleteDocument, rawUrl: string): Reso
   return { fragment, offset: offsets[fragment] ?? offsets[fragment.toLowerCase()] };
 }
 
+/** Executes a validated web fetch, including caching, focusing, and bounded pagination. */
 export async function executeWebFetch(
   params: WebFetchParameters,
   signal: AbortSignal | undefined,

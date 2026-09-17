@@ -44,6 +44,7 @@ interface MarkdownFence {
   length: number;
 }
 
+/** Tracks whether the current Markdown line opens or closes a fenced code block. */
 function updateFence(line: string, fence: MarkdownFence | undefined): MarkdownFence | undefined {
   const match = FENCE.exec(line);
 

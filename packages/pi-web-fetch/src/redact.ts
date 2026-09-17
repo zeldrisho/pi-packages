@@ -17,6 +17,7 @@ const SENSITIVE_QUERY_KEYS = new Set([
   "token",
 ]);
 
+/** Replaces sensitive query-parameter values and reports whether anything changed. */
 function redactSensitiveParams(params: URLSearchParams): boolean {
   let redacted = false;
 

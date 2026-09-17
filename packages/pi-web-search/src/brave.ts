@@ -385,6 +385,7 @@ function escapeMarkdownCell(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
 }
 
+/** Renders a structured Brave snippet as a bounded Markdown table when possible. */
 function structuredSnippetToMarkdown(value: BraveSnippet): string | undefined {
   const table = value.table;
 
@@ -406,6 +407,7 @@ function structuredSnippetToMarkdown(value: BraveSnippet): string | undefined {
   return `${caption}${header}\n${separator}\n${body}`;
 }
 
+/** Converts a Brave structured snippet payload to bounded, display-safe Markdown. */
 function braveSnippetToMarkdown(value: string): string {
   try {
     const snippet = value.trim();

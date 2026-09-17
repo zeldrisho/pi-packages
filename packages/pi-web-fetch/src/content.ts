@@ -56,6 +56,7 @@ export interface FetchResult extends CompleteDocument {
   truncated: boolean;
 }
 
+/** Returns the longest prefix whose UTF-8 representation fits within the byte limit. */
 function sliceByByteLength(value: string, maxBytes: number): string {
   if (encoder.encode(value).byteLength <= maxBytes) return value;
   let low = 0;
@@ -73,6 +74,7 @@ function sliceByByteLength(value: string, maxBytes: number): string {
   return value.slice(0, low);
 }
 
+/** Slices content while enforcing the configured character, line, and byte budgets. */
 function boundedContentChunk(value: string, offset: number, maxCharacters: number): string {
   let chunk = value.slice(offset, offset + maxCharacters);
   let newline = -1;
