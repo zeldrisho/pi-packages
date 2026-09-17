@@ -18,13 +18,17 @@ export interface RuleMatch {
  */
 export function resolveRule(command: string, rules: Record<string, Action>): RuleMatch | null {
   let bestPattern: string | null = null;
+
   for (const pattern of Object.keys(rules)) {
     if (!command.includes(pattern)) continue;
+
     if (bestPattern === null || pattern.length > bestPattern.length) {
       bestPattern = pattern;
     }
   }
+
   if (bestPattern === null) return null;
+
   return { pattern: bestPattern, action: rules[bestPattern] };
 }
 

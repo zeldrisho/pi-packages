@@ -16,9 +16,11 @@ describe("awaitWithAbort", () => {
   it("ignores late settlement after aborting", async () => {
     const controller = new AbortController();
     let resolveOperation: (value: string) => void = () => {};
+
     const operation = new Promise<string>((resolve) => {
       resolveOperation = resolve;
     });
+
     const pending = awaitWithAbort(operation, controller.signal);
 
     controller.abort();
@@ -38,6 +40,7 @@ describe("awaitWithAbort", () => {
   it.each(["resolve", "reject"] as const)("removes its listener after %s", async (settlement) => {
     const controller = new AbortController();
     const remove = vi.spyOn(controller.signal, "removeEventListener");
+
     const operation =
       settlement === "resolve" ? Promise.resolve("ok") : Promise.reject(new Error("failed"));
 

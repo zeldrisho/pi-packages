@@ -8,11 +8,13 @@ import { createFetchHarness } from "./harness";
 /** Builds a minimal HTTP response for offline fetch testing. */
 function fakeTextResponse(body: string, contentType = "text/plain"): IncomingMessage {
   const buffer = Buffer.from(body);
+
   const iterator = {
     async *[Symbol.asyncIterator]() {
       yield buffer;
     },
   };
+
   // SAFETY: the literal satisfies IncomingMessage's stream contract; we set the few
   // fields the tests read (statusCode, headers) immediately above.
   return {
@@ -218,6 +220,7 @@ describe("web_fetch honest-evidence details", () => {
       undefined,
       dependencies,
     );
+
     expect(result.details.requestedUrl).toBe(`${origin}/html`);
     expect(result.details.finalUrl).toBe(`${origin}/html`);
     expect(result.details.contentKind).toBe("article");
@@ -235,13 +238,16 @@ describe("web_fetch honest-evidence details", () => {
     const redacted = `https://credentials.example.com/page-${process.pid}?token=REDACTED&page=2`;
     const updates: string[] = [];
     const transportedUrls: string[] = [];
+
     const fetchDependencies: FetchRemoteDependencies = {
       validateUrl: async (value) => {
         const url = value instanceof URL ? value : new URL(value);
+
         return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
       },
       request: async (target) => {
         transportedUrls.push(target.url.href);
+
         return fakeTextResponse("credential-safe content");
       },
     };
@@ -264,9 +270,11 @@ describe("web_fetch honest-evidence details", () => {
 
   it("redacts credential-bearing query values from extracted link details", async () => {
     const requested = `https://links.example.com/page-${process.pid}`;
+
     const fetchDependencies: FetchRemoteDependencies = {
       validateUrl: async (value) => {
         const url = value instanceof URL ? value : new URL(value);
+
         return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
       },
       request: async () =>
@@ -300,6 +308,7 @@ describe("web_fetch honest-evidence details", () => {
       undefined,
       dependencies,
     );
+
     expect(result.details.contentKind).toBe("raw-text");
     expect(result.details.extractor).toBe("raw");
     expect(result.details.confidence).toBe("high");
@@ -310,20 +319,24 @@ describe("web_fetch honest-evidence details", () => {
     const requested = `https://github.com/owner/repo/blob/main/file-${process.pid}.ts`;
     const expectedFinal = `https://raw.githubusercontent.com/owner/repo/main/file-${process.pid}.ts`;
     const validatedUrls: string[] = [];
+
     const fetchDependencies: FetchRemoteDependencies = {
       validateUrl: async (value) => {
         const url = value instanceof URL ? value : new URL(value);
         validatedUrls.push(url.toString());
+
         return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
       },
       request: async () => fakeTextResponse("export const example = 1;\n"),
     };
+
     const result = await executeWebFetch(
       { url: requested },
       undefined,
       undefined,
       fetchDependencies,
     );
+
     // The rewrite happens before validation, and the parallel llms.txt probe also
     // validates its own URL, so the rewritten raw URL must be among the validations.
     expect(validatedUrls).toContain(expectedFinal);
@@ -337,20 +350,24 @@ describe("web_fetch honest-evidence details", () => {
     const requested = `https://gist.github.com/owner/gist-id-${process.pid}`;
     const expectedFinal = `https://gist.github.com/owner/gist-id-${process.pid}/raw`;
     const validatedUrls: string[] = [];
+
     const fetchDependencies: FetchRemoteDependencies = {
       validateUrl: async (value) => {
         const url = value instanceof URL ? value : new URL(value);
         validatedUrls.push(url.toString());
+
         return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
       },
       request: async () => fakeTextResponse("const gist = true;\n"),
     };
+
     const result = await executeWebFetch(
       { url: requested },
       undefined,
       undefined,
       fetchDependencies,
     );
+
     // The rewrite happens before validation, and the parallel llms.txt probe also
     // validates its own URL, so the rewritten raw URL must be among the validations.
     expect(validatedUrls).toContain(expectedFinal);

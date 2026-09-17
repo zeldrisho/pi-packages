@@ -8,6 +8,7 @@ function response(
   headers: Record<string, string> = {},
 ): IncomingMessage {
   const bytes = Buffer.from(body);
+
   // SAFETY: Fetch tests use only these response fields and the supplied async stream contract.
   return {
     statusCode,
@@ -30,6 +31,7 @@ describe("stale cache revalidation", () => {
     const url = `https://raw.githubusercontent.com/example/project/main/revalidate-${process.pid}-${Math.random()}.txt`;
     const requestHeaders: Array<Readonly<Record<string, string>> | undefined> = [];
     let requests = 0;
+
     const dependencies: FetchRemoteDependencies = {
       validateUrl: async (value): Promise<ValidatedTarget> => ({
         url: value instanceof URL ? value : new URL(value),
@@ -39,6 +41,7 @@ describe("stale cache revalidation", () => {
       request: async (_target, _signal, headers) => {
         requestHeaders.push(headers);
         requests += 1;
+
         return requests === 1
           ? response(200, "cached representation", {
               "content-type": "text/plain",
@@ -69,6 +72,7 @@ describe("stale cache revalidation", () => {
     vi.useFakeTimers();
     vi.setSystemTime(startedAt);
     const url = `https://raw.githubusercontent.com/example/project/main/hit-${process.pid}-${Math.random()}.txt`;
+
     const dependencies: FetchRemoteDependencies = {
       validateUrl: async (value) => ({
         url: value instanceof URL ? value : new URL(value),
@@ -77,6 +81,7 @@ describe("stale cache revalidation", () => {
       }),
       request: async () => response(200, "fresh representation", { "content-type": "text/plain" }),
     };
+
     const miss = await executeWebFetch({ url }, undefined, undefined, dependencies);
     const hit = await executeWebFetch({ url }, undefined, undefined, dependencies);
     expect(miss.details.cacheStatus).toBe("miss");

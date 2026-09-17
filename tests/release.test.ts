@@ -25,6 +25,7 @@ async function createRepository(version = "1.0.0"): Promise<string> {
   git(root, "config", "user.name", "Release Test");
   git(root, "add", ".");
   git(root, "commit", "--quiet", "-m", "feat: initial package");
+
   return root;
 }
 
@@ -154,6 +155,7 @@ describe("release CLI", () => {
   function fakeAutomation() {
     const resolvePackageByTag = vi.fn().mockResolvedValue({ path: "packages/alpha" });
     const writeReleaseNotes = vi.fn();
+
     return {
       automation: {
         packageCatalog: vi.fn(),

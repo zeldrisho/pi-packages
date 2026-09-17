@@ -17,7 +17,9 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(import.meta.dirname ?? process.cwd(), "..");
+
 const PACKAGES = ["pi-web-fetch", "pi-web-search"] as const;
+
 const FILES = ["cache.ts", "inflight.ts", "render.ts"] as const;
 
 function pairs() {
@@ -34,14 +36,17 @@ function read(path: string): string | null {
 
 function check(): number {
   let drift = 0;
+
   for (const { file, a, b } of pairs()) {
     const left = read(a);
     const right = read(b);
+
     if (left === null || right === null) {
       console.error(`missing: ${left === null ? a : b}`);
       drift += 1;
       continue;
     }
+
     if (left !== right) {
       console.error(`DRIFT: ${file} differs between ${PACKAGES[0]} and ${PACKAGES[1]}`);
       drift += 1;
@@ -49,6 +54,7 @@ function check(): number {
       console.log(`ok: ${file}`);
     }
   }
+
   return drift;
 }
 
@@ -57,21 +63,28 @@ function sync(from: string): number {
   // CLI string so `includes` accepts the known union.
   if (!PACKAGES.includes(from as (typeof PACKAGES)[number])) {
     console.error(`--from must be one of: ${PACKAGES.join(", ")}`);
+
     return 1;
   }
+
   const source = from === PACKAGES[0] ? PACKAGES[0] : PACKAGES[1];
   const target = source === PACKAGES[0] ? PACKAGES[1] : PACKAGES[0];
+
   for (const { file } of pairs()) {
     const src = join(ROOT, "packages", source, "src", file);
     const dst = join(ROOT, "packages", target, "src", file);
     const content = read(src);
+
     if (content === null) {
       console.error(`missing source: ${src}`);
+
       return 1;
     }
+
     writeFileSync(dst, content, "utf8");
     console.log(`synced ${file}: ${source} -> ${target}`);
   }
+
   return check() === 0 ? 0 : 1;
 }
 
@@ -86,11 +99,14 @@ export interface SyncArguments {
  */
 export function parseSyncArguments(argv: string[]): SyncArguments {
   const [command = "check", ...rest] = argv;
+
   if (command !== "check" && command !== "sync") {
     throw new Error(`unknown command: ${command} (expected "check" or "sync")`);
   }
+
   const fromFlagIndex = rest.findIndex((arg) => arg === "--from");
   const fromFlag = rest.find((arg) => arg.startsWith("--from="));
+
   // SAFETY: the `--from` value is validated against PACKAGES below; the
   // assertions narrow the CLI string to the known union of package names.
   const from = fromFlag
@@ -98,9 +114,11 @@ export function parseSyncArguments(argv: string[]): SyncArguments {
     : fromFlagIndex !== -1
       ? (rest[fromFlagIndex + 1] as (typeof PACKAGES)[number])
       : PACKAGES[0];
+
   if (!PACKAGES.includes(from)) {
     throw new Error(`--from must be one of: ${PACKAGES.join(", ")}`);
   }
+
   return { command, from };
 }
 

@@ -5,6 +5,7 @@ export {
   type ResolveAddresses,
   type ValidatedTarget,
 } from "./network-policy";
+
 export {
   decodeResponse,
   FETCH_MAX_BYTES,

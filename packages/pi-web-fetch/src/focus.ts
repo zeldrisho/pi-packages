@@ -1,4 +1,5 @@
 const WORD_PATTERN = /[\p{L}\p{N}_+#]+/gu;
+
 const HEADING_PATTERN = /^#{1,6}\s+\S/;
 
 /** Metadata describing deterministic query-focused extraction. */
@@ -35,24 +36,31 @@ function splitSections(markdown: string): Section[] {
     .split(/\n{2,}/)
     .map((block) => block.trim())
     .filter(Boolean);
+
   if (blocks.length === 0) return [];
 
   const lines = markdown.split(/\r?\n/);
   const hasHeadings = lines.some((line) => HEADING_PATTERN.test(line));
+
   if (!hasHeadings) return blocks.map((block) => ({ markdown: block, tokens: tokens(block) }));
 
   const sections: string[] = [];
   let current: string[] = [];
+
   const flush = () => {
     const section = current.join("\n").trim();
+
     if (section) sections.push(section);
     current = [];
   };
+
   for (const line of lines) {
     if (HEADING_PATTERN.test(line)) flush();
     current.push(line);
   }
+
   flush();
+
   return sections.map((section) => ({ markdown: section, tokens: tokens(section) }));
 }
 
@@ -83,7 +91,9 @@ export function focusMarkdown(markdown: string, query: string): FocusResult {
 
   const averageLength =
     sections.reduce((sum, section) => sum + section.tokens.length, 0) / sections.length || 1;
+
   const documentFrequency = new Map<string, number>();
+
   for (const term of queryTerms) {
     documentFrequency.set(
       term,
@@ -93,24 +103,31 @@ export function focusMarkdown(markdown: string, query: string): FocusResult {
 
   const selected = sections.filter((section) => {
     const frequencies = new Map<string, number>();
+
     for (const token of section.tokens) frequencies.set(token, (frequencies.get(token) ?? 0) + 1);
     const lengthNormalization = 1 - 0.75 + 0.75 * (section.tokens.length / averageLength);
     let score = 0;
+
     for (const term of queryTerms) {
       const frequency = frequencies.get(term) ?? 0;
+
       if (frequency === 0) continue;
       const frequencyInDocuments = documentFrequency.get(term) ?? 0;
+
       const inverseDocumentFrequency = Math.log(
         1 + (sections.length - frequencyInDocuments + 0.5) / (frequencyInDocuments + 0.5),
       );
+
       score +=
         inverseDocumentFrequency *
         ((frequency * (1.2 + 1)) / (frequency + 1.2 * lengthNormalization));
     }
+
     return score > 0;
   });
 
   const focused = selected.map((section) => section.markdown).join("\n\n");
+
   return {
     markdown: focused,
     details: {

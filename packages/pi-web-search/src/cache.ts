@@ -48,9 +48,11 @@ export function stableKeyHash(key: string): string {
 export function resolveCachePath(directory: string, keyPath: string): string {
   const base = resolve(directory);
   const full = resolve(base, keyPath);
+
   if (full !== base && !full.startsWith(base + sep)) {
     throw new Error(`Refusing to write cache entry outside ${base}: ${keyPath}`);
   }
+
   return full;
 }
 
@@ -63,10 +65,12 @@ export function resolveCachePath(directory: string, keyPath: string): string {
 function encodeExpiresAt(expiresAt: number): Uint8Array {
   const out = new Uint8Array(8);
   let value = BigInt(Math.round(expiresAt));
+
   for (let index = 7; index >= 0; index -= 1) {
     out[index] = Number(value & 0xffn);
     value >>= 8n;
   }
+
   return out;
 }
 
@@ -78,7 +82,9 @@ function encodeExpiresAt(expiresAt: number): Uint8Array {
  */
 function decodeExpiresAt(bytes: Uint8Array): number {
   let value = 0n;
+
   for (let index = 0; index < 8; index += 1) value = (value << 8n) | BigInt(bytes[index]);
+
   return Number(value);
 }
 
@@ -123,19 +129,26 @@ export class ExpiringLruCache<K, V> {
    */
   get(key: K): V | undefined {
     const entry = this.#entries.get(key);
+
     if (entry) {
       if (entry.expiresAt <= this.now()) {
         this.#delete(key);
+
         return undefined;
       }
+
       this.#entries.delete(key);
       this.#entries.set(key, entry);
+
       return entry.value;
     }
+
     if (this.persistence) {
       const loaded = this.#loadFromDisk(key);
+
       if (loaded !== undefined) return loaded.value;
     }
+
     return undefined;
   }
 
@@ -150,13 +163,16 @@ export class ExpiringLruCache<K, V> {
   set(key: K, value: V, expiresAt: number): boolean {
     this.#delete(key);
     const size = this.sizeOf(value);
+
     if (size > this.maxBytes) return false;
 
     this.#entries.set(key, { expiresAt, size, value });
     this.#byteSize += size;
     this.#evict();
     const stored = this.#entries.has(key);
+
     if (stored && this.persistence) this.#writeToDisk(key, value, expiresAt);
+
     return stored;
   }
 
@@ -164,6 +180,7 @@ export class ExpiringLruCache<K, V> {
     let bytes: Uint8Array;
     const path = resolveCachePath(this.persistence!.directory, this.persistence!.keyToPath(key));
     let fileSize: number;
+
     try {
       // Serialized metadata can exceed the value budget, but never allow an
       // unbounded cache file to be read into memory.
@@ -171,37 +188,50 @@ export class ExpiringLruCache<K, V> {
     } catch {
       return undefined;
     }
+
     if (fileSize < 8 || fileSize > this.maxBytes * 2 + 65_536) {
       this.#removeFromDisk(key);
+
       return undefined;
     }
+
     try {
       bytes = readFileSync(path);
     } catch {
       return undefined;
     }
+
     let entry: ExpiringCacheEntry<V>;
+
     try {
       const expiresAt = decodeExpiresAt(bytes);
       const value = this.persistence!.deserialize(bytes.subarray(8));
+
       if (this.persistence!.validate && !this.persistence!.validate(value)) {
         throw new Error("invalid cache entry");
       }
+
       const size = this.sizeOf(value);
+
       if (!Number.isFinite(size) || size < 0 || size > this.maxBytes)
         throw new Error("oversized cache entry");
       entry = { expiresAt, size, value };
     } catch {
       this.#removeFromDisk(key);
+
       return undefined;
     }
+
     if (entry.expiresAt <= this.now()) {
       this.#removeFromDisk(key);
+
       return undefined;
     }
+
     this.#entries.set(key, entry);
     this.#byteSize += entry.size;
     this.#evict();
+
     return this.#entries.get(key);
   }
 
@@ -211,10 +241,12 @@ export class ExpiringLruCache<K, V> {
       mkdirSync(directory, { recursive: true, mode: 0o700 });
       chmodSync(directory, 0o700);
       const payload = this.persistence!.serialize(value);
+
       if (payload.byteLength > this.maxBytes * 2 + 65_536)
         throw new Error("oversized cache payload");
       const path = resolveCachePath(directory, this.persistence!.keyToPath(key));
       const temp = `${path}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
+
       try {
         writeFileSync(temp, Buffer.concat([encodeExpiresAt(expiresAt), payload]), { mode: 0o600 });
         chmodSync(temp, 0o600);
@@ -241,27 +273,35 @@ export class ExpiringLruCache<K, V> {
 
   #maintainDisk(): void {
     const persistence = this.persistence!;
+
     try {
       const files = readdirSync(persistence.directory);
       const candidates: Array<{ path: string; size: number; mtime: number }> = [];
+
       for (const file of files) {
         const path = resolveCachePath(persistence.directory, file);
+
         if (file.endsWith(".tmp")) {
           try {
             unlinkSync(path);
           } catch {
             // Best effort cleanup.
           }
+
           continue;
         }
+
         try {
           const stat = statSync(path);
+
           if (!stat.isFile() || stat.size < 8 || stat.size > this.maxBytes * 2 + 65_536) {
             unlinkSync(path);
             continue;
           }
+
           const descriptor = openSync(path, "r");
           const header = new Uint8Array(8);
+
           try {
             if (
               readSync(descriptor, header, 0, 8, 0) !== 8 ||
@@ -273,17 +313,22 @@ export class ExpiringLruCache<K, V> {
           } finally {
             closeSync(descriptor);
           }
+
           candidates.push({ path, size: stat.size, mtime: stat.mtimeMs });
         } catch {
           // Ignore races and inaccessible files in this best-effort sweep.
         }
       }
+
       candidates.sort((a, b) => a.mtime - b.mtime);
       let total = candidates.reduce((sum, candidate) => sum + candidate.size, 0);
+
       while (candidates.length > this.maxEntries || total > this.maxBytes * 2 + 65_536) {
         const oldest = candidates.shift();
+
         if (!oldest) break;
         total -= oldest.size;
+
         try {
           unlinkSync(oldest.path);
         } catch {
@@ -298,6 +343,7 @@ export class ExpiringLruCache<K, V> {
   #evict(): void {
     while (this.#entries.size > this.maxEntries || this.#byteSize > this.maxBytes) {
       const oldest = this.#entries.keys().next().value;
+
       if (oldest === undefined) break;
       this.#delete(oldest);
     }
@@ -305,12 +351,16 @@ export class ExpiringLruCache<K, V> {
 
   #delete(key: K): void {
     const entry = this.#entries.get(key);
+
     if (!entry) {
       if (this.persistence) this.#removeFromDisk(key);
+
       return;
     }
+
     this.#entries.delete(key);
     this.#byteSize -= entry.size;
+
     if (this.persistence) this.#removeFromDisk(key);
   }
 }

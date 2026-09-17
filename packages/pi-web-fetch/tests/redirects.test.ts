@@ -26,17 +26,21 @@ describe("web_fetch redirects", () => {
   it("revalidates and repins every redirect", async () => {
     const validated: string[] = [];
     const requested: ValidatedTarget[] = [];
+
     const result = await fetchRemoteContent(`${origin}/redirect`, 0, 6_000, undefined, {
       validateUrl: async (value) => {
         const url = value instanceof URL ? value : new URL(value);
         validated.push(url.pathname);
+
         return { url, address: "127.0.0.1", family: 4 };
       },
       request: async (target, signal) => {
         requested.push(target);
+
         return await requestPinned(target, signal);
       },
     });
+
     expect(validated).toEqual(["/redirect", "/html"]);
     expect(requested.map((target) => target.url.pathname)).toEqual(["/redirect", "/html"]);
     expect(requested[1]).not.toBe(requested[0]);
@@ -49,13 +53,16 @@ describe("web_fetch redirects", () => {
       fetchRemoteContent(`${origin}/redirect-blocked`, 0, 6_000, undefined, {
         validateUrl: async (value) => {
           const url = value instanceof URL ? value : new URL(value);
+
           if (url.pathname === "/redirect-blocked") {
             return { url, address: "127.0.0.1", family: 4 };
           }
+
           return await validateRemoteUrl(url);
         },
         request: async (target, signal) => {
           requested.push(target.url.pathname);
+
           return await requestPinned(target, signal);
         },
       }),

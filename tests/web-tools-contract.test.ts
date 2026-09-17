@@ -11,6 +11,7 @@ function textResponse(body: string): IncomingMessage {
   const response = Readable.from([body]) as IncomingMessage;
   response.statusCode = 200;
   response.headers = { "content-type": "text/plain; charset=utf-8" };
+
   return response;
 }
 
@@ -57,11 +58,13 @@ describe("web tool truncation contract", () => {
     expect(fetchResult.details.nextOffset).toBe(fetchResult.details.truncation.nextOffset);
 
     process.env.BRAVE_SEARCH_API_KEY = "contract-secret";
+
     const generic = Array.from({ length: 20 }, (_, index) => ({
       title: `Contract result ${index}`,
       url: `https://search-contract.example/${index}`,
       snippets: ["a".repeat(8_000), "b".repeat(8_000), "c".repeat(8_000)],
     }));
+
     vi.stubGlobal(
       "fetch",
       vi.fn(
@@ -73,12 +76,14 @@ describe("web tool truncation contract", () => {
     );
 
     const runtime = new SearchRuntime();
+
     try {
       const searchResult = await runtime.execute(
         { query: "repository truncation contract", mode: "context", count: 20 },
         undefined,
         undefined,
       );
+
       expectCommonTruncationContract(
         searchResult.details.truncation,
         searchResult.details.truncated,

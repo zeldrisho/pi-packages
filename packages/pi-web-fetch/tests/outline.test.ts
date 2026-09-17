@@ -117,12 +117,14 @@ describe("document outlines", () => {
 
   it("bounds heading count and remote heading text", () => {
     const longHeading = "A".repeat(MAX_OUTLINE_HEADING_CHARACTERS + 20);
+
     const markdown = [
       `# ${longHeading}`,
       ...Array.from({ length: MAX_OUTLINE_HEADINGS + 2 }, (_, index) =>
         [`## Section ${index}`, "Body."].join("\n"),
       ),
     ].join("\n");
+
     const outline = createDocumentOutline(markdown);
 
     expect(outline.totalHeadings).toBe(MAX_OUTLINE_HEADINGS + 3);

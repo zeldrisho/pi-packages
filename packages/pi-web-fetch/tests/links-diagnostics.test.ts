@@ -33,6 +33,7 @@ describe("bounded extracted links", () => {
       '<a href="data:text/plain,no">Data</a>',
       '<a href="https://user:secret@other.example/private">Credentials</a>',
     ].join("");
+
     expect(extractDocumentLinks(html, new URL("https://example.com/docs/page"))).toEqual({
       internal: [{ url: "https://example.com/guide", anchorText: "Internal guide" }],
       external: [{ url: "https://other.example/path", anchorText: "External" }],
@@ -46,6 +47,7 @@ describe("bounded extracted links", () => {
       { length: 20 },
       (_, index) => `<a href="/page-${index}">Page ${index}</a>`,
     ).join("");
+
     const links = extractDocumentLinks(html, new URL("https://example.com/"));
     expect(links.internal).toHaveLength(16);
     expect(links.omittedInternal).toBe(4);

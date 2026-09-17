@@ -20,6 +20,7 @@ describe("web_search provider transport", () => {
   it("uses only Brave's context endpoint without fetching result URLs", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "context-only-secret";
     const resultUrl = "https://example.com/provider-result";
+
     const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) =>
       jsonResponse({
         grounding: {
@@ -27,6 +28,7 @@ describe("web_search provider transport", () => {
         },
       }),
     );
+
     vi.stubGlobal("fetch", fetchMock);
 
     await createSearchTool().execute(
@@ -87,6 +89,7 @@ describe("web_search provider transport", () => {
   it("rejects successful streamed responses that exceed the byte limit", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "streamed-oversize-secret";
     let cancelled = false;
+
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(new Uint8Array(1_000_001).fill(0x20));
@@ -96,6 +99,7 @@ describe("web_search provider transport", () => {
         cancelled = true;
       },
     });
+
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response(body, { headers: { "content-type": "application/json" } })),
@@ -121,6 +125,7 @@ describe("web_search provider transport", () => {
   it("stops reading oversized provider errors while preserving the HTTP status", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "large-error-secret";
     let cancelled = false;
+
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(new TextEncoder().encode(`<b>${"failure ".repeat(1_200)}`));
@@ -129,6 +134,7 @@ describe("web_search provider transport", () => {
         cancelled = true;
       },
     });
+
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response(body, { status: 429 })),
@@ -161,15 +167,18 @@ describe("web_search provider transport", () => {
             once: true,
           });
         });
+
         return jsonResponse({});
       }),
     );
+
     const pending = createSearchTool().execute(
       "call",
       { query: "timeout query" },
       undefined,
       undefined,
     );
+
     const expectation = expect(pending).rejects.toThrow("timed out after 20 seconds");
     await vi.advanceTimersByTimeAsync(20_000);
     await expectation;
@@ -185,16 +194,19 @@ describe("web_search provider transport", () => {
             once: true,
           });
         });
+
         return jsonResponse({});
       }),
     );
     const controller = new AbortController();
+
     const pending = createSearchTool().execute(
       "call",
       { query: "cancel query" },
       controller.signal,
       undefined,
     );
+
     controller.abort();
     await expect(pending).rejects.toThrow("cancelled");
   });

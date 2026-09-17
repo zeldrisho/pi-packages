@@ -6,6 +6,7 @@ import registerWebFetch from "../src/index";
 
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@earendil-works/pi-coding-agent")>();
+
   return { ...actual, keyHint: () => "Ctrl+O to expand" };
 });
 
@@ -52,7 +53,9 @@ describe("web_fetch rendering", () => {
         theme: RenderTheme,
       ): RenderedComponent;
     };
+
     const output = Array.from({ length: 12 }, (_, index) => `Fetched line ${index + 1}`).join("\n");
+
     const result = {
       content: [{ type: "text" as const, text: output }],
       details: {
@@ -67,6 +70,7 @@ describe("web_fetch rendering", () => {
       .renderResult(result, { expanded: false, isPartial: false }, renderTheme)
       .render(200)
       .join("\n");
+
     const expanded = tool
       .renderResult(result, { expanded: true, isPartial: false }, renderTheme)
       .render(200)
@@ -80,6 +84,7 @@ describe("web_fetch rendering", () => {
     expect(
       tool.renderCall({ url: "https://example.com" }, renderTheme).render(200).join("\n"),
     ).toContain("web_fetch https://example.com");
+
     const credentialedCall = tool
       .renderCall(
         { url: "https://user:password@example.com/page?token=secret&page=2" },
@@ -87,6 +92,7 @@ describe("web_fetch rendering", () => {
       )
       .render(200)
       .join("\n");
+
     expect(credentialedCall).toContain("web_fetch https://example.com/page?token=REDACTED&page=2");
     expect(credentialedCall).not.toContain("user");
     expect(credentialedCall).not.toContain("password");
@@ -121,6 +127,7 @@ describe("web_fetch rendering", () => {
       0,
       200_000,
     );
+
     expect(result.truncated).toBe(true);
     expect(result.markdown).not.toMatch(/[\uD800-\uDBFF]\n\n\[Content truncated/);
   });
@@ -129,6 +136,7 @@ describe("web_fetch rendering", () => {
     const markdown = htmlToMarkdownFallback(
       "<html><body>  Hello   world<nav>menu</nav><script>bad()</script><p>Next</p></body></html>",
     );
+
     expect(markdown).toContain("Hello world");
     expect(markdown).toContain("Next");
     expect(markdown).not.toContain("menu");

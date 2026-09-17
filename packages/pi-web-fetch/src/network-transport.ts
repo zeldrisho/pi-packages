@@ -20,6 +20,7 @@ const encoder = new TextEncoder();
 function abortedError(): Error {
   const error = new Error("Operation aborted.");
   error.name = "AbortError";
+
   return error;
 }
 
@@ -39,6 +40,7 @@ function responseTooLargeMessage(
   const size = sizeIsExact
     ? `is ${formatSize(receivedBytes)}`
     : `has reached at least ${formatSize(receivedBytes)}`;
+
   return [
     `web_fetch response ${size}, exceeding the ${formatSize(maxBytes)} raw download limit.`,
     "maxCharacters only controls returned output.",
@@ -63,7 +65,9 @@ async function requestOnce(
   headers: Readonly<Record<string, string>>,
 ): Promise<IncomingMessage> {
   const family = isIP(address);
+
   if (family !== 4 && family !== 6) throw new Error(`web_fetch could not resolve ${address}.`);
+
   const lookup: LookupFunction = (_hostname, options, callback) => {
     // Match dns.lookup's asynchronous callback contract. Calling back inline
     // lets an immediately unreachable address emit a socket error before
@@ -73,18 +77,24 @@ async function requestOnce(
       else callback(null, address, family);
     });
   };
+
   const request = target.url.protocol === "https:" ? httpsRequest : httpRequest;
+
   return await new Promise((resolve, reject) => {
     const controller = new AbortController();
     let attemptExpired = false;
+
     const timer = setTimeout(() => {
       attemptExpired = true;
       controller.abort();
     }, attemptTimeoutMs);
+
     const forwardAbort = () => controller.abort();
+
     if (signal.aborted) controller.abort();
     else signal.addEventListener("abort", forwardAbort, { once: true });
     let settled = false;
+
     const finish = (callback: () => void) => {
       if (settled) return;
       settled = true;
@@ -92,8 +102,10 @@ async function requestOnce(
       signal.removeEventListener("abort", forwardAbort);
       callback();
     };
+
     const unreachableError = () =>
       new Error(`web_fetch could not reach ${address} within ${attemptTimeoutMs} ms.`);
+
     const outgoing = request(
       target.url,
       {
@@ -114,6 +126,7 @@ async function requestOnce(
         } else finish(() => resolve(response));
       },
     );
+
     outgoing.once("error", (error) => {
       // The per-attempt deadline surfaces as a raw AbortError from the HTTP
       // client; report it as an unreachable address instead so the next
@@ -148,14 +161,17 @@ export async function requestPinned(
   const attemptTimeoutMs = options.attemptTimeoutMs ?? CONNECT_ATTEMPT_TIMEOUT_MS;
   const addresses = target.addresses?.length ? target.addresses : [target.address];
   let lastError: unknown;
+
   for (const address of addresses) {
     try {
       return await requestOnce(target, address, signal, attemptTimeoutMs, options.headers ?? {});
     } catch (error) {
       lastError = error;
+
       if (signal.aborted) throw error;
     }
   }
+
   throw lastError ?? new Error("web_fetch could not connect.");
 }
 
@@ -168,6 +184,7 @@ export async function requestPinned(
  */
 export function responseHeader(response: IncomingMessage, name: string): string | undefined {
   const value = response.headers[name];
+
   return Array.isArray(value) ? value[0] : value;
 }
 
@@ -189,27 +206,33 @@ export async function readResponseBytes(
   signal?: AbortSignal,
 ): Promise<Uint8Array> {
   const declared = Number(responseHeader(response, "content-length"));
+
   if (Number.isFinite(declared) && declared > maxBytes) {
     response.destroy();
     throw new Error(responseTooLargeMessage(declared, maxBytes, true));
   }
+
   // Once response headers arrive the connect deadline and caller signal are no
   // longer wired to the socket, so a stalled body would otherwise hang the
   // fetch forever. Keep the caller signal attached for the whole body read and
   // drop the socket when it fires.
   const forwardAbort = () => response.destroy();
+
   if (signal?.aborted) response.destroy();
   else signal?.addEventListener("abort", forwardAbort, { once: true });
   const chunks: Uint8Array[] = [];
   let total = 0;
+
   try {
     for await (const value of response) {
       const chunk = value instanceof Uint8Array ? value : encoder.encode(value);
       total += chunk.byteLength;
+
       if (total > maxBytes) {
         response.destroy();
         throw new Error(responseTooLargeMessage(total, maxBytes, false));
       }
+
       chunks.push(chunk);
     }
   } catch (error) {
@@ -218,15 +241,18 @@ export async function readResponseBytes(
   } finally {
     signal?.removeEventListener("abort", forwardAbort);
   }
+
   // Destroying the socket can end the stream without an error; detect a
   // mid-read abort here as well so truncated bodies never look complete.
   if (signal?.aborted) throw abortedError();
   const output = new Uint8Array(total);
   let offset = 0;
+
   for (const chunk of chunks) {
     output.set(chunk, offset);
     offset += chunk.byteLength;
   }
+
   return output;
 }
 
@@ -242,6 +268,7 @@ export async function readResponseBytes(
  */
 export function decodeResponse(bytes: Uint8Array, contentTypeHeader: string): string {
   const charset = contentTypeHeader.match(/(?:^|;)\s*charset\s*=\s*["']?([^;"'\s]+)/i)?.[1];
+
   try {
     return new TextDecoder(charset || "utf-8").decode(bytes);
   } catch {

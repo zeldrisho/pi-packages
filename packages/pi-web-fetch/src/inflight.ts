@@ -19,12 +19,16 @@ function waitForCaller<T>(
   cancelledMessage: string,
 ): Promise<T> {
   if (!signal) return operation;
+
   return new Promise((resolve, reject) => {
     const abort = (): void => reject(new Error(cancelledMessage));
+
     if (signal.aborted) {
       abort();
+
       return;
     }
+
     signal.addEventListener("abort", abort, { once: true });
     operation.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort));
   });
@@ -61,6 +65,7 @@ export class InflightCoalescer<K, V> {
     cancelledMessage: string,
   ): Promise<V> {
     let entry = this.#entries.get(key);
+
     if (!entry) {
       if (this.#entries.size >= this.maxEntries) return operation(signal);
       const controller = new AbortController();
@@ -79,16 +84,19 @@ export class InflightCoalescer<K, V> {
     }
 
     entry.waiters += 1;
+
     try {
       return await waitForCaller(entry.promise, signal, cancelledMessage);
     } finally {
       entry.waiters -= 1;
+
       if (entry.waiters === 0 && !entry.settled) entry.controller.abort();
     }
   }
 
   #settle(key: K, entry: InflightEntry<V>): void {
     entry.settled = true;
+
     if (this.#entries.get(key) === entry) this.#entries.delete(key);
   }
 }

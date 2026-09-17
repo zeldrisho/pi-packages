@@ -185,14 +185,20 @@ catalogs:
     typescript:
       specifier: ^7.0.2
       version: 7.0.2
+    vite:
+      specifier: npm:@voidzero-dev/vite-plus-core@0.3.2
+      version: 0.3.2
     vite-plus:
       specifier: 0.3.2
       version: 0.3.2
+    vitest:
+      specifier: 4.1.11
+      version: 4.1.11
 
 overrides:
-  vite: npm:@voidzero-dev/vite-plus-core@0.3.2
-  vitest: 4.1.11
   nanoid@^3.3.17: 3.3.18
+  vite@*: npm:@voidzero-dev/vite-plus-core@0.3.2
+  vitest@*: 4.1.11
 
 importers:
 
@@ -208,13 +214,13 @@ importers:
         specifier: 'catalog:'
         version: 7.0.2
       vite:
-        specifier: npm:@voidzero-dev/vite-plus-core@0.3.2
+        specifier: 'catalog:'
         version: '@voidzero-dev/vite-plus-core@0.3.2(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)'
       vite-plus:
         specifier: 'catalog:'
         version: 0.3.2(@opentelemetry/api@1.9.0)(@types/node@26.2.0)(@vitest/coverage-v8@4.1.11)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)
       vitest:
-        specifier: 4.1.11
+        specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@26.2.0)(@vitest/browser-preview@4.1.11)(@vitest/coverage-v8@4.1.11)(@voidzero-dev/vite-plus-core@0.3.2(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))
 
   packages/pi-gate:
@@ -226,7 +232,7 @@ importers:
         specifier: 'catalog:'
         version: 7.0.2
       vite:
-        specifier: npm:@voidzero-dev/vite-plus-core@0.3.2
+        specifier: 'catalog:'
         version: '@voidzero-dev/vite-plus-core@0.3.2(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)'
       vite-plus:
         specifier: 'catalog:'
@@ -254,7 +260,7 @@ importers:
         specifier: 'catalog:'
         version: 7.0.2
       vite:
-        specifier: npm:@voidzero-dev/vite-plus-core@0.3.2
+        specifier: 'catalog:'
         version: '@voidzero-dev/vite-plus-core@0.3.2(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)'
       vite-plus:
         specifier: 'catalog:'
@@ -278,7 +284,7 @@ importers:
         specifier: 'catalog:'
         version: 7.0.2
       vite:
-        specifier: npm:@voidzero-dev/vite-plus-core@0.3.2
+        specifier: 'catalog:'
         version: '@voidzero-dev/vite-plus-core@0.3.2(@types/node@26.2.0)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)'
       vite-plus:
         specifier: 'catalog:'

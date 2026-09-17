@@ -24,6 +24,7 @@ import { formatCollapsibleOutput } from "./render";
 import { SearchRuntime } from "./search";
 
 export { ExpiringLruCache } from "./cache";
+
 export {
   SearchRuntime,
   summarizeDomainDiversity,
@@ -33,6 +34,7 @@ export {
   type SearchParameters,
   type SearchTruncationDetails,
 } from "./search";
+
 export type { BraveQueryMeta, ContextDepth, ContextThresholdMode, SearchResponse } from "./brave";
 
 export const webSearchParameters = Type.Object({
@@ -194,6 +196,7 @@ export default function (pi: ExtensionAPI) {
       if (isPartial) return new Text(theme.fg("warning", "Searching…"), 0, 0);
 
       const content = result.content.find((item) => item.type === "text");
+
       return new Text(
         content?.type === "text"
           ? formatCollapsibleOutput(content.text, expanded, theme)

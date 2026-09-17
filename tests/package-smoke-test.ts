@@ -4,18 +4,25 @@ import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const root = resolve(import.meta.dirname, "..");
+
 const packagesDirectory = join(root, "packages");
+
 const packageDirectories = (await readdir(packagesDirectory, { withFileTypes: true }))
   .filter((entry) => entry.isDirectory())
   .map((entry) => join(packagesDirectory, entry.name));
+
 const temporaryDirectory = await mkdtemp(join(tmpdir(), "pi-package-smoke-"));
+
 const tarballDirectory = join(temporaryDirectory, "tarballs");
+
 const fixtureDirectory = join(temporaryDirectory, "fixture");
+
 const piEcosystemDependencies = [
   "@earendil-works/pi-ai",
   "@earendil-works/pi-coding-agent",
   "@earendil-works/pi-tui",
 ] as const;
+
 const smokeDependencies = [...piEcosystemDependencies, "typebox"] as const;
 
 /**
@@ -32,6 +39,7 @@ async function smokeDependencyVersion(packageName: string): Promise<string> {
   ) {
     return "latest";
   }
+
   for (const packageDirectory of packageDirectories) {
     try {
       const manifestPath = join(
@@ -40,9 +48,11 @@ async function smokeDependencyVersion(packageName: string): Promise<string> {
         ...packageName.split("/"),
         "package.json",
       );
+
       // SAFETY: manifests are produced by `vp pm pack`; we only read the `version`
       // field, which is a semver string when present.
       const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as { version?: string };
+
       if (manifest.version && /^\d+\.\d+\.\d+/.test(manifest.version)) {
         return manifest.version;
       }
@@ -52,6 +62,7 @@ async function smokeDependencyVersion(packageName: string): Promise<string> {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
   }
+
   throw new Error(`Unable to derive the installed version for ${packageName}`);
 }
 
@@ -66,6 +77,7 @@ async function smokeDependencyVersion(packageName: string): Promise<string> {
  */
 function run(command: string, args: string[], cwd: string) {
   const result = spawnSync(command, args, { cwd, encoding: "utf8", stdio: "pipe" });
+
   if (result.status !== 0) {
     process.stderr.write(result.stdout);
     process.stderr.write(result.stderr);
@@ -81,13 +93,16 @@ try {
 
   const dependencies: Record<string, string> = {};
   const packageNames: string[] = [];
+
   for (const directory of packageDirectories) {
     const manifest = JSON.parse(await readFile(join(directory, "package.json"), "utf8"));
     run("vp", ["pm", "pack", "--", "--pack-destination", tarballDirectory], directory);
     const prefix = `${manifest.name.replace(/^@/, "").replace("/", "-")}-${manifest.version}`;
+
     const tarball = (await readdir(tarballDirectory)).find(
       (file) => file.startsWith(prefix) && file.endsWith(".tgz"),
     );
+
     if (!tarball) throw new Error(`No tarball was produced for ${manifest.name}`);
     dependencies[manifest.name] = `file:${join(tarballDirectory, tarball)}`;
     packageNames.push(manifest.name);
@@ -96,6 +111,7 @@ try {
   for (const packageName of smokeDependencies) {
     dependencies[packageName] = await smokeDependencyVersion(packageName);
   }
+
   await writeFile(
     join(fixtureDirectory, "package.json"),
     `${JSON.stringify(
