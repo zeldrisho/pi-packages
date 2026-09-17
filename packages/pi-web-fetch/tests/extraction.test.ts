@@ -96,6 +96,17 @@ describe("HTML extraction", () => {
     expect(result.markdown.slice(offset)).toMatch(/^#+ Get started/m);
   });
 
+  it("strips markup before generating fragment slugs", async () => {
+    const result = await extractHtmlToMarkdown(
+      `<main><article><h1>Guide</h1><h2 id="markup-heading"><em>Markup</em> heading</h2><p>${longText()}</p></article></main>`,
+      new URL("https://example.com/guide"),
+    );
+
+    const offset = result.fragmentOffsets?.["markup-heading"];
+    expect(offset).toBeDefined();
+    expect(result.markdown.slice(offset)).toMatch(/^#+ Markup heading/m);
+  });
+
   it("discards malformed schema.org data without writing through Pi's TUI", async () => {
     const articleText = longText();
 

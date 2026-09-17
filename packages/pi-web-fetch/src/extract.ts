@@ -3,9 +3,31 @@ import type { DefuddleResponse } from "defuddle/node";
 
 const RAW_ID_SELECTOR_SAFE = /^-?[_a-zA-Z][-_a-zA-Z0-9]*$/;
 
+function stripMarkupForFragmentSlug(value: string): string {
+  let result = "";
+
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] !== "<") {
+      result += value[index];
+      continue;
+    }
+
+    const tagEnd = value.indexOf(">", index + 1);
+
+    if (tagEnd < 0) {
+      // Preserve the old behavior for an unterminated tag: only discard `<`.
+      result += value.slice(index + 1);
+      break;
+    }
+
+    index = tagEnd;
+  }
+
+  return result;
+}
+
 function fragmentSlug(value: string): string {
-  return value
-    .replace(/<[^>]*>/g, "")
+  return stripMarkupForFragmentSlug(value)
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
