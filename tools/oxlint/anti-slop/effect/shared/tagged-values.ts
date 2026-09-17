@@ -3,11 +3,13 @@ import type { ESTree } from "vite-plus/lint/plugins";
 const equalityOperators = new Set(["==", "===", "!=", "!=="]);
 const broadEffectCatchMethods = new Set(["catch", "catchAll", "catchIf"]);
 
+/** Return whether a node is an ESTree string literal. */
 export const isStringLiteral = (
 	node: ESTree.Node | null | undefined,
 ): node is ESTree.StringLiteral =>
 	node?.type === "Literal" && typeof node.value === "string";
 
+/** Recognize dot or computed access to a tagged value's `_tag` field. */
 export const isTagMember = (
 	node: ESTree.Node | null | undefined,
 ): node is ESTree.MemberExpression =>
@@ -19,6 +21,7 @@ export const isTagMember = (
 			isStringLiteral(node.property) &&
 			node.property.value === "_tag"));
 
+/** Extract the `_tag` member from a comparison against a string literal. */
 export const tagMemberFromComparison = (
 	node: ESTree.BinaryExpression,
 ): ESTree.MemberExpression | undefined => {
@@ -28,6 +31,7 @@ export const tagMemberFromComparison = (
 	return undefined;
 };
 
+/** Recognize calls to Effect's broad catch combinators. */
 const isBroadEffectCatchCall = (
 	node: ESTree.Node | null | undefined,
 ): node is ESTree.CallExpression =>
@@ -39,6 +43,7 @@ const isBroadEffectCatchCall = (
 	node.callee.property.type === "Identifier" &&
 	broadEffectCatchMethods.has(node.callee.property.name);
 
+/** Return whether a node belongs to a callback passed to a broad Effect catch. */
 export const isInsideBroadEffectHandler = (node: ESTree.Node): boolean => {
 	let current: ESTree.Node | null | undefined = node.parent;
 	while (current !== null && current !== undefined) {
@@ -56,6 +61,7 @@ export const isInsideBroadEffectHandler = (node: ESTree.Node): boolean => {
 	return false;
 };
 
+/** Return whether a `_tag` member is nested beneath a `reason` member. */
 export const isReasonTagMember = (node: ESTree.MemberExpression): boolean =>
 	node.object.type === "MemberExpression" &&
 	((!node.object.computed &&
@@ -65,6 +71,7 @@ export const isReasonTagMember = (node: ESTree.MemberExpression): boolean =>
 			isStringLiteral(node.object.property) &&
 			node.object.property.value === "reason"));
 
+/** Read a static identifier or string-literal object property name. */
 export const propertyName = (
 	property: ESTree.ObjectProperty,
 ): string | undefined => {
@@ -80,6 +87,7 @@ export const propertyName = (
 	return undefined;
 };
 
+/** Return whether an object literal is used as an Effect Match pattern. */
 export const isMatchPatternObject = (node: ESTree.ObjectExpression): boolean => {
 	const call = node.parent;
 	if (call?.type !== "CallExpression" || !call.arguments.includes(node)) {

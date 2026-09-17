@@ -31,6 +31,7 @@ export type ResolvedTypeMatcher = (
 
 const environmentsByProgram = new WeakMap<ESTree.Program, TypeAliasEnvironment>();
 
+/** Return whether an unknown visitor-key value is an ESTree node. */
 function isNode(value: unknown): value is ESTree.Node {
 	return (
 		typeof value === "object" &&
@@ -40,6 +41,7 @@ function isNode(value: unknown): value is ESTree.Node {
 	);
 }
 
+/** Find the lexical scope that owns a type declaration. */
 function enclosingTypeScope(node: ESTree.Node): TypeScope {
 	let current: ESTree.Node | null = node.parent;
 	while (current !== null) {
@@ -57,6 +59,7 @@ function enclosingTypeScope(node: ESTree.Node): TypeScope {
 	return node;
 }
 
+/** Extract the type-space binding introduced by a declaration or import. */
 function declaredTypeBinding(node: ESTree.Node): {
 	readonly alias: ESTree.TSTypeAliasDeclaration | null;
 	readonly name: string;
@@ -82,6 +85,7 @@ function declaredTypeBinding(node: ESTree.Node): {
 	return null;
 }
 
+/** Recursively collect aliases and competing type bindings from an ESTree tree. */
 function collectTypeBindings(
 	node: ESTree.Node,
 	visitorKeys: VisitorKeys,
@@ -128,6 +132,7 @@ export function createTypeAliasEnvironment(
 	return environment;
 }
 
+/** Measure the parent-chain distance from a node to a possible ancestor. */
 function ancestorDistance(ancestor: ESTree.Node, node: ESTree.Node): number | null {
 	let current: ESTree.Node | null = node;
 	let distance = 0;
@@ -139,6 +144,7 @@ function ancestorDistance(ancestor: ESTree.Node, node: ESTree.Node): number | nu
 	return null;
 }
 
+/** Find bindings declared in the nearest lexical scope visible from a use. */
 function nearestTypeBindings(
 	name: string,
 	use: ESTree.Node,
@@ -183,10 +189,12 @@ export function hasVisibleTypeBinding(
 	);
 }
 
+/** Return the name of an unqualified type reference. */
 function typeReferenceName(type: ESTree.TSTypeReference): string | null {
 	return type.typeName.type === "Identifier" ? type.typeName.name : null;
 }
 
+/** Bind an alias's type parameters to explicit or default arguments. */
 function aliasSubstitutions(
 	alias: ESTree.TSTypeAliasDeclaration,
 	reference: ESTree.TSTypeReference,

@@ -8,6 +8,7 @@ import {
   unwrapArrayExpression,
 } from "../shared/array-method.ts";
 
+/** Find the reduce callback and accumulator that enclose an AST node. */
 function enclosingReducer(node: ESTree.Node) {
   let parent = node.parent;
   while (parent !== null) {
@@ -34,6 +35,7 @@ function enclosingReducer(node: ESTree.Node) {
   return null;
 }
 
+/** Trace stable local aliases to determine whether a node references an accumulator. */
 function referencesAccumulator(
   sourceCode: SourceCode,
   node: ESTree.Node,
@@ -57,6 +59,7 @@ function referencesAccumulator(
   return false;
 }
 
+/** Return whether a copy helper resolves to the expected unshadowed global. */
 function isGlobalCopyOwner(sourceCode: SourceCode, node: ESTree.Node, name: string): boolean {
   node = unwrapArrayExpression(node);
   if (node.type !== "Identifier" || node.name !== name) return false;

@@ -47,6 +47,7 @@ export type TypeEnvironment = {
 	readonly typeAliases: LexicalTypeAliasEnvironment;
 };
 
+/** Unwrap an exported declaration to the statement that introduces its type. */
 function declaredStatement(statement: ESTree.Statement): ESTree.Node | null {
 	return statement.type === "ExportNamedDeclaration" ||
 		statement.type === "ExportDefaultDeclaration"
@@ -54,6 +55,7 @@ function declaredStatement(statement: ESTree.Statement): ESTree.Node | null {
 		: statement;
 }
 
+/** Collect the lexical aliases and interface declarations used for type analysis. */
 export function createTypeEnvironment(
 	program: ESTree.Program,
 	visitorKeys: Readonly<Record<string, readonly string[]>>,
@@ -74,10 +76,12 @@ export function createTypeEnvironment(
 	};
 }
 
+/** Return the name of an unqualified type reference. */
 function typeReferenceName(type: ESTree.TSTypeReference): string | null {
 	return type.typeName.type === "Identifier" ? type.typeName.name : null;
 }
 
+/** Return whether a type name resolves to an unshadowed TypeScript built-in. */
 function isBuiltIn(
 	name: string,
 	use: ESTree.Node,
@@ -89,6 +93,7 @@ function isBuiltIn(
 	);
 }
 
+/** Match an unparameterized reference after removing transparent wrappers. */
 function isUnappliedReferenceTo(type: ESTree.TSType, name: string): boolean {
 	const unwrapped = unwrapTransparentType(type);
 	return (
@@ -100,6 +105,7 @@ function isUnappliedReferenceTo(type: ESTree.TSType, name: string): boolean {
 	);
 }
 
+/** Remove parenthesized and readonly wrappers that preserve dictionary shape. */
 function unwrapTransparentType(type: ESTree.TSType): ESTree.TSType {
 	let current = type;
 	while (
@@ -111,10 +117,12 @@ function unwrapTransparentType(type: ESTree.TSType): ESTree.TSType {
 	return current;
 }
 
+/** Return whether a transparently wrapped type is `never`. */
 function isNeverType(type: ESTree.TSType): boolean {
 	return unwrapTransparentType(type).type === "TSNeverKeyword";
 }
 
+/** Recognize an optional `never` property that contributes no usable shape. */
 function isEffectivelyEmptyMember(member: ESTree.TSSignature): boolean {
 	return (
 		member.type === "TSPropertySignature" &&
@@ -125,10 +133,12 @@ function isEffectivelyEmptyMember(member: ESTree.TSSignature): boolean {
 	);
 }
 
+/** Return whether a type literal has no inhabitable members. */
 function isEffectivelyEmptyTypeLiteral(type: ESTree.TSTypeLiteral): boolean {
 	return type.members.length === 0 || type.members.every(isEffectivelyEmptyMember);
 }
 
+/** Return whether a sole interface declaration has no inhabitable members or bases. */
 function isEffectivelyEmptyInterface(
 	declarations: readonly ESTree.TSInterfaceDeclaration[],
 ): boolean {
@@ -141,6 +151,7 @@ function isEffectivelyEmptyInterface(
 	);
 }
 
+/** Resolve chained type-parameter substitutions while guarding against cycles. */
 function resolvedSubstitutionArgument(
 	type: ESTree.TSType,
 	base: TypeAliasEnvironment,
@@ -157,6 +168,7 @@ function resolvedSubstitutionArgument(
 	return resolvedSubstitutionArgument(substitution, base, nextResolving);
 }
 
+/** Bind a referenced alias's parameters to supplied or default type arguments. */
 function aliasSubstitution(
 	alias: ESTree.TSTypeAliasDeclaration,
 	type: ESTree.TSTypeReference,
@@ -173,6 +185,7 @@ function aliasSubstitution(
 	return next;
 }
 
+/** Classify a type's directly unsafe dictionary value after alias resolution. */
 function unsafeDirectValue(
 	type: ESTree.TSType,
 	environment: TypeEnvironment,
@@ -229,6 +242,7 @@ function unsafeDirectValue(
 	return unsafeDirectValue(alias.typeAnnotation, environment, nextSubstitutions, nextResolving);
 }
 
+/** Collect dictionary value types represented by a type expression. */
 function dictionaryValueTypes(
 	type: ESTree.TSType,
 	environment: TypeEnvironment,
