@@ -12,7 +12,7 @@ pi install -l npm:@zeldrisho/pi-gate
 
 ## Configure
 
-On first load, the extension creates `~/.pi/agent/pi-gate.json` with starter rules and a 30-second prompt timeout. Existing files are never overwritten. The published package includes [`config.schema.json`](config.schema.json); use this schema URL for editor completion:
+On first load, the extension creates `~/.pi/agent/pi-gate.json` with starter rules and a 30-second prompt timeout. Existing files are never overwritten. If no configuration can be created yet, pi-gate warns at session start and allows commands until the file is created. If an existing configuration cannot be read or parsed, pi-gate warns and prompts for every command until it is fixed. The published package includes [`config.schema.json`](config.schema.json); use this schema URL for editor completion:
 
 ```json
 {

@@ -10,7 +10,7 @@ Install [Vite+](https://vite-plus.dev/) and workspace dependencies:
 vp install
 ```
 
-Use Node.js 24.10.0 or newer. Common commands:
+Use Node.js 24.11.0 or newer. Common commands:
 
 | Task                         | Command           |
 | ---------------------------- | ----------------- |

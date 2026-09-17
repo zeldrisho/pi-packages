@@ -12,7 +12,7 @@ const readme = await readFile(join(root, "README.md"), "utf8");
 const workspace = await readFile(join(root, "pnpm-workspace.yaml"), "utf8");
 const lockfile = await readFile(join(root, "pnpm-lock.yaml"), "utf8");
 const releaseWorkflow = await readFile(join(root, ".github/workflows/release.yml"), "utf8");
-const expectedFiles = ["src", "README.md", "CHANGELOG.md", "LICENSE"];
+const expectedFiles = ["src", "CHANGELOG.md"];
 const packageSpecificFiles = new Map([["pi-gate", ["config.schema.json"]]]);
 const expectedScripts = {
   check: "vp check",

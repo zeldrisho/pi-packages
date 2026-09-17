@@ -1,6 +1,6 @@
-import { defineRule } from "@oxlint/plugins";
+import { defineRule } from "vite-plus/lint/plugins";
 
-import type { ESTree } from "@oxlint/plugins";
+import type { ESTree } from "vite-plus/lint/plugins";
 
 type RuntimeFunction = ESTree.ArrowFunctionExpression | ESTree.Function;
 
@@ -21,6 +21,15 @@ function isInsideTypeGuard(node: ESTree.Node): boolean {
 		current = current.parent;
 	}
 	return false;
+}
+
+/** Return whether typeof safely probes for the existence of a possibly absent binding. */
+function isExistenceProbe(node: ESTree.UnaryExpression): boolean {
+	const parent = node.parent;
+	if (parent.type !== "BinaryExpression") return false;
+	if (!["===", "!==", "==", "!="].includes(parent.operator)) return false;
+	const other = parent.left === node ? parent.right : parent.left;
+	return other.type === "Literal" && other.value === "undefined";
 }
 
 /** Disallow runtime typeof checks that narrow unparsed values instead of decoding them. */
@@ -57,6 +66,7 @@ export const noRuntimeTypeofRule = defineRule({
 					option.allowInTypeGuards === true;
 				if (
 					node.operator === "typeof" &&
+					!isExistenceProbe(node) &&
 					(!allowInTypeGuards || !isInsideTypeGuard(node))
 				) {
 					context.report({ node, messageId: "runtimeTypeof" });

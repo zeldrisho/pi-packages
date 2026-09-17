@@ -1,17 +1,25 @@
-import { defineRule } from "@oxlint/plugins";
+import { defineRule } from "vite-plus/lint/plugins";
 
 import {
+	classifyUnsafeDictionaryValue,
 	classifyWideningTarget,
 	createTypeEnvironment,
 	isKnownEvidenceExpression,
 	type TypeEnvironment,
 	type WideningTarget,
 } from "../shared/dictionary-types.ts";
+import {
+	containsUnknownType,
+	functionParameterBindingName,
+	functionParameterTypeAnnotation,
+} from "../shared/function-parameters.ts";
+import { resolveVariable } from "../shared/scope.ts";
 
-import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins";
+import type { ESTree, SourceCode, Variable } from "vite-plus/lint/plugins";
 
 type FunctionExpression = ESTree.ArrowFunctionExpression | ESTree.Function;
 
+/** Remove syntax-only TypeScript and parenthesis wrappers from an expression. */
 function unwrapExpression(expression: ESTree.Expression): ESTree.Expression {
 	let current = expression;
 	while (
@@ -26,19 +34,7 @@ function unwrapExpression(expression: ESTree.Expression): ESTree.Expression {
 	return current;
 }
 
-function resolveVariable(
-	sourceCode: SourceCode,
-	identifier: ESTree.IdentifierReference,
-): Variable | null {
-	let scope: Scope | null = sourceCode.getScope(identifier);
-	while (scope !== null) {
-		const variable = scope.set.get(identifier.name);
-		if (variable !== undefined) return variable;
-		scope = scope.upper;
-	}
-	return null;
-}
-
+/** Return the sole variable declarator for a resolved binding. */
 function variableDeclarator(variable: Variable): ESTree.VariableDeclarator | null {
 	if (variable.defs.length !== 1) return null;
 	const [definition] = variable.defs;
@@ -47,6 +43,7 @@ function variableDeclarator(variable: Variable): ESTree.VariableDeclarator | nul
 		: null;
 }
 
+/** Return whether a const binding remains unchanged after initialization. */
 function isStableConstVariable(variable: Variable, declarator: ESTree.VariableDeclarator): boolean {
 	return (
 		declarator.parent.type === "VariableDeclaration" &&
@@ -55,6 +52,7 @@ function isStableConstVariable(variable: Variable, declarator: ESTree.VariableDe
 	);
 }
 
+/** Trace an expression through stable const bindings to known value evidence. */
 function hasKnownEvidence(
 	sourceCode: SourceCode,
 	expression: ESTree.Expression,
@@ -77,6 +75,147 @@ function hasKnownEvidence(
 	return hasKnownEvidence(sourceCode, declarator.init, visitedVariables);
 }
 
+/** Recognize function nodes that can own parameters or a return annotation. */
+function isFunctionExpression(node: ESTree.Node): node is FunctionExpression {
+	return (
+		node.type === "ArrowFunctionExpression" ||
+		node.type === "FunctionDeclaration" ||
+		node.type === "FunctionExpression" ||
+		node.type === "TSDeclareFunction" ||
+		node.type === "TSEmptyBodyFunctionExpression"
+	);
+}
+
+/** Resolve a call target to a locally declared function when possible. */
+function localFunctionForCall(
+	sourceCode: SourceCode,
+	callee: ESTree.Expression,
+): FunctionExpression | null {
+	const unwrapped = unwrapExpression(callee);
+	if (isFunctionExpression(unwrapped)) return unwrapped;
+	if (unwrapped.type !== "Identifier") return null;
+	const variable = resolveVariable(sourceCode, unwrapped);
+	if (variable === null || variable.defs.length !== 1) return null;
+	const [definition] = variable.defs;
+	if (definition === undefined) return null;
+	if (definition.type === "FunctionName" && isFunctionExpression(definition.node)) {
+		return definition.node;
+	}
+	if (definition.type !== "Variable" || definition.node.type !== "VariableDeclarator") {
+		return null;
+	}
+	const initializer = definition.node.init;
+	if (initializer === null) return null;
+	const unwrappedInitializer = unwrapExpression(initializer);
+	return isFunctionExpression(unwrappedInitializer) ? unwrappedInitializer : null;
+}
+
+/** Read a resolved variable's declaration or parameter type annotation. */
+function variableTypeAnnotation(
+	sourceCode: SourceCode,
+	variable: Variable,
+): ESTree.TSTypeAnnotation | null {
+	if (variable.defs.length !== 1) return null;
+	const [definition] = variable.defs;
+	if (definition === undefined) return null;
+	if (
+		definition.type === "Variable" &&
+		definition.node.type === "VariableDeclarator" &&
+		definition.node.id.type === "Identifier"
+	) {
+		return definition.node.id.typeAnnotation ?? null;
+	}
+	if (definition.type !== "Parameter" || !isFunctionExpression(definition.node)) {
+		return null;
+	}
+	const parameter = definition.node.params.find(
+		(candidate) =>
+			functionParameterBindingName(candidate, sourceCode) === variable.name,
+	);
+	return parameter === undefined ? null : (functionParameterTypeAnnotation(parameter) ?? null);
+}
+
+/** Return whether a type retains more evidence than an unsafe dictionary value. */
+function hasInformativeType(
+	type: ESTree.TSType,
+	environment: TypeEnvironment,
+): boolean {
+	return classifyUnsafeDictionaryValue(type, environment) === null;
+}
+
+/** Determine whether a call argument carries syntactically known type evidence. */
+function hasKnownCallArgumentEvidence(
+	sourceCode: SourceCode,
+	expression: ESTree.Expression,
+	environment: TypeEnvironment,
+	visitedVariables = new Set<Variable>(),
+): boolean {
+	if (expression.type === "ParenthesizedExpression" || expression.type === "TSNonNullExpression") {
+		return hasKnownCallArgumentEvidence(
+			sourceCode,
+			expression.expression,
+			environment,
+			visitedVariables,
+		);
+	}
+	if (expression.type === "TSAsExpression" || expression.type === "TSTypeAssertion") {
+		return hasInformativeType(expression.typeAnnotation, environment);
+	}
+	if (expression.type === "TSSatisfiesExpression") {
+		return hasKnownCallArgumentEvidence(
+			sourceCode,
+			expression.expression,
+			environment,
+			visitedVariables,
+		);
+	}
+	if (expression.type === "CallExpression") {
+		const owner = localFunctionForCall(sourceCode, expression.callee);
+		const returnType = owner?.returnType?.typeAnnotation;
+		return returnType !== undefined && hasInformativeType(returnType, environment);
+	}
+	if (expression.type !== "Identifier") return isKnownEvidenceExpression(expression);
+	const variable = resolveVariable(sourceCode, expression);
+	if (variable === null || visitedVariables.has(variable)) return false;
+	const annotation = variableTypeAnnotation(sourceCode, variable);
+	if (annotation !== null) {
+		return hasInformativeType(annotation.typeAnnotation, environment);
+	}
+	const declarator = variableDeclarator(variable);
+	if (
+		declarator === null ||
+		declarator.init === null ||
+		!isStableConstVariable(variable, declarator)
+	) {
+		return false;
+	}
+	visitedVariables.add(variable);
+	return hasKnownCallArgumentEvidence(
+		sourceCode,
+		declarator.init,
+		environment,
+		visitedVariables,
+	);
+}
+
+/** Locate the parameter refined by a function's type predicate. */
+function typePredicateSubjectIndex(
+	sourceCode: SourceCode,
+	owner: FunctionExpression,
+): number | null {
+	const predicate = owner.returnType?.typeAnnotation;
+	if (predicate?.type !== "TSTypePredicate" || predicate.parameterName.type !== "Identifier") {
+		return null;
+	}
+	const predicateParameterName = predicate.parameterName.name;
+	const index = owner.params.findIndex(
+		(parameter) =>
+			functionParameterBindingName(parameter, sourceCode) === predicateParameterName,
+	);
+	return index === -1 ? null : index;
+}
+
+/** Classify an optional annotation as a widening destination. */
 function annotationTarget(
 	annotation: ESTree.TSTypeAnnotation | null | undefined,
 	environment: TypeEnvironment,
@@ -86,6 +225,7 @@ function annotationTarget(
 		: classifyWideningTarget(annotation.typeAnnotation, environment);
 }
 
+/** Find the nearest function that encloses an AST node. */
 function enclosingFunction(node: ESTree.Node): FunctionExpression | null {
 	let current: ESTree.Node | null = node.parent;
 	while (current !== null && current.type !== "Program") {
@@ -101,12 +241,14 @@ function enclosingFunction(node: ESTree.Node): FunctionExpression | null {
 	return null;
 }
 
+/** Render a property key as a stable diagnostic name. */
 function sourceKeyName(sourceCode: SourceCode, key: ESTree.PropertyKey): string {
 	if (key.type === "Identifier" || key.type === "PrivateIdentifier") return key.name;
 	if (key.type === "Literal") return String(key.value);
 	return sourceCode.getText(key);
 }
 
+/** Derive a readable diagnostic name for a function node. */
 function functionName(sourceCode: SourceCode, owner: FunctionExpression | null): string {
 	if (owner === null) return "anonymous function";
 	if (owner.id !== null) return owner.id.name;
@@ -117,15 +259,18 @@ function functionName(sourceCode: SourceCode, owner: FunctionExpression | null):
 	return "anonymous function";
 }
 
+/** Return whether an expression is an empty object literal after unwrapping. */
 function isEmptyObjectExpression(expression: ESTree.Expression): boolean {
 	const unwrapped = unwrapExpression(expression);
 	return unwrapped.type === "ObjectExpression" && unwrapped.properties.length === 0;
 }
 
+/** Return whether a widening target can represent a fresh dictionary accumulator. */
 function isDictionaryAccumulatorTarget(destination: WideningTarget): boolean {
 	return destination.kind === "open dictionary" || destination.kind === "generic container";
 }
 
+/** Return whether a type assertion is nested directly inside another assertion. */
 function hasParentAssertion(node: ESTree.Node): boolean {
 	return node.parent?.type === "TSAsExpression" || node.parent?.type === "TSTypeAssertion";
 }
@@ -171,7 +316,10 @@ export const noKnownValueWideningRule = defineRule({
 
 		return {
 			Program(node) {
-				environment = createTypeEnvironment(node);
+				environment = createTypeEnvironment(
+					node,
+					context.sourceCode.visitorKeys,
+				);
 			},
 			VariableDeclarator(node) {
 				if (node.init === null || node.id.type !== "Identifier") return;
@@ -208,6 +356,43 @@ export const noKnownValueWideningRule = defineRule({
 					targetFromAnnotation(declarator.id.typeAnnotation),
 					`binding \`${declarator.id.name}\``,
 				);
+			},
+			CallExpression(node) {
+				if (environment === null) return;
+				const owner = localFunctionForCall(context.sourceCode, node.callee);
+				if (owner === null) return;
+				const parameterIndex = typePredicateSubjectIndex(context.sourceCode, owner);
+				if (parameterIndex === null) return;
+				const parameter = owner.params[parameterIndex];
+				const argument = node.arguments[parameterIndex];
+				if (parameter === undefined || argument === undefined || argument.type === "SpreadElement") {
+					return;
+				}
+				const parameterAnnotation = functionParameterTypeAnnotation(parameter);
+				if (
+					parameterAnnotation === null ||
+					parameterAnnotation === undefined ||
+					!containsUnknownType(parameterAnnotation.typeAnnotation)
+				) {
+					return;
+				}
+				if (
+					!hasKnownCallArgumentEvidence(
+						context.sourceCode,
+						argument,
+						environment,
+					)
+				) {
+					return;
+				}
+				context.report({
+					node: argument,
+					messageId: "widening",
+					data: {
+						subject: `argument for parameter \`${functionParameterBindingName(parameter, context.sourceCode)}\` of \`${functionName(context.sourceCode, owner)}\``,
+						target: "unknown",
+					},
+				});
 			},
 			ReturnStatement(node) {
 				if (node.argument === null) return;
