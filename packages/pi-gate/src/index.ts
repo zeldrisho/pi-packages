@@ -57,6 +57,7 @@ function reportHerdrBlocked(pi: ExtensionAPI, ctx: { mode?: string }, active: bo
 }
 
 export type { Action, GateConfig } from "./config";
+
 export {
   CONFIG_SCHEMA_URL,
   DEFAULT_PROMPT_TIMEOUT_MS,
@@ -68,9 +69,13 @@ export {
   loadConfigResult,
   parseConfig,
 } from "./config";
+
 export type { ConfigLoadResult, ConfigLoadStatus } from "./config";
+
 export type { RuleMatch } from "./rules";
+
 export { resolveAction, resolveRule } from "./rules";
+
 export {
   MAX_DISPLAY_COMMAND_CHARACTERS,
   MAX_DISPLAY_COMMAND_LINES,
@@ -81,12 +86,13 @@ export {
 /** Gate the built-in `bash` tool against the user-provided rules. */
 export default function piGate(pi: ExtensionAPI): void {
   ensureConfig();
-  const loadResult = loadConfigResult();
+  let loadResult = loadConfigResult();
   const { config } = loadResult;
 
   pi.on("session_start", (_event, ctx) => {
     const path = configPath();
     const ruleCount = Object.keys(config.operations).length;
+
     if (loadResult.status === "loaded") {
       if (ruleCount === 0) {
         ctx.ui.notify(
@@ -114,20 +120,29 @@ export default function piGate(pi: ExtensionAPI): void {
 
   pi.on("tool_call", async (event, ctx) => {
     if (event.toolName !== "bash") return undefined;
+
     if (!isToolCallEventType("bash", event)) return undefined;
     const command = event.input.command;
+
+    if (loadResult.status === "failed") {
+      loadResult = loadConfigResult();
+    }
+
     const match =
       loadResult.status === "failed"
         ? { pattern: "configuration unavailable", action: "prompt" as const }
-        : resolveRule(command, config.operations);
+        : resolveRule(command, loadResult.config.operations);
+
     if (match === null || match.action === "allow") return undefined;
     const rule = formatRule(match);
 
     if (match.action === "block") {
       const reason = `pi-gate: command blocked by rule ${rule}`;
+
       if (ctx.hasUI) {
         ctx.ui.notify(reason, "warning");
       }
+
       return { block: true, reason, terminate: true };
     }
 
@@ -139,17 +154,20 @@ export default function piGate(pi: ExtensionAPI): void {
         terminate: true,
       };
     }
+
     reportHerdrBlocked(pi, ctx, true);
     let choice: string | undefined;
+
     try {
       choice = await ctx.ui.select(
         `pi-gate: allow this command?\n\n${formatPromptCommand(command, match.pattern)}\n\nMatched rule: ${rule}\nMatched command text is wrapped in »…«`,
         ["Allow", "Deny"],
-        { timeout: config.promptTimeoutMs },
+        { timeout: loadResult.config.promptTimeoutMs },
       );
     } finally {
       reportHerdrBlocked(pi, ctx, false);
     }
+
     if (choice !== "Allow") {
       return {
         block: true,
@@ -157,6 +175,7 @@ export default function piGate(pi: ExtensionAPI): void {
         terminate: true,
       };
     }
+
     return undefined;
   });
 }
