@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Upgrade Defuddle to `^0.19.4` for improved metadata and Markdown extraction, HTML sanitization, SVG safety, and support for declarative shadow DOM and MathML content
+
 ### Fixed
 
 - Extract HTML correctly when servers send duplicated equivalent `Content-Type` media types, and reject conflicting media-type declarations instead of returning raw HTML

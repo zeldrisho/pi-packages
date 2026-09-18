@@ -164,7 +164,7 @@ export function createFetchHarness() {
       // SAFETY: the server listens on a TCP port, so `server.address()` is an
       // AddressInfo (never a string or null in this start() path).
       const address = server.address() as AddressInfo;
-      fixtureOrigin = `http://fixture.test:${address.port}`;
+      fixtureOrigin = `http://example.test:${address.port}`;
       fixtureDependencies = {
         validateUrl: async (value): Promise<ValidatedTarget> => ({
           url: value instanceof URL ? value : new URL(value),

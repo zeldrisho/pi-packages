@@ -38,7 +38,7 @@
     "typecheck": "vp check --no-fmt --no-lint"
   },
   "dependencies": {
-    "defuddle": "^0.19.3",
+    "defuddle": "^0.19.4",
     "linkedom": "^0.18.13"
   },
   "devDependencies": {
