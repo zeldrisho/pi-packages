@@ -172,6 +172,43 @@ export interface FetchRemoteDependencies extends RedirectDependencies {
 }
 
 /**
+ * Returns a usable media type from a response header.
+ *
+ * Some servers incorrectly emit an equivalent media type more than once (for example,
+ * `text/html,text/html; charset=utf-8`). Treat that as the declared type, but reject
+ * conflicting media types rather than guessing which representation to parse.
+ */
+function normalizeContentType(header: string): string | undefined {
+  const mediaTypes: string[] = [];
+  let current = "";
+  let quoted = false;
+
+  for (const character of header) {
+    if (character === '"') quoted = !quoted;
+
+    if (character === "," && !quoted) {
+      mediaTypes.push(current);
+      current = "";
+    } else current += character;
+  }
+
+  mediaTypes.push(current);
+  const normalized: string[] = [];
+
+  for (const value of mediaTypes) {
+    const mediaType = value.split(";", 1)[0].trim().toLowerCase();
+
+    if (mediaType) normalized.push(mediaType);
+  }
+
+  if (normalized.length === 0 || normalized.some((value) => value !== normalized[0])) {
+    return undefined;
+  }
+
+  return normalized[0];
+}
+
+/**
  * Converts a successful HTTP response into a complete document.
  *
  * HTML content is extracted to Markdown, JSON is pretty-printed when valid, and other supported content is returned as trimmed text.
@@ -201,7 +238,7 @@ async function documentFromResponse(
   }
 
   const contentTypeHeader = responseHeader(response, "content-type") ?? "text/plain";
-  const contentType = contentTypeHeader.split(";", 1)[0].trim().toLowerCase();
+  const contentType = normalizeContentType(contentTypeHeader);
 
   const linkHints = parseLinkHeaderForAgentHints(
     responseHeader(response, "link") ?? "",
@@ -209,18 +246,21 @@ async function documentFromResponse(
   );
 
   const allowed =
-    contentType.startsWith("text/") ||
-    [
-      "application/json",
-      "application/markdown",
-      "application/x-markdown",
-      "application/xml",
-      "application/xhtml+xml",
-    ].includes(contentType);
+    contentType !== undefined &&
+    (contentType.startsWith("text/") ||
+      [
+        "application/json",
+        "application/markdown",
+        "application/x-markdown",
+        "application/xml",
+        "application/xhtml+xml",
+      ].includes(contentType));
 
   if (!allowed) {
     response.destroy();
-    throw new Error(`web_fetch does not support ${contentType || "this content type"}.`);
+    throw new Error(
+      `web_fetch does not support ${contentType ?? (contentTypeHeader || "this content type")}.`,
+    );
   }
 
   const raw = decodeResponse(

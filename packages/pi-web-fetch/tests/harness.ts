@@ -66,6 +66,18 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
       );
 
       return;
+    case "/duplicated-html-type":
+      response.setHeader("content-type", "text/html,text/html; charset=utf-8");
+      response.end(
+        "<html><head><title>Duplicated type</title></head><body><h1>Recovered</h1></body></html>",
+      );
+
+      return;
+    case "/conflicting-types":
+      response.setHeader("content-type", "text/plain, text/html");
+      response.end("<html><body><h1>Ambiguous</h1></body></html>");
+
+      return;
     case "/redirect":
       response.writeHead(302, { location: "/html" });
       response.end();
