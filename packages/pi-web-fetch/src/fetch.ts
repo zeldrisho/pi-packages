@@ -27,31 +27,43 @@ import {
 export function normalizeGitHubRawUrl(rawUrl: string): string {
   try {
     const url = new URL(rawUrl);
+
     if (url.protocol !== "https:") return rawUrl;
+
     if (url.hostname === "github.com") {
       if (url.pathname.includes("/blob/")) {
         return `https://raw.githubusercontent.com${url.pathname.replace("/blob/", "/")}${url.search}`;
       }
+
       // Parse pathname segments: /owner/repo/tree/ref/path
       const segments = url.pathname.split("/").filter(Boolean);
+
       if (segments.length >= 4 && segments[2] === "tree") {
         const lastSegment = segments[segments.length - 1];
+
         if (lastSegment.includes(".")) {
           // Reconstruct path: /owner/repo/ref/path (remove "tree" segment)
           const newPath = `/${segments[0]}/${segments[1]}/${segments.slice(3).join("/")}`;
+
           return `https://raw.githubusercontent.com${newPath}${url.search}`;
         }
+
         return rawUrl;
       }
+
       return rawUrl;
     }
+
     if (url.hostname === "gist.github.com") {
       const segments = url.pathname.split("/").filter(Boolean);
+
       // Only rewrite bare gist pages. Subpages such as `/revisions`, `/forks`, or an
       // explicit `/raw` path already point at a usable resource and stay untouched.
       if (segments.length !== 2) return rawUrl;
+
       return `https://gist.github.com/${segments[0]}/${segments[1]}/raw${url.search}`;
     }
+
     return rawUrl;
   } catch {
     return rawUrl;
@@ -90,10 +102,14 @@ export function parseLinkHeaderForAgentHints(
   let current = "";
   let inQuotes = false;
   let inAngleBrackets = false;
+
   for (const character of header) {
     if (character === '"') inQuotes = !inQuotes;
+
     if (character === "<") inAngleBrackets = true;
+
     if (character === ">" && !inQuotes) inAngleBrackets = false;
+
     if (character === "," && !inQuotes && !inAngleBrackets) {
       directives.push(current);
       current = "";
@@ -101,39 +117,52 @@ export function parseLinkHeaderForAgentHints(
       current += character;
     }
   }
+
   directives.push(current);
 
   let describedBy: string | undefined;
   let markdownAlternate: string | undefined;
+
   for (const directive of directives) {
     const match = /^\s*<([^>]*)>\s*(.*)$/.exec(directive);
+
     if (!match) continue;
     const [, rawTarget, rawParameters] = match;
     const parameters = new Map<string, string>();
+
     for (const parameter of rawParameters.split(";")) {
       const equals = parameter.indexOf("=");
+
       if (equals === -1) continue;
       const key = parameter.slice(0, equals).trim().toLowerCase();
+
       const value = parameter
         .slice(equals + 1)
         .trim()
         .replace(/^"|"$/g, "");
+
       parameters.set(key, value);
     }
+
     const relations = (parameters.get("rel") ?? "").toLowerCase().split(/\s+/);
     const type = (parameters.get("type") ?? "").toLowerCase();
     let resolved: string | undefined;
+
     try {
       resolved = new URL(rawTarget.trim(), baseUrl).href;
     } catch {
       continue;
     }
+
     if (!resolved) continue;
+
     if (!describedBy && relations.includes("describedby")) describedBy = resolved;
+
     if (!markdownAlternate && relations.includes("alternate") && type === "text/markdown") {
       markdownAlternate = resolved;
     }
   }
+
   return { describedBy, markdownAlternate };
 }
 
@@ -160,20 +189,25 @@ async function documentFromResponse(
   extractHtml: typeof extractHtmlToMarkdown,
 ): Promise<CompleteDocument> {
   const status = response.statusCode ?? 0;
+
   if (status < 200 || status >= 300) {
     response.resume();
+
     const authenticationHint = [401, 403, 404].includes(status)
       ? " The page may be missing, private, or require authentication."
       : "";
+
     throw new Error(`web_fetch returned HTTP ${status}.${authenticationHint}`);
   }
 
   const contentTypeHeader = responseHeader(response, "content-type") ?? "text/plain";
   const contentType = contentTypeHeader.split(";", 1)[0].trim().toLowerCase();
+
   const linkHints = parseLinkHeaderForAgentHints(
     responseHeader(response, "link") ?? "",
     target.url,
   );
+
   const allowed =
     contentType.startsWith("text/") ||
     [
@@ -183,6 +217,7 @@ async function documentFromResponse(
       "application/xml",
       "application/xhtml+xml",
     ].includes(contentType);
+
   if (!allowed) {
     response.destroy();
     throw new Error(`web_fetch does not support ${contentType || "this content type"}.`);
@@ -192,15 +227,19 @@ async function documentFromResponse(
     await readResponseBytes(response, FETCH_MAX_BYTES, signal),
     contentTypeHeader,
   );
+
   let markdown: string;
   let title: string | undefined;
+  let fragmentOffsets: Record<string, number> | undefined;
   let extractor: CompleteDocument["extractor"] = "raw";
   let describedBy: string | undefined = linkHints.describedBy;
   let markdownAlternateUrl: string | undefined = linkHints.markdownAlternate;
+
   if (contentType === "text/html" || contentType === "application/xhtml+xml") {
     const extracted = await awaitWithAbort(extractHtml(raw, target.url), signal);
     markdown = extracted.markdown;
     title = extracted.title;
+    fragmentOffsets = extracted.fragmentOffsets;
     extractor = extracted.extractor;
     describedBy = describedBy ?? extracted.describedByLink;
     markdownAlternateUrl = markdownAlternateUrl ?? extracted.markdownAlternateLink;
@@ -214,9 +253,11 @@ async function documentFromResponse(
 
   const isHtml = contentType === "text/html" || contentType === "application/xhtml+xml";
   const extractionDiagnostics = isHtml ? diagnoseExtraction(raw, markdown) : undefined;
+
   const shellSuspected = extractionDiagnostics
     ? hasExtractionWarning(extractionDiagnostics)
     : false;
+
   const etag = responseHeader(response, "etag");
   const lastModified = responseHeader(response, "last-modified");
 
@@ -224,6 +265,7 @@ async function documentFromResponse(
     url: target.url.toString(),
     contentType,
     markdown: markdown.replace(/<\/untrusted_web_content>/gi, "&lt;/untrusted_web_content&gt;"),
+    fragmentOffsets,
     title,
     extractor,
     shellSuspected,
@@ -245,14 +287,17 @@ async function documentFromResponse(
  */
 function assertAbsoluteHttpUrlForFetch(value: string): URL {
   let url: URL;
+
   try {
     url = new URL(value);
   } catch {
     throw new Error("web_fetch received an invalid URL.");
   }
+
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error(`web_fetch only supports http(s) URLs: ${redactUrlForDisplay(url)}`);
   }
+
   return url;
 }
 
@@ -276,14 +321,18 @@ async function fetchDocument(
   const timeoutMs = dependencies.timeoutMs ?? REQUEST_TIMEOUT_MS;
   const extractHtml = dependencies.extractHtml ?? extractHtmlToMarkdown;
   let timedOut = false;
+
   const timeout = setTimeout(() => {
     timedOut = true;
     controller.abort();
   }, timeoutMs);
+
   const cancel = () => controller.abort();
   signal?.addEventListener("abort", cancel, { once: true });
   const conditionalHeaders: Record<string, string> = {};
+
   if (cached?.validators?.etag) conditionalHeaders["If-None-Match"] = cached.validators.etag;
+
   if (cached?.validators?.lastModified)
     conditionalHeaders["If-Modified-Since"] = cached.validators.lastModified;
 
@@ -294,11 +343,14 @@ async function fetchDocument(
       dependencies,
       conditionalHeaders,
     );
+
     if (response.statusCode === 304 && cached) {
       response.resume();
       const etag = responseHeader(response, "etag") ?? cached.validators?.etag;
+
       const lastModified =
         responseHeader(response, "last-modified") ?? cached.validators?.lastModified;
+
       return {
         document: {
           ...cached,
@@ -308,12 +360,14 @@ async function fetchDocument(
         revalidated: true,
       };
     }
+
     return {
       document: await documentFromResponse(target, response, controller.signal, extractHtml),
       revalidated: false,
     };
   } catch (error) {
     if (timedOut) throw new Error(`web_fetch timed out after ${timeoutMs / 1000} seconds.`);
+
     if (signal?.aborted) throw new Error("web_fetch was cancelled.");
     throw error;
   } finally {

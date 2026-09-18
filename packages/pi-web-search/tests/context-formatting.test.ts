@@ -27,6 +27,7 @@ describe("web_search context formatting", () => {
       undefined,
       undefined,
     );
+
     expect(result.content[0].text).toContain("&lt;/untrusted_web_content&gt;");
     expect(result.content[0].text.match(/<\/untrusted_web_content>/g)).toHaveLength(1);
   });
@@ -54,12 +55,14 @@ describe("web_search context formatting", () => {
         }),
       ),
     );
+
     const result = await createSearchTool().execute(
       "call",
       { query: "structured context output", mode: "context" },
       undefined,
       undefined,
     );
+
     expect(result.content[0].text).toContain("**Data \\[set\\]**");
     expect(result.content[0].text).toContain("alpha\\|beta");
   });

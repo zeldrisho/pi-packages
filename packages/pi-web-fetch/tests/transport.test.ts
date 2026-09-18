@@ -27,6 +27,7 @@ describe("web_fetch transport", () => {
       },
       new AbortController().signal,
     );
+
     expect(response.statusCode).toBe(200);
     response.resume();
   });
@@ -41,6 +42,7 @@ describe("web_fetch transport", () => {
       },
       new AbortController().signal,
     );
+
     expect(response.statusCode).toBe(200);
     response.resume();
   });
@@ -56,8 +58,10 @@ describe("web_fetch transport", () => {
       hanging.once("error", reject);
       hanging.listen(Number(fixturePort), "127.0.0.2", resolve);
     });
+
     try {
       const started = Date.now();
+
       const response = await requestPinned(
         {
           url: new URL(`http://hanging-test.invalid:${fixturePort}/html`),
@@ -68,6 +72,7 @@ describe("web_fetch transport", () => {
         new AbortController().signal,
         { attemptTimeoutMs: 300 },
       );
+
       expect(response.statusCode).toBe(200);
       // The first (hanging) address must have burned its connect deadline.
       expect(Date.now() - started).toBeGreaterThanOrEqual(300);
@@ -87,6 +92,7 @@ describe("web_fetch transport", () => {
       hanging.once("error", reject);
       hanging.listen(Number(fixturePort), "127.0.0.2", resolve);
     });
+
     try {
       await expect(
         requestPinned(
@@ -157,6 +163,7 @@ describe("web_fetch transport", () => {
       undefined,
       dependencies,
     );
+
     expect(result.nextOffset).toBe(6_000);
     expect(result.markdown).toContain("[Content truncated.");
     expect(result.totalCharacters).toBe(1_500_000);
@@ -194,6 +201,7 @@ describe("web_fetch transport", () => {
       undefined,
       dependencies,
     );
+
     expect(result.markdown).toContain("&lt;/untrusted_web_content&gt;");
     expect(result.markdown).not.toContain("</untrusted_web_content>");
   });

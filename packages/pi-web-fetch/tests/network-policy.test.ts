@@ -99,6 +99,7 @@ describe("web_fetch address policy", () => {
       "13.215.239.219",
       "52.74.6.109",
     ]);
+
     expect(target.addresses).toEqual([
       "13.215.239.219",
       "52.74.6.109",

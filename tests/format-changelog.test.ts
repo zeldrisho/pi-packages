@@ -11,6 +11,7 @@ describe("formatChangelog", () => {
       "### Added\n\n- First\n\n" +
       "## [1.0.1](https://github.com/zeldrisho/pi-packages/compare/alpha-v1.0.0...alpha-v1.0.1) (2026-08-12)\n\n" +
       "### Bug fixes\n\n- Fix a thing\n";
+
     const output = formatChangelog(input, { repoUrl: REPO_URL, packageDirectory: "alpha" });
     expect(output).toContain("## [1.0.1] - 2026-08-12");
     expect(output).toContain("## [1.0.0] - 2026-08-01");
@@ -29,6 +30,7 @@ describe("formatChangelog", () => {
       "# Changelog\n\n" +
       "## [1.0.0] - 2026-08-01\n\n" +
       "### Bug fixes\n\n- Fix\n\n### Maintenance\n\n- Upgrade deps\n\n### Documentation\n\n- Docs\n";
+
     const output = formatChangelog(input, { repoUrl: REPO_URL, packageDirectory: "alpha" });
     expect(output).toContain("### Fixed");
     expect(output).toContain("### Changed");
@@ -56,6 +58,7 @@ describe("formatChangelog", () => {
   it("keeps bullets contiguous and preserves their text", () => {
     const input =
       "# Changelog\n\n## [1.0.0] - 2026-08-01\n\n### Fixed\n\n- One\n\n- Two\n\n- Three\n";
+
     const output = formatChangelog(input, { repoUrl: REPO_URL, packageDirectory: "alpha" });
     expect(output).toContain("- One\n- Two\n- Three");
   });

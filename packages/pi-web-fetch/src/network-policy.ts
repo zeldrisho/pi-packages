@@ -64,15 +64,19 @@ const GLOBALLY_REACHABLE_IPV6_EXCEPTIONS = [
 ] as const;
 
 const blockedIPv4Addresses = new BlockList();
+
 const blockedIPv6Addresses = new BlockList();
+
 const allowedIPv6Addresses = new BlockList();
 
 for (const [network, prefix] of BLOCKED_IPV4_RANGES) {
   blockedIPv4Addresses.addSubnet(network, prefix, "ipv4");
 }
+
 for (const [network, prefix] of BLOCKED_IPV6_RANGES) {
   blockedIPv6Addresses.addSubnet(network, prefix, "ipv6");
 }
+
 for (const [network, prefix] of GLOBALLY_REACHABLE_IPV6_EXCEPTIONS) {
   allowedIPv6Addresses.addSubnet(network, prefix, "ipv6");
 }
@@ -106,11 +110,15 @@ export type ResolveAddresses = (hostname: string) => Promise<string[]>;
  */
 export function isPrivateAddress(address: string): boolean {
   const family = isIP(address);
+
   if (family === 4) return blockedIPv4Addresses.check(address, "ipv4");
+
   if (family === 6) {
     if (allowedIPv6Addresses.check(address, "ipv6")) return false;
+
     return blockedIPv6Addresses.check(address, "ipv6");
   }
+
   return true;
 }
 
@@ -136,8 +144,10 @@ export async function validateRemoteUrl(
   resolveHostname?: ResolveAddresses,
 ): Promise<ValidatedTarget> {
   const url = value instanceof URL ? value : new URL(value);
+
   if (url.protocol !== "http:" && url.protocol !== "https:")
     throw new Error("web_fetch only supports HTTP and HTTPS URLs.");
+
   if (url.username || url.password)
     throw new Error("web_fetch blocks URLs containing credentials.");
 
@@ -145,24 +155,31 @@ export async function validateRemoteUrl(
     .toLowerCase()
     .replace(/^\[|\]$/g, "")
     .replace(/\.$/, "");
+
   if (!hostname || hostname === "localhost" || hostname.endsWith(".localhost")) {
     throw new Error("web_fetch blocks local hostnames.");
   }
 
   let addresses: string[];
+
   if (isIP(hostname)) addresses = [hostname];
   else if (resolveHostname) addresses = await resolveHostname(hostname);
   else {
     const records = await dnsLookup(hostname, { all: true, verbatim: true });
     addresses = [];
+
     for (const record of records) addresses.push(record.address);
   }
+
   if (addresses.length === 0 || addresses.some(isPrivateAddress)) {
     throw new Error(`web_fetch blocks private or reserved network targets (${hostname}).`);
   }
+
   const ordered = preferIpv4First(addresses);
   const address = ordered[0];
   const family = isIP(address);
+
   if (family !== 4 && family !== 6) throw new Error(`web_fetch could not resolve ${hostname}.`);
+
   return { url, address, family, addresses: ordered };
 }

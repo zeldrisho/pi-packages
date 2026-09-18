@@ -28,10 +28,12 @@ describe("extraction regressions", () => {
       new URL("./fixtures/github-issue-37.html", import.meta.url),
       "utf8",
     );
+
     const result = await extractHtmlToMarkdown(
       html,
       new URL("https://github.com/zeldrisho/pi-packages/issues/37"),
     );
+
     expect(result.markdown).toContain("Repo-level overrides fork upstream dependency decisions");
     expect(result.markdown).toContain("Removal condition");
     expect(result.markdown).toContain("Lifecycle rules");
@@ -41,6 +43,7 @@ describe("extraction regressions", () => {
     const prose = "Application documentation remains available in server-rendered HTML. ".repeat(
       180,
     );
+
     const html = `<html><body><div id="app"><main><article><h1>Documentation</h1><p>${prose}</p></article></main></div><script>${"x".repeat(80_000)}</script></body></html>`;
     const result = await extractHtmlToMarkdown(html, new URL("https://example.com/app"));
     const diagnostics = diagnoseExtraction(html, result.markdown);

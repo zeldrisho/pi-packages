@@ -13,14 +13,17 @@ export function formatCollapsibleOutput(
   theme: RenderTheme,
 ): string {
   const lines = output.replace(/\r\n/g, "\n").split("\n");
+
   while (lines.at(-1) === "") lines.pop();
   const totalLines = lines.length;
   const visibleLines = expanded ? lines : lines.slice(0, COLLAPSED_LINES);
   let text = visibleLines.map((line) => theme.fg("toolOutput", line)).join("\n");
 
   const remaining = totalLines - visibleLines.length;
+
   if (remaining > 0) {
     text += `${theme.fg("muted", `\n... (${remaining} more lines, ${totalLines} total,`)} ${keyHint("app.tools.expand", "to expand")}${theme.fg("muted", ")")}`;
   }
+
   return `\n${text}`;
 }

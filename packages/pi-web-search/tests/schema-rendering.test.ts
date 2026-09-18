@@ -9,6 +9,7 @@ import { createSearchTool, jsonResponse, renderTheme } from "./harness";
 
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@earendil-works/pi-coding-agent")>();
+
   return { ...actual, keyHint: () => "Ctrl+O to expand" };
 });
 
@@ -82,6 +83,7 @@ describe("web_search schema rendering", () => {
 
   it("constructs bounded Brave web requests and normalizes results", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "test-secret";
+
     const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = new URL(input instanceof Request ? input.url : input.toString());
       expect(url.origin + url.pathname).toBe("https://api.search.brave.com/res/v1/web/search");
@@ -90,6 +92,7 @@ describe("web_search schema rendering", () => {
       expect(url.searchParams.get("freshness")).toBe("pw");
       expect(url.searchParams.get("search_lang")).toBe("en-US");
       expect(new Headers(init?.headers).get("X-Subscription-Token")).toBe("test-secret");
+
       return jsonResponse({
         web: {
           results: [
@@ -103,6 +106,7 @@ describe("web_search schema rendering", () => {
         },
       });
     });
+
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await createSearchTool().execute(
@@ -143,6 +147,7 @@ describe("web_search schema rendering", () => {
       ),
     );
     const tool = createSearchTool();
+
     const result = await tool.execute(
       "call",
       { query: "unique renderer query 721", count: 3 },
@@ -154,6 +159,7 @@ describe("web_search schema rendering", () => {
       .renderResult(result, { expanded: false, isPartial: false }, renderTheme)
       .render(200)
       .join("\n");
+
     const expanded = tool
       .renderResult(result, { expanded: true, isPartial: false }, renderTheme)
       .render(200)

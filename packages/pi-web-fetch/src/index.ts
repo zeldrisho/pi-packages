@@ -15,7 +15,9 @@ import { formatCollapsibleOutput } from "./render";
 import { executeWebFetch } from "./service";
 
 export { ExpiringLruCache } from "./cache";
+
 export type { FetchResult } from "./content";
+
 export {
   diagnoseExtraction,
   extractDocumentLinks,
@@ -23,10 +25,15 @@ export {
   type ExtractedLinks,
   type ExtractionDiagnostics,
 } from "./evidence";
+
 export { fetchRemoteContent, type FetchRemoteDependencies } from "./fetch";
+
 export { focusMarkdown, type FocusDetails, type FocusResult } from "./focus";
+
 export { createDocumentOutline, type DocumentOutline, type OutlineHeading } from "./outline";
+
 export { redactUrlForDisplay } from "./redact";
+
 export {
   executeWebFetch,
   type CacheStatus,
@@ -34,6 +41,7 @@ export {
   type WebFetchParameters,
   type WebFetchTruncationDetails,
 } from "./service";
+
 export {
   FETCH_MAX_BYTES,
   isPrivateAddress,
@@ -85,7 +93,7 @@ export default function (pi: ExtensionAPI) {
     name: "web_fetch",
     label: "Web Fetch",
     description:
-      "Fetch a public HTTP(S) page and return a bounded Markdown content chunk with continuation metadata.",
+      "Fetch a public HTTP(S) page and return a bounded Markdown content chunk with continuation metadata. URL fragments start at the matching heading or anchor; explicit offsets take precedence.",
     promptSnippet: "Read a public web page as bounded Markdown",
     promptGuidelines: [
       "Use web_fetch for a user-provided URL or to inspect relevant sources found with web_search.",
@@ -110,6 +118,7 @@ export default function (pi: ExtensionAPI) {
       if (isPartial) return new Text(theme.fg("warning", "Fetching…"), 0, 0);
 
       const content = result.content.find((item) => item.type === "text");
+
       return new Text(
         content?.type === "text"
           ? formatCollapsibleOutput(content.text, expanded, theme)

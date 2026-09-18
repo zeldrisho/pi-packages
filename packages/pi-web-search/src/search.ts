@@ -30,9 +30,13 @@ import { InflightCoalescer } from "./inflight";
 import { SEARCH_DEFAULT_RESULT_COUNT } from "./limits";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
+
 const CACHE_MAX_ENTRIES = 100;
+
 const CACHE_MAX_RESULT_BYTES = 20 * 1_024 * 1_024;
+
 const MAX_INFLIGHT_REQUESTS = 100;
+
 const encoder = new TextEncoder();
 
 /** Honest-evidence summary comparing what was requested with what was returned. */
@@ -72,16 +76,21 @@ export interface DomainDiversity {
 /** Computes neutral domain-diversity metrics without assigning trust or authority. */
 export function summarizeDomainDiversity(results: SearchResult[]): DomainDiversity {
   const counts = new Map<string, number>();
+
   for (const result of results) {
     try {
       const hostname = new URL(result.url).hostname.toLowerCase().replace(/^www\./, "");
+
       if (hostname) counts.set(hostname, (counts.get(hostname) ?? 0) + 1);
     } catch {
       // Provider URLs are untrusted; malformed values do not contribute to diversity.
     }
   }
+
   let largestCount = 0;
+
   for (const count of counts.values()) largestCount = Math.max(largestCount, count);
+
   return {
     uniqueDomains: counts.size,
     topDomainShare: results.length > 0 ? largestCount / results.length : 0,
@@ -93,6 +102,7 @@ function resolveCacheDirectory(name: string): string {
   const base = process.env.XDG_CACHE_HOME
     ? join(process.env.XDG_CACHE_HOME, name)
     : join(homedir(), ".cache", name);
+
   return base;
 }
 
@@ -191,12 +201,15 @@ const searchCachePersistence: CachePersistence<string, CachedSearch> = {
     // `{ results, meta }` object; older disk entries stored a bare
     // SearchResult[] array and are upgraded here to empty metadata.
     const parsed = JSON.parse(new TextDecoder().decode(bytes)) as CachedSearch | SearchResult[];
+
     if (Array.isArray(parsed)) return { results: parsed, meta: {}, availableCount: parsed.length };
+
     return parsed;
   },
   validate: isCachedSearch,
   keyToPath: (key) => stableKeyHash(key),
 };
+
 const searchCache = new ExpiringLruCache<string, CachedSearch>(
   CACHE_MAX_ENTRIES,
   CACHE_MAX_RESULT_BYTES,
@@ -204,6 +217,7 @@ const searchCache = new ExpiringLruCache<string, CachedSearch>(
   undefined,
   searchCachePersistence,
 );
+
 const inflightSearches = new InflightCoalescer<string, CachedSearch>(MAX_INFLIGHT_REQUESTS);
 
 /**
@@ -245,10 +259,12 @@ export class SearchRuntime {
     cwd: string = process.cwd(),
   ) {
     const query = params.query.trim();
+
     if (!query) throw new Error("Search query cannot be empty.");
 
     const count = params.count ?? SEARCH_DEFAULT_RESULT_COUNT;
     const mode = params.mode ?? "web";
+
     const webExtras = {
       country: params.country,
       safesearch: params.safesearch,
@@ -261,6 +277,7 @@ export class SearchRuntime {
       uiLang: params.uiLang,
       dateRange: params.dateRange,
     };
+
     const contextExtras = {
       country: params.country,
       safesearch: params.safesearch,
@@ -269,6 +286,7 @@ export class SearchRuntime {
       threshold: params.threshold,
       depth: params.depth,
     };
+
     validateProviderRequest(query, count, mode, {
       ...webExtras,
       ...contextExtras,
@@ -282,12 +300,15 @@ export class SearchRuntime {
       depth: params.depth,
     });
     const credentials = await resolveApiKey(cwd);
+
     if (!credentials) {
       throw new Error(
         "BRAVE_SEARCH_API_KEY is required for web search. Set it in the environment, the workspace .env, or the agent .env, then run /reload.",
       );
     }
+
     const provider: Provider = "brave";
+
     const cacheKey = JSON.stringify({
       provider,
       mode,
@@ -309,6 +330,7 @@ export class SearchRuntime {
       depth: params.depth,
       cwd,
     });
+
     const cachedPayload = searchCache.get(cacheKey);
     const cachedEntry = cachedPayload?.results;
     const cached = cachedEntry !== undefined;
@@ -349,10 +371,12 @@ export class SearchRuntime {
                   credentials.key,
                   webExtras,
                 );
+
           const availableCount = found.results.length;
           const bounded = found.results.filter((result) => result.url).slice(0, count);
           const entry: CachedSearch = { results: bounded, meta: found.meta, availableCount };
           searchCache.set(cacheKey, entry, Date.now() + CACHE_TTL_MS);
+
           return entry;
         },
         signal,
@@ -362,10 +386,12 @@ export class SearchRuntime {
     const meta = payload.meta;
     let results = payload.results.filter((result) => result.url).slice(0, count);
     const output = formatResults(query, provider, mode, results);
+
     const truncation = truncateHead(output, {
       maxLines: DEFAULT_MAX_LINES,
       maxBytes: DEFAULT_MAX_BYTES,
     });
+
     const evidence: SearchEvidence = {
       requestedCount: count,
       returnedCount: results.length,
@@ -374,15 +400,24 @@ export class SearchRuntime {
       truncated: truncation.truncated,
       ...summarizeDomainDiversity(results),
     };
+
     if (meta.altered !== undefined) evidence.alteredQuery = meta.altered;
+
     if (meta.spellcheckOff !== undefined) evidence.spellcheckOff = meta.spellcheckOff;
+
     if (meta.showStrictWarning !== undefined) evidence.showStrictWarning = meta.showStrictWarning;
+
     if (meta.moreResultsAvailable !== undefined)
       evidence.moreResultsAvailable = meta.moreResultsAvailable;
+
     if (meta.operatorsApplied !== undefined) evidence.operatorsApplied = meta.operatorsApplied;
+
     if (meta.operatorSites !== undefined) evidence.operatorSites = meta.operatorSites;
+
     if (mode === "context" && params.threshold !== undefined) evidence.threshold = params.threshold;
+
     if (mode === "context" && params.depth !== undefined) evidence.depth = params.depth;
+
     if (mode === "web" && params.offset !== undefined) evidence.offset = params.offset;
     let text = truncation.content;
     let fullOutputPath: string | undefined;
@@ -391,6 +426,7 @@ export class SearchRuntime {
       const tempDirectory = await mkdtemp(join(tmpdir(), "pi-web-search-"));
       this.#tempDirectories.add(tempDirectory);
       fullOutputPath = join(tempDirectory, "results.txt");
+
       try {
         await withFileMutationQueue(fullOutputPath, () =>
           writeFile(fullOutputPath!, output, "utf8"),
@@ -400,6 +436,7 @@ export class SearchRuntime {
         this.#tempDirectories.delete(tempDirectory);
         throw error;
       }
+
       text += `\n\n[Output truncated to ${truncation.outputLines} of ${truncation.totalLines} lines (${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}). Full output saved to: ${fullOutputPath}]`;
     }
 

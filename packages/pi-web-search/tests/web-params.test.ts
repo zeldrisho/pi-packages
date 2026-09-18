@@ -13,11 +13,14 @@ async function runSearchCapturingUrl(params: SearchParameters): Promise<URL> {
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
       url = new URL(input instanceof Request ? input.url : String(input));
+
       return jsonResponse({ web: { results: [] } });
     }),
   );
   await createSearchTool().execute("call", params, undefined, undefined);
+
   if (!url) throw new Error("the provider request was not made");
+
   return url;
 }
 
@@ -54,6 +57,7 @@ describe("web_search web-mode parameters", () => {
       "fetch",
       vi.fn(async () => {
         requests += 1;
+
         return jsonResponse({
           web: { results: [{ title: "A", url: "https://example.com/a", description: "d" }] },
         });
@@ -97,6 +101,7 @@ describe("web_search extra snippets rendering", () => {
       undefined,
       undefined,
     );
+
     const snippet = result.details.results[0]?.snippet;
     expect(snippet).toContain("main summary");
     expect(snippet).toContain("first excerpt");
@@ -137,6 +142,7 @@ describe("web_search extra snippets rendering", () => {
 
   it("allows shared options (country, spellcheck, goggles) in context mode", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "context-shared-secret";
+
     const url = await runSearchCapturingUrl({
       query: "shared options query",
       mode: "context",

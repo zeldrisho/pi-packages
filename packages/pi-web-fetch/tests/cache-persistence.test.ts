@@ -7,7 +7,9 @@ import { ExpiringLruCache, stableKeyHash, type CachePersistence } from "../src/c
 import type { CompleteDocument } from "../src/content";
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
+
 const encoder = new TextEncoder();
+
 const decoder = new TextDecoder();
 
 function makePersistence(directory: string): CachePersistence<string, CompleteDocument> {
@@ -77,6 +79,7 @@ describe("web_fetch disk cache", () => {
   it("deletes backing files when entries are evicted by the count limit", async () => {
     let now = 0;
     const cache = makeCache(directory, () => now);
+
     for (const key of ["a", "b", "c", "d"]) {
       cache.set(key, document(key, key.repeat(10)), now + DAY_MS);
     }
@@ -113,9 +116,11 @@ describe("web_fetch disk cache", () => {
     mkdirSync(directory, { recursive: true, mode: 0o700 });
     const path = join(directory, stableKeyHash("https://example.com/big"));
     const header = new Uint8Array(8);
+
     const payload = encoder.encode(
       JSON.stringify(document("https://example.com/big", "z".repeat(2_000_000))),
     );
+
     await writeFile(path, Buffer.concat([header, payload]), "utf8");
 
     const cache = makeCache(directory, () => 0);

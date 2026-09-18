@@ -6,7 +6,9 @@ import { ExpiringLruCache, stableKeyHash, type CachePersistence } from "../src/c
 import type { SearchResult } from "../src/brave";
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
+
 const encoder = new TextEncoder();
+
 const decoder = new TextDecoder();
 
 function makePersistence(directory: string): CachePersistence<string, SearchResult[]> {
@@ -76,6 +78,7 @@ describe("web_search disk cache", () => {
   it("deletes backing files when entries are evicted by the count limit", async () => {
     let now = 0;
     const cache = makeCache(directory, () => now);
+
     for (const key of ["a", "b", "c", "d"]) {
       cache.set(key, results(`https://example.com/${key}`), now + DAY_MS);
     }
@@ -101,6 +104,7 @@ describe("web_search disk cache", () => {
 
   it("rejects individually oversized entries and stores nothing", () => {
     const cache = makeCache(directory);
+
     const huge: SearchResult[] = [
       {
         title: "big",
@@ -109,6 +113,7 @@ describe("web_search disk cache", () => {
         quality: "low",
       },
     ];
+
     expect(cache.set("big", huge, Date.now() + DAY_MS)).toBe(false);
     expect(cache.get("big")).toBeUndefined();
   });

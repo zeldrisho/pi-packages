@@ -1,6 +1,9 @@
 const FENCE = /^[ \t]{0,3}(`{3,}|~{3,})/;
+
 const MAX_FALLBACK_HEADING_CHARACTERS = 60;
+
 export const MAX_OUTLINE_HEADINGS = 12;
+
 export const MAX_OUTLINE_HEADING_CHARACTERS = 120;
 
 /** One bounded heading exposed as untrusted document-shape metadata. */
@@ -41,15 +44,20 @@ interface MarkdownFence {
   length: number;
 }
 
+/** Tracks whether the current Markdown line opens or closes a fenced code block. */
 function updateFence(line: string, fence: MarkdownFence | undefined): MarkdownFence | undefined {
   const match = FENCE.exec(line);
+
   if (!match) return fence;
   const marker = match[1];
+
   if (!fence) return { character: marker[0], length: marker.length };
+
   const closes =
     marker[0] === fence.character &&
     marker.length >= fence.length &&
     !line.slice(match[0].length).trim();
+
   return closes ? undefined : fence;
 }
 
@@ -66,15 +74,20 @@ function isSpaceOrTab(character: string | undefined): boolean {
 /** Parses the bounded ATX prefix with a linear scan to avoid backtracking on remote input. */
 function parseAtxHeading(line: string): ParsedAtxHeading | undefined {
   let index = 0;
+
   while (index < 3 && isSpaceOrTab(line[index])) index += 1;
+
   if (isSpaceOrTab(line[index])) return undefined;
 
   const markerStart = index;
+
   while (line[index] === "#") index += 1;
   const level = index - markerStart;
+
   if (level < 1 || level > 6 || !isSpaceOrTab(line[index])) return undefined;
 
   while (isSpaceOrTab(line[index])) index += 1;
+
   return { level, text: line.slice(index) };
 }
 
@@ -86,6 +99,7 @@ function parseAtxHeading(line: string): ParsedAtxHeading | undefined {
  */
 function countWords(value: string): number {
   const trimmed = value.trim();
+
   return trimmed ? trimmed.split(/\s+/).length : 0;
 }
 
@@ -97,10 +111,12 @@ function countWords(value: string): number {
  */
 function countDocumentWords(lines: string[]): number {
   let fence: MarkdownFence | undefined;
+
   return lines.reduce((total, line) => {
     const wasInsideFence = Boolean(fence);
     fence = updateFence(line, fence);
     const heading = wasInsideFence || fence ? undefined : parseAtxHeading(line);
+
     return total + countWords(heading ? cleanHeading(heading.text) : line);
   }, 0);
 }
@@ -113,12 +129,16 @@ function countDocumentWords(lines: string[]): number {
  */
 function cleanHeading(value: string): string {
   let contentEnd = value.length;
+
   while (contentEnd > 0 && isSpaceOrTab(value[contentEnd - 1])) contentEnd -= 1;
 
   let markerStart = contentEnd;
+
   while (markerStart > 0 && value[markerStart - 1] === "#") markerStart -= 1;
+
   if (markerStart < contentEnd && markerStart > 0 && isSpaceOrTab(value[markerStart - 1])) {
     contentEnd = markerStart - 1;
+
     while (contentEnd > 0 && isSpaceOrTab(value[contentEnd - 1])) contentEnd -= 1;
   }
 
@@ -139,16 +159,21 @@ function collectAtxHeadings(lines: string[]): HeadingCollection {
   for (const [lineNumber, line] of lines.entries()) {
     const wasInsideFence = Boolean(fence);
     fence = updateFence(line, fence);
+
     if (wasInsideFence || fence) continue;
     const heading = parseAtxHeading(line);
+
     if (!heading) continue;
     const text = cleanHeading(heading.text);
+
     if (!text) continue;
     total += 1;
+
     if (locations.length <= MAX_OUTLINE_HEADINGS) {
       locations.push({ level: heading.level, text, line: lineNumber, inferred: false });
     }
   }
+
   return { locations, total };
 }
 
@@ -162,6 +187,7 @@ function collectAtxHeadings(lines: string[]): HeadingCollection {
 function looksLikeFallbackHeading(line: string, nextLine: string): boolean {
   if (/^\s{4,}/.test(line)) return false;
   const candidate = line.trim();
+
   if (
     !candidate ||
     candidate.length > MAX_FALLBACK_HEADING_CHARACTERS ||
@@ -173,8 +199,10 @@ function looksLikeFallbackHeading(line: string, nextLine: string): boolean {
   ) {
     return false;
   }
+
   if (!/^[A-Z]/.test(candidate) && !/[`()._]/.test(candidate)) return false;
   const following = nextLine.trim();
+
   return following.length > MAX_FALLBACK_HEADING_CHARACTERS || /[.!?]$/.test(following);
 }
 
@@ -190,25 +218,32 @@ function collectFallbackHeadings(lines: string[]): HeadingCollection {
   const nextNonEmptyIndexes = new Int32Array(lines.length);
   nextNonEmptyIndexes.fill(-1);
   let nextNonEmptyIndex = -1;
+
   for (let lineNumber = lines.length - 1; lineNumber >= 0; lineNumber -= 1) {
     nextNonEmptyIndexes[lineNumber] = nextNonEmptyIndex;
+
     if (lines[lineNumber].trim()) nextNonEmptyIndex = lineNumber;
   }
+
   let fence: MarkdownFence | undefined;
 
   for (const [lineNumber, line] of lines.entries()) {
     const wasInsideFence = Boolean(fence);
     fence = updateFence(line, fence);
+
     if (wasInsideFence || fence) continue;
     const followingIndex = nextNonEmptyIndexes[lineNumber];
     const following = followingIndex === -1 ? "" : lines[followingIndex];
+
     if (looksLikeFallbackHeading(line, following)) {
       total += 1;
+
       if (locations.length <= MAX_OUTLINE_HEADINGS) {
         locations.push({ level: 2, text: cleanHeading(line), line: lineNumber, inferred: true });
       }
     }
   }
+
   return { locations, total };
 }
 
@@ -222,8 +257,10 @@ export function createDocumentOutline(markdown: string): DocumentOutline {
   const lines = markdown.split("\n");
   const explicit = collectAtxHeadings(lines);
   const collection = explicit.total > 0 ? explicit : collectFallbackHeadings(lines);
+
   const headings = collection.locations.slice(0, MAX_OUTLINE_HEADINGS).map((heading, index) => {
     const next = collection.locations[index + 1]?.line ?? lines.length;
+
     return {
       level: heading.level,
       text: heading.text,
@@ -231,6 +268,7 @@ export function createDocumentOutline(markdown: string): DocumentOutline {
       inferred: heading.inferred,
     };
   });
+
   return {
     totalWords: countDocumentWords(lines),
     totalHeadings: collection.total,

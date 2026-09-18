@@ -17,14 +17,17 @@ const SENSITIVE_QUERY_KEYS = new Set([
   "token",
 ]);
 
+/** Replaces sensitive query-parameter values and reports whether anything changed. */
 function redactSensitiveParams(params: URLSearchParams): boolean {
   let redacted = false;
+
   for (const key of params.keys()) {
     if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
       params.set(key, "REDACTED");
       redacted = true;
     }
   }
+
   return redacted;
 }
 
@@ -37,6 +40,7 @@ function redactSensitiveParams(params: URLSearchParams): boolean {
  */
 export function redactUrlForDisplay(value: string | URL): string {
   let url: URL;
+
   try {
     url = value instanceof URL ? new URL(value.href) : new URL(value);
   } catch {
@@ -46,9 +50,12 @@ export function redactUrlForDisplay(value: string | URL): string {
   url.username = "";
   url.password = "";
   redactSensitiveParams(url.searchParams);
+
   if (url.hash.length > 1) {
     const fragmentParams = new URLSearchParams(url.hash.slice(1));
+
     if (redactSensitiveParams(fragmentParams)) url.hash = fragmentParams.toString();
   }
+
   return url.href;
 }

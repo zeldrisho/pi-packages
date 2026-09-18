@@ -25,6 +25,7 @@ describe("web_fetch caching", () => {
       undefined,
       dependencies,
     );
+
     expect(first.truncated).toBe(true);
     expect(first.nextOffset).toBe(1_000);
 
@@ -35,6 +36,7 @@ describe("web_fetch caching", () => {
       undefined,
       dependencies,
     );
+
     expect(second.offset).toBe(1_000);
     expect(second.markdown).toContain("[End of page content.]");
   });
@@ -43,12 +45,14 @@ describe("web_fetch caching", () => {
     fixture.resetContinuationRequests();
     const url = `${origin}/versioned-continuation?cache=continuation`;
     const updates: string[] = [];
+
     const first = await executeWebFetch(
       { url, maxCharacters: 1_000 },
       undefined,
       (update) => updates.push(update.content[0].text),
       dependencies,
     );
+
     expect(first.details.cached).toBe(false);
     expect(first.details.nextOffset).toBe(1_000);
     expect(first.details.truncation).toEqual({
@@ -59,12 +63,14 @@ describe("web_fetch caching", () => {
     expect(fixture.continuationRequests()).toBe(1);
 
     const continuation = { url, offset: first.details.nextOffset, maxCharacters: 2_000 };
+
     const second = await executeWebFetch(
       continuation,
       undefined,
       (update) => updates.push(update.content[0].text),
       dependencies,
     );
+
     const repeated = await executeWebFetch(continuation, undefined, undefined, dependencies);
 
     expect(second.details.cached).toBe(true);
@@ -77,12 +83,14 @@ describe("web_fetch caching", () => {
 
   it("derives focused views from the complete cached document", async () => {
     const url = `${origin}/focused?request=${Date.now()}`;
+
     const focused = await executeWebFetch(
       { url, query: "caching" },
       undefined,
       undefined,
       dependencies,
     );
+
     const complete = await executeWebFetch({ url }, undefined, undefined, dependencies);
 
     expect(focused.content[0].text).toContain("Caching stores complete pages.");
@@ -141,12 +149,14 @@ describe("web_fetch caching", () => {
   it("wraps tool output and caches identical requests", async () => {
     const updates: string[] = [];
     const params = { url: `${origin}/html`, maxCharacters: 6_000 };
+
     const first = await executeWebFetch(
       params,
       undefined,
       (update) => updates.push(update.content[0].text),
       dependencies,
     );
+
     const second = await executeWebFetch(
       params,
       undefined,

@@ -4,6 +4,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const defaultRoot = resolve(import.meta.dirname, "..");
+
 const tagPattern = /^([A-Za-z0-9._-]+)-v(\d+\.\d+\.\d+)$/;
 
 interface PackageManifest {
@@ -50,6 +51,7 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
 
   async function packageCatalog(): Promise<PackageInfo[]> {
     const entries = await readdir(packagesRoot, { withFileTypes: true });
+
     return await Promise.all(
       entries
         .filter((entry) => entry.isDirectory())
@@ -58,15 +60,19 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
           if (!/^[A-Za-z0-9._-]+$/.test(entry.name)) {
             throw new Error(`Invalid package directory name: ${entry.name}`);
           }
+
           const path = `packages/${entry.name}`;
           const manifestPath = join(root, path, "package.json");
           const manifest: PackageManifest = JSON.parse(await readFile(manifestPath, "utf8"));
+
           if (manifest.name !== `@zeldrisho/${entry.name}`) {
             throw new Error(`Unexpected package name in ${manifestPath}: ${manifest.name}`);
           }
+
           if (!/^\d+\.\d+\.\d+$/.test(manifest.version)) {
             throw new Error(`Invalid package version in ${manifestPath}: ${manifest.version}`);
           }
+
           return {
             directory: entry.name,
             path,
@@ -88,19 +94,24 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
    */
   async function resolvePackageByTag(tag: string): Promise<PackageInfo> {
     const match = tagPattern.exec(tag);
+
     if (!match) {
       throw new Error(`Tag ${tag} does not match <package>-v<version>`);
     }
+
     const [, directory, version] = match;
     const pkg = (await packageCatalog()).find((candidate) => candidate.directory === directory);
+
     if (!pkg) {
       throw new Error(`No package matches the tag ${tag}`);
     }
+
     if (pkg.version !== version) {
       throw new Error(
         `Tag version ${version} does not match ${pkg.name} manifest version ${pkg.version}`,
       );
     }
+
     return pkg;
   }
 
@@ -110,22 +121,28 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
    */
   async function writeReleaseNotes(packagePath: string, outputPath: string): Promise<void> {
     const pkg = (await packageCatalog()).find((candidate) => candidate.path === packagePath);
+
     if (!pkg) throw new Error(`Unknown package path: ${packagePath}`);
     const changelog = await readFile(pkg.changelogPath, "utf8");
+
     const heading = [...changelog.matchAll(/^##\s+\[?(\d+\.\d+\.\d+)(?:\]|\s|$)/gm)].find(
       (match) => match[1] === pkg.version,
     );
+
     if (heading?.index === undefined) {
       throw new Error(`Changelog does not contain ${pkg.name}@${pkg.version}`);
     }
+
     const start = heading.index;
     const remainder = changelog.slice(start);
     const nextHeading = remainder.slice(1).search(/^##\s+/m);
     const notes = nextHeading < 0 ? remainder : remainder.slice(0, nextHeading + 1);
+
     // Carry the version's link definition so the heading resolves in the release notes.
     const referenceLine = changelog
       .split("\n")
       .find((line) => line.startsWith(`[${pkg.version}]:`));
+
     const suffix = referenceLine ? `\n\n${referenceLine}` : "";
     // Release notes are written to an explicitly provided path. Normalize it so
     // `..` segments cannot escape, and reject relative paths that would resolve
@@ -135,6 +152,7 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
     // caller (the CI runner temp directory or a local file) are trusted.
     const resolvedCwd = resolve(process.cwd());
     const resolvedPath = resolve(outputPath);
+
     if (
       !isAbsolute(outputPath) &&
       !(resolvedPath === resolvedCwd || resolvedPath.startsWith(resolvedCwd + sep))
@@ -143,6 +161,7 @@ export function createReleaseAutomation(options: ReleaseAutomationOptions = {}):
         `Refusing to write release notes outside the working directory: ${outputPath}`,
       );
     }
+
     await writeFile(resolvedPath, `${notes.trim()}${suffix}\n`);
   }
 
@@ -160,6 +179,7 @@ export async function runReleaseCli(
   automation: ReleaseAutomation = createReleaseAutomation(),
 ): Promise<void> {
   const [command, argument, secondArgument] = args;
+
   switch (command) {
     case "package":
       if (!argument) throw new Error("A tag is required");
@@ -169,6 +189,7 @@ export async function runReleaseCli(
       if (!argument || !secondArgument) {
         throw new Error("A package path and output path are required");
       }
+
       await automation.writeReleaseNotes(argument, secondArgument);
       break;
     default:

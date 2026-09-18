@@ -75,6 +75,7 @@ interface FakeContext {
 type CapturedHandler = (event: any, context: any) => any;
 
 type SessionStartHandler = (event: SessionStartEvent, context: FakeContext) => Promise<void> | void;
+
 type ToolCallHandler = (
   event: ToolCallEvent,
   context: FakeContext,
@@ -114,6 +115,7 @@ function createUi(state: UiState, hasUI: boolean): FakeUi {
     },
     select: async (prompt, options, settings) => {
       state.selectCalls.push({ prompt, options, settings });
+
       return state.selectResponse;
     },
   };
@@ -128,13 +130,16 @@ function createExtensionContext(
     selectCalls: [],
     selectResponse: undefined,
   };
+
   const ctx: FakeContext = { ui: createUi(uiState, hasUI), hasUI, mode };
+
   return { ctx, uiState };
 }
 
 function makeExtension(): ExtensionFactory {
   const handlers: RecordedHandlers = { sessionStart: undefined, toolCall: undefined };
   const herdrEvents: HerdrBlockedEvent[] = [];
+
   // SAFETY: the test only exercises the `on` method; the rest of ExtensionAPI is unused.
   const pi = {
     events: {
@@ -152,32 +157,43 @@ function makeExtension(): ExtensionFactory {
       }
     },
   } as ExtensionAPI;
+
   const install = (): ExtensionInstall => {
     piGate(pi);
     const { ctx, uiState } = createExtensionContext(true);
+
     return { ctx, uiState, handlers, herdrEvents };
   };
+
   return { install };
 }
 
 function setConfig(content: string | null): void {
   const dir = process.env.PI_CODING_AGENT_DIR;
+
   if (!dir) throw new Error("PI_CODING_AGENT_DIR must be set in tests");
+
   if (content === null) {
     try {
       rmSync(join(dir, "pi-gate.json"), { force: true });
     } catch {
       // ignore
     }
+
     return;
   }
+
   writeFileSync(join(dir, "pi-gate.json"), content, "utf-8");
 }
 
 let workDir: string;
+
 const originalEnv = process.env.PI_CODING_AGENT_DIR;
+
 const originalHerdrEnv = process.env.HERDR_ENV;
+
 const originalHerdrSocketPath = process.env.HERDR_SOCKET_PATH;
+
 const originalHerdrPaneId = process.env.HERDR_PANE_ID;
 
 beforeEach(() => {
@@ -191,6 +207,7 @@ afterEach(() => {
   } else {
     delete process.env.PI_CODING_AGENT_DIR;
   }
+
   for (const [name, value] of [
     ["HERDR_ENV", originalHerdrEnv],
     ["HERDR_SOCKET_PATH", originalHerdrSocketPath],
@@ -199,6 +216,7 @@ afterEach(() => {
     if (value === undefined) delete process.env[name];
     else process.env[name] = value;
   }
+
   try {
     rmSync(workDir, { recursive: true, force: true });
   } catch {
@@ -254,6 +272,7 @@ describe("parseConfig", () => {
         },
       }),
     );
+
     expect(result.operations).toEqual({
       "rm -rf": "prompt",
       sudo: "block",
@@ -271,14 +290,17 @@ describe("parseConfig", () => {
         },
       }),
     );
+
     expect(result.operations).toEqual({ "rm -rf": "prompt" });
   });
 
   it("skips empty and excessively long patterns", () => {
     const tooLong = "x".repeat(MAX_RULE_PATTERN_LENGTH + 1);
+
     const result = parseConfig(
       JSON.stringify({ operations: { "": "block", valid: "prompt", [tooLong]: "allow" } }),
     );
+
     expect(result.operations).toEqual({ valid: "prompt" });
   });
 
@@ -286,6 +308,7 @@ describe("parseConfig", () => {
     const operations = Object.fromEntries(
       Array.from({ length: MAX_RULE_COUNT + 5 }, (_, index) => [`rule-${index}`, "block"]),
     );
+
     expect(Object.keys(parseConfig(JSON.stringify({ operations })).operations)).toHaveLength(
       MAX_RULE_COUNT,
     );
@@ -311,6 +334,7 @@ describe("formatCommandForDisplay", () => {
         "\n",
       ),
     );
+
     expect(result.split("\n")).toHaveLength(MAX_DISPLAY_COMMAND_LINES + 1);
     expect(result).toContain("[command display truncated]");
     expect(result).not.toContain(`line-${MAX_DISPLAY_COMMAND_LINES}`);
@@ -339,6 +363,7 @@ describe("highlightRuleForDisplay", () => {
       `command ${"x".repeat(MAX_DISPLAY_COMMAND_CHARACTERS)}`,
       "command",
     );
+
     expect(result).toContain("»command«");
     expect(result).toContain("[command display truncated]");
     expect(result).not.toContain("[»command« display truncated]");
@@ -402,6 +427,7 @@ describe("resolveAction", () => {
       "rm -rf": "prompt",
       "rm -rf /": "allow",
     });
+
     expect(action).toBe<Action>("allow");
   });
 
@@ -410,6 +436,7 @@ describe("resolveAction", () => {
       "rm -rf /": "allow",
       "rm -rf": "block",
     });
+
     expect(action).toBe<Action>("allow");
   });
 
@@ -486,6 +513,7 @@ describe("piGate extension", () => {
         text: expect.stringContaining("configuration exists but could not be loaded"),
         level: "warning",
       });
+
       const result = await handlers.toolCall!(
         {
           toolName: "bash",
@@ -494,6 +522,7 @@ describe("piGate extension", () => {
         },
         ctx,
       );
+
       expect(uiState.selectCalls).toHaveLength(1);
       expect(result).toEqual({
         block: true,
@@ -554,11 +583,13 @@ describe("piGate extension", () => {
     it("ignores non-bash tools", async () => {
       setConfig(JSON.stringify({ operations: { sudo: "block" } }));
       const { ctx, handlers } = makeExtension().install();
+
       const readEvent: ReadToolCallEvent = {
         toolName: "read",
         toolCallId: "t1",
         input: { path: "/etc/passwd" },
       };
+
       const result = await handlers.toolCall!(readEvent, ctx);
       expect(result).toBeUndefined();
     });
@@ -739,11 +770,13 @@ describe("piGate extension", () => {
     it("accepts a typed bash event and reads the command from event.input", async () => {
       setConfig(JSON.stringify({ operations: { sudo: "block" } }));
       const { ctx, handlers } = makeExtension().install();
+
       const event: BashToolCallEvent = {
         toolName: "bash",
         toolCallId: "t1",
         input: { command: "sudo echo hi" },
       };
+
       // SAFETY: exercise the type-narrowing helper the extension actually uses.
       // SAFETY: isToolCallEventType accepts a generic over the expected event shape; our locally-built event satisfies the runtime shape but TypeScript cannot infer it from the local type.
       if (!isToolCallEventType("bash", event as never)) throw new Error("expected bash event");

@@ -11,6 +11,7 @@ export interface ResolvedApiKey {
 }
 
 const KEY_NAME = "BRAVE_SEARCH_API_KEY";
+
 const MAX_DOT_ENV_BYTES = 64 * 1024;
 
 /**
@@ -22,8 +23,10 @@ const MAX_DOT_ENV_BYTES = 64 * 1024;
 export function extractKeyValue(text: string): string | undefined {
   for (const line of text.split(/\r?\n/)) {
     const match = line.match(/^\s*BRAVE_SEARCH_API_KEY\s*=\s*(.*)$/);
+
     if (!match) continue;
     let value = match[1].trim();
+
     if (
       value.length >= 2 &&
       ((value.startsWith('"') && value.endsWith('"')) ||
@@ -31,8 +34,10 @@ export function extractKeyValue(text: string): string | undefined {
     ) {
       value = value.slice(1, -1);
     }
+
     return value || undefined;
   }
+
   return undefined;
 }
 
@@ -44,10 +49,12 @@ export function extractKeyValue(text: string): string | undefined {
  */
 async function readDotEnvKey(path: string): Promise<string | undefined> {
   let handle: Awaited<ReturnType<typeof open>> | undefined;
+
   try {
     handle = await open(path, "r");
     const buffer = Buffer.alloc(MAX_DOT_ENV_BYTES);
     const { bytesRead } = await handle.read(buffer, 0, MAX_DOT_ENV_BYTES, 0);
+
     return extractKeyValue(buffer.toString("utf8", 0, bytesRead));
   } catch {
     return undefined;
@@ -66,12 +73,15 @@ async function readDotEnvKey(path: string): Promise<string | undefined> {
  */
 export async function resolveApiKey(cwd: string): Promise<ResolvedApiKey | undefined> {
   const fromEnvironment = process.env[KEY_NAME];
+
   if (fromEnvironment) return { key: fromEnvironment, source: "environment" };
 
   const fromWorkspace = await readDotEnvKey(join(cwd, ".env"));
+
   if (fromWorkspace) return { key: fromWorkspace, source: "workspace .env" };
 
   const fromAgent = await readDotEnvKey(join(getAgentDir(), ".env"));
+
   if (fromAgent) return { key: fromAgent, source: "agent .env" };
 
   return undefined;

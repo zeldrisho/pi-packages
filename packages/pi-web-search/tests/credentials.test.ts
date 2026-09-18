@@ -8,6 +8,7 @@ import { extractKeyValue, resolveApiKey } from "../src/credentials";
 // never touch the real agent configuration.
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@earendil-works/pi-coding-agent")>();
+
   return {
     ...actual,
     getAgentDir: () => agentDirectory,
@@ -15,7 +16,9 @@ vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
 });
 
 let agentDirectory = "";
+
 let workspaceDirectory = "";
+
 const originalApiKey = process.env.BRAVE_SEARCH_API_KEY;
 
 beforeEach(async () => {
@@ -100,12 +103,14 @@ describe("web_search key-source reporting", () => {
     );
 
     const { createSearchTool } = await import("./harness");
+
     const result = await createSearchTool().execute(
       "call",
       { query: "source query" },
       undefined,
       undefined,
     );
+
     expect(result.details.apiKeySource).toBe("environment");
 
     // SAFETY: the serialized details must not contain the raw credential.

@@ -5,10 +5,12 @@ import type { SearchParameters, SearchRuntime } from "../src/search";
 
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@earendil-works/pi-coding-agent")>();
+
   return { ...actual, keyHint: () => "Ctrl+O to expand" };
 });
 
 export type { SearchParameters } from "../src/search";
+
 export type SearchExecutionResult = Awaited<ReturnType<SearchRuntime["execute"]>>;
 
 export interface RenderedComponent {
@@ -58,7 +60,9 @@ export function createSearchHarness() {
       if (event === "session_shutdown") shutdownHandler = handler;
     },
   } as ExtensionAPI);
+
   if (!registered) throw new Error("web_search was not registered");
+
   // SAFETY: the captured value is the web_search SearchTool registered above.
   return {
     tool: registered as SearchTool,
@@ -99,6 +103,7 @@ const originalApiKey = process.env.BRAVE_SEARCH_API_KEY;
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+
   if (originalApiKey === undefined) delete process.env.BRAVE_SEARCH_API_KEY;
   else process.env.BRAVE_SEARCH_API_KEY = originalApiKey;
 });

@@ -3,17 +3,26 @@ import { join, resolve } from "node:path";
 import { describe, it } from "vite-plus/test";
 
 const root = resolve(import.meta.dirname, "..");
+
 const packagesDirectory = join(root, "packages");
+
 const packageDirectories = (await readdir(packagesDirectory, { withFileTypes: true }))
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
+
 const readme = await readFile(join(root, "README.md"), "utf8");
+
 const workspace = await readFile(join(root, "pnpm-workspace.yaml"), "utf8");
+
 const lockfile = await readFile(join(root, "pnpm-lock.yaml"), "utf8");
+
 const releaseWorkflow = await readFile(join(root, ".github/workflows/release.yml"), "utf8");
+
 const expectedFiles = ["src", "CHANGELOG.md"];
+
 const packageSpecificFiles = new Map([["pi-gate", ["config.schema.json"]]]);
+
 const expectedScripts = {
   check: "vp check",
   test: "vp test",
@@ -23,10 +32,12 @@ const expectedScripts = {
   format: "vp fmt --write",
   typecheck: "vp check --no-fmt --no-lint",
 };
+
 const expectedTypeScriptConfiguration = {
   extends: "../../tsconfig.json",
   include: ["src", "tests"],
 };
+
 const synchronizedInfrastructurePairs = [
   ["packages/pi-web-fetch/src/cache.ts", "packages/pi-web-search/src/cache.ts"],
   ["packages/pi-web-fetch/src/inflight.ts", "packages/pi-web-search/src/inflight.ts"],
@@ -44,15 +55,19 @@ const synchronizedInfrastructurePairs = [
 function parseOverrides(yaml: string): Map<string, string> {
   const overrides = new Map<string, string>();
   let inOverrides = false;
+
   for (const line of yaml.split(/\r?\n/)) {
     if (!inOverrides) {
       if (/^overrides:\s*$/.test(line)) inOverrides = true;
       continue;
     }
+
     if (/^\S/.test(line)) break;
-    const match = line.match(/^ {2}([A-Za-z0-9@._/-]+):\s*(?:"([^"]*)"|(\S+))?/);
+    const match = line.match(/^ {2}([A-Za-z0-9@._/*-]+):\s*(?:"([^"]*)"|(\S+))?/);
+
     if (match) overrides.set(match[1], match[2] ?? match[3] ?? "");
   }
+
   return overrides;
 }
 
@@ -65,6 +80,7 @@ function parseOverrides(yaml: string): Map<string, string> {
  */
 function sameValues(actual: string[], expected: string[]) {
   const compare = (left: string, right: string) => left.localeCompare(right);
+
   return JSON.stringify([...actual].sort(compare)) === JSON.stringify([...expected].sort(compare));
 }
 
@@ -83,18 +99,23 @@ describe("repository contracts", () => {
     if (!releaseWorkflow.includes("gh release create")) {
       fail("the release job must create GitHub releases with gh release create");
     }
+
     if (releaseWorkflow.includes("softprops/action-gh-release")) {
       fail("the release workflow must not use softprops/action-gh-release");
     }
+
     if (!releaseWorkflow.includes("RELEASE_TAG: ${{ github.ref_name }}")) {
       fail("the release job must pass the tag via RELEASE_TAG: ${{ github.ref_name }} env var");
     }
+
     if (!releaseWorkflow.includes('gh release create "$RELEASE_TAG"')) {
       fail('the release job must create the release with gh release create "$RELEASE_TAG"');
     }
+
     if (!releaseWorkflow.includes("--verify-tag")) {
       fail("the release job must pass --verify-tag to gh release create");
     }
+
     if (
       !releaseWorkflow.includes(
         '--title "${{ fromJSON(steps.pkg.outputs.result).shortName }} v${{ fromJSON(steps.pkg.outputs.result).version }}"',
@@ -102,30 +123,38 @@ describe("repository contracts", () => {
     ) {
       fail("the GitHub release title must use the package short name and version");
     }
+
     if (!releaseWorkflow.includes('--notes-file "${{ runner.temp }}/notes.md"')) {
       fail("the release job must use the notes file at ${{ runner.temp }}/notes.md");
     }
+
     if (!releaseWorkflow.includes('--target "${{ github.sha }}"')) {
       fail("the release job must target ${{ github.sha }}");
     }
+
     if (
       !releaseWorkflow.includes("GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}") ||
       !releaseWorkflow.includes("GH_REPO: ${{ github.repository }}")
     ) {
       fail("the release job must set GH_TOKEN and GH_REPO for gh release create");
     }
+
     if (!releaseWorkflow.includes("tags:") || !releaseWorkflow.includes('"*-v*.*.*"')) {
       fail("the release workflow must trigger on component tag pushes (<package>-v<version>)");
     }
+
     if (!releaseWorkflow.includes("id-token: write")) {
       fail("the publishing job must grant id-token: write for npm trusted publishing");
     }
+
     if (!releaseWorkflow.includes("environment: publish")) {
       fail("npm publication must require approval through the protected publish environment");
     }
+
     if (!releaseWorkflow.includes("shortName")) {
       fail("the GitHub release name must use the package short name, not the scoped npm name");
     }
+
     if (
       !releaseWorkflow.includes("scripts/release.ts package") ||
       !releaseWorkflow.includes("scripts/release.ts notes")
@@ -140,7 +169,9 @@ describe("repository contracts", () => {
     const documentedDirectories = [...readme.matchAll(/\]\(packages\/([A-Za-z0-9._-]+)\)/g)].map(
       (match) => match[1],
     );
+
     const activeDirectories = packageDirectories;
+
     if (!sameValues(documentedDirectories, activeDirectories)) {
       fail(
         `README package catalog does not match active packages: documented=${documentedDirectories
@@ -156,9 +187,18 @@ describe("repository contracts", () => {
         readFile(join(root, left)),
         readFile(join(root, right)),
       ]);
+
       if (!leftContents.equals(rightContents)) {
         fail(`${left} and ${right} must remain byte-for-byte identical; update both intentionally`);
       }
+    }
+  });
+
+  it("parses wildcard override selectors", () => {
+    const parsed = parseOverrides('overrides:\n  vite@*: "catalog:"\n');
+
+    if (parsed.get("vite@*") !== "catalog:") {
+      fail("parseOverrides must preserve wildcard override selectors");
     }
   });
 
@@ -167,13 +207,16 @@ describe("repository contracts", () => {
       if (version === "catalog:") continue;
       const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const resolved = lockfile.match(new RegExp(`${escapedName}@[^\\s:]+`, "g")) ?? [];
+
       if (resolved.length === 0) {
         fail(
           `${name} is overridden to ${version} but is absent from the lockfile; the override is removable`,
         );
       }
+
       for (const occurrence of resolved) {
         const resolvedVersion = occurrence.slice(name.length + 1);
+
         if (resolvedVersion !== version) {
           fail(
             `${name} is overridden to ${version} but the lockfile resolves ${resolvedVersion}; update the lockfile or remove the override`,
@@ -189,6 +232,7 @@ describe("repository contracts", () => {
     // indicate a wrong package manager was used and would break workspace
     // catalog resolution.
     const rootEntries = await readdir(root);
+
     const forbidden = [
       "package-lock.json",
       "npm-shrinkwrap.json",
@@ -196,19 +240,25 @@ describe("repository contracts", () => {
       "bun.lock",
       "bun.lockb",
     ];
+
     const found = rootEntries.filter((entry) => forbidden.includes(entry));
+
     if (found.length > 0) {
       fail(`repository root must not contain ${found.join(", ")} — use pnpm via vp install`);
     }
+
     const packageLocks = await Promise.all(
       packageDirectories.map(async (directory) => {
         const entries = await readdir(join(packagesDirectory, directory));
+
         return entries
           .filter((entry) => forbidden.includes(entry))
           .map((entry) => `${directory}/${entry}`);
       }),
     );
+
     const foundInPackages = packageLocks.flat();
+
     if (foundInPackages.length > 0) {
       fail(`packages must not contain ${foundInPackages.join(", ")} — use pnpm via vp install`);
     }
@@ -220,12 +270,15 @@ describe("repository contracts", () => {
     // a stray `src/*.js` would be published without a build step.
     for (const directory of packageDirectories) {
       const stack = [join(packagesDirectory, directory, "src")];
+
       while (stack.length > 0) {
         // SAFETY: stack is non-empty by while condition — pop always returns a string.
         const current = stack.pop() as string;
         const entries = await readdir(current, { withFileTypes: true });
+
         for (const entry of entries) {
           const full = join(current, entry.name);
+
           if (entry.isDirectory()) {
             stack.push(full);
           } else if (
@@ -245,19 +298,25 @@ describe("repository contracts", () => {
     for (const directory of packageDirectories) {
       const packageDirectory = join(packagesDirectory, directory);
       const manifest = JSON.parse(await readFile(join(packageDirectory, "package.json"), "utf8"));
+
       const typeScriptConfiguration = JSON.parse(
         await readFile(join(packageDirectory, "tsconfig.json"), "utf8"),
       );
+
       const expectedName = `@zeldrisho/${directory}`;
+
       if (manifest.name !== expectedName) {
         fail(`${directory}/package.json name must be ${expectedName}, received ${manifest.name}`);
       }
+
       if (JSON.stringify(manifest.scripts) !== JSON.stringify(expectedScripts)) {
         fail(`${manifest.name} scripts must match the uniform package scripts`);
       }
+
       if (JSON.stringify(manifest.engines) !== JSON.stringify({ node: ">=24" })) {
         fail(`${manifest.name} engines must require Node >=24`);
       }
+
       if (
         JSON.stringify(typeScriptConfiguration) !== JSON.stringify(expectedTypeScriptConfiguration)
       ) {
@@ -265,15 +324,19 @@ describe("repository contracts", () => {
           `${manifest.name} tsconfig.json must extend the base config and include src and tests`,
         );
       }
+
       const packageFiles = [...expectedFiles, ...(packageSpecificFiles.get(directory) ?? [])];
+
       if (!sameValues(manifest.files ?? [], packageFiles)) {
         fail(
           `${manifest.name} files must contain only ${packageFiles.join(", ")}; received ${(manifest.files ?? []).join(", ")}`,
         );
       }
+
       if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(["./src/index.ts"])) {
         fail(`${manifest.name} must expose only ./src/index.ts as its Pi extension`);
       }
+
       if (!readme.includes(`pi install npm:${manifest.name}`)) {
         fail(`README package catalog is missing the install command for ${manifest.name}`);
       }

@@ -33,11 +33,14 @@ async function runSearchCapturingUrl(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
       url = new URL(input instanceof Request ? input.url : String(input));
+
       return jsonResponse(response);
     }),
   );
   await createSearchTool().execute("call", params, undefined, undefined);
+
   if (!url) throw new Error("the provider request was not made");
+
   return url;
 }
 
@@ -70,6 +73,7 @@ describe("web_search code-search options", () => {
       query: "versioned docs",
       dateRange: "2025-01-01to2025-06-30",
     });
+
     expect(url.searchParams.get("freshness")).toBe("2025-01-01to2025-06-30");
 
     await expect(

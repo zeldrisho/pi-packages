@@ -23,6 +23,7 @@ interface GateConfigSchema {
 
 async function loadSchema(): Promise<GateConfigSchema> {
   const source = await readFile(new URL("../config.schema.json", import.meta.url), "utf8");
+
   // SAFETY: this test immediately asserts the schema fields consumed through this local shape.
   return JSON.parse(source) as GateConfigSchema;
 }

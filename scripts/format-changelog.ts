@@ -75,9 +75,11 @@ function normalizeSectionTitle(title: string): string {
 function compareSemver(left: string, right: string): number {
   const a = left.split(".").map(Number);
   const b = right.split(".").map(Number);
+
   for (let i = 0; i < 3; i += 1) {
     if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) - (b[i] ?? 0);
   }
+
   return 0;
 }
 
@@ -88,6 +90,7 @@ function parseHeading(line: string) {
   const semverMatch = raw.match(/^(\d+\.\d+\.\d+)/);
   const version = semverMatch ? semverMatch[1] : raw;
   const dateMatch = line.match(/(\d{4}-\d{2}-\d{2})/);
+
   return { version, date: dateMatch ? dateMatch[1] : null };
 }
 
@@ -96,8 +99,10 @@ function parseEntry(segment: string[]): ChangeEntry {
   const preamble: string[] = [];
   const sections: Array<{ title: string; lines: string[] }> = [];
   let current: { title: string; lines: string[] } | null = null;
+
   for (const line of segment.slice(1)) {
     const sectionMatch = line.match(/^###\s+(.*)$/);
+
     if (sectionMatch) {
       current = { title: sectionMatch[1].trim(), lines: [] };
       sections.push(current);
@@ -107,18 +112,22 @@ function parseEntry(segment: string[]): ChangeEntry {
       preamble.push(line);
     }
   }
+
   // Drop the blank separator line that follows each `###` heading so merged
   // sections stay contiguous and re-emit with a single blank between sections.
   for (const section of sections) {
     while (section.lines.length > 0 && section.lines[0].trim() === "") section.lines.shift();
+
     while (section.lines.length > 0 && section.lines[section.lines.length - 1].trim() === "")
       section.lines.pop();
   }
+
   return { version: heading.version, date: heading.date, preamble, sections };
 }
 
 function orderIndex(title: string): number {
   const index = STANDARD_SECTIONS.indexOf(title);
+
   return index === -1 ? STANDARD_SECTIONS.length : index;
 }
 
@@ -127,16 +136,20 @@ function renderEntry(entry: ChangeEntry): string {
   const heading = entry.date ? `## [${title}] - ${entry.date}` : `## [${title}]`;
   const parts: string[] = [];
   const preamble = entry.preamble.join("\n").trim();
+
   if (preamble) parts.push(preamble);
   const merged = new Map<string, string[]>();
+
   for (const section of entry.sections) {
     const normalized = normalizeSectionTitle(section.title);
     const lines = (merged.get(normalized) ?? []).concat(section.lines);
     merged.set(normalized, lines);
   }
+
   const ordered = [...merged.entries()].sort(
     (left, right) => orderIndex(left[0]) - orderIndex(right[0]),
   );
+
   for (const [sectionTitle, lines] of ordered) {
     // Keep a Changelog lists bullets contiguously; drop the blank separators
     // the legacy generator left between items, normalize the bullet marker to
@@ -146,9 +159,12 @@ function renderEntry(entry: ChangeEntry): string {
       .filter((line) => line.trim() !== "")
       .map((line) => line.replace(/^\*\s+/, "- "))
       .join("\n");
+
     parts.push(body ? `### ${sectionTitle}\n\n${body}` : `### ${sectionTitle}`);
   }
+
   if (parts.length === 0) return heading;
+
   return `${heading}\n\n${parts.join("\n\n")}`;
 }
 
@@ -166,9 +182,11 @@ export function formatChangelog(
 ): string {
   const lines = content.split(/\r?\n/);
   const headerIndex = lines.findIndex((line) => /^#\s/.test(line));
+
   if (headerIndex === -1) {
     throw new Error("Changelog must begin with a '# Changelog' header");
   }
+
   const firstEntryIndex = lines.findIndex(
     (line, index) => index > headerIndex && /^##\s/.test(line),
   );
@@ -176,9 +194,11 @@ export function formatChangelog(
   const entries: ChangeEntry[] = [];
   const start = firstEntryIndex === -1 ? lines.length : firstEntryIndex;
   let segment: string[] = [];
+
   const flush = () => {
     if (segment.length > 0) entries.push(parseEntry(segment));
   };
+
   for (const line of lines.slice(start)) {
     if (/^##\s/.test(line)) {
       flush();
@@ -190,9 +210,11 @@ export function formatChangelog(
       segment.push(line);
     }
   }
+
   flush();
 
   const unreleased = entries.find((entry) => entry.version === "Unreleased");
+
   const versions = entries
     .filter((entry) => entry.version !== "Unreleased")
     .sort((left, right) => compareSemver(right.version, left.version));
@@ -200,9 +222,11 @@ export function formatChangelog(
   const { repoUrl, packageDirectory } = options;
   const tagFor = (version: string) => `${packageDirectory}-v${version}`;
   const refs: string[] = [];
+
   for (let i = 0; i < versions.length; i += 1) {
     const version = versions[i].version;
     const tag = tagFor(version);
+
     if (i === versions.length - 1) {
       refs.push(`[${version}]: ${repoUrl}/releases/tag/${tag}`);
     } else {
@@ -210,6 +234,7 @@ export function formatChangelog(
       refs.push(`[${version}]: ${repoUrl}/compare/${previousTag}...${tag}`);
     }
   }
+
   if (versions.length > 0) {
     refs.unshift(`[Unreleased]: ${repoUrl}/compare/${tagFor(versions[0].version)}...HEAD`);
   }
@@ -217,6 +242,7 @@ export function formatChangelog(
   // Preserve a manually written Unreleased body only when it carries content.
   const unreleasedHasContent =
     unreleased && (unreleased.preamble.join("").trim() !== "" || unreleased.sections.length > 0);
+
   const unreleasedBlock = renderEntry({
     version: "Unreleased",
     date: null,
@@ -234,14 +260,17 @@ async function main(): Promise<void> {
   const repository = process.env.GITHUB_REPOSITORY ?? "zeldrisho/pi-packages";
   const repoUrl = `https://github.com/${repository}`;
   const packagesRoot = join(root, "packages");
+
   const directories = (await readdir(packagesRoot, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
+
   for (const directory of directories) {
     const path = join(packagesRoot, directory, "CHANGELOG.md");
     const original = await readFile(path, "utf8");
     const normalized = formatChangelog(original, { repoUrl, packageDirectory: directory });
+
     if (normalized !== original) {
       await writeFile(path, normalized);
       process.stdout.write(`Formatted ${path}\n`);

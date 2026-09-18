@@ -2,7 +2,9 @@ import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@earendil-works/pi-coding-
 import type { ExtractedLinks, ExtractionDiagnostics } from "./evidence";
 
 const CONTENT_LINE_BUDGET = Math.max(1, DEFAULT_MAX_LINES - 10);
+
 const CONTENT_BYTE_BUDGET = Math.max(1_024, DEFAULT_MAX_BYTES - 2_048);
+
 const encoder = new TextEncoder();
 
 /**
@@ -14,6 +16,8 @@ const encoder = new TextEncoder();
 export interface CompleteDocument {
   url: string;
   contentType: string;
+  /** Character offsets for document fragments, derived from HTML anchors/headings. */
+  fragmentOffsets?: Record<string, number>;
   markdown: string;
   title?: string;
   extractor: "defuddle" | "basic" | "raw";
@@ -52,27 +56,37 @@ export interface FetchResult extends CompleteDocument {
   truncated: boolean;
 }
 
+/** Returns the longest prefix whose UTF-8 representation fits within the byte limit. */
 function sliceByByteLength(value: string, maxBytes: number): string {
   if (encoder.encode(value).byteLength <= maxBytes) return value;
   let low = 0;
   let high = value.length;
+
   while (low < high) {
     const middle = Math.ceil((low + high) / 2);
+
     if (encoder.encode(value.slice(0, middle)).byteLength <= maxBytes) low = middle;
     else high = middle - 1;
   }
+
   if (low > 0 && /[\uD800-\uDBFF]/.test(value[low - 1])) low -= 1;
+
   return value.slice(0, low);
 }
 
+/** Slices content while enforcing the configured character, line, and byte budgets. */
 function boundedContentChunk(value: string, offset: number, maxCharacters: number): string {
   let chunk = value.slice(offset, offset + maxCharacters);
   let newline = -1;
+
   for (let lines = 1; lines < CONTENT_LINE_BUDGET; lines += 1) {
     newline = chunk.indexOf("\n", newline + 1);
+
     if (newline === -1) break;
   }
+
   if (newline !== -1) chunk = chunk.slice(0, newline);
+
   return sliceByByteLength(chunk, CONTENT_BYTE_BUDGET);
 }
 
@@ -97,11 +111,13 @@ export function sliceCompleteDocument(
   let markdown = boundedContentChunk(document.markdown, offset, maxCharacters);
   const end = offset + markdown.length;
   const truncated = end < totalCharacters;
+
   if (truncated) {
     markdown += `\n\n[Content truncated. Continue with offset=${end} to read the next chunk.]`;
   } else if (offset > 0) {
     markdown += "\n\n[End of page content.]";
   }
+
   return {
     ...document,
     markdown,

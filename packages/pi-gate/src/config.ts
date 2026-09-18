@@ -17,12 +17,18 @@ export interface ConfigLoadResult {
 }
 
 const CONFIG_FILE_NAME = "pi-gate.json";
+
 export const CONFIG_SCHEMA_URL =
   "https://raw.githubusercontent.com/zeldrisho/pi-packages/main/packages/pi-gate/config.schema.json";
+
 const ACTIONS: readonly Action[] = ["prompt", "block", "allow"] as const;
+
 export const DEFAULT_PROMPT_TIMEOUT_MS = 30_000;
+
 export const MAX_RULE_COUNT = 1_000;
+
 export const MAX_RULE_PATTERN_LENGTH = 1_024;
+
 export const MAX_PROMPT_TIMEOUT_MS = 86_400_000;
 
 const DEFAULT_CONFIG: GateConfig = {
@@ -94,15 +100,19 @@ export function parseConfig(content: string): GateConfig {
   const rules: Record<string, Action> = {};
   let acceptedRuleCount = 0;
   let parsed: unknown;
+
   try {
     parsed = JSON.parse(content);
   } catch {
     return { operations: rules, promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS };
   }
+
   if (!isJsonObject(parsed)) {
     return { operations: rules, promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS };
   }
+
   const configuredTimeout = parsed["promptTimeoutMs"];
+
   const promptTimeoutMs =
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- validate the optional numeric field at the untrusted JSON boundary before applying range checks
     typeof configuredTimeout === "number" &&
@@ -111,18 +121,24 @@ export function parseConfig(content: string): GateConfig {
     configuredTimeout <= MAX_PROMPT_TIMEOUT_MS
       ? configuredTimeout
       : DEFAULT_PROMPT_TIMEOUT_MS;
+
   const operations = parsed["operations"];
+
   if (!isJsonObject(operations)) {
     return { operations: rules, promptTimeoutMs };
   }
+
   for (const [pattern, action] of Object.entries(operations)) {
     if (acceptedRuleCount >= MAX_RULE_COUNT) break;
+
     if (pattern.length === 0 || pattern.length > MAX_RULE_PATTERN_LENGTH) continue;
+
     if (isAction(action)) {
       rules[pattern] = action;
       acceptedRuleCount += 1;
     }
   }
+
   return { operations: rules, promptTimeoutMs };
 }
 
@@ -133,23 +149,29 @@ export function parseConfig(content: string): GateConfig {
 export function loadConfigResult(): ConfigLoadResult {
   const emptyConfig = { operations: {}, promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS };
   const path = configPath();
+
   if (!existsSync(path)) {
     return { config: emptyConfig, status: "missing" };
   }
+
   let content: string;
+
   try {
     content = readFileSync(path, "utf-8");
   } catch {
     return { config: emptyConfig, status: "failed" };
   }
+
   try {
     const parsed: unknown = JSON.parse(content);
+
     if (!isJsonObject(parsed) || !isJsonObject(parsed["operations"])) {
       return { config: parseConfig(content), status: "failed" };
     }
   } catch {
     return { config: emptyConfig, status: "failed" };
   }
+
   return { config: parseConfig(content), status: "loaded" };
 }
 
@@ -164,13 +186,17 @@ export function loadConfig(): GateConfig {
  */
 export function ensureConfig(): void {
   const path = configPath();
+
   if (existsSync(path)) return;
+
   try {
     mkdirSync(agentDir(), { recursive: true });
   } catch {
     return;
   }
+
   const content = JSON.stringify({ $schema: CONFIG_SCHEMA_URL, ...DEFAULT_CONFIG }, null, 2) + "\n";
+
   try {
     writeFileSync(path, content, { encoding: "utf-8", flag: "wx", mode: 0o600 });
   } catch {

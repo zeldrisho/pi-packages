@@ -7,5 +7,7 @@ import { join } from "node:path";
 // state never leaks between runs or test files (which would otherwise make
 // "first fetch is not cached" assertions flaky).
 const testCacheRoot = join(tmpdir(), `pi-test-cache-${process.pid}`);
+
 mkdirSync(testCacheRoot, { recursive: true, mode: 0o700 });
+
 process.env.XDG_CACHE_HOME = testCacheRoot;

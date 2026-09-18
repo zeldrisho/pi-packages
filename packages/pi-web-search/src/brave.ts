@@ -14,13 +14,19 @@ import {
 import { normalizeText, requestJson } from "./provider";
 
 export type Provider = "brave";
+
 export type Freshness = "day" | "week" | "month" | "year";
+
 export type SafesearchMode = "off" | "moderate" | "strict";
+
 export type SearchMode = "web" | "context";
+
 /** Relevance threshold for the LLM context endpoint. */
 export type ContextThresholdMode = "strict" | "balanced" | "lenient" | "disabled";
+
 /** Token-budget preset for the LLM context endpoint (coding-oriented). */
 export type ContextDepth = "quick" | "standard" | "deep";
+
 /** Allowed Brave `result_filter` values. */
 export type ResultFilterValue = (typeof SEARCH_RESULT_FILTER_VALUES)[number];
 
@@ -71,18 +77,27 @@ export interface SearchResponse {
 export function parseQueryMeta(query: BraveQuery | undefined): BraveQueryMeta {
   if (!query) return {};
   const meta: BraveQueryMeta = {};
+
   if (query.altered) meta.altered = query.altered;
+
   if (query.cleaned) meta.cleaned = query.cleaned;
+
   if (query.spellcheck_off !== undefined) meta.spellcheckOff = query.spellcheck_off;
+
   if (query.show_strict_warning !== undefined) meta.showStrictWarning = query.show_strict_warning;
+
   if (query.more_results_available !== undefined)
     meta.moreResultsAvailable = query.more_results_available;
   const operators = query.search_operators;
+
   if (operators) {
     if (operators.applied !== undefined) meta.operatorsApplied = operators.applied;
+
     if (operators.cleaned_query) meta.cleanedQuery = operators.cleaned_query;
+
     if (Array.isArray(operators.sites)) meta.operatorSites = [...operators.sites];
   }
+
   return meta;
 }
 
@@ -175,8 +190,11 @@ export interface ContextSearchExtras {
  */
 export function classifyResultQuality(result: { title: string; snippet: string }): ResultQuality {
   if (!result.title && !result.snippet) return "low";
+
   if (result.snippet.length >= 80) return "high";
+
   if (result.title || result.snippet) return "medium";
+
   return "low";
 }
 
@@ -188,8 +206,11 @@ const CONTEXT_DEPTH_BUDGETS = {
   ContextDepth,
   { tokens: number; snippets: number; tokensPerUrl: number; snippetsPerUrl: number }
 >;
+
 const BRAVE_MAX_EXTRA_SNIPPETS = 5;
+
 const DATE_RANGE_PATTERN = /^\d{4}-\d{2}-\d{2}to\d{4}-\d{2}-\d{2}$/;
+
 const COUNTRY_PATTERN = /^([A-Za-z]{2}|ALL)$/;
 
 /**
@@ -220,24 +241,31 @@ export function validateProviderRequest(
       "The extraSnippets, operators, resultFilter, offset, uiLang, and dateRange options are only supported in web mode.",
     );
   }
+
   if (mode === "web" && (extras?.threshold !== undefined || extras?.depth !== undefined)) {
     throw new Error("The threshold and depth options are only supported in context mode.");
   }
+
   const maximumQueryCharacters =
     mode === "context" ? SEARCH_CONTEXT_MAX_QUERY_CHARACTERS : SEARCH_WEB_MAX_QUERY_CHARACTERS;
+
   if (query.length > maximumQueryCharacters) {
     throw new Error(`Search queries cannot exceed ${maximumQueryCharacters} characters.`);
   }
+
   const maximumCount =
     mode === "context" ? SEARCH_CONTEXT_MAX_RESULT_COUNT : SEARCH_WEB_MAX_RESULT_COUNT;
+
   if (!Number.isInteger(count) || count < SEARCH_MIN_RESULT_COUNT || count > maximumCount) {
     throw new Error(
       `Search result count must be an integer between ${SEARCH_MIN_RESULT_COUNT} and ${maximumCount} in ${mode} mode.`,
     );
   }
+
   if (extras?.country !== undefined && !COUNTRY_PATTERN.test(extras.country)) {
     throw new Error('Search country must be a 2-letter code (e.g. "US") or "ALL".');
   }
+
   if (extras?.goggles !== undefined) {
     if (!extras.goggles || extras.goggles.length > SEARCH_MAX_GOGGLES_CHARACTERS) {
       throw new Error(
@@ -245,6 +273,7 @@ export function validateProviderRequest(
       );
     }
   }
+
   if (extras?.offset !== undefined) {
     if (
       !Number.isInteger(extras.offset) ||
@@ -256,9 +285,11 @@ export function validateProviderRequest(
       );
     }
   }
+
   if (extras?.resultFilter !== undefined) {
     normalizeResultFilter(extras.resultFilter);
   }
+
   if (extras?.dateRange !== undefined) {
     if (
       extras.dateRange.length > SEARCH_MAX_DATE_RANGE_CHARACTERS ||
@@ -269,6 +300,7 @@ export function validateProviderRequest(
       );
     }
   }
+
   if (extras?.uiLang !== undefined && (extras.uiLang.length < 2 || extras.uiLang.length > 20)) {
     throw new Error("Search uiLang must be between 2 and 20 characters (e.g. en-US).");
   }
@@ -286,8 +318,10 @@ export function normalizeResultFilter(value: string): string {
     .split(",")
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean);
+
   const unique = [...new Set(values)];
   const allowed = new Set<string>(SEARCH_RESULT_FILTER_VALUES);
+
   if (
     unique.length === 0 ||
     value.length > SEARCH_MAX_RESULT_FILTER_CHARACTERS ||
@@ -298,6 +332,7 @@ export function normalizeResultFilter(value: string): string {
       `Search resultFilter must be a comma-separated list of: ${SEARCH_RESULT_FILTER_VALUES.join(", ")}, and must include "web" (only web results are mapped).`,
     );
   }
+
   return unique.join(",");
 }
 
@@ -316,8 +351,11 @@ export function mapFreshness(
   if (freshness && dateRange) {
     throw new Error("Search freshness and dateRange are mutually exclusive; set only one.");
   }
+
   if (dateRange) return dateRange;
+
   if (freshness) return { day: "pd", week: "pw", month: "pm", year: "py" }[freshness];
+
   return undefined;
 }
 
@@ -330,6 +368,7 @@ export function mapFreshness(
 function normalizeUrl(value: string): string {
   try {
     const url = new URL(value);
+
     return url.protocol === "http:" || url.protocol === "https:"
       ? url.toString().slice(0, 2048)
       : "";
@@ -346,30 +385,39 @@ function escapeMarkdownCell(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
 }
 
+/** Renders a structured Brave snippet as a bounded Markdown table when possible. */
 function structuredSnippetToMarkdown(value: BraveSnippet): string | undefined {
   const table = value.table;
+
   if (!table || table.length === 0) return undefined;
 
   const rows = table.filter(Boolean);
   const headers = [...new Set(rows.flatMap((row) => Object.keys(row)))];
+
   if (headers.length === 0) return undefined;
 
   const caption = value.caption ? `**${escapeMarkdownLinkText(value.caption)}**\n\n` : "";
   const header = `| ${headers.map(escapeMarkdownCell).join(" | ")} |`;
   const separator = `| ${headers.map(() => "---").join(" | ")} |`;
+
   const body = rows
     .map((row) => `| ${headers.map((key) => escapeMarkdownCell(String(row[key]))).join(" | ")} |`)
     .join("\n");
+
   return `${caption}${header}\n${separator}\n${body}`;
 }
 
+/** Converts a Brave structured snippet payload to bounded, display-safe Markdown. */
 function braveSnippetToMarkdown(value: string): string {
   try {
     const snippet = value.trim();
+
     if (!snippet) return "";
     const parsed: BraveSnippet = JSON.parse(snippet);
     const rendered = structuredSnippetToMarkdown(parsed);
+
     if (rendered !== undefined) return rendered.slice(0, 8000);
+
     return `\`\`\`json\n${JSON.stringify(parsed, null, 2)}\n\`\`\``.slice(0, 8000);
   } catch {
     return String(value)
@@ -403,18 +451,28 @@ export async function searchBraveWeb(
   url.searchParams.set("count", String(count));
   url.searchParams.set("safesearch", extras.safesearch ?? "moderate");
   url.searchParams.set("text_decorations", "false");
+
   if (language) url.searchParams.set("search_lang", language);
+
   if (extras.country) url.searchParams.set("country", extras.country.toUpperCase());
+
   if (extras.extraSnippets) url.searchParams.set("extra_snippets", "true");
+
   if (extras.operators !== undefined) url.searchParams.set("operators", String(extras.operators));
+
   if (extras.spellcheck !== undefined)
     url.searchParams.set("spellcheck", String(extras.spellcheck));
+
   if (extras.resultFilter)
     url.searchParams.set("result_filter", normalizeResultFilter(extras.resultFilter));
+
   if (extras.goggles) url.searchParams.set("goggles", extras.goggles);
+
   if (extras.offset !== undefined) url.searchParams.set("offset", String(extras.offset));
+
   if (extras.uiLang) url.searchParams.set("ui_lang", extras.uiLang);
   const mappedFreshness = mapFreshness(freshness, extras.dateRange);
+
   if (mappedFreshness) url.searchParams.set("freshness", mappedFreshness);
 
   const data = await requestJson<BraveWebResponse & { query?: BraveQuery }>(
@@ -432,15 +490,18 @@ export async function searchBraveWeb(
     results: (data.web?.results ?? []).map((item) => {
       const title = normalizeText(item.title ?? "", 300);
       let snippet = normalizeText(item.description ?? "", 600);
+
       if (extras.extraSnippets && item.extra_snippets?.length) {
         const additional = item.extra_snippets
           .slice(0, BRAVE_MAX_EXTRA_SNIPPETS)
           .map((value) => normalizeText(value ?? "", 300))
           .filter(Boolean);
+
         if (additional.length) {
           snippet = normalizeText([snippet, ...additional].filter(Boolean).join("\n\n"), 2000);
         }
       }
+
       return {
         title,
         url: normalizeUrl(item.url ?? ""),
@@ -480,12 +541,18 @@ export async function searchBraveContext(
   url.searchParams.set("maximum_number_of_tokens_per_url", String(budget.tokensPerUrl));
   url.searchParams.set("maximum_number_of_snippets_per_url", String(budget.snippetsPerUrl));
   url.searchParams.set("context_threshold_mode", extras.threshold ?? "strict");
+
   if (language) url.searchParams.set("search_lang", language);
+
   if (extras.country) url.searchParams.set("country", extras.country.toUpperCase());
+
   if (extras.safesearch) url.searchParams.set("safesearch", extras.safesearch);
+
   if (extras.spellcheck !== undefined)
     url.searchParams.set("spellcheck", String(extras.spellcheck));
+
   if (extras.goggles) url.searchParams.set("goggles", extras.goggles);
+
   if (freshness)
     url.searchParams.set(
       "freshness",
@@ -508,8 +575,10 @@ export async function searchBraveContext(
       const snippets = [
         ...new Set((item.snippets ?? []).map(braveSnippetToMarkdown).filter(Boolean)),
       ];
+
       const title = normalizeText(item.title ?? "", 300);
       const snippet = snippets.slice(0, budget.snippetsPerUrl).join("\n\n");
+
       return {
         title,
         url: normalizeUrl(item.url ?? ""),

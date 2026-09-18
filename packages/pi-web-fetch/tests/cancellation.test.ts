@@ -37,10 +37,12 @@ describe("web_fetch cancellation", () => {
 
   it("times out while the response body is stalled after headers", async () => {
     const ready = fixture.waitForStalledBody();
+
     const pending = fetchRemoteContent(`${origin}/stalled-body`, 0, 6_000, undefined, {
       ...dependencies,
       timeoutMs: 100,
     });
+
     await ready;
     await expect(pending).rejects.toThrow("web_fetch timed out after 0.1 seconds.");
   });
@@ -48,10 +50,12 @@ describe("web_fetch cancellation", () => {
   it("cancels while the response body is stalled after headers", async () => {
     const controller = new AbortController();
     const ready = fixture.waitForStalledBody();
+
     const pending = fetchRemoteContent(`${origin}/stalled-body`, 0, 6_000, controller.signal, {
       ...dependencies,
       timeoutMs: 10_000,
     });
+
     await ready;
     controller.abort();
     await expect(pending).rejects.toThrow("web_fetch was cancelled.");
@@ -64,6 +68,7 @@ describe("web_fetch cancellation", () => {
         ...dependencies,
         extractHtml: () => {
           extractionCount += 1;
+
           return new Promise<never>(() => {});
         },
         timeoutMs: 20,
@@ -75,10 +80,12 @@ describe("web_fetch cancellation", () => {
   it("cancels while HTML extraction is stalled", async () => {
     const controller = new AbortController();
     let extractionStarted = false;
+
     const pending = fetchRemoteContent(`${origin}/html`, 0, 6_000, controller.signal, {
       ...dependencies,
       extractHtml: () => {
         extractionStarted = true;
+
         return new Promise<never>(() => {});
       },
       timeoutMs: 10_000,
@@ -107,6 +114,7 @@ describe("web_fetch cancellation", () => {
   it("cancels while initial URL validation is stalled", async () => {
     const controller = new AbortController();
     let requestCount = 0;
+
     const pending = fetchRemoteContent("https://example.test", 0, 6_000, controller.signal, {
       validateUrl: () => new Promise<ValidatedTarget>(() => {}),
       request: async () => {
@@ -129,7 +137,9 @@ describe("web_fetch cancellation", () => {
         validateUrl: async (value) => {
           const url = value instanceof URL ? value : new URL(value);
           validated.push(url.pathname);
+
           if (url.pathname === "/html") return await new Promise<ValidatedTarget>(() => {});
+
           return { url, address: "127.0.0.1", family: 4 };
         },
         timeoutMs: 100,
@@ -141,10 +151,13 @@ describe("web_fetch cancellation", () => {
   it("ignores late validation settlement after cancellation", async () => {
     const controller = new AbortController();
     let resolveValidation: (target: ValidatedTarget) => void = () => {};
+
     const validation = new Promise<ValidatedTarget>((resolve) => {
       resolveValidation = resolve;
     });
+
     let requestCount = 0;
+
     const pending = fetchRemoteContent("https://example.test", 0, 6_000, controller.signal, {
       validateUrl: () => validation,
       request: async () => {

@@ -4,6 +4,7 @@ import { createSearchTool, jsonResponse } from "./harness";
 describe("web_search caching coalescing", () => {
   it("caches identical requests without caching secrets", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "cache-secret";
+
     const fetchMock = vi.fn(async () =>
       jsonResponse({
         web: {
@@ -11,6 +12,7 @@ describe("web_search caching coalescing", () => {
         },
       }),
     );
+
     vi.stubGlobal("fetch", fetchMock);
     const tool = createSearchTool();
     const params = { query: "unique cache query 914", count: 1 };
@@ -19,6 +21,7 @@ describe("web_search caching coalescing", () => {
     const first = await tool.execute("first", params, undefined, (update) =>
       updates.push(update.content[0].text),
     );
+
     const second = await tool.execute("second", params, undefined, (update) =>
       updates.push(update.content[0].text),
     );
@@ -33,7 +36,9 @@ describe("web_search caching coalescing", () => {
   it("coalesces concurrent searches without letting one caller cancel another", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "coalesce-secret";
     let resolveResponse: (response: Response) => void = () => {};
+
     let sharedSignal: AbortSignal | undefined;
+
     const fetchMock = vi.fn(
       async (_input: string | URL | Request, init?: RequestInit) =>
         await new Promise<Response>((resolve) => {
@@ -41,6 +46,7 @@ describe("web_search caching coalescing", () => {
           resolveResponse = resolve;
         }),
     );
+
     vi.stubGlobal("fetch", fetchMock);
     const tool = createSearchTool();
     const controller = new AbortController();
