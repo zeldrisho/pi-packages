@@ -44,16 +44,6 @@ minimumReleaseAgeExclude:
   - "@voidzero-dev/vite-plus-win32-arm64-msvc@0.3.2"
   - "@voidzero-dev/vite-plus-win32-x64-msvc@0.3.2"
   - vite-plus@0.3.2
-  - vite-plus
-  - "@voidzero-dev/*"
-  - oxlint
-  - "@oxlint/*"
-  - oxlint-tsgolint
-  - "@oxlint-tsgolint/*"
-  - oxfmt
-  - "@oxfmt/*"
-  - vitest
-  - "@vitest/*"
 
 overrides:
   # Dependency-override lifecycle, tracked in issue #37

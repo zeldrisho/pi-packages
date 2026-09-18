@@ -748,12 +748,9 @@ export async function executeWebFetch(
         ]
       : []),
     ...(resolvedFragment.fragment !== undefined && !fragmentMatched
-      ? [
-          `[Fragment #${resolvedFragment.fragment} was not found; showing the page from the beginning.]`,
-          "",
-        ]
+      ? ["[The requested URL fragment was not found; showing the page from the beginning.]", ""]
       : []),
-    ...(fragmentMatched ? [`[Starting at fragment #${resolvedFragment.fragment}.]`, ""] : []),
+    ...(fragmentMatched ? ["[Starting at the requested URL fragment.]", ""] : []),
     ...(focused
       ? [
           focused.details.matchedSections > 0

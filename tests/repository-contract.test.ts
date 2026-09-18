@@ -63,7 +63,7 @@ function parseOverrides(yaml: string): Map<string, string> {
     }
 
     if (/^\S/.test(line)) break;
-    const match = line.match(/^ {2}([A-Za-z0-9@._/-]+):\s*(?:"([^"]*)"|(\S+))?/);
+    const match = line.match(/^ {2}([A-Za-z0-9@._/*-]+):\s*(?:"([^"]*)"|(\S+))?/);
 
     if (match) overrides.set(match[1], match[2] ?? match[3] ?? "");
   }
@@ -191,6 +191,14 @@ describe("repository contracts", () => {
       if (!leftContents.equals(rightContents)) {
         fail(`${left} and ${right} must remain byte-for-byte identical; update both intentionally`);
       }
+    }
+  });
+
+  it("parses wildcard override selectors", () => {
+    const parsed = parseOverrides('overrides:\n  vite@*: "catalog:"\n');
+
+    if (parsed.get("vite@*") !== "catalog:") {
+      fail("parseOverrides must preserve wildcard override selectors");
     }
   });
 

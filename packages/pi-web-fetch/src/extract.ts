@@ -41,7 +41,11 @@ interface FragmentOffsets {
   [fragment: string]: number;
 }
 
-function buildFragmentOffsets(document: Document, markdown: string): FragmentOffsets {
+function buildFragmentOffsets(
+  document: Document,
+  markdown: string,
+  originalIds?: ReadonlyMap<HTMLElement, string>,
+): FragmentOffsets {
   const lines = markdown.split("\n");
 
   const headings = lines
@@ -61,7 +65,8 @@ function buildFragmentOffsets(document: Document, markdown: string): FragmentOff
   const used = new Set<number>();
 
   for (const element of document.querySelectorAll<HTMLElement>("[id], a[name]")) {
-    const id = element.getAttribute("id") ?? element.getAttribute("name");
+    const id =
+      originalIds?.get(element) ?? element.getAttribute("id") ?? element.getAttribute("name");
 
     if (!id) continue;
     const slug = fragmentSlug(id);
@@ -557,6 +562,12 @@ export async function extractHtmlToMarkdown(
     // through Pi's TUI even though extraction succeeds.
     resolveDocumentRelativeMetadataUrls(document, baseUrl);
     removeMalformedSchemaOrgData(document);
+    const originalIds = new Map<HTMLElement, string>();
+
+    for (const element of document.querySelectorAll<HTMLElement>("[id]")) {
+      originalIds.set(element, element.id);
+    }
+
     normalizeSelectorUnsafeIds(document);
     stripChromeWrappers(document, baseUrl);
     advertised = readAdvertisedLinks(document, baseUrl);
@@ -576,7 +587,7 @@ export async function extractHtmlToMarkdown(
         markdown,
         title: trimmedTitle || undefined,
         extractor: "defuddle",
-        fragmentOffsets: buildFragmentOffsets(document, markdown),
+        fragmentOffsets: buildFragmentOffsets(document, markdown, originalIds),
         ...advertised,
       };
     }

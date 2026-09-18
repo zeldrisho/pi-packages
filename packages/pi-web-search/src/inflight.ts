@@ -64,6 +64,8 @@ export class InflightCoalescer<K, V> {
     signal: AbortSignal | undefined,
     cancelledMessage: string,
   ): Promise<V> {
+    if (signal?.aborted) throw new Error(cancelledMessage);
+
     let entry = this.#entries.get(key);
 
     if (!entry) {

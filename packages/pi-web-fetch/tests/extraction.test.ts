@@ -143,6 +143,15 @@ schema"}</script></head><body><main><article><h1>Fixture</h1><p>${articleText}</
     }
   });
 
+  it("preserves original unsafe IDs in fragment offsets", async () => {
+    const html = `<main><h1>Fixture</h1><h2 id="1">Numeric heading</h2><p>${longText()}</p></main>`;
+    const result = await extractHtmlToMarkdown(html, new URL("https://example.com/article"));
+
+    const offset = result.fragmentOffsets?.["1"];
+    expect(offset).toBeDefined();
+    expect(result.markdown.slice(offset)).toMatch(/^#+ Numeric heading/m);
+  });
+
   it("preserves the origin when extracting a GitHub-style host + path URL", async () => {
     // GitHub release pages are full of document-relative links (e.g. `/owner/repo`).
     // If the scheme and host were stripped before reaching Defuddle, it would call
