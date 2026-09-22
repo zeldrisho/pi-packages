@@ -27,6 +27,8 @@ const promptPackages = new Set(["pi-coderabbit"]);
 
 const skillPackages = new Set(["pi-sentry-skills", "pi-anthropics-skills"]);
 
+const themePackages = new Set(["pi-catppuccin"]);
+
 const expectedScripts = {
   check: "vp check",
   test: "vp test",
@@ -278,7 +280,12 @@ describe("repository contracts", () => {
     // packages use `files: ["src", ...]` and Pi loads TypeScript directly —
     // a stray `src/*.js` would be published without a build step.
     for (const directory of packageDirectories) {
-      if (promptPackages.has(directory) || skillPackages.has(directory)) continue;
+      if (
+        promptPackages.has(directory) ||
+        skillPackages.has(directory) ||
+        themePackages.has(directory)
+      )
+        continue;
       const stack = [join(packagesDirectory, directory, "src")];
 
       while (stack.length > 0) {
@@ -315,6 +322,7 @@ describe("repository contracts", () => {
 
       const isPromptPackage = promptPackages.has(directory);
       const isSkillPackage = skillPackages.has(directory);
+      const isThemePackage = themePackages.has(directory);
 
       const expectedName = `@zeldrisho/${directory}`;
 
@@ -331,7 +339,7 @@ describe("repository contracts", () => {
       }
 
       const expectedPackageTypeScriptConfiguration =
-        isPromptPackage || isSkillPackage
+        isPromptPackage || isSkillPackage || isThemePackage
           ? expectedContentOnlyTypeScriptConfiguration
           : expectedTypeScriptConfiguration;
 
@@ -346,7 +354,9 @@ describe("repository contracts", () => {
         ? ["prompts", "licenses", "CHANGELOG.md"]
         : isSkillPackage
           ? ["skills", "licenses", "CHANGELOG.md"]
-          : [...expectedFiles, ...(packageSpecificFiles.get(directory) ?? [])];
+          : isThemePackage
+            ? ["themes", "CHANGELOG.md"]
+            : [...expectedFiles, ...(packageSpecificFiles.get(directory) ?? [])];
 
       if (!sameValues(manifest.files ?? [], packageFiles)) {
         fail(
@@ -361,6 +371,10 @@ describe("repository contracts", () => {
       } else if (isSkillPackage) {
         if (JSON.stringify(manifest.pi?.skills) !== JSON.stringify(["./skills"])) {
           fail(`${manifest.name} must expose only ./skills as its Pi skills`);
+        }
+      } else if (isThemePackage) {
+        if (JSON.stringify(manifest.pi?.themes) !== JSON.stringify(["./themes"])) {
+          fail(`${manifest.name} must expose only ./themes as its Pi themes`);
         }
       } else if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(["./src/index.ts"])) {
         fail(`${manifest.name} must expose only ./src/index.ts as its Pi extension`);

@@ -1,0 +1,53 @@
+{
+  "name": "@zeldrisho/pi-catppuccin",
+  "version": "0.1.0",
+  "description": "Catppuccin Mocha theme for Pi",
+  "keywords": [
+    "catppuccin",
+    "mocha",
+    "pi",
+    "pi-package",
+    "themes"
+  ],
+  "homepage": "https://github.com/zeldrisho/pi-packages/tree/main/packages/pi-catppuccin#readme",
+  "bugs": {
+    "url": "https://github.com/zeldrisho/pi-packages/issues"
+  },
+  "license": "MIT",
+  "author": "Zeldris",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zeldrisho/pi-packages.git",
+    "directory": "packages/pi-catppuccin"
+  },
+  "files": [
+    "themes",
+    "CHANGELOG.md"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "check": "vp check",
+    "test": "vp test",
+    "test:watch": "vp test --watch",
+    "lint": "vp lint",
+    "lint:fix": "vp lint --fix",
+    "format": "vp fmt --write",
+    "typecheck": "vp check --no-fmt --no-lint"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "pi": {
+    "themes": [
+      "./themes"
+    ]
+  }
+}
