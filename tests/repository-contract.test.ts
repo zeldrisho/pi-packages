@@ -42,6 +42,11 @@ const expectedTypeScriptConfiguration = {
   include: ["src", "tests"],
 };
 
+const expectedContentOnlyTypeScriptConfiguration = {
+  extends: "../../tsconfig.json",
+  files: [],
+};
+
 const synchronizedInfrastructurePairs = [
   ["packages/pi-web-fetch/src/cache.ts", "packages/pi-web-search/src/cache.ts"],
   ["packages/pi-web-fetch/src/inflight.ts", "packages/pi-web-search/src/inflight.ts"],
@@ -325,12 +330,16 @@ describe("repository contracts", () => {
         fail(`${manifest.name} engines must require Node >=24`);
       }
 
+      const expectedPackageTypeScriptConfiguration =
+        isPromptPackage || isSkillPackage
+          ? expectedContentOnlyTypeScriptConfiguration
+          : expectedTypeScriptConfiguration;
+
       if (
-        JSON.stringify(typeScriptConfiguration) !== JSON.stringify(expectedTypeScriptConfiguration)
+        JSON.stringify(typeScriptConfiguration) !==
+        JSON.stringify(expectedPackageTypeScriptConfiguration)
       ) {
-        fail(
-          `${manifest.name} tsconfig.json must extend the base config and include src and tests`,
-        );
+        fail(`${manifest.name} tsconfig.json does not match its package type`);
       }
 
       const packageFiles = isPromptPackage

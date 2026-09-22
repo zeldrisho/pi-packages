@@ -188,6 +188,25 @@ export function responseHeader(response: IncomingMessage, name: string): string 
   return Array.isArray(value) ? value[0] : value;
 }
 
+export function responseHeaderValues(response: IncomingMessage, name: string): string[] {
+  const values: string[] = [];
+  const lowerName = name.toLowerCase();
+
+  const rawHeaders = response.rawHeaders ?? [];
+
+  for (let index = 0; index + 1 < rawHeaders.length; index += 2) {
+    if (rawHeaders[index].toLowerCase() === lowerName) {
+      values.push(rawHeaders[index + 1]);
+    }
+  }
+
+  if (values.length > 0) return values;
+
+  const value = response.headers[name];
+
+  return value === undefined ? [] : Array.isArray(value) ? value : [value];
+}
+
 /**
  * Read and buffer the complete response body.
  *

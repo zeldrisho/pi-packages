@@ -27,7 +27,7 @@ validation, configuration, and framework protections. Classify uncertain items a
 - Test files (unless explicitly reviewing test security)
 - Dead code, commented code, documentation strings
 - Patterns using **constants** or **server-controlled configuration**
-- Code paths that require prior authentication to reach (note the auth requirement instead)
+- Code paths that require prior authentication to reach (note the auth requirement, but still assess authorization, impact, and exploitability)
 
 ### Server-Controlled Values (NOT Attacker-Controlled)
 
@@ -172,10 +172,10 @@ For each potential finding, confirm:
 - **Issue**: [What the vulnerability is]
 - **Impact**: [What an attacker could do]
 - **Evidence**:
+
   ```python
   [Vulnerable code snippet]
   ```
-````
 
 - **Fix**: [How to remediate]
 
@@ -186,9 +186,5 @@ For each potential finding, confirm:
 - **Location**: `file.py:456`
 - **Question**: [What needs to be verified]
 
-```
-
 If no vulnerabilities found, state: "No high-confidence vulnerabilities identified."
-
-
-```
+````

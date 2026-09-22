@@ -98,7 +98,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
 
-# SAFE: Using minimal base images
+# MINIMAL: Pin the image digest before treating a base image as trusted
 FROM alpine:3.19
 FROM gcr.io/distroless/nodejs18
 FROM scratch  # Empty base image
@@ -150,13 +150,14 @@ docker history --no-trunc myimage
 
 ```dockerfile
 # FLAG: Packages that increase attack surface
+# SSH access, privilege escalation, network tools, and build tooling:
 RUN apt-get install -y \
-    openssh-server \  # SSH access
-    sudo \            # Privilege escalation
-    netcat \          # Network tools
-    nmap \            # Network scanning
-    gcc make \        # Compilers (should be in build stage only)
-    python3-pip       # Package managers (install deps, then remove)
+    openssh-server \
+    sudo \
+    netcat \
+    nmap \
+    gcc make \
+    python3-pip
 ```
 
 ---

@@ -35,7 +35,7 @@ def safe_join(base_directory, user_path):
     target = (base / user_path).resolve()
 
     # Verify target is under base
-    if not str(target).startswith(str(base)):
+    if not target.is_relative_to(base):
         raise ValueError("Path traversal detected")
 
     return str(target)
@@ -315,15 +315,15 @@ import os
 
 def safe_extract(zip_path, extract_dir):
     """Safely extract ZIP, preventing path traversal."""
-    extract_dir = os.path.abspath(extract_dir)
+    extract_dir = os.path.realpath(extract_dir)
 
     with zipfile.ZipFile(zip_path, 'r') as zf:
         for member in zf.namelist():
             # Get absolute path of extracted file
-            member_path = os.path.abspath(os.path.join(extract_dir, member))
+            member_path = os.path.realpath(os.path.join(extract_dir, member))
 
             # Verify it's under extract directory
-            if not member_path.startswith(extract_dir + os.sep):
+            if os.path.commonpath((extract_dir, member_path)) != extract_dir:
                 raise ValueError(f"Path traversal in ZIP: {member}")
 
             # Check for symlinks (additional safety)

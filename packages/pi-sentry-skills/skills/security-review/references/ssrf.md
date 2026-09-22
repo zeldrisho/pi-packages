@@ -179,16 +179,13 @@ def safe_fetch_with_dns_pinning(url):
     if is_internal_ip(ip):
         raise ValueError("Internal IP not allowed")
 
-    # Make request directly to IP with Host header
-    # This prevents DNS rebinding attacks
-    modified_url = url.replace(hostname, ip)
-    headers = {'Host': hostname}
-
-    response = requests.get(
-        modified_url,
-        headers=headers,
+    # Use a transport that connects to the validated IP while preserving the
+    # original hostname for Host, TLS SNI, and certificate verification.
+    response = pinned_request(
+        url,
+        resolved_address=ip,
         allow_redirects=False,
-        verify=True  # Still verify TLS with original hostname
+        verify=True,
     )
 
     return response
@@ -250,10 +247,11 @@ import requests
 class SafeRequests:
     @staticmethod
     def get(url, **kwargs):
+        # Resolve, validate, and pin the address used by the actual transport.
         validate_url(url)
         kwargs['allow_redirects'] = False
         kwargs['timeout'] = (5, 30)  # Connect and read timeout
-        return requests.get(url, **kwargs)
+        return safe_fetch_with_dns_pinning(url, **kwargs)
 ```
 
 ### Node.js

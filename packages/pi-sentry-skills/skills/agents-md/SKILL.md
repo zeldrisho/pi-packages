@@ -30,7 +30,7 @@ Use only sections that add non-obvious value.
 
 ## Toolchain
 
-- Use **pnpm**: `pnpm install`
+- Use **Vite+**: `vp install`
 
 ## Commands
 

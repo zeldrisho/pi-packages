@@ -171,7 +171,7 @@ describe("web_fetch transport", () => {
   it("rejects conflicting media types instead of guessing the representation", async () => {
     await expect(
       fetchRemoteContent(`${origin}/conflicting-types`, 0, 6_000, undefined, dependencies),
-    ).rejects.toThrow("does not support text/plain, text/html");
+    ).rejects.toThrow("does not support text/html, text/plain");
   });
 
   it("accepts documentation-sized responses while keeping returned content bounded", async () => {

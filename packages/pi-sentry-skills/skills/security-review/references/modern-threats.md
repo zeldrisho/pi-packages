@@ -145,11 +145,9 @@ function sanitizeHTML(html) {
 const ws = new WebSocket("wss://api.example.com/ws");
 ws.onopen = () => ws.send(JSON.stringify({ action: "getData" }));
 
-// SAFE: Token-based authentication
+// SAFE: Authenticate through the first WebSocket message
 const token = getAuthToken();
-const ws = new WebSocket(`wss://api.example.com/ws?token=${token}`);
-
-// Or via first message
+const ws = new WebSocket("wss://api.example.com/ws");
 ws.onopen = () => {
   ws.send(JSON.stringify({ type: "auth", token: token }));
 };
@@ -216,13 +214,20 @@ from collections import defaultdict
 import time
 
 class WebSocketRateLimiter:
-    def __init__(self, max_messages=100, window=60):
+    def __init__(self, max_messages=100, window=60, max_clients=10_000):
         self.max_messages = max_messages
         self.window = window
+        self.max_clients = max_clients
         self.message_counts = defaultdict(list)
 
     def is_allowed(self, client_id):
         now = time.time()
+        if client_id not in self.message_counts and len(self.message_counts) >= self.max_clients:
+            oldest = min(
+                self.message_counts,
+                key=lambda key: self.message_counts[key][-1] if self.message_counts[key] else 0,
+            )
+            del self.message_counts[oldest]
         # Remove old entries
         self.message_counts[client_id] = [
             t for t in self.message_counts[client_id]
@@ -257,7 +262,7 @@ def summarize_document(document_content):
 **1. Input/Output Separation**
 
 ```python
-# SAFE: Structured prompt with clear boundaries
+# Defense in depth: boundaries are not a complete security control.
 def summarize_document(document_content):
     prompt = """You are a document summarizer.
 
@@ -272,9 +277,9 @@ DOCUMENT END
 
 Provide a brief summary of the above document."""
 
-    # Escape potential injection patterns
-    safe_content = escape_prompt_injection(document_content)
-    return llm.complete(prompt.format(document=safe_content))
+    # Heuristic filtering only; this is not a security boundary.
+    filtered_content = filter_prompt_injection_patterns(document_content)
+    return llm.complete(prompt.format(document=filtered_content))
 ```
 
 **2. Input Sanitization**
@@ -282,9 +287,9 @@ Provide a brief summary of the above document."""
 ```python
 import re
 
-def escape_prompt_injection(text):
-    """Remove or escape potential injection patterns."""
-    # Remove common injection patterns
+def filter_prompt_injection_patterns(text):
+    """Apply heuristic filtering; this is not prompt-injection protection."""
+    # Replace a small set of known patterns; this is not comprehensive.
     patterns = [
         r'ignore\s+(all\s+)?(previous|prior)\s+(instructions?|prompts?)',
         r'disregard\s+(all\s+)?(previous|prior)',

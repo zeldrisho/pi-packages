@@ -4,10 +4,10 @@
 
 ### Strength Requirements
 
-| Context     | Minimum Length | Maximum Length         |
-| ----------- | -------------- | ---------------------- |
-| With MFA    | 8 characters   | At least 64 characters |
-| Without MFA | 15 characters  | At least 64 characters |
+| Context     | Minimum Length | Maximum accepted length |
+| ----------- | -------------- | ----------------------- |
+| With MFA    | 8 characters   | At least 64 characters  |
+| Without MFA | 15 characters  | At least 64 characters  |
 
 **Composition Rules:**
 
@@ -206,8 +206,8 @@ const publicKeyCredential = await navigator.credentials.create({
 
 ### Session ID Requirements
 
-- **Entropy**: Minimum 64 bits of randomness
-- **Length**: At least 16 characters (hex) or 128 bits
+- **Entropy**: Minimum 128 bits of randomness
+- **Length**: At least 32 characters (hex, 128 bits)
 - **Generation**: Cryptographically secure random generator only
 
 ```python

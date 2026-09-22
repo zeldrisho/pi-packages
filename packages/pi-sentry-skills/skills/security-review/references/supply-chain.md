@@ -92,12 +92,9 @@ registry=https://registry.npmjs.org
 @company:registry=https://npm.company.com
 //npm.company.com/:_authToken=${NPM_TOKEN}
 
-# SAFE: pip with explicit index for each package
-# requirements.txt with --index-url per package
---index-url https://internal.company.com/pypi
-internal-package==1.0.0
---index-url https://pypi.org/simple
-requests==2.28.1
+# SAFE: install packages in separate commands with explicit indexes
+pip install --index-url https://internal.company.com/pypi internal-package==1.0.0
+pip install --index-url https://pypi.org/simple requests==2.28.1
 ```
 
 ```json

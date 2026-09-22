@@ -191,7 +191,8 @@ for (const packageName of packageNames) {
           if (entry.isDirectory()) stack.push(full);
           else if (entry.name === "SKILL.md") {
             const skill = await readFile(full, "utf8");
-            if (!skill.startsWith("---\\n") || !skill.includes("\\nname:") || !skill.includes("\\ndescription:")) {
+            const frontmatter = skill.match(/^---\\n([\\s\\S]*?)\\n---(?:\\n|$)/)?.[1] ?? "";
+            if (!frontmatter.match(/(^|\\n)name:/) || !frontmatter.match(/(^|\\n)description:/)) {
               throw new Error(\`Invalid Pi skill: \${full}\`);
             }
             skillCount++;
@@ -212,7 +213,8 @@ for (const packageName of packageNames) {
       }
       for (const promptFile of promptFiles) {
         const prompt = await readFile(join(promptDirectory, promptFile), "utf8");
-        if (!prompt.startsWith("---\\n") || !prompt.includes("\\ndescription:")) {
+        const frontmatter = prompt.match(/^---\\n([\\s\\S]*?)\\n---(?:\\n|$)/)?.[1] ?? "";
+        if (!frontmatter.match(/(^|\\n)description:/)) {
           throw new Error(\`\${packageName} has an invalid prompt template: \${promptFile}\`);
         }
       }

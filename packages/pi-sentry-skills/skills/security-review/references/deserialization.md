@@ -304,7 +304,9 @@ import hmac
 import hashlib
 import json
 
-SECRET_KEY = b'your-secret-key'
+# Load a randomly generated key from a secret manager or KMS.
+# Keep the same key stable across application instances.
+SECRET_KEY = load_secret_from_manager("serialization-signing-key")
 
 def serialize_with_signature(data):
     json_data = json.dumps(data)

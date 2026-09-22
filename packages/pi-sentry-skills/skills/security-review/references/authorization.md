@@ -233,9 +233,9 @@ def get_file(filepath):
 # SAFE: Validate and sanitize path
 @app.route('/files/<path:filepath>')
 def get_file(filepath):
-    base_dir = '/app/user_files'
+    base_dir = os.path.realpath('/app/user_files')
     full_path = os.path.realpath(os.path.join(base_dir, filepath))
-    if not full_path.startswith(base_dir):
+    if os.path.commonpath((base_dir, full_path)) != base_dir:
         raise PermissionDenied()
     return send_file(full_path)
 ```

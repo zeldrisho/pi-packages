@@ -11,6 +11,7 @@ import {
   FETCH_MAX_BYTES,
   readResponseBytes,
   responseHeader,
+  responseHeaderValues,
 } from "./network-transport";
 
 /**
@@ -237,7 +238,9 @@ async function documentFromResponse(
     throw new Error(`web_fetch returned HTTP ${status}.${authenticationHint}`);
   }
 
-  const contentTypeHeader = responseHeader(response, "content-type") ?? "text/plain";
+  const contentTypeHeader =
+    responseHeaderValues(response, "content-type").join(", ") || "text/plain";
+
   const contentType = normalizeContentType(contentTypeHeader);
 
   const linkHints = parseLinkHeaderForAgentHints(

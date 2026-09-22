@@ -21,11 +21,14 @@ def transfer(from_account, to_account, amount):
 # Attack: Two concurrent transfers can overdraft
 
 # SAFE: Atomic operation with locking
+from collections import defaultdict
 from threading import Lock
 
-account_locks = {}
+account_locks = defaultdict(Lock)
 
 def transfer(from_account, to_account, amount):
+    if from_account.id == to_account.id:
+        return False
     # Acquire locks in consistent order to prevent deadlock
     locks = sorted([from_account.id, to_account.id])
     with account_locks[locks[0]], account_locks[locks[1]]:
@@ -44,8 +47,14 @@ from django.db import transaction
 
 @transaction.atomic
 def transfer(from_account_id, to_account_id, amount):
-    from_account = Account.objects.select_for_update().get(id=from_account_id)
-    to_account = Account.objects.select_for_update().get(id=to_account_id)
+    accounts = {
+        account.id: account
+        for account in Account.objects.select_for_update()
+        .filter(id__in=[from_account_id, to_account_id])
+        .order_by("id")
+    }
+    from_account = accounts[from_account_id]
+    to_account = accounts[to_account_id]
 
     if from_account.balance >= amount:
         from_account.balance -= amount
@@ -202,8 +211,16 @@ def checkout(cart):
         product.stock -= item.quantity  # Reserve immediately
         product.save()
 
-    # If payment fails, transaction rolls back
-    process_payment()
+    # Queue an idempotent payment intent in the same transaction.
+    PaymentOutbox.objects.create(
+        cart_id=cart.id,
+        idempotency_key=cart.payment_id,
+        status="pending",
+    )
+
+# After this transaction commits, an outbox worker calls the payment provider
+# with the idempotency key and reconciles failures without charging uncommitted
+# orders or inventory.
 ```
 
 ### 6. Time-Based Attacks
@@ -278,19 +295,25 @@ class OrderStateMachine:
 
 ```python
 # SAFE: Idempotent operations with idempotency keys
-import hashlib
 
 def process_request(request_data, idempotency_key):
-    # Check if request was already processed
-    existing = ProcessedRequest.query.filter_by(key=idempotency_key).first()
-    if existing:
-        return existing.response  # Return cached response
+    # ProcessedRequest.key has a unique database constraint.
+    with db.transaction():
+        try:
+            ProcessedRequest.create(key=idempotency_key, status="processing")
+        except UniqueViolation:
+            existing = ProcessedRequest.query.filter_by(key=idempotency_key).first()
+            if existing.status == "complete":
+                return existing.response  # Return the cached response
+            raise RequestInProgress("The request is already being processed")
 
-    # Process request
+    # Process only after this transaction has atomically claimed the key.
     result = do_processing(request_data)
 
-    # Store for future duplicate requests
-    ProcessedRequest.create(key=idempotency_key, response=result)
+    with db.transaction():
+        ProcessedRequest.query.filter_by(key=idempotency_key).update(
+            status="complete", response=result
+        )
     return result
 ```
 

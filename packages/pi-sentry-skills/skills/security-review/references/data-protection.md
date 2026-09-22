@@ -93,10 +93,10 @@ def decrypt_ssn(encrypted_ssn):
 # VULNERABLE: HTTP endpoint
 app.run(host='0.0.0.0', port=80)
 
-# SAFE: HTTPS required
+# DEVELOPMENT ONLY: HTTPS encryption with a self-signed certificate
 app.run(host='0.0.0.0', port=443, ssl_context='adhoc')
 
-# BETTER: Proper TLS configuration
+# PRODUCTION: Use a trusted certificate or TLS-terminating reverse proxy
 ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
 ssl_context.load_cert_chain('cert.pem', 'key.pem')
 ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
@@ -248,13 +248,14 @@ logger.info(f"Search query: {sanitize_for_log(user_input)}")
 import ctypes
 
 def secure_zero(data):
-    """Zero out sensitive data in memory."""
-    if isinstance(data, bytearray):
-        for i in range(len(data)):
-            data[i] = 0
-    elif isinstance(data, bytes):
-        # Can't modify bytes, but can overwrite the reference
-        pass
+    """Best-effort clearing for mutable buffers only.
+
+    Python cannot guarantee removal of every memory copy.
+    """
+    if not isinstance(data, bytearray):
+        raise TypeError("secure_zero requires a mutable bytearray")
+    for i in range(len(data)):
+        data[i] = 0
 
 # In Java:
 # char[] password = getPassword();

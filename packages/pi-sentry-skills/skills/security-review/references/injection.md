@@ -185,6 +185,7 @@ Block or escape: `& | ; $ > < \ ! ' " ( ) { } [ ] \n \r`
 ```java
 // SAFE: Escape special characters
 String safeName = LdapEncoder.filterEncode(userName);
+String safePassword = LdapEncoder.filterEncode(password);
 String filter = "(&(uid=" + safeName + ")(userPassword=" + safePassword + "))";
 ```
 
@@ -225,8 +226,13 @@ template.render(name=user_input)
 String query = "//users/user[name='" + userName + "']";
 
 // SAFE: Use parameterized XPath
+xpath.setXPathVariableResolver(name -> {
+    if ("name".equals(name.getLocalPart())) {
+        return userName;
+    }
+    throw new IllegalArgumentException("Unknown XPath variable");
+});
 XPathExpression expr = xpath.compile("//users/user[name=$name]");
-expr.setVariable("name", userName);
 ```
 
 ---

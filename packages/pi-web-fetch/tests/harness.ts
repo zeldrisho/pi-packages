@@ -74,7 +74,7 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
 
       return;
     case "/conflicting-types":
-      response.setHeader("content-type", "text/plain, text/html");
+      response.setHeader("content-type", ["text/html", "text/plain"]);
       response.end("<html><body><h1>Ambiguous</h1></body></html>");
 
       return;
