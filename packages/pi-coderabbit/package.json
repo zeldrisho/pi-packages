@@ -1,15 +1,15 @@
 {
-  "name": "@zeldrisho/pi-web-fetch",
-  "version": "0.9.1",
-  "description": "Pi extension for secure, bounded public web page fetching and Markdown extraction",
+  "name": "@zeldrisho/pi-coderabbit",
+  "version": "0.1.0",
+  "description": "Pi prompt templates for safe CodeRabbit reviews and autofixes",
   "keywords": [
+    "code-review",
+    "coderabbit",
     "pi",
-    "pi-coding-agent",
-    "pi-extension",
     "pi-package",
-    "web-fetch"
+    "prompts"
   ],
-  "homepage": "https://github.com/zeldrisho/pi-packages/tree/main/packages/pi-web-fetch#readme",
+  "homepage": "https://github.com/zeldrisho/pi-packages/tree/main/packages/pi-coderabbit#readme",
   "bugs": {
     "url": "https://github.com/zeldrisho/pi-packages/issues"
   },
@@ -18,10 +18,11 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/zeldrisho/pi-packages.git",
-    "directory": "packages/pi-web-fetch"
+    "directory": "packages/pi-coderabbit"
   },
   "files": [
-    "src",
+    "prompts",
+    "licenses",
     "CHANGELOG.md"
   ],
   "type": "module",
@@ -37,29 +38,17 @@
     "format": "vp fmt --write",
     "typecheck": "vp check --no-fmt --no-lint"
   },
-  "dependencies": {
-    "defuddle": "^0.19.4",
-    "linkedom": "^0.18.13"
-  },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "catalog:",
-    "@earendil-works/pi-tui": "catalog:",
-    "typebox": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
-  },
-  "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*",
-    "typebox": "*"
   },
   "engines": {
     "node": ">=24"
   },
   "pi": {
-    "extensions": [
-      "./src/index.ts"
+    "prompts": [
+      "./prompts"
     ]
   }
 }

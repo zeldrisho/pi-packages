@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-09-22
+
+### Changed
+
+- Upgrade Defuddle to `^0.19.4` for improved metadata and Markdown extraction, HTML sanitization, SVG safety, and support for declarative shadow DOM and MathML content
+
+### Fixed
+
+- Extract HTML correctly when servers send duplicated equivalent `Content-Type` media types, and reject conflicting media-type declarations instead of returning raw HTML
+
 ## [0.9.0] - 2026-09-17
 
 ### Added
@@ -148,7 +158,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.9.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.9.1...HEAD
+[0.9.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.9.0...pi-web-fetch-v0.9.1
 [0.9.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.8.2...pi-web-fetch-v0.9.0
 [0.8.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.8.1...pi-web-fetch-v0.8.2
 [0.8.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.8.0...pi-web-fetch-v0.8.1

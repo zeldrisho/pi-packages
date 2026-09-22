@@ -23,6 +23,10 @@ const expectedFiles = ["src", "CHANGELOG.md"];
 
 const packageSpecificFiles = new Map([["pi-gate", ["config.schema.json"]]]);
 
+const promptPackages = new Set(["pi-coderabbit"]);
+
+const skillPackages = new Set(["pi-sentry-skills", "pi-anthropics-skills"]);
+
 const expectedScripts = {
   check: "vp check",
   test: "vp test",
@@ -36,6 +40,11 @@ const expectedScripts = {
 const expectedTypeScriptConfiguration = {
   extends: "../../tsconfig.json",
   include: ["src", "tests"],
+};
+
+const expectedContentOnlyTypeScriptConfiguration = {
+  extends: "../../tsconfig.json",
+  files: [],
 };
 
 const synchronizedInfrastructurePairs = [
@@ -269,6 +278,7 @@ describe("repository contracts", () => {
     // packages use `files: ["src", ...]` and Pi loads TypeScript directly —
     // a stray `src/*.js` would be published without a build step.
     for (const directory of packageDirectories) {
+      if (promptPackages.has(directory) || skillPackages.has(directory)) continue;
       const stack = [join(packagesDirectory, directory, "src")];
 
       while (stack.length > 0) {
@@ -303,6 +313,9 @@ describe("repository contracts", () => {
         await readFile(join(packageDirectory, "tsconfig.json"), "utf8"),
       );
 
+      const isPromptPackage = promptPackages.has(directory);
+      const isSkillPackage = skillPackages.has(directory);
+
       const expectedName = `@zeldrisho/${directory}`;
 
       if (manifest.name !== expectedName) {
@@ -317,15 +330,23 @@ describe("repository contracts", () => {
         fail(`${manifest.name} engines must require Node >=24`);
       }
 
+      const expectedPackageTypeScriptConfiguration =
+        isPromptPackage || isSkillPackage
+          ? expectedContentOnlyTypeScriptConfiguration
+          : expectedTypeScriptConfiguration;
+
       if (
-        JSON.stringify(typeScriptConfiguration) !== JSON.stringify(expectedTypeScriptConfiguration)
+        JSON.stringify(typeScriptConfiguration) !==
+        JSON.stringify(expectedPackageTypeScriptConfiguration)
       ) {
-        fail(
-          `${manifest.name} tsconfig.json must extend the base config and include src and tests`,
-        );
+        fail(`${manifest.name} tsconfig.json does not match its package type`);
       }
 
-      const packageFiles = [...expectedFiles, ...(packageSpecificFiles.get(directory) ?? [])];
+      const packageFiles = isPromptPackage
+        ? ["prompts", "licenses", "CHANGELOG.md"]
+        : isSkillPackage
+          ? ["skills", "licenses", "CHANGELOG.md"]
+          : [...expectedFiles, ...(packageSpecificFiles.get(directory) ?? [])];
 
       if (!sameValues(manifest.files ?? [], packageFiles)) {
         fail(
@@ -333,7 +354,15 @@ describe("repository contracts", () => {
         );
       }
 
-      if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(["./src/index.ts"])) {
+      if (isPromptPackage) {
+        if (JSON.stringify(manifest.pi?.prompts) !== JSON.stringify(["./prompts"])) {
+          fail(`${manifest.name} must expose only ./prompts as its Pi prompts`);
+        }
+      } else if (isSkillPackage) {
+        if (JSON.stringify(manifest.pi?.skills) !== JSON.stringify(["./skills"])) {
+          fail(`${manifest.name} must expose only ./skills as its Pi skills`);
+        }
+      } else if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(["./src/index.ts"])) {
         fail(`${manifest.name} must expose only ./src/index.ts as its Pi extension`);
       }
 

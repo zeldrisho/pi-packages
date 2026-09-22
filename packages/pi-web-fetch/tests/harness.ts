@@ -66,6 +66,18 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
       );
 
       return;
+    case "/duplicated-html-type":
+      response.setHeader("content-type", "text/html,text/html; charset=utf-8");
+      response.end(
+        "<html><head><title>Duplicated type</title></head><body><h1>Recovered</h1></body></html>",
+      );
+
+      return;
+    case "/conflicting-types":
+      response.setHeader("content-type", ["text/html", "text/plain"]);
+      response.end("<html><body><h1>Ambiguous</h1></body></html>");
+
+      return;
     case "/redirect":
       response.writeHead(302, { location: "/html" });
       response.end();
@@ -152,7 +164,7 @@ export function createFetchHarness() {
       // SAFETY: the server listens on a TCP port, so `server.address()` is an
       // AddressInfo (never a string or null in this start() path).
       const address = server.address() as AddressInfo;
-      fixtureOrigin = `http://fixture.test:${address.port}`;
+      fixtureOrigin = `http://example.test:${address.port}`;
       fixtureDependencies = {
         validateUrl: async (value): Promise<ValidatedTarget> => ({
           url: value instanceof URL ? value : new URL(value),

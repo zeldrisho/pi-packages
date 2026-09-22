@@ -1,0 +1,2 @@
+getsentry/skills commit: c2f99a5b04b4cd992ec3022d7c2c3e23e938d241
+Source: https://github.com/getsentry/skills

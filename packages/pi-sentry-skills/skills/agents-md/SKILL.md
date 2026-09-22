@@ -1,0 +1,76 @@
+---
+name: agents-md
+description: Use this skill when creating or updating AGENTS.md files or other agent instruction files. Inspect the repository toolchain, commands, policies, and conventions, then write concise, actionable, reference-backed guidance with verified paths and commands.
+---
+
+# Maintaining AGENTS.md
+
+Goal: concise, actionable agent instructions. Target under 60 lines; never exceed 100.
+
+## Workflow
+
+1. Inspect before writing:
+   - package manager: lock files and manifests
+   - commands: `package.json`, `Makefile`, task runners, CI workflows
+   - docs/specs/policies: `README.md`, `CONTRIBUTING.md`, `docs/`, `specs/`, `policies/`, `SECURITY.md`, `.github/`
+   - conventions: current code patterns, test layout, generated files, legacy areas to avoid
+2. Choose scope:
+   - root `AGENTS.md`: repo-wide defaults
+   - nested `AGENTS.md`: only when a subtree has different commands or rules
+   - closest instruction file wins; keep narrower files shorter than root files
+3. Write the smallest useful file.
+4. Verify exact paths and commands exist.
+
+## Default Sections
+
+Use only sections that add non-obvious value.
+
+```markdown
+# Agent Instructions
+
+## Toolchain
+
+- Use **Vite+**: `vp install`
+
+## Commands
+
+| Task      | Command                                |
+| --------- | -------------------------------------- |
+| Test file | `pnpm vitest run path/to/file.test.ts` |
+| Lint file | `pnpm eslint path/to/file.ts`          |
+
+## Key Conventions
+
+- Use headings, bullets, and tables; avoid paragraphs.
+- Reference existing docs, specs, and policies instead of duplicating them.
+- Keep one rule per bullet and omit generic quality slogans.
+- Use repo-relative paths and verify referenced paths and commands exist.
+- Keep generated files under their documented workflow; do not edit them by hand.
+
+## External References
+
+| Need            | File                   |
+| --------------- | ---------------------- |
+| Setup           | `CONTRIBUTING.md`      |
+| Architecture    | `docs/architecture.md` |
+| Security policy | `SECURITY.md`          |
+```
+
+## Writing Rules
+
+- List exact external files for setup, architecture, API specs, security, release, and policy docs when they exist.
+- Prefer file-scoped test/lint/typecheck commands; include full builds only when no narrower command exists.
+- Put commands in tables when there is more than one.
+- Keep one rule per bullet.
+- Keep rationale out unless it prevents a likely mistake.
+- Do not restate linter, formatter, or typechecker config.
+- Do not list installed skills or plugins.
+- Do not include generic quality slogans.
+
+## Anti-Patterns
+
+- welcome text, intros, conclusions, or pleasantries
+- long prose explaining why instructions matter
+- duplicated content from `README.md`, `CONTRIBUTING.md`, or policy docs
+- project-wide commands when file-scoped commands are available
+- nested `AGENTS.md` files that repeat root instructions

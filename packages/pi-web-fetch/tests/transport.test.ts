@@ -155,6 +155,25 @@ describe("web_fetch transport", () => {
     expect(result.title).toBe("Fixture");
   });
 
+  it("extracts HTML when the server repeats an equivalent media type", async () => {
+    const result = await fetchRemoteContent(
+      `${origin}/duplicated-html-type`,
+      0,
+      6_000,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.markdown).toContain("Recovered");
+    expect(result.markdown).not.toContain("<html>");
+  });
+
+  it("rejects conflicting media types instead of guessing the representation", async () => {
+    await expect(
+      fetchRemoteContent(`${origin}/conflicting-types`, 0, 6_000, undefined, dependencies),
+    ).rejects.toThrow("does not support text/html, text/plain");
+  });
+
   it("accepts documentation-sized responses while keeping returned content bounded", async () => {
     const result = await fetchRemoteContent(
       `${origin}/documentation-sized`,

@@ -24,6 +24,7 @@
 - Read `docs/development.md` before runtime or dependency changes, especially its security and regression requirements.
 - Read `docs/architecture.md` before changing package boundaries, network acquisition, caching, or derived views.
 - Follow `docs/release.md` before version bumps, changelog edits, tags, or publishing; pushing a component tag publishes automatically.
+- Update work branches from their target with a merge commit; do not rebase (`docs/release.md`).
 
 ## External References
 
@@ -37,4 +38,6 @@
 | Gate configuration schema                       | `packages/pi-gate/config.schema.json` |
 | Fetch behavior and setup                        | `packages/pi-web-fetch/README.md`     |
 | Search behavior and setup                       | `packages/pi-web-search/README.md`    |
+| Dependency catalog and override conditions      | `pnpm-workspace.yaml`                 |
+| Task definitions and test configuration         | `package.json`, `vite.config.ts`      |
 | CI checks                                       | `.github/workflows/ci.yml`            |
