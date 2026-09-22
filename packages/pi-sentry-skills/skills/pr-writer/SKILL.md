@@ -104,5 +104,3 @@ gh api -X PATCH repos/{owner}/{repo}/pulls/PR_NUMBER \
 Refresh the title and body when follow-up commits materially change scope,
 approach, breaking behavior, risk, migration, or review expectations. Skip
 typo-only, formatting-only, and rename-only follow-ups.
-
-## Examples
