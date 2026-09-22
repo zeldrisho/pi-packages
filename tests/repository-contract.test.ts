@@ -334,7 +334,7 @@ describe("repository contracts", () => {
       }
 
       const packageFiles = isPromptPackage
-        ? ["prompts", "CHANGELOG.md"]
+        ? ["prompts", "licenses", "CHANGELOG.md"]
         : isSkillPackage
           ? ["skills", "licenses", "CHANGELOG.md"]
           : [...expectedFiles, ...(packageSpecificFiles.get(directory) ?? [])];

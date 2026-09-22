@@ -22,6 +22,7 @@
   },
   "files": [
     "prompts",
+    "licenses",
     "CHANGELOG.md"
   ],
   "type": "module",

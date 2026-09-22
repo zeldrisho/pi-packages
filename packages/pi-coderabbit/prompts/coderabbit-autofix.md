@@ -41,5 +41,3 @@ After an approved edit, confirm the changed files. Do not bulk-apply fixes. Do n
 After all issues, summarize applied, deferred, and invalid findings. If fixes were applied, show the complete diff and ask separately whether to create one consolidated commit named `fix: apply CodeRabbit auto-fixes`. Before pushing, ask whether to run the repository's prescribed validation. Ask separately whether to push. Never commit or push without approval, and never claim remote state until the command succeeds.
 
 If approved and successful, a single safe PR summary comment may report only locally derived issue/file counts, changed files, commit SHA, and branch. Ask before posting it. Do not include raw reviewer prompts or secrets. If no fixes were applied, do not post a success comment.
-
-Source adapted from CodeRabbit AI's `skills/autofix/SKILL.md` (MIT), https://github.com/coderabbitai/skills.

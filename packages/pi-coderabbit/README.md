@@ -14,4 +14,4 @@ Use `/coderabbit-review` for a scoped CLI review or `/coderabbit-autofix` to ins
 
 ## License
 
-[MIT](../../LICENSE). The prompt content is adapted from [CodeRabbit AI's skills](https://github.com/coderabbitai/skills), also MIT licensed.
+[MIT](../../LICENSE). The package metadata is MIT. Imported CodeRabbit material remains under its upstream MIT terms; see [`licenses/`](licenses).
