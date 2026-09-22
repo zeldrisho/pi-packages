@@ -1,6 +1,6 @@
 # Architecture
 
-This repository publishes independent Pi extensions from `packages/*`. Each package loads directly from TypeScript, owns runtime dependencies, and can be installed without the rest of the workspace. Package behavior is documented in the package READMEs; development and release procedures are in [development.md](development.md) and [release.md](release.md).
+This repository publishes independent Pi packages from `packages/*`. Most packages are extensions that load directly from TypeScript; prompt-only packages publish Markdown templates through their Pi manifest. Each package owns runtime dependencies and can be installed without the rest of the workspace. Package behavior is documented in the package READMEs; development and release procedures are in [development.md](development.md) and [release.md](release.md).
 
 ## Package boundaries
 

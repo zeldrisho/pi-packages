@@ -127,7 +127,7 @@ try {
   );
   await writeFile(
     join(fixtureDirectory, "smoke.ts"),
-    `import { readFile } from "node:fs/promises";
+    `import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { syncBuiltinESMExports } from "node:module";
 import { discoverAndLoadExtensions } from "@earendil-works/pi-coding-agent";
@@ -177,9 +177,27 @@ for (const packageName of packageNames) {
 
     const packageDirectory = join(process.cwd(), "node_modules", ...packageName.split("/"));
     const manifest = JSON.parse(await readFile(join(packageDirectory, "package.json"), "utf8"));
+    if (Array.isArray(manifest.pi?.prompts)) {
+      if (JSON.stringify(manifest.pi.prompts) !== JSON.stringify(["./prompts"])) {
+        throw new Error(\`Invalid Pi prompt manifest for \${packageName}\`);
+      }
+      const promptDirectory = join(packageDirectory, "prompts");
+      const promptFiles = (await readdir(promptDirectory)).filter((file) => file.endsWith(".md"));
+      if (promptFiles.length === 0) {
+        throw new Error(\`\${packageName} did not package any prompt templates\`);
+      }
+      for (const promptFile of promptFiles) {
+        const prompt = await readFile(join(promptDirectory, promptFile), "utf8");
+        if (!prompt.startsWith("---\\n") || !prompt.includes("\\ndescription:")) {
+          throw new Error(\`\${packageName} has an invalid prompt template: \${promptFile}\`);
+        }
+      }
+      continue;
+    }
     if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(["./src/index.ts"])) {
       throw new Error(\`Invalid Pi extension manifest for \${packageName}\`);
     }
+
     const extensionPath = join(packageDirectory, manifest.pi.extensions[0]);
     const loaded = await discoverAndLoadExtensions(
       [extensionPath],

@@ -1,0 +1,53 @@
+{
+  "name": "@zeldrisho/pi-coderabbit",
+  "version": "0.1.0",
+  "description": "Pi prompt templates for safe CodeRabbit reviews and autofixes",
+  "keywords": [
+    "code-review",
+    "coderabbit",
+    "pi",
+    "pi-package",
+    "prompts"
+  ],
+  "homepage": "https://github.com/zeldrisho/pi-packages/tree/main/packages/pi-coderabbit#readme",
+  "bugs": {
+    "url": "https://github.com/zeldrisho/pi-packages/issues"
+  },
+  "license": "MIT",
+  "author": "Zeldris",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zeldrisho/pi-packages.git",
+    "directory": "packages/pi-coderabbit"
+  },
+  "files": [
+    "prompts",
+    "CHANGELOG.md"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "check": "vp check",
+    "test": "vp test",
+    "test:watch": "vp test --watch",
+    "lint": "vp lint",
+    "lint:fix": "vp lint --fix",
+    "format": "vp fmt --write",
+    "typecheck": "vp check --no-fmt --no-lint"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "pi": {
+    "prompts": [
+      "./prompts"
+    ]
+  }
+}

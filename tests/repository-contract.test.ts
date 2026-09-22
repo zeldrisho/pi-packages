@@ -23,6 +23,8 @@ const expectedFiles = ["src", "CHANGELOG.md"];
 
 const packageSpecificFiles = new Map([["pi-gate", ["config.schema.json"]]]);
 
+const promptPackages = new Set(["pi-coderabbit"]);
+
 const expectedScripts = {
   check: "vp check",
   test: "vp test",
@@ -269,6 +271,7 @@ describe("repository contracts", () => {
     // packages use `files: ["src", ...]` and Pi loads TypeScript directly —
     // a stray `src/*.js` would be published without a build step.
     for (const directory of packageDirectories) {
+      if (promptPackages.has(directory)) continue;
       const stack = [join(packagesDirectory, directory, "src")];
 
       while (stack.length > 0) {
@@ -303,6 +306,8 @@ describe("repository contracts", () => {
         await readFile(join(packageDirectory, "tsconfig.json"), "utf8"),
       );
 
+      const isPromptPackage = promptPackages.has(directory);
+
       const expectedName = `@zeldrisho/${directory}`;
 
       if (manifest.name !== expectedName) {
@@ -325,7 +330,9 @@ describe("repository contracts", () => {
         );
       }
 
-      const packageFiles = [...expectedFiles, ...(packageSpecificFiles.get(directory) ?? [])];
+      const packageFiles = isPromptPackage
+        ? ["prompts", "CHANGELOG.md"]
+        : [...expectedFiles, ...(packageSpecificFiles.get(directory) ?? [])];
 
       if (!sameValues(manifest.files ?? [], packageFiles)) {
         fail(
@@ -333,7 +340,11 @@ describe("repository contracts", () => {
         );
       }
 
-      if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(["./src/index.ts"])) {
+      if (isPromptPackage) {
+        if (JSON.stringify(manifest.pi?.prompts) !== JSON.stringify(["./prompts"])) {
+          fail(`${manifest.name} must expose only ./prompts as its Pi prompts`);
+        }
+      } else if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(["./src/index.ts"])) {
         fail(`${manifest.name} must expose only ./src/index.ts as its Pi extension`);
       }
 

@@ -9,6 +9,7 @@ Monorepo for my personal Pi extensions.
 | [`@zeldrisho/pi-gate`](packages/pi-gate)             | Block or confirm bash commands from a user JSON config | `pi install npm:@zeldrisho/pi-gate`       |
 | [`@zeldrisho/pi-web-fetch`](packages/pi-web-fetch)   | Fetch public web pages as bounded Markdown             | `pi install npm:@zeldrisho/pi-web-fetch`  |
 | [`@zeldrisho/pi-web-search`](packages/pi-web-search) | Search the web with Brave Search                       | `pi install npm:@zeldrisho/pi-web-search` |
+| [`@zeldrisho/pi-coderabbit`](packages/pi-coderabbit) | CodeRabbit review and autofix prompts                  | `pi install npm:@zeldrisho/pi-coderabbit` |
 
 Install only the extensions you need using the commands above. See each package README for configuration, behavior, and usage.
 
