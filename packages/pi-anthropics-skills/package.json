@@ -1,0 +1,55 @@
+{
+  "name": "@zeldrisho/pi-anthropics-skills",
+  "version": "0.1.0",
+  "description": "Pi engineering skills adapted from Anthropic's knowledge-work plugins",
+  "keywords": [
+    "documentation",
+    "pi",
+    "pi-package",
+    "skills",
+    "tech-debt",
+    "testing-strategy"
+  ],
+  "homepage": "https://github.com/zeldrisho/pi-packages/tree/main/packages/pi-anthropics-skills#readme",
+  "bugs": {
+    "url": "https://github.com/zeldrisho/pi-packages/issues"
+  },
+  "license": "MIT",
+  "author": "Zeldris",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zeldrisho/pi-packages.git",
+    "directory": "packages/pi-anthropics-skills"
+  },
+  "files": [
+    "skills",
+    "licenses",
+    "CHANGELOG.md"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "check": "vp check",
+    "test": "vp test",
+    "test:watch": "vp test --watch",
+    "lint": "vp lint",
+    "lint:fix": "vp lint --fix",
+    "format": "vp fmt --write",
+    "typecheck": "vp check --no-fmt --no-lint"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "pi": {
+    "skills": [
+      "./skills"
+    ]
+  }
+}

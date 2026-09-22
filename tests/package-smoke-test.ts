@@ -177,6 +177,30 @@ for (const packageName of packageNames) {
 
     const packageDirectory = join(process.cwd(), "node_modules", ...packageName.split("/"));
     const manifest = JSON.parse(await readFile(join(packageDirectory, "package.json"), "utf8"));
+    if (Array.isArray(manifest.pi?.skills)) {
+      if (JSON.stringify(manifest.pi.skills) !== JSON.stringify(["./skills"])) {
+        throw new Error(\`Invalid Pi skill manifest for \${packageName}\`);
+      }
+      const skillDirectory = join(packageDirectory, "skills");
+      const stack = [skillDirectory];
+      let skillCount = 0;
+      while (stack.length > 0) {
+        const current = stack.pop() as string;
+        for (const entry of await readdir(current, { withFileTypes: true })) {
+          const full = join(current, entry.name);
+          if (entry.isDirectory()) stack.push(full);
+          else if (entry.name === "SKILL.md") {
+            const skill = await readFile(full, "utf8");
+            if (!skill.startsWith("---\\n") || !skill.includes("\\nname:") || !skill.includes("\\ndescription:")) {
+              throw new Error(\`Invalid Pi skill: \${full}\`);
+            }
+            skillCount++;
+          }
+        }
+      }
+      if (skillCount === 0) throw new Error(\`\${packageName} did not package any Pi skills\`);
+      continue;
+    }
     if (Array.isArray(manifest.pi?.prompts)) {
       if (JSON.stringify(manifest.pi.prompts) !== JSON.stringify(["./prompts"])) {
         throw new Error(\`Invalid Pi prompt manifest for \${packageName}\`);
