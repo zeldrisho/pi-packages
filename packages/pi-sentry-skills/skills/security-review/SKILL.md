@@ -3,11 +3,6 @@ name: security-review
 description: Use this skill when reviewing code or diffs for exploitable security vulnerabilities, including injection, XSS, SSRF, authentication, authorization, cryptography, file handling, secrets, or supply-chain risks. Trace attacker-controlled input through the codebase and report only high-confidence findings with severity and remediation.
 ---
 
-<!--
-Reference material based on OWASP Cheat Sheet Series (CC BY-SA 4.0)
-https://cheatsheetseries.owasp.org/
--->
-
 # Security Review Skill
 
 Review code for exploitable security vulnerabilities.

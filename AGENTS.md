@@ -7,16 +7,16 @@
 
 ## Commands
 
-| Task                              | Command                              |
-| --------------------------------- | ------------------------------------ |
-| Run one test file                 | `vp test <path-to-test>`             |
-| Run one package's tests           | `vp run '@zeldrisho/<package>#test'` |
-| Lint one file                     | `vp lint <path-to-file>`             |
-| Format one file                   | `vp fmt <path-to-file> --write`      |
-| Type-check workspace              | `vp run typecheck`                   |
-| Complete validation before review | `vp run validate`                    |
-| Normalize changelogs              | `vp run format:changelog`            |
-| Sync shared web modules           | `vp run sync:web-modules`            |
+| Task                              | Command                                 |
+| --------------------------------- | --------------------------------------- |
+| Run one test file                 | `vp test <path-to-test>`                |
+| Run one package's tests           | `vp run '@zeldrisho/<package>#test'`    |
+| Check formatting, lint, and types | `vp check`                              |
+| Auto-fix formatting and lint      | `vp check --fix`                        |
+| Focused lint / format / typecheck | `vp lint`, `vp fmt`, `vp run typecheck` |
+| Complete validation before review | `vp run validate`                       |
+| Normalize changelogs              | `vp run format:changelog`               |
+| Sync shared web modules           | `vp run sync:web-modules`               |
 
 ## Key Conventions
 

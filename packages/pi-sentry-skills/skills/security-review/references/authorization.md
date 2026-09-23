@@ -1,7 +1,5 @@
 # Authorization Security Reference
 
-> Adapted from `getsentry/skills/skills/security-review/references/authorization.md` at commit `c2f99a5b04b4cd992ec3022d7c2c3e23e938d241`; changes made. Contains OWASP-derived material under CC BY-SA 4.0. See `LICENSE` for attribution and terms.
-
 ## Overview
 
 Authorization verifies that a requested action or service is approved for a specific entity—distinct from authentication, which verifies identity. A user who has been authenticated is often not authorized to access every resource and perform every action.
