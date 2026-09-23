@@ -571,6 +571,7 @@ interface ResolvedFragment {
   endOffset?: number;
 }
 
+/** Converts a one-based source line and column into a Markdown character offset. */
 function sourceOffset(markdown: string, lineNumber: number, columnNumber = 1): number | undefined {
   if (lineNumber < 1 || columnNumber < 1) return undefined;
 
@@ -585,6 +586,7 @@ function sourceOffset(markdown: string, lineNumber: number, columnNumber = 1): n
   return offset + Math.min(columnNumber - 1, lines[lineNumber - 1].length);
 }
 
+/** Resolves heading and source-location URL fragments against a fetched document. */
 function resolveFragmentOffset(document: CompleteDocument, rawUrl: string): ResolvedFragment {
   let fragment: string | undefined;
 
