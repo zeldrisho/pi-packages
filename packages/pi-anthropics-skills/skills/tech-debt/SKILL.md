@@ -1,6 +1,6 @@
 ---
 name: tech-debt
-description: Use this skill when auditing technical debt, assessing code health, deciding what to refactor, or prioritizing a maintenance backlog. Categorize code, architecture, test, dependency, documentation, and infrastructure debt, score impact, risk, and effort, and produce a phased remediation plan.
+description: Use this skill when auditing technical debt or code health, deciding whether to refactor, or prioritizing a maintainability backlog.
 ---
 
 # Tech Debt Management

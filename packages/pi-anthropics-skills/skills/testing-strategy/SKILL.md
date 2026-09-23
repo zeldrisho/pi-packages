@@ -1,6 +1,6 @@
 ---
 name: testing-strategy
-description: Use this skill when designing a test strategy or test plan, deciding what tests to write, evaluating coverage, or choosing test architecture. Balance unit, integration, and end-to-end coverage around critical paths, error handling, edge cases, security boundaries, and data integrity, and identify testing gaps.
+description: Use this skill when planning tests, deciding what tests to write, evaluating existing test coverage, or choosing test architecture for a software change.
 ---
 
 # Testing Strategy

@@ -1,6 +1,6 @@
 ---
 name: documentation
-description: Use this skill when writing or maintaining technical documentation, including READMEs, API references, runbooks, architecture documents, onboarding guides, or other engineering docs. Identify the reader and document type, lead with useful information, show concrete examples, and link to related sources instead of duplicating them.
+description: Use this skill when writing or maintaining engineering documentation such as READMEs, API references, runbooks, architecture documents, or onboarding guides for a specific audience.
 ---
 
 # Technical Documentation

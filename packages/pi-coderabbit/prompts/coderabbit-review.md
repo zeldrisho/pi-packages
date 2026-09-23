@@ -1,17 +1,18 @@
 ---
 description: Run a scoped CodeRabbit CLI review and present trustworthy findings
-argument-hint: "[all|committed|uncommitted] [--base <branch>] [--dir <path>]"
+argument-hint: "[all|committed|uncommitted] [--base <branch>] [--base-commit <commit>] [--dir <path>] [--include-untracked] [--light]"
 ---
 
 Run a CodeRabbit review of the requested changes. The arguments are: `${ARGUMENTS:-all}`.
 
-Parse the arguments before acting. Accept one optional scope (`all`, `committed`, or `uncommitted`) plus the supported options listed below; reject unknown, duplicate, malformed, or incompatible selectors and ask the user to correct them rather than guessing.
+Parse arguments once before acting. Accept at most one scope (`all`, `committed`, or `uncommitted`; default `all`) and only these options: `--base <branch>`, `--base-commit <commit>`, `--dir <path>`, `--include-untracked`, and `--light`. Reject unknown, duplicate, malformed, missing-value, or incompatible arguments and ask the user to correct them rather than guessing.
 
 ## Scope and safety
 
 - Parse the arguments before acting. The review type defaults to `all` and must be one of `all`, `committed`, or `uncommitted`.
-- Preserve supported options such as `--base <branch>`, `--dir <path>`, `--include-untracked`, `--light`, and `--base-commit <commit>`. Do not silently drop options or combine incompatible selectors.
-- If `--dir` is supplied, first verify that it is inside an initialized Git worktree with `git -C <dir> rev-parse --is-inside-work-tree`. Never review a directory outside the requested repository.
+- Pass through each explicitly requested supported option; do not silently drop options or combine incompatible selectors.
+- If `--dir` is supplied, resolve the intended repository root and `git -C <dir> rev-parse --show-toplevel`, canonicalize both paths, and require an exact match before proceeding. Being inside some Git worktree is insufficient. If the authorized repository root cannot be established or the roots differ, stop and ask the user.
+- Before invoking CodeRabbit, determine what paths and content the selected scope/options will cause it to scan, including untracked files when `--include-untracked` is set. Verify that credential and other sensitive files are excluded. If the scan boundary or sensitive-file exclusion cannot be established, stop and explain the uncertainty; proceed only after the user explicitly approves the identified scope.
 - Inspect `pwd`, Git repository state, current branch, and changed-file status as context. Do not read credential files, environment secrets, or unrelated home-directory data.
 
 ## Prerequisites
@@ -29,6 +30,7 @@ Build a fixed argument vector, not a shell command assembled from reviewer or re
 - Always use `coderabbit review --agent`.
 - Add exactly one of `--committed` or `--uncommitted` for those scopes; add neither for `all`.
 - Add only explicitly requested, validated options.
+- If `--base <branch>` is requested, resolve and verify that branch in the authorized repository before assigning it to `BASE` and passing it. If unavailable, disclose the limitation and ask the user; never use an unset/empty `BASE` or substitute a guessed base. If `--base-commit <commit>` is requested, verify the commit exists before use.
 
 Run it in the requested directory and capture its NDJSON output. A failed command is a failed review; report the exit status and bounded diagnostic output rather than calling it clean. Require a valid completion event indicating successful completion before reporting a clean result. Missing completion, malformed/truncated NDJSON, or an unknown completion status is an incomplete/unknown review, not a clean one; report the gap and bounded diagnostics.
 

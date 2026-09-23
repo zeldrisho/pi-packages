@@ -1,6 +1,6 @@
 ---
 name: agents-md
-description: Use this skill when creating or updating AGENTS.md files or other agent instruction files. Inspect the repository toolchain, commands, policies, and conventions, then write concise, actionable, reference-backed guidance with verified paths and commands. Do not copy example commands without verifying them in the target repository.
+description: Use this skill when creating or updating AGENTS.md or other repository agent-instruction files, especially when documenting project-specific tooling, policies, or conventions.
 ---
 
 # Maintaining AGENTS.md
