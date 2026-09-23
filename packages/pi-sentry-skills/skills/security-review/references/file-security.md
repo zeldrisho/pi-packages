@@ -1,7 +1,5 @@
 # File Security Reference
 
-> Adapted from the Sentry security-review material at pinned revision `c2f99a5b04b4cd992ec3022d7c2c3e23e938d241`; changes made. Contains OWASP-derived material under CC BY-SA 4.0. See the package `LICENSE` for source mapping, attribution, and terms.
-
 ## Overview
 
 File operations present multiple security risks: path traversal attacks, malicious file uploads, XML External Entity (XXE) attacks, and insecure file permissions. This reference covers secure patterns for handling files.

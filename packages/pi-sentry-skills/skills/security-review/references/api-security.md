@@ -1,7 +1,5 @@
 # API Security Reference
 
-> Adapted from the Sentry security-review material at pinned revision `c2f99a5b04b4cd992ec3022d7c2c3e23e938d241`; changes made. Contains OWASP-derived material under CC BY-SA 4.0. See the package `LICENSE` for source mapping, attribution, and terms.
-
 ## Overview
 
 APIs expose application functionality and data, making them prime targets for attackers. This reference covers security for REST APIs, GraphQL, and general API patterns.

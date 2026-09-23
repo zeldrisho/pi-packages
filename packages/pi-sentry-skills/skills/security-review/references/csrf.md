@@ -1,7 +1,5 @@
 # Cross-Site Request Forgery (CSRF) Prevention Reference
 
-> Adapted from the Sentry security-review material at pinned revision `c2f99a5b04b4cd992ec3022d7c2c3e23e938d241`; changes made. Contains OWASP-derived material under CC BY-SA 4.0. See the package `LICENSE` for source mapping, attribution, and terms.
-
 ## Overview
 
 CSRF attacks trick authenticated users into performing unintended actions by exploiting the browser's automatic credential transmission. The attack works because browsers automatically include cookies with requests to a domain, regardless of the request's origin.

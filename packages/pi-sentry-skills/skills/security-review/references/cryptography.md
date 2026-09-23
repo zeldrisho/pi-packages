@@ -1,7 +1,5 @@
 # Cryptographic Security Reference
 
-> Adapted from the Sentry security-review material at pinned revision `c2f99a5b04b4cd992ec3022d7c2c3e23e938d241`; changes made. Contains OWASP-derived material under CC BY-SA 4.0. See the package `LICENSE` for source mapping, attribution, and terms.
-
 ## Core Principles
 
 1. **Avoid storing sensitive data** when possible - the best protection is not having the data
