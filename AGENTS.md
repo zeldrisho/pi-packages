@@ -24,6 +24,7 @@
 - Read `docs/development.md` before runtime or dependency changes, especially its security and regression requirements.
 - Read `docs/architecture.md` before changing package boundaries, network acquisition, caching, or derived views.
 - Follow `docs/release.md` before version bumps, changelog edits, tags, or publishing; pushing a component tag publishes automatically.
+- After each Pi package change, update its `CHANGELOG.md` under `Unreleased` if the change is notable to users. Follow `docs/release.md` and run `vp run format:changelog` after editing.
 - Update work branches from their target with a merge commit; do not rebase (`docs/release.md`).
 
 ## External References

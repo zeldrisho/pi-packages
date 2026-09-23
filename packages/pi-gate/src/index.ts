@@ -5,7 +5,7 @@
  * user-provided JSON configuration. Without a configuration file, the
  * extension creates one with starter rules and a default prompt timeout.
  *
- * Configuration file: `~/.pi/agent/pi-gate.json`
+ * Configuration file: `~/.pi/agent/gate.json` (legacy fallback: `pi-gate.json`)
  *
  * The configuration has an `operations` section, which maps a substring
  * pattern to one of three actions, and an optional `promptTimeoutMs` setting:
@@ -18,7 +18,7 @@
  * narrow `allow` rule can override a broader `prompt` or `block` rule.
  *
  * On first run, a configuration with the default prompt timeout and starter
- * operation rules is written to `~/.pi/agent/pi-gate.json`.
+ * operation rules is written to `~/.pi/agent/gate.json` when neither file exists.
  *
  * Non-UI modes (print, JSON) never auto-approve. A `prompt` or `block` rule
  * in non-UI mode always blocks and requests termination of the agent turn.

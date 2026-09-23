@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
@@ -8,6 +8,7 @@ import piGate, {
   formatCommandForDisplay,
   highlightRuleForDisplay,
   loadConfig,
+  loadConfigResult,
   parseConfig,
   resolveAction,
   resolveRule,
@@ -175,7 +176,7 @@ function setConfig(content: string | null): void {
 
   if (content === null) {
     try {
-      rmSync(join(dir, "pi-gate.json"), { force: true });
+      rmSync(join(dir, "gate.json"), { force: true });
     } catch {
       // ignore
     }
@@ -183,7 +184,7 @@ function setConfig(content: string | null): void {
     return;
   }
 
-  writeFileSync(join(dir, "pi-gate.json"), content, "utf-8");
+  writeFileSync(join(dir, "gate.json"), content, "utf-8");
 }
 
 let workDir: string;
@@ -392,6 +393,68 @@ describe("loadConfig", () => {
   });
 });
 
+describe("legacy configuration fallback", () => {
+  it("loads legacy rules without creating gate.json and reports the legacy path", async () => {
+    const path = join(workDir, "pi-gate.json");
+    const content = '{"operations":{"sudo":"block"},"promptTimeoutMs":5000}';
+    writeFileSync(path, content);
+    const { ctx, uiState, handlers } = makeExtension().install();
+
+    expect(loadConfig()).toEqual({ operations: { sudo: "block" }, promptTimeoutMs: 5000 });
+    expect(existsSync(join(workDir, "gate.json"))).toBe(false);
+    expect(readFileSync(path, "utf-8")).toBe(content);
+    await handlers.sessionStart!({ reason: "startup" }, ctx);
+    expect(uiState.notifyCalls[0]?.text).toContain(path);
+    expect(
+      await handlers.toolCall!(
+        { toolName: "bash", toolCallId: "legacy", input: { command: "sudo true" } },
+        ctx,
+      ),
+    ).toMatchObject({ block: true });
+  });
+
+  it("prefers gate.json without merging or modifying legacy rules", () => {
+    const path = join(workDir, "pi-gate.json");
+    const content = '{"operations":{"sudo":"block","rm":"block"}}';
+    writeFileSync(path, content);
+    setConfig('{"operations":{"sudo":"allow"}}');
+    ensureConfig();
+
+    expect(loadConfig().operations).toEqual({ sudo: "allow" });
+    expect(readFileSync(path, "utf-8")).toBe(content);
+  });
+
+  it.each(["malformed", "unreadable"])(
+    "does not fall back when gate.json is %s",
+    async (failure) => {
+      writeFileSync(join(workDir, "pi-gate.json"), '{"operations":{"echo":"allow"}}');
+
+      if (failure === "malformed") setConfig("{ invalid");
+      else mkdirSync(join(workDir, "gate.json"));
+      const { ctx, uiState, handlers } = makeExtension().install();
+
+      expect(loadConfigResult().status).toBe("failed");
+      expect(
+        await handlers.toolCall!(
+          { toolName: "bash", toolCallId: "failed", input: { command: "echo test" } },
+          ctx,
+        ),
+      ).toMatchObject({ block: true });
+      expect(uiState.selectCalls).toHaveLength(1);
+    },
+  );
+
+  it("preserves malformed legacy configuration instead of seeding defaults", () => {
+    const path = join(workDir, "pi-gate.json");
+    writeFileSync(path, "{ invalid");
+    ensureConfig();
+
+    expect(loadConfigResult().status).toBe("failed");
+    expect(existsSync(join(workDir, "gate.json"))).toBe(false);
+    expect(readFileSync(path, "utf-8")).toBe("{ invalid");
+  });
+});
+
 describe("resolveRule", () => {
   it("returns the matching pattern and action", () => {
     expect(resolveRule("sudo apt update", { sudo: "block" })).toEqual({
@@ -448,8 +511,9 @@ describe("resolveAction", () => {
 describe("ensureConfig", () => {
   it("writes the default configuration on first run", () => {
     ensureConfig();
-    const path = join(workDir, "pi-gate.json");
+    const path = join(workDir, "gate.json");
     expect(existsSync(path)).toBe(true);
+    expect(existsSync(join(workDir, "pi-gate.json"))).toBe(false);
     expect(JSON.parse(readFileSync(path, "utf-8"))).toEqual({
       $schema: CONFIG_SCHEMA_URL,
       promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS,
@@ -464,7 +528,7 @@ describe("ensureConfig", () => {
   });
 
   it("does not overwrite an existing configuration", () => {
-    const path = join(workDir, "pi-gate.json");
+    const path = join(workDir, "gate.json");
     writeFileSync(path, '{"operations":{"x":"block"}}', "utf-8");
     ensureConfig();
     expect(readFileSync(path, "utf-8")).toBe('{"operations":{"x":"block"}}');

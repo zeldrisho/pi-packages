@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- use `gate.json` as the default configuration filename, retaining `pi-gate.json` as a legacy fallback only when `gate.json` is absent; existing files are never automatically renamed or overwritten
+
 ## [0.4.1] - 2026-09-17
 
 ### Security
