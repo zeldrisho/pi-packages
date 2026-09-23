@@ -10,7 +10,7 @@ pi install npm:@zeldrisho/pi-anthropics-skills
 pi install -l npm:@zeldrisho/pi-anthropics-skills
 ```
 
-Individual skills can be enabled or disabled with Pi package filtering. Source revisions and the upstream license are included in `licenses/`.
+Select individual skills with [Pi package filtering](../../docs/package-filtering.md). Source revisions and the upstream license are included in `licenses/`.
 
 ## License
 

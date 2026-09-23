@@ -7,7 +7,7 @@ Catppuccin Mocha theme for Pi, updated for the current Pi theme format.
 ```bash
 pi install npm:@zeldrisho/pi-catppuccin
 # project-local:
-pi install npm:@zeldrisho/pi-catppuccin -l
+pi install -l npm:@zeldrisho/pi-catppuccin
 ```
 
 Select `catppuccin-mocha` from `/settings`, or set it in `settings.json`:

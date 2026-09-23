@@ -10,7 +10,7 @@ pi install npm:@zeldrisho/pi-sentry-skills
 pi install -l npm:@zeldrisho/pi-sentry-skills
 ```
 
-Individual skills can be enabled or disabled with Pi package filtering. Source revisions and applicable licenses are included in `licenses/`.
+Select individual skills with [Pi package filtering](../../docs/package-filtering.md). Source revisions and applicable licenses are included in `licenses/`.
 
 ## License
 
