@@ -91,6 +91,19 @@ describe("web_fetch caching", () => {
     expect(setext.content[0].text).not.toContain("Linked [Style]");
   });
 
+  it("strips complete and malformed HTML tags from Markdown fragment slugs", async () => {
+    for (const slug of ["safe", "nestedipt", "script"]) {
+      const result = await executeWebFetch(
+        { url: `${origin}/markdown-fragments.md#${slug}` },
+        undefined,
+        undefined,
+        dependencies,
+      );
+
+      expect(result.details.fragment).toMatchObject({ requested: slug, matched: true });
+    }
+  });
+
   it("returns stable continuation offsets", async () => {
     const first = await fetchRemoteContent(
       `${origin}/continuation`,

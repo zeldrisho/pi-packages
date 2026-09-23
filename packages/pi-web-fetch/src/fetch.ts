@@ -87,10 +87,27 @@ function markdownFragmentOffsets(markdown: string) {
   let fence: { marker: string; length: number } | undefined;
 
   const addHeading = (text: string, headingOffset: number) => {
-    const base = text
+    let withoutHtml = "";
+
+    for (let index = 0; index < text.length; index += 1) {
+      if (text[index] !== "<") {
+        withoutHtml += text[index];
+        continue;
+      }
+
+      const tagEnd = text.indexOf(">", index + 1);
+
+      if (tagEnd < 0) {
+        withoutHtml += text.slice(index + 1);
+        break;
+      }
+
+      index = tagEnd;
+    }
+
+    const base = withoutHtml
       .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
       .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-      .replace(/<[^>]*>/g, "")
       .replace(/[`*_~]/g, "")
       .normalize("NFKD")
       .replace(/[\u0300-\u036f]/g, "")

@@ -41,7 +41,7 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
   if (request.url?.startsWith("/markdown-fragments")) {
     response.setHeader("content-type", "text/plain; charset=utf-8");
     response.end(
-      "# Guide\n\n```md\n## Not a heading\n```\n\n### Styling\nStyle guidance.\n\nLinked [Style](https://example.test) Guide\n---\n\nSetext Section\n===",
+      "# Guide\n\n```md\n## Not a heading\n```\n\n### Styling\nStyle guidance.\n\nLinked [Style](https://example.test) Guide\n---\n\nSetext Section\n===\n\n### <script>Safe</script>\n\n### <scr<script>Nested</script>ipt>\n\n### <script",
     );
 
     return;
