@@ -113,12 +113,19 @@ describe("repository contracts", () => {
       const packageRoot = join(root, "packages", packageName);
       const manifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"));
 
-      if (manifest.license !== "SEE LICENSE IN licenses/README.md") {
-        fail(`${manifest.name} must point npm license metadata to its scoped license summary`);
+      if (
+        !["(Apache-2.0 AND MIT)", "(Apache-2.0 AND CC-BY-SA-4.0 AND MIT)"].includes(
+          manifest.license,
+        )
+      ) {
+        fail(`${manifest.name} must declare its SPDX license expression`);
       }
 
-      await readFile(join(packageRoot, "licenses", "README.md"));
-      await readFile(join(packageRoot, "licenses", "SOURCES.txt"));
+      const license = await readFile(join(packageRoot, "LICENSE"), "utf8");
+
+      if (!license.includes("Source:")) {
+        fail(`${manifest.name}/LICENSE must include its source attribution`);
+      }
 
       const skillsRoot = join(packageRoot, "skills");
       const pending = [skillsRoot];
@@ -419,9 +426,9 @@ describe("repository contracts", () => {
       }
 
       const packageFiles = isPromptPackage
-        ? ["prompts", "licenses", "CHANGELOG.md"]
+        ? ["prompts", "CHANGELOG.md"]
         : isSkillPackage
-          ? ["skills", "licenses", "CHANGELOG.md"]
+          ? ["skills", "CHANGELOG.md"]
           : isThemePackage
             ? ["themes", "CHANGELOG.md"]
             : [...expectedFiles, ...(packageSpecificFiles.get(directory) ?? [])];

@@ -10,8 +10,8 @@ pi install npm:@zeldrisho/pi-anthropics-skills
 pi install -l npm:@zeldrisho/pi-anthropics-skills
 ```
 
-Select individual skills with [Pi package filtering](../../docs/package-filtering.md). Upstream paths, pinned revision, change status, and license scope are documented in [`licenses/README.md`](licenses/README.md).
+Select individual skills with [Pi package filtering](../../docs/package-filtering.md). Upstream provenance and license scope are documented in [`LICENSE`](LICENSE).
 
 ## License
 
-This package contains adapted upstream material under Apache-2.0 alongside package-authored changes. See [`licenses/README.md`](licenses/README.md) for the file scope and applicable terms.
+Adapted upstream material is under Apache-2.0; package-authored material is under MIT where separable. See [`LICENSE`](LICENSE) for scope and attribution.

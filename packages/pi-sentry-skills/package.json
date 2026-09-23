@@ -14,7 +14,7 @@
   "bugs": {
     "url": "https://github.com/zeldrisho/pi-packages/issues"
   },
-  "license": "SEE LICENSE IN licenses/README.md",
+  "license": "(Apache-2.0 AND CC-BY-SA-4.0 AND MIT)",
   "author": "Zeldris",
   "repository": {
     "type": "git",
@@ -23,7 +23,6 @@
   },
   "files": [
     "skills",
-    "licenses",
     "CHANGELOG.md"
   ],
   "type": "module",

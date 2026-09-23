@@ -1,6 +1,6 @@
 # Server-Side Request Forgery (SSRF) Prevention Reference
 
-> Adapted from `getsentry/skills/skills/security-review/references/ssrf.md` at commit `c2f99a5b04b4cd992ec3022d7c2c3e23e938d241`; changes made. Contains OWASP-derived material under CC BY-SA 4.0. See `licenses/README.md` for attribution and terms.
+> Adapted from `getsentry/skills/skills/security-review/references/ssrf.md` at commit `c2f99a5b04b4cd992ec3022d7c2c3e23e938d241`; changes made. Contains OWASP-derived material under CC BY-SA 4.0. See `LICENSE` for attribution and terms.
 
 ## Overview
 

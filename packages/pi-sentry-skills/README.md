@@ -10,8 +10,8 @@ pi install npm:@zeldrisho/pi-sentry-skills
 pi install -l npm:@zeldrisho/pi-sentry-skills
 ```
 
-Select individual skills with [Pi package filtering](../../docs/package-filtering.md). Upstream paths, pinned revision, change status, and license scope are documented in [`licenses/README.md`](licenses/README.md).
+Select individual skills with [Pi package filtering](../../docs/package-filtering.md). Upstream provenance and license scope are documented in [`LICENSE`](LICENSE).
 
 ## License
 
-This package contains adapted Sentry material under Apache-2.0 and OWASP-derived security reference material under CC BY-SA 4.0, alongside package-authored changes. See [`licenses/README.md`](licenses/README.md) for file scope and applicable terms.
+Adapted Sentry material is under Apache-2.0; OWASP-derived security references are under CC BY-SA 4.0. See [`LICENSE`](LICENSE) for scope and attribution.
