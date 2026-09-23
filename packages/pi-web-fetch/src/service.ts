@@ -568,6 +568,21 @@ function urlWithoutFragment(rawUrl: string): string {
 interface ResolvedFragment {
   fragment?: string;
   offset?: number;
+  endOffset?: number;
+}
+
+function sourceOffset(markdown: string, lineNumber: number, columnNumber = 1): number | undefined {
+  if (lineNumber < 1 || columnNumber < 1) return undefined;
+
+  const lines = markdown.split("\n");
+
+  if (lineNumber > lines.length) return undefined;
+
+  let offset = 0;
+
+  for (let index = 0; index < lineNumber - 1; index += 1) offset += lines[index].length + 1;
+
+  return offset + Math.min(columnNumber - 1, lines[lineNumber - 1].length);
 }
 
 function resolveFragmentOffset(document: CompleteDocument, rawUrl: string): ResolvedFragment {
@@ -582,6 +597,36 @@ function resolveFragmentOffset(document: CompleteDocument, rawUrl: string): Reso
   }
 
   if (!fragment) return {};
+
+  const lineAnchor = /^L(\d+)(?:C(\d+))?(?:-L?(\d+)(?:C(\d+))?)?$/i.exec(fragment);
+
+  if (lineAnchor) {
+    const [, firstLine, firstColumn, lastLine, lastColumn] = lineAnchor;
+    const offset = sourceOffset(document.markdown, Number(firstLine), Number(firstColumn ?? 1));
+
+    if (offset === undefined) return { fragment };
+
+    if (lastLine) {
+      const endLine = Number(lastLine);
+      const endColumn = lastColumn === undefined ? undefined : Number(lastColumn);
+      const lines = document.markdown.split("\n");
+      const line = lines[endLine - 1];
+
+      if (!line) return { fragment };
+
+      const endOffset =
+        endColumn === undefined
+          ? sourceOffset(document.markdown, endLine, line.length + 1)
+          : sourceOffset(document.markdown, endLine, endColumn + 1);
+
+      return endOffset !== undefined && endOffset >= offset
+        ? { fragment, offset, endOffset }
+        : { fragment };
+    }
+
+    return { fragment, offset };
+  }
+
   const offsets = document.fragmentOffsets ?? {};
 
   return { fragment, offset: offsets[fragment] ?? offsets[fragment.toLowerCase()] };
@@ -688,19 +733,31 @@ export async function executeWebFetch(
   const fragmentMatched = resolvedFragment.fragment !== undefined && fragmentOffset !== undefined;
   const startingOffset = explicitOffset ?? fragmentOffset ?? FETCH_DEFAULT_OFFSET;
 
+  const hasFragmentRange =
+    explicitOffset === undefined &&
+    fragmentOffset !== undefined &&
+    resolvedFragment.endOffset !== undefined;
+
   const fragmentDocument =
     explicitOffset === undefined && fragmentOffset !== undefined
-      ? { ...document, markdown: document.markdown.slice(fragmentOffset) }
+      ? {
+          ...document,
+          markdown: hasFragmentRange
+            ? document.markdown.slice(fragmentOffset, resolvedFragment.endOffset)
+            : document.markdown.slice(fragmentOffset),
+        }
       : document;
 
   const focused =
     params.query === undefined ? undefined : focusMarkdown(fragmentDocument.markdown, params.query);
 
-  const outputDocument = focused ? { ...fragmentDocument, markdown: focused.markdown } : document;
+  const outputDocument = focused
+    ? { ...fragmentDocument, markdown: focused.markdown }
+    : fragmentDocument;
 
   const resultOffset = focused
     ? (explicitOffset ?? 0)
-    : (explicitOffset ?? fragmentOffset ?? startingOffset);
+    : (explicitOffset ?? (fragmentMatched ? 0 : startingOffset));
 
   const result = sliceCompleteDocument(outputDocument, resultOffset, maxCharacters);
 

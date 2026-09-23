@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Resolve GitHub Markdown heading fragments and source line, line-range, and column anchors in raw files
+
 ## [0.9.1] - 2026-09-22
 
 ### Changed
