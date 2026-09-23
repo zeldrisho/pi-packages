@@ -1,0 +1,23 @@
+{
+  "skill_name": "documentation",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Update this README's quick start based on the package scripts and config. Check commands actually exist.",
+      "expected_output": "A concise README section using verified commands/config, with source paths and no invented behavior.",
+      "assertions": [
+        "Commands are verified against project files",
+        "Unverified behavior is not stated as fact"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Write an incident runbook for the service, but its rollback procedure is unclear in the docs.",
+      "expected_output": "A procedure grounded in known steps, with unknown rollback details clearly called out rather than fabricated.",
+      "assertions": [
+        "Unknown rollback details are explicit",
+        "Procedure includes verification or escalation when known"
+      ]
+    }
+  ]
+}

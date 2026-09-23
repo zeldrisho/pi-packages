@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Clarified that the Pi skills are substantially revised adaptations of Anthropic's engineering skills, not verbatim upstream copies.
+
 ## [0.1.0] - 2026-09-21
 
 ### Added

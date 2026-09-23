@@ -1,7 +1,7 @@
 {
   "name": "@zeldrisho/pi-sentry-skills",
   "version": "0.1.0",
-  "description": "Pi skills adapted from Sentry's agent skills",
+  "description": "Pi adaptations of Sentry agent skills, revised for Agent Skills workflows",
   "keywords": [
     "agents-md",
     "pi",
@@ -14,7 +14,7 @@
   "bugs": {
     "url": "https://github.com/zeldrisho/pi-packages/issues"
   },
-  "license": "MIT",
+  "license": "SEE LICENSE IN licenses/README.md",
   "author": "Zeldris",
   "repository": {
     "type": "git",

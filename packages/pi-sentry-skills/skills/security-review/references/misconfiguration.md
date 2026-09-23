@@ -1,5 +1,7 @@
 # Security Misconfiguration Reference
 
+> Adapted from the Sentry security-review material at pinned revision `c2f99a5b04b4cd992ec3022d7c2c3e23e938d241`; changes made. Contains OWASP-derived material under CC BY-SA 4.0. See the package `licenses/README.md` and `licenses/SOURCES.txt` for source mapping, attribution, and terms.
+
 ## Overview
 
 Security misconfiguration is one of the most common vulnerabilities. It occurs when security settings are not defined, implemented incorrectly, or left at insecure defaults. This includes missing security headers, overly permissive CORS, debug mode in production, and exposed sensitive endpoints.

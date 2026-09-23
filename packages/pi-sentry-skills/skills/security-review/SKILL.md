@@ -27,7 +27,7 @@ validation, configuration, and framework protections. Classify uncertain items a
 - Test files (unless explicitly reviewing test security)
 - Dead code, commented code, documentation strings
 - Patterns using **constants** or **server-controlled configuration**
-- Code paths that require prior authentication to reach (note the auth requirement, but still assess authorization, impact, and exploitability)
+- Findings solely because a path requires authentication. Authentication is a precondition, not proof that authorization is correct; still assess whether an authenticated attacker can reach or affect another user's data or privileged actions.
 
 ### Server-Controlled Values (NOT Attacker-Controlled)
 

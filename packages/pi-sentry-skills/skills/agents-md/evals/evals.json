@@ -1,0 +1,23 @@
+{
+  "skill_name": "agents-md",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add concise instructions for this repository's tests and package manager. Verify commands from manifests and CI.",
+      "expected_output": "Scoped instructions with only verified tooling/commands and applicable parent guidance retained.",
+      "assertions": [
+        "Commands and paths are verified",
+        "No assumed tooling is copied from examples"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Create a nested AGENTS.md for a package with a root AGENTS.md already present.",
+      "expected_output": "The nested file contains only subtree-specific rules and does not discard non-conflicting root guidance.",
+      "assertions": [
+        "Existing parent instructions are inspected",
+        "Nested file avoids duplicating global rules"
+      ]
+    }
+  ]
+}

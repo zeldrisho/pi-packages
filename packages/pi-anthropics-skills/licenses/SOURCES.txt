@@ -1,2 +1,11 @@
-anthropics/knowledge-work-plugins commit: 93d82a54e9516d172c1d0a010c1c09d56bf9d11b
-Source: https://github.com/anthropics/knowledge-work-plugins
+Upstream source: anthropics/knowledge-work-plugins
+Pinned revision: 93d82a54e9516d172c1d0a010c1c09d56bf9d11b
+Repository: https://github.com/anthropics/knowledge-work-plugins
+Applicable license: Apache License 2.0 (see anthropics-apache-2.0.txt)
+
+Adapted source mapping:
+- skills/documentation/SKILL.md <- engineering/skills/documentation/SKILL.md
+- skills/testing-strategy/SKILL.md <- engineering/skills/testing-strategy/SKILL.md
+- skills/tech-debt/SKILL.md <- engineering/skills/tech-debt/SKILL.md
+
+These skill files retain substantial upstream wording and structure but have been revised for Pi and Agent Skills workflows. Each adapted SKILL.md carries a change/provenance notice. Evaluation cases were authored for this package and are not upstream files.

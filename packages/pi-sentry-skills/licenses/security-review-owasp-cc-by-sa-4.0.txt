@@ -3,6 +3,8 @@ The reference material in this skill is derived from the OWASP Cheat Sheet Serie
 Source: https://cheatsheetseries.owasp.org/
 OWASP Foundation: https://owasp.org/
 
+Changes were made to adapt this material for the Sentry-derived Pi security-review skill. Adapted OWASP-derived material is located in skills/security-review/references/.
+
 Original content is licensed under:
 
 Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)

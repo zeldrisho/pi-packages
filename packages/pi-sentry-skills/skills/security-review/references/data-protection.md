@@ -1,5 +1,7 @@
 # Data Protection Reference
 
+> Adapted from the Sentry security-review material at pinned revision `c2f99a5b04b4cd992ec3022d7c2c3e23e938d241`; changes made. Contains OWASP-derived material under CC BY-SA 4.0. See the package `licenses/README.md` and `licenses/SOURCES.txt` for source mapping, attribution, and terms.
+
 ## Overview
 
 Data protection encompasses safeguarding sensitive information throughout its lifecycle: collection, processing, storage, transmission, and disposal. Security failures at any stage can lead to data breaches.

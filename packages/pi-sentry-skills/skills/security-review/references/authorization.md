@@ -1,5 +1,7 @@
 # Authorization Security Reference
 
+> Adapted from `getsentry/skills/skills/security-review/references/authorization.md` at commit `c2f99a5b04b4cd992ec3022d7c2c3e23e938d241`; changes made. Contains OWASP-derived material under CC BY-SA 4.0. See `licenses/README.md` for attribution and terms.
+
 ## Overview
 
 Authorization verifies that a requested action or service is approved for a specific entity—distinct from authentication, which verifies identity. A user who has been authenticated is often not authorized to access every resource and perform every action.
@@ -353,12 +355,16 @@ def test_horizontal_access():
     assert response.status_code == 403
 
 def test_idor_enumeration():
-    # Try sequential IDs
-    for i in range(1, 100):
-        response = client.get(f'/api/resources/{i}')
-        if response.status_code == 200:
-            # Should be denied or return 404, not 200
-            assert False, f"IDOR vulnerability: /api/resources/{i}"
+    # Establish a resource owned by another user; do not treat arbitrary 200s
+    # as IDOR without proving the returned resource is unauthorized.
+    owner = create_user()
+    attacker = create_user()
+    resource = create_resource(owner=owner)
+
+    client.login(attacker)
+    response = client.get(f'/api/resources/{resource.id}')
+    assert response.status_code in (403, 404)
+    assert response.status_code != 200
 ```
 
 ---

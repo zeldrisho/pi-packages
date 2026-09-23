@@ -1,0 +1,17 @@
+{
+  "skill_name": "pr-writer",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Draft a title and body for my PR from the local diff. Don't open or update anything.",
+      "expected_output": "Reviewer-facing title/body from the full available diff, with no branch, commit, push, or hosted PR mutation.",
+      "assertions": ["No hosted PR mutation is performed", "Draft reflects full available diff"]
+    },
+    {
+      "id": 2,
+      "prompt": "Update PR 123 with this revised cover note.",
+      "expected_output": "The agent confirms repository/target and content if ambiguous, then updates only the explicitly requested PR.",
+      "assertions": ["Target PR is verified", "No unrelated branch or commit mutation"]
+    }
+  ]
+}

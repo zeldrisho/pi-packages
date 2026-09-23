@@ -1,2 +1,15 @@
-getsentry/skills commit: c2f99a5b04b4cd992ec3022d7c2c3e23e938d241
-Source: https://github.com/getsentry/skills
+Upstream source: getsentry/skills
+Pinned revision: c2f99a5b04b4cd992ec3022d7c2c3e23e938d241
+Repository: https://github.com/getsentry/skills
+Applicable licenses: Apache License 2.0 for Sentry material; CC BY-SA 4.0 for OWASP-derived security-review reference material (see adjacent license notices).
+
+Adapted source mapping:
+- skills/agents-md/SKILL.md <- skills/agents-md/SKILL.md
+- skills/pr-writer/SKILL.md <- skills/pr-writer/SKILL.md
+- skills/security-review/SKILL.md <- skills/security-review/SKILL.md
+- skills/security-review/references/*.md <- skills/security-review/references/*.md, except:
+  - references/docker.md <- skills/security-review/infrastructure/docker.md
+  - references/javascript.md <- skills/security-review/languages/javascript.md
+  - references/python.md <- skills/security-review/languages/python.md
+
+The security-review skill and reference files have been adapted for this Pi package. The PR-writer instructions have also been substantially revised, including explicit safeguards around hosted PR mutations. Every adapted skill entry point and reference includes or retains source attribution; changes are indicated in the relevant files. Evaluation cases were authored for this package and are not upstream files.

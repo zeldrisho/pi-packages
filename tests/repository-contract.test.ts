@@ -1,5 +1,5 @@
 import { readFile, readdir } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { describe, it } from "vite-plus/test";
 
 const root = resolve(import.meta.dirname, "..");
@@ -106,6 +106,74 @@ function fail(message: string): never {
 }
 
 describe("repository contracts", () => {
+  it("validates packaged Agent Skill metadata and local reference paths", async () => {
+    const names = new Set<string>();
+
+    for (const packageName of skillPackages) {
+      const packageRoot = join(root, "packages", packageName);
+      const manifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"));
+
+      if (manifest.license !== "SEE LICENSE IN licenses/README.md") {
+        fail(`${manifest.name} must point npm license metadata to its scoped license summary`);
+      }
+
+      await readFile(join(packageRoot, "licenses", "README.md"));
+      await readFile(join(packageRoot, "licenses", "SOURCES.txt"));
+
+      const skillsRoot = join(packageRoot, "skills");
+      const pending = [skillsRoot];
+
+      while (pending.length > 0) {
+        const directory = pending.pop();
+
+        if (!directory) continue;
+
+        for (const entry of await readdir(directory, { withFileTypes: true })) {
+          const path = join(directory, entry.name);
+
+          if (entry.isDirectory()) {
+            pending.push(path);
+            continue;
+          }
+
+          if (entry.name !== "SKILL.md") continue;
+
+          const source = await readFile(path, "utf8");
+
+          const frontmatter = source.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1];
+
+          if (!frontmatter) fail(`${path} must have YAML frontmatter`);
+
+          const name = frontmatter.match(/^name:\s*(.*?)\s*$/m)?.[1];
+
+          const description = frontmatter.match(/^description:\s*(.*?)\s*$/m)?.[1];
+          const directoryName = path.split(/[\\/]/).at(-2);
+
+          if (!name || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) || name.length > 64) {
+            fail(`${path} has an invalid skill name`);
+          }
+
+          if (name !== directoryName) fail(`${path} name must match its skill directory`);
+
+          if (names.has(name)) fail(`duplicate skill name: ${name}`);
+          names.add(name);
+
+          if (!description || description.length > 1024) {
+            fail(`${path} must have a nonempty description of at most 1024 characters`);
+          }
+
+          for (const reference of source.matchAll(/(?:\.\/)?(references\/[a-zA-Z0-9_.-]+)/g)) {
+            try {
+              await readFile(join(dirname(path), reference[1]));
+            } catch {
+              fail(`${path} references missing file ${reference[1]}`);
+            }
+          }
+        }
+      }
+    }
+  });
+
   it("creates GitHub releases with gh release create on component tag push", () => {
     if (!releaseWorkflow.includes("gh release create")) {
       fail("the release job must create GitHub releases with gh release create");

@@ -1,5 +1,7 @@
 # Error Handling Security Reference
 
+> Adapted from the Sentry security-review material at pinned revision `c2f99a5b04b4cd992ec3022d7c2c3e23e938d241`; changes made. Contains OWASP-derived material under CC BY-SA 4.0. See the package `licenses/README.md` and `licenses/SOURCES.txt` for source mapping, attribution, and terms.
+
 ## Overview
 
 Improper error handling can lead to information disclosure, denial of service, or security bypasses. This includes verbose error messages exposing internals, fail-open patterns that skip security checks on errors, and unhandled exceptions that crash services or leave systems in insecure states.
