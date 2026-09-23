@@ -17,6 +17,93 @@ describe("web_fetch caching", () => {
     await fixture.stop();
   });
 
+  it("starts GitHub-style source fetches at line fragments", async () => {
+    const result = await executeWebFetch(
+      { url: `${origin}/line-fragments.rs#L3` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.content[0].text).toContain("[Starting at the requested URL fragment.]");
+    expect(result.content[0].text).toContain("let second = 2;");
+    expect(result.content[0].text).not.toContain("let first = 1;");
+    expect(result.details.fragment).toMatchObject({ requested: "L3", matched: true });
+  });
+
+  it("limits GitHub source line ranges and column selections", async () => {
+    const range = await executeWebFetch(
+      { url: `${origin}/line-fragments.rs#L2-L3` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(range.content[0].text).toContain("let first = 1;");
+    expect(range.content[0].text).toContain("let second = 2;");
+    expect(range.content[0].text).not.toContain("fn main()");
+    expect(range.content[0].text).not.toContain("[Content truncated.");
+
+    const columns = await executeWebFetch(
+      { url: `${origin}/line-fragments.rs#L2C3-L2C12` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(columns.content[0].text).toContain("let first");
+    expect(columns.content[0].text).not.toContain("let second");
+  });
+
+  it("starts GitHub-style Markdown fetches at a heading fragment", async () => {
+    const result = await executeWebFetch(
+      { url: `${origin}/markdown-fragments.md#styling` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.content[0].text).toContain("[Starting at the requested URL fragment.]");
+    expect(result.content[0].text).toContain("### Styling\nStyle guidance.");
+    expect(result.content[0].text).not.toContain("# Guide");
+    expect(result.content[0].text).not.toContain("Not a heading");
+    expect(result.details.fragment).toMatchObject({ requested: "styling", matched: true });
+  });
+
+  it("resolves Markdown link and Setext heading slugs", async () => {
+    const linked = await executeWebFetch(
+      { url: `${origin}/markdown-fragments.md#linked-style-guide` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    const setext = await executeWebFetch(
+      { url: `${origin}/markdown-fragments.md#setext-section` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(linked.content[0].text).toContain("Linked [Style](https://example.test) Guide");
+    expect(linked.content[0].text).not.toContain("# Guide");
+    expect(setext.content[0].text).toContain("Setext Section\n===");
+    expect(setext.content[0].text).not.toContain("Linked [Style]");
+  });
+
+  it("strips complete and malformed HTML tags from Markdown fragment slugs", async () => {
+    for (const slug of ["safe", "nestedipt", "script"]) {
+      const result = await executeWebFetch(
+        { url: `${origin}/markdown-fragments.md#${slug}` },
+        undefined,
+        undefined,
+        dependencies,
+      );
+
+      expect(result.details.fragment).toMatchObject({ requested: slug, matched: true });
+    }
+  });
+
   it("returns stable continuation offsets", async () => {
     const first = await fetchRemoteContent(
       `${origin}/continuation`,

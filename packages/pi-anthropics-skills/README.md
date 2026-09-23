@@ -1,6 +1,6 @@
 # @zeldrisho/pi-anthropics-skills
 
-Pi skills adapted from [Anthropic's knowledge-work plugins](https://github.com/anthropics/knowledge-work-plugins): `documentation`, `testing-strategy`, and `tech-debt`.
+Pi-portable adaptations of Anthropic's [`engineering` skills](https://github.com/anthropics/knowledge-work-plugins/tree/93d82a54e9516d172c1d0a010c1c09d56bf9d11b/engineering/skills): `documentation`, `testing-strategy`, and `tech-debt`. These files have since been substantially revised for Agent Skills and Pi workflows; they are not verbatim upstream copies and are not endorsed by Anthropic.
 
 ## Install
 
@@ -10,8 +10,8 @@ pi install npm:@zeldrisho/pi-anthropics-skills
 pi install -l npm:@zeldrisho/pi-anthropics-skills
 ```
 
-Individual skills can be enabled or disabled with Pi package filtering. Source revisions and the upstream license are included in `licenses/`.
+Select individual skills with [Pi package filtering](../../docs/package-filtering.md). Upstream provenance and license scope are documented in [`LICENSE`](LICENSE).
 
 ## License
 
-The package metadata is MIT. Imported Anthropic material remains under Apache-2.0; see `licenses/`.
+Adapted upstream material is under Apache-2.0; package-authored material is under MIT where separable. See [`LICENSE`](LICENSE) for scope and attribution.

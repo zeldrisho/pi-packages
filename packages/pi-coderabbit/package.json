@@ -1,6 +1,6 @@
 {
   "name": "@zeldrisho/pi-coderabbit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Pi prompt templates for safe CodeRabbit reviews and autofixes",
   "keywords": [
     "code-review",
@@ -22,7 +22,6 @@
   },
   "files": [
     "prompts",
-    "licenses",
     "CHANGELOG.md"
   ],
   "type": "module",

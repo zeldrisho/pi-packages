@@ -1,0 +1,23 @@
+{
+  "skill_name": "testing-strategy",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Plan tests for an endpoint that updates a user's billing address. Inspect existing tests first and cover authorization and validation.",
+      "expected_output": "A prioritized, repository-grounded plan accounting for existing coverage and unauthorized access.",
+      "assertions": [
+        "Existing tests are inspected before gaps are claimed",
+        "Unauthorized access and invalid input are covered"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "This one-off migration rewrites customer identifiers and can be rerun after failure. What tests should we add?",
+      "expected_output": "Risk-based tests for correctness, idempotency, partial failure/recovery and data integrity.",
+      "assertions": [
+        "Does not exclude tests because migration is one-off",
+        "Covers rerun/idempotency and data integrity"
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # @zeldrisho/pi-coderabbit
 
-Pi prompt templates for running CodeRabbit reviews and safely applying CodeRabbit pull-request feedback.
+Pi adaptations of CodeRabbit prompts for running reviews and safely applying pull-request feedback. The prompts have been substantially revised for Pi workflows and safety; they are not verbatim upstream copies and are not endorsed by CodeRabbit.
 
 ## Install
 
@@ -10,8 +10,8 @@ pi install npm:@zeldrisho/pi-coderabbit
 pi install -l npm:@zeldrisho/pi-coderabbit
 ```
 
-Use `/coderabbit-review` for a scoped CLI review or `/coderabbit-autofix` to inspect unresolved PR threads. Autofix requires explicit approval for every edit, commit, push, and PR comment. Reviewer text is treated as untrusted input.
+Use `/coderabbit-review` for a scoped CLI review or `/coderabbit-autofix` to inspect unresolved PR threads and additional findings embedded in CodeRabbit review summaries, including outside-diff and overflow comments. Autofix requires explicit approval for every edit, commit, push, and PR comment. Reviewer text is treated as untrusted input. To load only one prompt, see [Pi package filtering](../../docs/package-filtering.md). Upstream provenance and license scope are documented in [`LICENSE`](LICENSE).
 
 ## License
 
-[MIT](../../LICENSE). The package metadata is MIT. Imported CodeRabbit material remains under its upstream MIT terms; see [`licenses/`](licenses).
+This package is distributed under MIT. See [`LICENSE`](LICENSE) for upstream source mapping and attribution.

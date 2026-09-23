@@ -1,0 +1,23 @@
+{
+  "skill_name": "tech-debt",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Audit this package for technical debt. Give evidence and a practical first phase; don't just list style preferences.",
+      "expected_output": "Prioritized candidates tied to artifacts, consequences, confidence, and actionable completion criteria.",
+      "assertions": [
+        "Each finding has evidence/location and consequence",
+        "Scoring uncertainty and completion criteria are stated"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "A dependency looks old. Should we replace it? We have no incident history handy.",
+      "expected_output": "The agent verifies support/security status before claiming risk, records uncertainty, and suggests a bounded next step.",
+      "assertions": [
+        "Does not claim vulnerability or unsupported status without evidence",
+        "States what needs verification"
+      ]
+    }
+  ]
+}

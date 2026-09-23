@@ -1,0 +1,23 @@
+{
+  "skill_name": "security-review",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review this authenticated endpoint: a logged-in user can request /invoices/{id}. Trace whether they can read another tenant's invoice.",
+      "expected_output": "Trace identity, tenant/object authorization, and exploitability; authentication alone does not suppress a confirmed IDOR.",
+      "assertions": [
+        "Authenticated access is not automatically excluded",
+        "Finding requires evidence of cross-tenant access"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Review this URL fetcher. It allowlists hostnames, then uses fetch() after a separate DNS lookup and follows redirects.",
+      "expected_output": "Identify rebinding and redirect validation gaps; do not label separate-lookup/global-fetch pattern safe.",
+      "assertions": [
+        "DNS rebinding/connection pinning is considered",
+        "Redirect destinations are considered"
+      ]
+    }
+  ]
+}

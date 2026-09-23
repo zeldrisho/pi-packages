@@ -1,7 +1,6 @@
 ---
 name: security-review
 description: Use this skill when reviewing code or diffs for exploitable security vulnerabilities, including injection, XSS, SSRF, authentication, authorization, cryptography, file handling, secrets, or supply-chain risks. Trace attacker-controlled input through the codebase and report only high-confidence findings with severity and remediation.
-allowed-tools: Read Grep Glob Bash Task
 ---
 
 <!--
@@ -15,10 +14,7 @@ Review code for exploitable security vulnerabilities.
 
 ## Reporting standard
 
-Report only high-confidence findings: a vulnerable operation with confirmed
-attacker-controlled input. Research the wider codebase to trace data flow,
-validation, configuration, and framework protections. Classify uncertain items as
-“Needs Verification”.
+Report only high-confidence findings supported by repository evidence. For injection-style findings, trace attacker-controlled input to the vulnerable operation and verify validation and framework protections. Hardcoded secrets, weak cryptography, and unsafe configuration do not require attacker-controlled input; assess their exposure and impact. Classify uncertain items as “Needs Verification” rather than asserting them as confirmed.
 
 ## Do Not Flag
 
@@ -26,8 +22,8 @@ validation, configuration, and framework protections. Classify uncertain items a
 
 - Test files (unless explicitly reviewing test security)
 - Dead code, commented code, documentation strings
-- Patterns using **constants** or **server-controlled configuration**
-- Code paths that require prior authentication to reach (note the auth requirement, but still assess authorization, impact, and exploitability)
+- Patterns using **constants** or **server-controlled configuration**, except reportable hardcoded secrets, weak cryptography, or unsafe configuration; assess those by exposure and impact.
+- Findings solely because a path requires authentication. Authentication is a precondition, not proof that authorization is correct; still assess whether an authenticated attacker can reach or affect another user's data or privileged actions.
 
 ### Server-Controlled Values (NOT Attacker-Controlled)
 
@@ -41,14 +37,14 @@ These are configured by operators, not controlled by attackers:
 | Framework constants   | `django.conf.settings.*`                     | Not user-modifiable              |
 | Hardcoded values      | `BASE_URL = "https://api.internal"`          | Compile-time constants           |
 
-**SSRF Example - NOT a vulnerability:**
+**Illustrative SSRF examples (not exhaustive):**
 
 ```python
 # SAFE: URL comes from Django settings (server-controlled)
 response = requests.get(f"{settings.SEER_AUTOFIX_URL}{path}")
 ```
 
-**SSRF Example - IS a vulnerability:**
+**Illustrative vulnerable SSRF pattern (not exhaustive):**
 
 ```python
 # VULNERABLE: URL comes from request (attacker-controlled)
@@ -68,7 +64,7 @@ Check language guides before flagging. Common false positives:
 | `cursor.execute("...%s", (input,))` | Parameterized query            |
 | `innerHTML = "<b>Loading...</b>"`   | Constant string, no user input |
 
-**Only flag these when:**
+**Examples of framework-bypass patterns (not exhaustive):** These do not define a complete safe-list. For every finding, analyze the specific execution context, data flow, applicable framework behavior, and exploitability; do not infer safety or vulnerability solely from whether a pattern appears below.
 
 - Django: `{{ var|safe }}`, `{% autoescape off %}`, `mark_safe(user_input)`
 - React: `dangerouslySetInnerHTML={{__html: userInput}}`
@@ -159,9 +155,11 @@ For each potential finding, confirm:
 
 ### Summary
 
+- **Reviewed scope**: [files, components, or diff and revision]
 - **Findings**: X (Y Critical, Z High, ...)
 - **Risk Level**: Critical/High/Medium/Low
 - **Confidence**: High/Mixed
+- **Incomplete or unverified checks**: [list, or "None"]
 
 ### Findings
 
@@ -186,5 +184,5 @@ For each potential finding, confirm:
 - **Location**: `file.py:456`
 - **Question**: [What needs to be verified]
 
-If no vulnerabilities found, state: "No high-confidence vulnerabilities identified."
+If no high-confidence vulnerabilities are identified, state: "No high-confidence vulnerabilities identified" and include the reviewed scope and any incomplete or unverified checks. Do not present a partial review as a clean result.
 ````

@@ -1,28 +1,27 @@
 {
-  "name": "@zeldrisho/pi-sentry-skills",
-  "version": "0.1.1",
-  "description": "Pi adaptations of Sentry agent skills, revised for Agent Skills workflows",
+  "name": "@zeldrisho/pi-catppuccin",
+  "version": "0.1.0",
+  "description": "Catppuccin Mocha theme for Pi",
   "keywords": [
-    "agents-md",
+    "catppuccin",
+    "mocha",
     "pi",
     "pi-package",
-    "pr-writer",
-    "security-review",
-    "skills"
+    "themes"
   ],
-  "homepage": "https://github.com/zeldrisho/pi-packages/tree/main/packages/pi-sentry-skills#readme",
+  "homepage": "https://github.com/zeldrisho/pi-packages/tree/main/packages/pi-catppuccin#readme",
   "bugs": {
     "url": "https://github.com/zeldrisho/pi-packages/issues"
   },
-  "license": "(Apache-2.0 AND CC-BY-SA-4.0 AND MIT)",
+  "license": "MIT",
   "author": "Zeldris",
   "repository": {
     "type": "git",
     "url": "https://github.com/zeldrisho/pi-packages.git",
-    "directory": "packages/pi-sentry-skills"
+    "directory": "packages/pi-catppuccin"
   },
   "files": [
-    "skills",
+    "themes",
     "CHANGELOG.md"
   ],
   "type": "module",
@@ -47,8 +46,8 @@
     "node": ">=24"
   },
   "pi": {
-    "skills": [
-      "./skills"
+    "themes": [
+      "./themes"
     ]
   }
 }

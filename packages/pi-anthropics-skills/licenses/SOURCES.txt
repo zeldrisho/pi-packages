@@ -1,2 +1,0 @@
-anthropics/knowledge-work-plugins commit: 93d82a54e9516d172c1d0a010c1c09d56bf9d11b
-Source: https://github.com/anthropics/knowledge-work-plugins

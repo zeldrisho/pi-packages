@@ -31,6 +31,22 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
     return;
   }
 
+  if (request.url?.startsWith("/line-fragments")) {
+    response.setHeader("content-type", "text/plain; charset=utf-8");
+    response.end("fn main() {\n  let first = 1;\n  let second = 2;\n}\n");
+
+    return;
+  }
+
+  if (request.url?.startsWith("/markdown-fragments")) {
+    response.setHeader("content-type", "text/plain; charset=utf-8");
+    response.end(
+      "# Guide\n\n```md\n## Not a heading\n```\n\n### Styling\nStyle guidance.\n\nLinked [Style](https://example.test) Guide\n---\n\nSetext Section\n===\n\n### <script>Safe</script>\n\n### <scr<script>Nested</script>ipt>\n\n### <script",
+    );
+
+    return;
+  }
+
   if (request.url?.startsWith("/focused")) {
     response.setHeader("content-type", "text/plain");
     response.end(

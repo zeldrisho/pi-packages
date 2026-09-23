@@ -1,54 +1,27 @@
 ---
 name: documentation
-description: Use this skill when writing or maintaining technical documentation, including READMEs, API references, runbooks, architecture documents, onboarding guides, or other engineering docs. Identify the reader and document type, lead with useful information, show concrete examples, and link to related sources instead of duplicating them.
+description: Use this skill when writing or maintaining engineering documentation such as READMEs, API references, runbooks, architecture documents, or onboarding guides for a specific audience.
 ---
 
 # Technical Documentation
 
-Write clear, maintainable technical documentation for different audiences and purposes.
+Create documentation that helps its intended reader complete a task accurately. Keep procedures and claims grounded in the project, not assumptions.
 
-## Document Types
+## Workflow
 
-### README
+1. Identify the reader, their goal, and the document type. For a README, optimize for first successful use; for a runbook, incident recovery; for API docs, correct integration; for architecture docs, decisions and system boundaries; for onboarding, safe completion of common tasks.
+2. Inspect the implementation and authoritative sources (configuration, API schemas, existing docs, tests, CI). Reuse verified commands and names; mark unresolved behavior as a question rather than guessing.
+3. Lead with the information needed to act. Order steps by dependency and include prerequisites, expected results, and failure or rollback guidance when relevant.
+4. Include a minimal working example for interfaces or procedures. Verify syntax, paths, options, outputs, and links against available sources; do not invent API behavior.
+5. Link to the source of truth instead of duplicating policy or reference material. Keep duplicated facts minimal and clearly scoped.
+6. Review for the intended reader: can they find the next action, understand terminology, and distinguish required from optional steps? Remove stale, redundant, or generic text.
 
-- What this is and why it exists
-- Quick start (< 5 minutes to first success)
-- Configuration and usage
-- Contributing guide
+## Useful content by document type
 
-### API Documentation
+- **README:** purpose, prerequisites, quick start, configuration, common usage, and links to contribution/support guidance.
+- **API reference:** authentication, request/response shapes, errors, pagination/limits where applicable, and runnable examples.
+- **Runbook:** trigger/conditions, access prerequisites, ordered procedure, verification, rollback, and escalation when known.
+- **Architecture:** context, goals, components/data flow, key decisions, trade-offs, and boundaries.
+- **Onboarding:** environment setup, system relationships, common tasks, and verified help channels.
 
-- Endpoint reference with request/response examples
-- Authentication and error codes
-- Rate limits and pagination
-- SDK examples
-
-### Runbook
-
-- When to use this runbook
-- Prerequisites and access needed
-- Step-by-step procedure
-- Rollback steps
-- Escalation path
-
-### Architecture Doc
-
-- Context and goals
-- High-level design with diagrams
-- Key decisions and trade-offs
-- Data flow and integration points
-
-### Onboarding Guide
-
-- Environment setup
-- Key systems and how they connect
-- Common tasks with walkthroughs
-- Who to ask for what
-
-## Principles
-
-1. **Write for the reader** — Who is reading this and what do they need?
-2. **Start with the most useful information** — Don't bury the lede
-3. **Show, don't tell** — Code examples, commands, screenshots
-4. **Keep it current** — Outdated docs are worse than no docs
-5. **Link, don't duplicate** — Reference other docs instead of copying
+Adapt these lists; do not add sections that do not help the reader.

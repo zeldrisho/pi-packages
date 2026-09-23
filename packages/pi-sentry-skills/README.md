@@ -1,6 +1,6 @@
 # @zeldrisho/pi-sentry-skills
 
-Pi skills adapted from [getsentry/skills](https://github.com/getsentry/skills): `agents-md`, `security-review`, and `pr-writer`.
+Pi adaptations of [`getsentry/skills`](https://github.com/getsentry/skills/tree/c2f99a5b04b4cd992ec3022d7c2c3e23e938d241): `agents-md`, `security-review`, and `pr-writer`. The skills and security references have been revised for Pi and Agent Skills workflows; they are not verbatim upstream copies and are not endorsed by Sentry.
 
 ## Install
 
@@ -10,8 +10,8 @@ pi install npm:@zeldrisho/pi-sentry-skills
 pi install -l npm:@zeldrisho/pi-sentry-skills
 ```
 
-Individual skills can be enabled or disabled with Pi package filtering. Source revisions and applicable licenses are included in `licenses/`.
+Select individual skills with [Pi package filtering](../../docs/package-filtering.md). Upstream provenance and license scope are documented in [`LICENSE`](LICENSE).
 
 ## License
 
-The package metadata is MIT. Imported Sentry material remains under its upstream Apache-2.0 or CC-BY-SA-4.0 terms; see `licenses/`.
+Adapted Sentry material is under Apache-2.0; OWASP-derived security references are under CC BY-SA 4.0. See [`LICENSE`](LICENSE) for scope and attribution.

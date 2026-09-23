@@ -202,6 +202,23 @@ for (const packageName of packageNames) {
       if (skillCount === 0) throw new Error(\`\${packageName} did not package any Pi skills\`);
       continue;
     }
+    if (Array.isArray(manifest.pi?.themes)) {
+      if (JSON.stringify(manifest.pi.themes) !== JSON.stringify(["./themes"])) {
+        throw new Error(\`Invalid Pi theme manifest for \${packageName}\`);
+      }
+      const themeDirectory = join(packageDirectory, "themes");
+      const themeFiles = (await readdir(themeDirectory)).filter((file) => file.endsWith(".json"));
+      if (themeFiles.length === 0) {
+        throw new Error(\`\${packageName} did not package any themes\`);
+      }
+      for (const themeFile of themeFiles) {
+        const theme = JSON.parse(await readFile(join(themeDirectory, themeFile), "utf8"));
+        if (typeof theme.name !== "string" || typeof theme.colors !== "object") {
+          throw new Error(\`\${packageName} has an invalid theme: \${themeFile}\`);
+        }
+      }
+      continue;
+    }
     if (Array.isArray(manifest.pi?.prompts)) {
       if (JSON.stringify(manifest.pi.prompts) !== JSON.stringify(["./prompts"])) {
         throw new Error(\`Invalid Pi prompt manifest for \${packageName}\`);

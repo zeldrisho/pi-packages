@@ -1,4 +1,0 @@
-coderabbitai/skills commits:
-- commands/coderabbit-review.md: 929b0ec6dae6871abf20f78e7e502d6b836e1379
-- skills/autofix/SKILL.md: 521a49f2faec375adad7affbd0067afaab5350c0
-Source: https://github.com/coderabbitai/skills

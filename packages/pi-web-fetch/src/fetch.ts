@@ -78,6 +78,87 @@ export function detectAppShell(raw: string, markdown: string): boolean {
 
 const REQUEST_TIMEOUT_MS = 20_000;
 
+/** Indexes GitHub-style Markdown heading slugs without treating fenced examples as headings. */
+function markdownFragmentOffsets(markdown: string) {
+  const offsets: Record<string, number> = {};
+  const duplicates = new Map<string, number>();
+  const lines = markdown.split("\n");
+  let offset = 0;
+  let fence: { marker: string; length: number } | undefined;
+
+  const addHeading = (text: string, headingOffset: number) => {
+    let withoutHtml = "";
+
+    for (let index = 0; index < text.length; index += 1) {
+      if (text[index] !== "<") {
+        withoutHtml += text[index];
+        continue;
+      }
+
+      const tagEnd = text.indexOf(">", index + 1);
+
+      if (tagEnd < 0) {
+        withoutHtml += text.slice(index + 1);
+        break;
+      }
+
+      index = tagEnd;
+    }
+
+    const base = withoutHtml
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+      .replace(/[`*_~]/g, "")
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^\p{Letter}\p{Number} _-]/gu, "")
+      .trim()
+      .replace(/[ _]+/g, "-");
+
+    if (!base) return;
+
+    const duplicate = duplicates.get(base) ?? 0;
+    duplicates.set(base, duplicate + 1);
+    offsets[duplicate ? `${base}-${duplicate}` : base] = headingOffset;
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const fenceMatch = /^\s{0,3}(`{3,}|~{3,})/.exec(line);
+
+    if (fenceMatch) {
+      const marker = fenceMatch[1][0];
+
+      if (!fence) fence = { marker, length: fenceMatch[1].length };
+      else if (fence.marker === marker && fenceMatch[1].length >= fence.length) fence = undefined;
+    } else if (!fence) {
+      const atxHeading = /^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/.exec(line);
+      const setextHeading = /^\s{0,3}(=+|-+)\s*$/.test(lines[index + 1] ?? "");
+
+      if (atxHeading) addHeading(atxHeading[1], offset);
+      else if (setextHeading) addHeading(line.trim(), offset);
+    }
+
+    offset += line.length + 1;
+  }
+
+  return offsets;
+}
+
+/** Indexes GitHub line anchors such as `#L78` in plain-text source files. */
+function lineFragmentOffsets(text: string) {
+  const offsets: Record<string, number> = {};
+  let offset = 0;
+
+  for (const [index, line] of text.split("\n").entries()) {
+    offsets[`L${index + 1}`] = offset;
+    offset += line.length + 1;
+  }
+
+  return offsets;
+}
+
 /** Agent-discovery hints advertised in an HTTP `Link:` header. */
 export interface LinkHeaderAgentHints {
   describedBy?: string;
@@ -292,7 +373,19 @@ async function documentFromResponse(
     } catch {
       markdown = raw;
     }
-  } else markdown = raw.trim();
+  } else {
+    markdown = raw;
+
+    const markdownContent = /\bmarkdown\b|\.md(?:$|[?#])/i.test(
+      contentTypeHeader + target.url.pathname,
+    );
+
+    if (contentType.startsWith("text/") || markdownContent) {
+      fragmentOffsets = lineFragmentOffsets(markdown);
+
+      if (markdownContent) Object.assign(fragmentOffsets, markdownFragmentOffsets(markdown));
+    }
+  }
 
   const isHtml = contentType === "text/html" || contentType === "application/xhtml+xml";
   const extractionDiagnostics = isHtml ? diagnoseExtraction(raw, markdown) : undefined;
