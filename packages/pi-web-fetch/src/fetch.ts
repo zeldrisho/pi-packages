@@ -374,7 +374,7 @@ async function documentFromResponse(
       markdown = raw;
     }
   } else {
-    markdown = raw.trim();
+    markdown = raw;
 
     const markdownContent = /\bmarkdown\b|\.md(?:$|[?#])/i.test(
       contentTypeHeader + target.url.pathname,

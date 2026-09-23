@@ -91,6 +91,7 @@ import ipaddress
 import socket
 
 BLOCKED_RANGES = [
+    ipaddress.ip_network('::/128'),          # IPv6 unspecified
     ipaddress.ip_network('127.0.0.0/8'),      # Loopback
     ipaddress.ip_network('10.0.0.0/8'),       # Private
     ipaddress.ip_network('172.16.0.0/12'),    # Private
@@ -109,6 +110,8 @@ BLOCKED_RANGES = [
 def is_internal_ip(ip_str):
     try:
         ip = ipaddress.ip_address(ip_str)
+        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+            ip = ip.ipv4_mapped
         return any(ip in network for network in BLOCKED_RANGES)
     except ValueError:
         return True  # Invalid IP, block it

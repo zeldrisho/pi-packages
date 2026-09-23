@@ -614,7 +614,7 @@ function resolveFragmentOffset(document: CompleteDocument, rawUrl: string): Reso
       const lines = document.markdown.split("\n");
       const line = lines[endLine - 1];
 
-      if (!line) return { fragment };
+      if (line === undefined) return { fragment };
 
       const endOffset =
         endColumn === undefined
