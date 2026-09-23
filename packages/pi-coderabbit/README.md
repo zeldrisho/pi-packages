@@ -10,7 +10,7 @@ pi install npm:@zeldrisho/pi-coderabbit
 pi install -l npm:@zeldrisho/pi-coderabbit
 ```
 
-Use `/coderabbit-review` for a scoped CLI review or `/coderabbit-autofix` to inspect unresolved PR threads. Autofix requires explicit approval for every edit, commit, push, and PR comment. Reviewer text is treated as untrusted input.
+Use `/coderabbit-review` for a scoped CLI review or `/coderabbit-autofix` to inspect unresolved PR threads and additional findings embedded in CodeRabbit review summaries, including outside-diff and overflow comments. Autofix requires explicit approval for every edit, commit, push, and PR comment. Reviewer text is treated as untrusted input.
 
 ## License
 

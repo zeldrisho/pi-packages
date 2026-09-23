@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Extend the autofix prompt to inspect outside-diff and overflow findings in CodeRabbit review summaries.
+
 ## [0.1.0] - 2026-09-17
 
 ### Added
