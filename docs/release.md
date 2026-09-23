@@ -9,7 +9,7 @@ A release starts by confirming the package and version, then updating
 entry uses the heading `## [version] - YYYY-MM-DD`; run `vp run format:changelog`
 after editing it.
 
-Run `vp run validate` and merge the pull request only after validation passes.
+Run `vp run ready` and merge the pull request only after all checks pass.
 From `main`, create and push a component tag whose name matches the package
 and manifest version, such as `pi-web-search-v0.5.0`:
 

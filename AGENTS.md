@@ -14,7 +14,7 @@
 | Check formatting, lint, and types | `vp check`                              |
 | Auto-fix formatting and lint      | `vp check --fix`                        |
 | Focused lint / format / typecheck | `vp lint`, `vp fmt`, `vp run typecheck` |
-| Complete validation before review | `vp run validate`                       |
+| Complete checks before review     | `vp run ready`                          |
 | Normalize changelogs              | `vp run format:changelog`               |
 | Sync shared web modules           | `vp run sync:web-modules`               |
 

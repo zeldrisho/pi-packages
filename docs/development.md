@@ -12,12 +12,12 @@ vp install
 
 Use Node.js 24.11.0 or newer. Common commands:
 
-| Task                         | Command           |
-| ---------------------------- | ----------------- |
-| Format, lint, type-check     | `vp check`        |
-| Run one test file            | `vp test <path>`  |
-| Run complete validation      | `vp run validate` |
-| Show environment diagnostics | `vp env doctor`   |
+| Task                         | Command          |
+| ---------------------------- | ---------------- |
+| Format, lint, type-check     | `vp check`       |
+| Run one test file            | `vp test <path>` |
+| Run complete checks          | `vp run ready`   |
+| Show environment diagnostics | `vp env doctor`  |
 
 Set `BRAVE_SEARCH_API_KEY` only for manually exercising `pi-web-search`; never commit credentials. Inspect `package.json` and `vite.config.ts` before choosing or changing tasks.
 
@@ -48,14 +48,14 @@ vp run benchmark:web-fetch-extraction
 
 ## Verification
 
-`vp run validate` covers formatting, linting, type checking, tests, repository contracts, tarball inspection, and packaged smoke tests. Tarballs should contain only the package README, changelog, license, manifest, runtime `src/` files, and explicitly contracted metadata such as `pi-gate`'s schema.
+`vp run ready` runs the dependency audit, formatting, linting, type checking, tests, repository contracts, tarball inspection, and packaged smoke tests. Tarballs should contain only the package README, changelog, license, manifest, runtime `src/` files, and explicitly contracted metadata such as `pi-gate`'s schema.
 
 The deterministic suites use local fixtures and mocked Brave responses. Manually verify affected behavior, including missing keys and both search modes; fetch formats, redirects, blocked targets, limits, caching, coalescing, cancellation, and continuation; and temporary-file cleanup. Load a package in an isolated session with `pi -e ./packages/<name>`.
 
-Before review, inspect the final diff for unrelated behavior, new network paths, cache changes, implicit mutation, forceful fallbacks, and output growth. Run focused tests, `vp check --fix`, required normalization tasks, and finally `vp run validate`.
+Before review, inspect the final diff for unrelated behavior, new network paths, cache changes, implicit mutation, forceful fallbacks, and output growth. Run focused tests, `vp check --fix`, required normalization tasks, and finally `vp run ready`.
 
 ## Dependencies
 
-Open dependency updates manually. Review upstream notes, lockfile changes, GitHub Action major tags, and run validation. Keep Typebox, Vite+, TypeScript, and major toolchain updates separate. Refresh the `@earendil-works/*` catalog at least once per release cycle; after catalog or lockfile changes, check the override conditions in `pnpm-workspace.yaml` and remove satisfied overrides. CI runs `vp pm audit -- --audit-level high`; production advisories are not allowlisted.
+Open dependency updates manually. Review upstream notes, lockfile changes, GitHub Action major tags, and run validation. Keep Typebox, Vite+, TypeScript, and major toolchain updates separate. Refresh the `@earendil-works/*` catalog at least once per release cycle; after catalog or lockfile changes, check the override conditions in `pnpm-workspace.yaml` and remove satisfied overrides. `vp run ready` includes `vp pm audit -- --audit-level high`; production advisories are not allowlisted.
 
 Before a catalog bump, smoke-test Pi's latest APIs with `PI_SMOKE_DEPENDENCIES=latest vp run test:packages` while retaining the locked Typebox version.
