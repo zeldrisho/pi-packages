@@ -1,6 +1,6 @@
 {
   "name": "@zeldrisho/pi-anthropics-skills",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Pi adaptations of Anthropic engineering skills, revised for Agent Skills workflows",
   "keywords": [
     "documentation",
