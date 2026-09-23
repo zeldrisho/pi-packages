@@ -1,6 +1,6 @@
 # Agent Instructions
 
-## Package Manager
+## Toolchain
 
 - Use **Vite+** (`vp install`) with the pnpm workspace and lockfile.
 - Use `vp run <name>` for project scripts; `vp <name>` invokes a built-in command.
@@ -23,9 +23,9 @@
 - Edit shared `cache.ts`, `inflight.ts`, and `render.ts` in `packages/pi-web-fetch/src/`, then run `vp run sync:web-modules` to update `pi-web-search`.
 - Read `docs/development.md` before runtime or dependency changes, especially its security and regression requirements.
 - Read `docs/architecture.md` before changing package boundaries, network acquisition, caching, or derived views.
-- Follow `docs/release.md` before version bumps, changelog edits, tags, or publishing; pushing a component tag publishes automatically.
+- Follow `docs/release.md` before version bumps, changelog edits, tags, or publishing; push release tags one at a time because GitHub omits tag workflow events when more than three are pushed together.
 - After each Pi package change, update its `CHANGELOG.md` under `Unreleased` if the change is notable to users. Follow `docs/release.md` and run `vp run format:changelog` after editing.
-- Update work branches from their target with a merge commit; do not rebase (`docs/release.md`).
+- Update work branches from their target before review.
 
 ## External References
 

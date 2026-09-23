@@ -17,6 +17,10 @@ and manifest version, such as `pi-web-search-v0.5.0`:
 git tag <name>-v<version> && git push origin <name>-v<version>
 ```
 
+Push tags one at a time. GitHub does not create tag-push events when more than
+three tags are pushed in a single push, so batched pushes will not start the
+release workflows.
+
 The tag starts the release workflow. After it completes, verify the CI result,
 GitHub release, npm version, provenance, and tarball contents.
 
@@ -36,4 +40,4 @@ Pause and notify the owner if any manifest, tag, package path, changelog, authen
 
 ## Invariants
 
-Keep the manifest, component tag, GitHub release, npm version, and changelog synchronized. The agent writes changelogs; the workflow only reads them. Update work branches from their target with a merge commit; do not rebase.
+Keep the manifest, component tag, GitHub release, npm version, and changelog synchronized. The agent writes changelogs; the workflow only reads them.
