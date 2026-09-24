@@ -169,6 +169,7 @@ function makeExtension(): ExtensionFactory {
   return { install };
 }
 
+/** Writes the test gate configuration, or removes it when content is null. */
 function setConfig(content: string | null): void {
   const dir = process.env.PI_CODING_AGENT_DIR;
 
