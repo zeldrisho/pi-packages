@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Support reviewing an open pull request by number when its head commit is checked out locally.
+
 ## [0.2.0] - 2026-09-23
 
 ### Changed
