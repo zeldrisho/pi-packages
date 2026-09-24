@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-24
+
+### Changed
+
+- Removed attribution details duplicated in the package README and license.
+
 ## [0.1.1] - 2026-09-23
 
 ### Changed
@@ -20,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `agents-md`, `security-review`, and `pr-writer` Pi skills from Sentry's skills repository
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-sentry-skills-v0.1.1...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-sentry-skills-v0.1.2...HEAD
+[0.1.2]: https://github.com/zeldrisho/pi-packages/compare/pi-sentry-skills-v0.1.1...pi-sentry-skills-v0.1.2
 [0.1.1]: https://github.com/zeldrisho/pi-packages/compare/pi-sentry-skills-v0.1.0...pi-sentry-skills-v0.1.1
 [0.1.0]: https://github.com/zeldrisho/pi-packages/releases/tag/pi-sentry-skills-v0.1.0

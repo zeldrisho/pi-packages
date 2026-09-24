@@ -12,7 +12,9 @@ pi install -l npm:@zeldrisho/pi-gate
 
 ## Configure
 
-On first load, the extension creates `~/.pi/agent/pi-gate.json` with starter rules and a 30-second prompt timeout. Existing files are never overwritten. If no configuration can be created yet, pi-gate warns at session start and allows commands until the file is created. If an existing configuration cannot be read or parsed, pi-gate warns and prompts for every command until it is fixed. The published package includes [`config.schema.json`](config.schema.json); use this schema URL for editor completion:
+The extension reads `~/.pi/agent/gate.json`, falling back to legacy `~/.pi/agent/pi-gate.json` only when `gate.json` is absent. Set `PI_CODING_AGENT_DIR` to use a different configuration directory. If both files exist, only `gate.json` is used—even if it is invalid. To migrate, rename `pi-gate.json` to `gate.json` and run `/reload`; existing files are never automatically renamed, merged, or overwritten.
+
+On first load, if neither file exists, the extension creates `gate.json` with starter rules and a 30-second prompt timeout. If no configuration can be created yet, pi-gate warns at session start and allows commands until the file is created. If an existing configuration cannot be read or parsed, pi-gate warns and prompts for every command until it is fixed. The published package includes [`config.schema.json`](config.schema.json); use this schema URL for editor completion:
 
 ```json
 {

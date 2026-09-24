@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-24
+
+### Added
+
+- Support reviewing an open pull request by number when its head commit is checked out locally.
+
 ## [0.2.0] - 2026-09-23
 
 ### Changed
@@ -21,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - CodeRabbit review and individually approved autofix prompt templates
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-coderabbit-v0.2.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-coderabbit-v0.3.0...HEAD
+[0.3.0]: https://github.com/zeldrisho/pi-packages/compare/pi-coderabbit-v0.2.0...pi-coderabbit-v0.3.0
 [0.2.0]: https://github.com/zeldrisho/pi-packages/compare/pi-coderabbit-v0.1.0...pi-coderabbit-v0.2.0
 [0.1.0]: https://github.com/zeldrisho/pi-packages/releases/tag/pi-coderabbit-v0.1.0

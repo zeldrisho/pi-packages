@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "validate": "vp check && vp test --coverage && vp run test:contracts && vp run pack:dry-run && vp run test:packages",
+    "ready": "vp pm audit -- --audit-level high && vp check && vp test --coverage && vp run test:contracts && vp run pack:dry-run && vp run test:packages",
     "check": "vp check",
     "test": "vp test",
     "lint": "vp lint",

@@ -16,7 +16,9 @@ export interface ConfigLoadResult {
   status: ConfigLoadStatus;
 }
 
-const CONFIG_FILE_NAME = "pi-gate.json";
+const CONFIG_FILE_NAME = "gate.json";
+
+const LEGACY_CONFIG_FILE_NAME = "pi-gate.json";
 
 export const CONFIG_SCHEMA_URL =
   "https://raw.githubusercontent.com/zeldrisho/pi-packages/main/packages/pi-gate/config.schema.json";
@@ -54,10 +56,18 @@ function agentDir(): string {
 /**
  * Returns the full path to the pi-gate configuration file.
  *
- * @returns The absolute path to pi-gate.json
+ * Prefers gate.json, falling back to pi-gate.json only when gate.json is absent.
+ *
+ * @returns The selected configuration path, or gate.json for first-run creation
  */
 export function configPath(): string {
-  return join(agentDir(), CONFIG_FILE_NAME);
+  const path = join(agentDir(), CONFIG_FILE_NAME);
+
+  if (existsSync(path)) return path;
+
+  const legacyPath = join(agentDir(), LEGACY_CONFIG_FILE_NAME);
+
+  return existsSync(legacyPath) ? legacyPath : path;
 }
 
 /**

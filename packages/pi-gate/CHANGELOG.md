@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-24
+
+### Changed
+
+- Use `gate.json` as the default configuration filename, retaining `pi-gate.json` as a legacy fallback only when `gate.json` is absent; existing files are never automatically renamed or overwritten.
+
 ## [0.4.1] - 2026-09-17
 
 ### Security
@@ -56,7 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - support `prompt`, `block`, and `allow` actions, with longest-pattern-wins resolution
 - block rather than auto-approve in non-UI modes
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.4.1...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.5.0...HEAD
+[0.5.0]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.4.1...pi-gate-v0.5.0
 [0.4.1]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.4.0...pi-gate-v0.4.1
 [0.4.0]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.3.0...pi-gate-v0.4.0
 [0.3.0]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.2.0...pi-gate-v0.3.0

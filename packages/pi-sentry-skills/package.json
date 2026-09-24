@@ -1,6 +1,6 @@
 {
   "name": "@zeldrisho/pi-sentry-skills",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Pi adaptations of Sentry agent skills, revised for Agent Skills workflows",
   "keywords": [
     "agents-md",
