@@ -137,6 +137,8 @@ describe("repository contracts", () => {
         fail(`${manifest.name} must include a readable LICENSE file`);
       }
 
+      if (!license.trim()) fail(`${manifest.name} LICENSE file must not be empty`);
+
       const skillsRoot = join(packageRoot, "skills");
       const pending = [skillsRoot];
 

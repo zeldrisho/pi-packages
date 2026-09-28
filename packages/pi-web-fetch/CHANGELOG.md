@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Remove the rarely needed `maxCharacters` override from the model-facing tool schema; output remains bounded by the default
+
 ### Fixed
 
 - Preserve short and sparsely extracted pages instead of replacing them with a site's `/llms.txt` index; index fallback is reserved for explicit JavaScript, bot-wall, or consent-interstitial signals

@@ -2,13 +2,10 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
-  FETCH_DEFAULT_MAX_CHARACTERS,
   FETCH_DEFAULT_OFFSET,
-  FETCH_MAX_CHARACTERS,
   FETCH_MAX_OFFSET_CHARACTERS,
   FETCH_MAX_QUERY_CHARACTERS,
   FETCH_MAX_URL_CHARACTERS,
-  FETCH_MIN_MAX_CHARACTERS,
 } from "./limits";
 import { redactUrlForDisplay } from "./redact";
 import { formatCollapsibleOutput } from "./render";
@@ -54,28 +51,20 @@ export const webFetchParameters = Type.Object({
   url: Type.String({
     minLength: 1,
     maxLength: FETCH_MAX_URL_CHARACTERS,
-    description: "Public HTTP or HTTPS URL to fetch",
+    description: "HTTP or HTTPS page URL",
   }),
   query: Type.Optional(
     Type.String({
       minLength: 1,
       maxLength: FETCH_MAX_QUERY_CHARACTERS,
-      description:
-        "Optional focus query; returns matching source sections in document order (offsets apply to the focused view)",
+      description: "Focus on matching sections; offsets then apply to this focused view",
     }),
   ),
   offset: Type.Optional(
     Type.Integer({
       minimum: 0,
       maximum: FETCH_MAX_OFFSET_CHARACTERS,
-      description: `Extracted-content character offset to start reading from (default: ${FETCH_DEFAULT_OFFSET}; use nextOffset to continue)`,
-    }),
-  ),
-  maxCharacters: Type.Optional(
-    Type.Integer({
-      minimum: FETCH_MIN_MAX_CHARACTERS,
-      maximum: FETCH_MAX_CHARACTERS,
-      description: `Maximum returned content characters (default: ${FETCH_DEFAULT_MAX_CHARACTERS})`,
+      description: `Character offset in extracted content (default: ${FETCH_DEFAULT_OFFSET}; continue with nextOffset)`,
     }),
   ),
 });

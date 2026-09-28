@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Simplify search guidance to favor broad discovery and avoid overly restrictive `site:` paths
+- Expose only core search controls (`mode`, `count`, `freshness`, and `spellcheck`) in the model-facing tool schema
+
 ## [0.8.2] - 2026-09-24
 
 ### Fixed
