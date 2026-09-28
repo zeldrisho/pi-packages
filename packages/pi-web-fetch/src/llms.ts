@@ -79,9 +79,13 @@ export function buildLlmsTxtCandidateUrls(rawUrl: string): URL[] {
 }
 
 function isLowQualityDocument(document: CompleteDocument): boolean {
-  return (
-    document.shellSuspected ||
-    (document.extractor !== "raw" && document.markdown.length < LLMS_TXT_MIN_MARKDOWN_CHARACTERS)
+  // Sparse extraction alone is not proof of an empty app shell: server-rendered pages
+  // may include useful content in streaming/framework markup that article extraction
+  // does not fully recognize. Keep that page rather than replacing it with a site index.
+  const diagnostics = document.extractionDiagnostics;
+
+  return Boolean(
+    diagnostics?.javascriptRequired || diagnostics?.botWall || diagnostics?.consentInterstitial,
   );
 }
 

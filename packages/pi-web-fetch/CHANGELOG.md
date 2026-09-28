@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve short and sparsely extracted pages instead of replacing them with a site's `/llms.txt` index; index fallback is reserved for explicit JavaScript, bot-wall, or consent-interstitial signals
+
 ## [0.9.2] - 2026-09-23
 
 ### Fixed
