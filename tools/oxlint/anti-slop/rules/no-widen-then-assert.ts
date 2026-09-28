@@ -15,27 +15,32 @@ const functionBoundaryTypes = new Set([
   "TSEmptyBodyFunctionExpression",
 ]);
 
+/** Remove parentheses without discarding assertions on an expression. */
 function unwrapExpressionParentheses(expression: ESTree.Expression): ESTree.Expression {
   let current = expression;
   while (current.type === "ParenthesizedExpression") current = current.expression;
   return current;
 }
 
+/** Remove parenthesized type wrappers before classifying or comparing a type. */
 function unwrapTypeParentheses(type: ESTree.TSType): ESTree.TSType {
   let current = type;
   while (current.type === "TSParenthesizedType") current = current.typeAnnotation;
   return current;
 }
 
+/** Return an unqualified type reference name, or null for a qualified reference. */
 function typeReferenceName(type: ESTree.TSTypeReference): string | null {
   return type.typeName.type === "Identifier" ? type.typeName.name : null;
 }
 
+/** Recognize unknown and any after removing parenthesized type wrappers. */
 function isUnknownOrAnyType(type: ESTree.TSType): boolean {
   const unwrapped = unwrapTypeParentheses(type);
   return unwrapped.type === "TSUnknownKeyword" || unwrapped.type === "TSAnyKeyword";
 }
 
+/** Recognize unrestricted primitive key types, their unions, and PropertyKey references. */
 function isBroadRecordKeyType(type: ESTree.TSType): boolean {
   const unwrapped = unwrapTypeParentheses(type);
   if (
@@ -49,6 +54,7 @@ function isBroadRecordKeyType(type: ESTree.TSType): boolean {
   return unwrapped.type === "TSTypeReference" && typeReferenceName(unwrapped) === "PropertyKey";
 }
 
+/** Recognize broad Record or index-signature types with unknown or any values, including Readonly wrappers. */
 function isBroadRecordType(type: ESTree.TSType): boolean {
   const unwrapped = unwrapTypeParentheses(type);
 
@@ -81,6 +87,7 @@ function isBroadRecordType(type: ESTree.TSType): boolean {
   );
 }
 
+/** Classify top types, object, and broad records; return null for other syntax. */
 function broadTypeKind(type: ESTree.TSType): BroadTypeKind | null {
   const unwrapped = unwrapTypeParentheses(type);
   if (unwrapped.type === "TSUnknownKeyword" || unwrapped.type === "TSAnyKeyword") return "top";
@@ -88,12 +95,14 @@ function broadTypeKind(type: ESTree.TSType): BroadTypeKind | null {
   return isBroadRecordType(unwrapped) ? "record" : null;
 }
 
+/** Return the assertion operand with its surrounding parentheses removed. */
 function assertedExpression(
   node: ESTree.TSAsExpression | ESTree.TSTypeAssertion,
 ): ESTree.Expression {
   return unwrapExpressionParentheses(node.expression);
 }
 
+/** Extract a type assertion through parentheses, or return null for other expressions. */
 function assertionFromExpression(
   expression: ESTree.Expression,
 ): ESTree.TSAsExpression | ESTree.TSTypeAssertion | null {
@@ -103,10 +112,12 @@ function assertionFromExpression(
     : null;
 }
 
+/** Read a type from source text and remove whitespace for syntactic comparison. */
 function normalizedTypeText(sourceText: string, type: ESTree.TSType): string {
   return sourceText.slice(type.start, type.end).replaceAll(/\s+/gu, "");
 }
 
+/** Compare available type evidence with an asserted type, ignoring parentheses and whitespace. */
 function typesHaveSameSyntax(
   sourceText: string,
   left: ESTree.TSType | null,
@@ -119,6 +130,7 @@ function typesHaveSameSyntax(
   );
 }
 
+/** Recognize type syntax that establishes an object value without resolving named types. */
 function isDefinitelyObjectType(type: ESTree.TSType): boolean {
   const unwrapped = unwrapTypeParentheses(type);
   switch (unwrapped.type) {
@@ -140,6 +152,7 @@ function isDefinitelyObjectType(type: ESTree.TSType): boolean {
   }
 }
 
+/** Recognize non-index members or Record values more specific than unknown or any. */
 function isDefinitelyNarrowerRecordType(type: ESTree.TSType): boolean {
   const unwrapped = unwrapTypeParentheses(type);
   if (unwrapped.type === "TSTypeLiteral") {
@@ -159,6 +172,7 @@ function isDefinitelyNarrowerRecordType(type: ESTree.TSType): boolean {
   );
 }
 
+/** Find the nearest enclosing function, or return null for program-level code. */
 function functionBoundary(node: ESTree.Node): ESTree.Node | null {
   let current = node.parent;
   while (current !== null && current.type !== "Program") {
@@ -168,6 +182,7 @@ function functionBoundary(node: ESTree.Node): ESTree.Node | null {
   return null;
 }
 
+/** Find the resolved binding whose reference has the identifier's source range. */
 function resolvedVariableForIdentifier(
   scopes: readonly {
     readonly references: readonly {
@@ -188,6 +203,7 @@ function resolvedVariableForIdentifier(
   return null;
 }
 
+/** Return the first variable declarator belonging to a binding, or null if absent. */
 function variableDeclarator(variable: Variable): ESTree.VariableDeclarator | null {
   for (const definition of variable.defs) {
     if (definition.type === "Variable" && definition.node.type === "VariableDeclarator") {
@@ -197,6 +213,7 @@ function variableDeclarator(variable: Variable): ESTree.VariableDeclarator | nul
   return null;
 }
 
+/** Trace literals, annotations, and stable const initializers within one function boundary, guarding against cycles. */
 function knownValueEvidence(
   expression: ESTree.Expression,
   scopes: Parameters<typeof resolvedVariableForIdentifier>[0],
@@ -260,6 +277,7 @@ function knownValueEvidence(
   );
 }
 
+/** Recover original value evidence and the broad type of a stable const binding, or return null. */
 function widenedBinding(
   variable: Variable,
   scopes: Parameters<typeof resolvedVariableForIdentifier>[0],
@@ -298,6 +316,7 @@ function widenedBinding(
   return evidence === null ? null : { broadKind, evidence, declaredAt: declarator.end, boundary };
 }
 
+/** Check whether syntax or original type evidence establishes a narrower assertion target. */
 function assertionIsNarrower(
   sourceText: string,
   broadKind: BroadTypeKind,
