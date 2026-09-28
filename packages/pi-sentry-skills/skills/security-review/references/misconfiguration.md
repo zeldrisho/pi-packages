@@ -339,7 +339,8 @@ response.set_cookie(
     httponly=True,     # No JavaScript access
     samesite='Lax',    # CSRF protection
     max_age=3600,      # Reasonable expiration
-    path='/'
+    path='/',
+    domain='.example.com'
 )
 
 # Flask session configuration

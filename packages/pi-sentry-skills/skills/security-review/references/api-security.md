@@ -163,7 +163,7 @@ def process_data():
 # SAFE: Validate content type
 @app.route('/api/data', methods=['POST'])
 def process_data():
-    if request.mimetype != 'application/json':
+    if request.content_type != 'application/json':
         return jsonify({'error': 'Content-Type must be application/json'}), 415
 
     data = request.get_json()

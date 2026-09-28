@@ -53,8 +53,7 @@ setInterval(userInput, 1000)  // FLAG: If string argument
 ```jsx
 // CHECK: URL validation for href/src
 const SafeLink = ({ url, children }) => {
-  const isValid =
-    !url.startsWith("//") && (url.startsWith("/") || new URL(url).protocol === "https:");
+  const isValid = url.startsWith("https://") || url.startsWith("/");
   if (!isValid) return null;
   return <a href={url}>{children}</a>;
 };

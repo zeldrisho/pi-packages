@@ -1,15 +1,15 @@
 {
-  "name": "@zeldrisho/pi-coderabbit",
-  "version": "0.3.0",
-  "description": "Pi prompt templates for safe CodeRabbit reviews and autofixes",
+  "name": "@zeldrisho/pi-coderabbit-skills",
+  "version": "0.1.0",
+  "description": "CodeRabbit skills packaged for Pi",
   "keywords": [
     "code-review",
     "coderabbit",
     "pi",
     "pi-package",
-    "prompts"
+    "skills"
   ],
-  "homepage": "https://github.com/zeldrisho/pi-packages/tree/main/packages/pi-coderabbit#readme",
+  "homepage": "https://github.com/zeldrisho/pi-packages/tree/main/packages/pi-coderabbit-skills#readme",
   "bugs": {
     "url": "https://github.com/zeldrisho/pi-packages/issues"
   },
@@ -18,11 +18,12 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/zeldrisho/pi-packages.git",
-    "directory": "packages/pi-coderabbit"
+    "directory": "packages/pi-coderabbit-skills"
   },
   "files": [
-    "prompts",
-    "CHANGELOG.md"
+    "skills",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "type": "module",
   "publishConfig": {
@@ -46,8 +47,8 @@
     "node": ">=24"
   },
   "pi": {
-    "prompts": [
-      "./prompts"
+    "skills": [
+      "./skills"
     ]
   }
 }

@@ -311,8 +311,7 @@ app.get(
 // Global handler for unhandled rejections
 process.on("unhandledRejection", (reason, promise) => {
   logger.error("Unhandled Rejection", { reason });
-  // Terminate so the supervisor can restart with clean state.
-  process.exit(1);
+  // Don't exit - handle gracefully
 });
 ```
 

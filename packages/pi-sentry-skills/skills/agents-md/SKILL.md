@@ -1,55 +1,92 @@
 ---
 name: agents-md
-description: Use this skill when creating or updating AGENTS.md or other repository agent-instruction files, especially when documenting project-specific tooling, policies, or conventions.
+description: Creates and maintains concise AGENTS.md project instruction files. Use when asked to create or update AGENTS.md, document repository agent conventions, or keep coding-agent instructions minimal and reference-backed.
 ---
 
 # Maintaining AGENTS.md
 
-Write only repository-specific instructions that save an agent from likely mistakes. Target under 60 lines; never exceed 100.
+Goal: concise, actionable agent instructions. Target under 60 lines; never exceed 100.
 
 ## Workflow
 
-1. Inspect the target directory and its ancestors for existing `AGENTS.md` files. Read applicable instructions before editing.
-2. Inspect actual evidence: lockfiles and manifests for package manager; scripts, task runners, and CI for commands; docs and policies for requirements; code and tests for conventions and generated files.
-3. Choose scope: root file for repository-wide defaults; nested file only for subtree-specific rules. The nearest applicable file takes precedence for its subtree; retain non-conflicting parent guidance and remove only superseded rules.
-4. Include only instructions that are actionable and not already obvious from tools/configuration. Prefer links to authoritative repository docs over copied policy.
-5. Verify every referenced path and every command against repository files/configuration. Use the repository's actual package manager and test/lint commands; do not assume pnpm, npm, Vitest, ESLint, or any other tool.
-6. Review the final file for duplication, contradictions, stale instructions, and line count.
+1. Inspect before writing:
+   - package manager: lock files and manifests
+   - commands: `package.json`, `Makefile`, task runners, CI workflows
+   - docs/specs/policies: `README.md`, `CONTRIBUTING.md`, `docs/`, `specs/`, `policies/`, `SECURITY.md`, `.github/`
+   - conventions: current code patterns, test layout, generated files, legacy areas to avoid
+2. Choose scope:
+   - root `AGENTS.md`: repo-wide defaults
+   - nested `AGENTS.md`: only when a subtree has different commands or rules
+   - closest instruction file wins; keep narrower files shorter than root files
+3. Write the smallest useful file.
+4. Verify exact paths and commands exist.
 
-## Optional structure
+## File Setup
 
-Use only sections supported by repository evidence:
+- Create `AGENTS.md` at the repository root.
+
+## Default Sections
+
+Use only sections that add non-obvious value.
 
 ```markdown
 # Agent Instructions
 
 ## Toolchain
 
-- Use [verified package manager/setup command].
+- Use **pnpm**: `pnpm install`
 
 ## Commands
 
-| Task | Command            |
-| ---- | ------------------ |
-| Test | [verified command] |
+| Task      | Command                                |
+| --------- | -------------------------------------- |
+| Test file | `pnpm vitest run path/to/file.test.ts` |
+| Lint file | `pnpm eslint path/to/file.ts`          |
 
 ## Key Conventions
 
-- [Specific, verified repository rule.]
+- Generated files: update with `pnpm generate`; do not edit by hand.
 
 ## External References
 
-| Need    | File            |
-| ------- | --------------- |
-| [Topic] | [Verified path] |
+| Need            | File                   |
+| --------------- | ---------------------- |
+| Setup           | `CONTRIBUTING.md`      |
+| Architecture    | `docs/architecture.md` |
+| Security policy | `SECURITY.md`          |
 ```
 
-## Writing rules
+## Writing Rules
 
-- List exact existing docs for setup, architecture, security, release, and policy when relevant.
-- Prefer the narrowest useful test/lint command; include broader commands only when no narrower command exists.
-- Keep one actionable rule per bullet; use repository-relative paths.
-- Omit generic quality slogans, welcome text, conclusions, and rationale unless it prevents a likely mistake.
-- Do not restate formatter, linter, or type-checker configuration.
+- Use headings, bullets, and tables; avoid paragraphs.
+- Use repo-relative paths; avoid vague references like "see docs".
+- Reference existing docs/specs/policies instead of copying them.
+- List exact external files for setup, architecture, API specs, security, release, and policy docs when they exist.
+- Prefer file-scoped test/lint/typecheck commands; include full builds only when no narrower command exists.
+- Put commands in tables when there is more than one.
+- Keep one rule per bullet.
+- Keep rationale out unless it prevents a likely mistake.
+- Do not restate linter, formatter, or typechecker config.
 - Do not list installed skills or plugins.
-- Keep generated files under their documented generation workflow.
+- Do not include generic quality slogans.
+
+## External Reference Rules
+
+Good:
+
+```markdown
+## External References
+
+| Need            | File                |
+| --------------- | ------------------- |
+| API contract    | `docs/api.md`       |
+| Release process | `docs/releasing.md` |
+```
+
+## Anti-Patterns
+
+- welcome text, intros, conclusions, or pleasantries
+- long prose explaining why instructions matter
+- duplicated content from `README.md`, `CONTRIBUTING.md`, or policy docs
+- project-wide commands when file-scoped commands are available
+- nested `AGENTS.md` files that repeat root instructions

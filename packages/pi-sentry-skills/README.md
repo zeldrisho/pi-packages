@@ -1,6 +1,12 @@
 # @zeldrisho/pi-sentry-skills
 
-Pi adaptations of [`getsentry/skills`](https://github.com/getsentry/skills/tree/c2f99a5b04b4cd992ec3022d7c2c3e23e938d241): `agents-md`, `security-review`, and `pr-writer`. The skills and security references have been revised for Pi and Agent Skills workflows; they are not verbatim upstream copies and are not endorsed by Sentry.
+Pi package of selected [Sentry agent skills](https://github.com/getsentry/skills), with supporting guides and Pi-compatible metadata. This package is not endorsed by Sentry.
+
+| Skill             | Purpose                                                    |
+| ----------------- | ---------------------------------------------------------- |
+| `agents-md`       | Create and maintain repository agent instructions          |
+| `security-review` | Review code for exploitable security vulnerabilities       |
+| `pr-writer`       | Draft and update reviewer-facing pull request descriptions |
 
 ## Install
 
@@ -10,8 +16,8 @@ pi install npm:@zeldrisho/pi-sentry-skills
 pi install -l npm:@zeldrisho/pi-sentry-skills
 ```
 
-Select individual skills with [Pi package filtering](../../docs/package-filtering.md). Upstream provenance and license scope are documented in [`LICENSE`](LICENSE).
+Select individual skills with [Pi package filtering](../../docs/package-filtering.md).
 
 ## License
 
-Adapted Sentry material is under Apache-2.0; OWASP-derived security references are under CC BY-SA 4.0. See [`LICENSE`](LICENSE) for scope and attribution.
+Sentry-derived material is Apache-2.0; OWASP-derived security references are CC BY-SA 4.0. See the package [`LICENSE`](LICENSE) and the security-review skill's `LICENSE` for terms and attribution.

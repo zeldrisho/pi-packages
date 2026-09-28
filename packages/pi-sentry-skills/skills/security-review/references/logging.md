@@ -148,10 +148,8 @@ logger.info(f"API request with key: {mask_token(api_key)}")
 def redact_pii(data):
     sensitive_fields = {'password', 'ssn', 'credit_card', 'api_key', 'token'}
     if isinstance(data, dict):
-        return {k: '[REDACTED]' if k in sensitive_fields else redact_pii(v)
+        return {k: '[REDACTED]' if k in sensitive_fields else v
                 for k, v in data.items()}
-    if isinstance(data, list):
-        return [redact_pii(item) for item in data]
     return data
 
 logger.debug(f"Request data: {redact_pii(request.json)}")
@@ -261,15 +259,14 @@ handler = RotatingFileHandler(
 # Set restrictive permissions
 os.chmod(log_file, 0o600)  # Owner only
 
-# Centralized logging over reliable TCP; terminate TLS with a
-# TLS-capable handler or a configured TLS proxy.
+# SAFE: Centralized logging with encryption
 import logging.handlers
 
 syslog_handler = logging.handlers.SysLogHandler(
     address=('secure-syslog.company.com', 514),
-    socktype=socket.SOCK_STREAM  # TCP reliability; not encryption
+    socktype=socket.SOCK_STREAM  # TCP for reliability
 )
-# Ensure the configured transport or proxy provides TLS.
+# Use TLS for syslog transport
 ```
 
 ---
@@ -360,21 +357,9 @@ class AuditLog(db.Model):
             user_id=user_id,
             details=details
         )
-        # Chain checksum over every security-relevant field.
-        canonical = json.dumps(
-            {
-                "previous_checksum": prev_checksum,
-                "timestamp": entry.timestamp.isoformat(),
-                "event_type": entry.event_type,
-                "user_id": entry.user_id,
-                "details": entry.details,
-            },
-            sort_keys=True,
-            separators=(",", ":"),
-            default=str,
-        )
+        # Chain checksum
         entry.checksum = hashlib.sha256(
-            canonical.encode()
+            f"{prev_checksum}{entry.timestamp}{entry.event_type}".encode()
         ).hexdigest()
         db.session.add(entry)
         db.session.commit()

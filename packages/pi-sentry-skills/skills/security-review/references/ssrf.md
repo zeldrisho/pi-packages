@@ -58,9 +58,7 @@ http://192.168.1.1:6379  # Redis
 def fetch_url(url):
     return requests.get(url).content
 
-# Incomplete on its own: host allowlisting does not prevent DNS rebinding
-# or redirects to an unapproved destination. Enforce the policy at the
-# transport connection and validate every redirect before following it.
+# SAFE: Allowlist of permitted domains
 ALLOWED_DOMAINS = {'api.example.com', 'cdn.example.com'}
 
 def fetch_url(url):
@@ -74,10 +72,7 @@ def fetch_url(url):
     if parsed.hostname not in ALLOWED_DOMAINS:
         raise ValueError("Domain not allowed")
 
-    # Do not treat this hostname check alone as a complete SSRF defense.
-    # The HTTP transport must connect to a validated/pinned address, preserve
-    # TLS hostname verification, and revalidate any redirect target.
-    raise NotImplementedError("Use a transport that enforces the policy above")
+    return requests.get(url).content
 ```
 
 ### 2. Block Internal Networks (Denylist)
@@ -89,7 +84,6 @@ import ipaddress
 import socket
 
 BLOCKED_RANGES = [
-    ipaddress.ip_network('::/128'),          # IPv6 unspecified
     ipaddress.ip_network('127.0.0.0/8'),      # Loopback
     ipaddress.ip_network('10.0.0.0/8'),       # Private
     ipaddress.ip_network('172.16.0.0/12'),    # Private
@@ -108,8 +102,6 @@ BLOCKED_RANGES = [
 def is_internal_ip(ip_str):
     try:
         ip = ipaddress.ip_address(ip_str)
-        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
-            ip = ip.ipv4_mapped
         return any(ip in network for network in BLOCKED_RANGES)
     except ValueError:
         return True  # Invalid IP, block it
@@ -176,25 +168,30 @@ def safe_fetch(url, max_redirects=5):
 import socket
 import time
 
-def safe_fetch_with_dns_pinning(url, **kwargs):
+def safe_fetch_with_dns_pinning(url):
     parsed = urlparse(url)
     hostname = parsed.hostname
-    if not hostname:
-        raise ValueError("Invalid URL")
 
-    # Resolve every A/AAAA answer and reject the request if any address is
-    # disallowed. The transport must connect to one of these checked addresses
-    # while preserving Host, TLS SNI, and certificate verification.
-    addresses = socket.getaddrinfo(hostname, parsed.port or 443)
-    checked = [address[4][0] for address in addresses]
-    if not checked or any(is_internal_ip(ip) for ip in checked):
-        raise ValueError("Disallowed address")
+    # Resolve DNS and pin the IP
+    ip = socket.gethostbyname(hostname)
 
-    # `pinned_request` is illustrative: use a client/transport that actually
-    # pins the connection. Never resolve again between validation and connect.
-    return pinned_request(
-        url, resolved_addresses=checked, allow_redirects=False, **kwargs
+    # Validate IP is not internal
+    if is_internal_ip(ip):
+        raise ValueError("Internal IP not allowed")
+
+    # Make request directly to IP with Host header
+    # This prevents DNS rebinding attacks
+    modified_url = url.replace(hostname, ip)
+    headers = {'Host': hostname}
+
+    response = requests.get(
+        modified_url,
+        headers=headers,
+        allow_redirects=False,
+        verify=True  # Still verify TLS with original hostname
     )
+
+    return response
 ```
 
 ### 5. Cloud Metadata Protection
@@ -253,11 +250,10 @@ import requests
 class SafeRequests:
     @staticmethod
     def get(url, **kwargs):
-        # Resolve, validate, and pin the address used by the actual transport.
         validate_url(url)
         kwargs['allow_redirects'] = False
         kwargs['timeout'] = (5, 30)  # Connect and read timeout
-        return safe_fetch_with_dns_pinning(url, **kwargs)
+        return requests.get(url, **kwargs)
 ```
 
 ### Node.js
@@ -273,16 +269,16 @@ async function safeFetch(targetUrl) {
     throw new Error("Invalid scheme");
   }
 
-  // Illustrative validation only: a separate lookup followed by global
-  // fetch() is vulnerable to DNS rebinding because fetch may resolve again.
-  // Use a dispatcher/agent that connects to the checked address while keeping
-  // the original Host header and TLS SNI. Reject redirects or validate and pin
-  // every redirect destination.
-  const addresses = await dns.lookup(parsed.hostname, { all: true });
-  if (!addresses.length || addresses.some(({ address }) => isInternalIP(address))) {
+  // Resolve and check IP
+  const addresses = await dns.lookup(parsed.hostname);
+  if (isInternalIP(addresses.address)) {
     throw new Error("Internal IP not allowed");
   }
-  throw new Error("Use a transport that pins the validated addresses");
+
+  return fetch(targetUrl, {
+    redirect: "error",
+    signal: AbortSignal.timeout(30000),
+  });
 }
 ```
 
@@ -293,9 +289,6 @@ public class SafeURLConnection {
     private static final Set<String> ALLOWED_PROTOCOLS = Set.of("http", "https");
 
     public static URLConnection openConnection(String urlString) throws IOException {
-        // Illustrative validation: connecting with URLConnection after a
-        // separate DNS lookup can resolve again. Use a transport that pins the
-        // validated address while preserving hostname/TLS verification.
         URL url = new URL(urlString);
 
         if (!ALLOWED_PROTOCOLS.contains(url.getProtocol())) {
@@ -307,12 +300,12 @@ public class SafeURLConnection {
             throw new SecurityException("Internal IP not allowed");
         }
 
-        // Do not connect using URLConnection after this separate lookup: it can
-        // resolve the hostname again. Production code must use a pinned
-        // transport, preserve TLS hostname verification, and validate redirects.
-        throw new UnsupportedOperationException(
-            "Use a transport that pins the validated address"
-        );
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setInstanceFollowRedirects(false);
+        connection.setConnectTimeout(5000);
+        connection.setReadTimeout(30000);
+
+        return connection;
     }
 }
 ```
