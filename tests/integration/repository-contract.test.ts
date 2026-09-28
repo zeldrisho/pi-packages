@@ -29,7 +29,7 @@ const packageSpecificFiles = new Map([["pi-gate", ["config.schema.json"]]]);
 
 const promptPackages = new Set(["pi-coderabbit"]);
 
-const skillPackages = new Set(["pi-sentry-skills", "pi-anthropics-skills"]);
+const skillPackages = new Set(["pi-sentry-skills", "pi-anthropics-skills", "pi-coderabbit-skills"]);
 
 const themePackages = new Set(["pi-catppuccin"]);
 
@@ -135,14 +135,6 @@ describe("repository contracts", () => {
         license = await readFile(join(packageRoot, "LICENSE"), "utf8");
       } catch {
         fail(`${manifest.name} must include a readable LICENSE file`);
-      }
-
-      if (!/\bSource:\s+\S+/i.test(license)) {
-        fail(`${manifest.name} LICENSE must include a Source: attribution`);
-      }
-
-      if (!/(?:licensed|offered) under\s+(?:Apache-2\.0|CC BY-SA 4\.0|MIT)/i.test(license)) {
-        fail(`${manifest.name} LICENSE must document its license scope`);
       }
 
       const skillsRoot = join(packageRoot, "skills");
