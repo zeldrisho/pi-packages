@@ -23,7 +23,7 @@ If unset, the tool reads the first matching `BRAVE_SEARCH_API_KEY=` line from th
 
 ## Usage
 
-`web_search` returns compact Brave results by default. Its model-facing options are `mode` (`web` or `context`), `count`, `freshness`, and `spellcheck`. Context mode uses Brave's LLM Context API and never fetches result URLs; use `web_fetch` to inspect a live page. Queries are limited to 400 characters.
+`web_search` returns compact Brave results by default. Its model-facing options are `mode` (`web` or `context`), `count`, `freshness`, and `spellcheck`. Context mode uses Brave's LLM Context API and never fetches result URLs; use `web_fetch` to inspect a live page. Context queries are limited to 400 characters; web-mode queries are limited to 400 characters.
 
 Identical searches are cached in byte-bounded memory and coalesced while in flight; cancelling one caller does not cancel work needed by another. Large output is written to a private temporary file and removed on write failure or session shutdown. Pi's interactive preview is collapsed by default (`Ctrl+O` expands it), and tool output remains bounded.
 
