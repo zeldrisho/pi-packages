@@ -22,7 +22,13 @@ three tags are pushed in a single push, so batched pushes will not start the
 release workflows.
 
 The tag starts the release workflow. After it completes, verify the CI result,
-GitHub release, npm version, provenance, and tarball contents.
+GitHub release, npm version, provenance, and tarball contents. The workflow is
+safe to retry after partial completion: it verifies an existing GitHub release
+matches the tag, commit, and expected title, then checks the exact package version
+on npm before publishing. Registry lookup errors other than a confirmed `404`
+stop the workflow; an existing version must have matching package/version metadata
+and registry integrity metadata. Published versions are immutable, so investigate
+any mismatch rather than attempting to overwrite or republish them.
 
 The tag name and manifest version must match. Publishing is automatic: the `publish` environment currently has no manual approval, so verify the package and version before pushing the tag. `scripts/release.ts notes <package> <file>` extracts the released changelog section for the release notes.
 

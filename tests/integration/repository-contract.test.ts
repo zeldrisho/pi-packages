@@ -221,17 +221,36 @@ describe("repository contracts", () => {
 
     if (
       !releaseWorkflow.includes(
-        '--title "${{ fromJSON(steps.pkg.outputs.result).shortName }} v${{ fromJSON(steps.pkg.outputs.result).version }}"',
-      )
+        "RELEASE_TITLE: ${{ fromJSON(steps.pkg.outputs.result).shortName }} v${{ fromJSON(steps.pkg.outputs.result).version }}",
+      ) ||
+      !releaseWorkflow.includes("name: process.env.RELEASE_TITLE")
     ) {
       fail("the GitHub release title must use the package short name and version");
     }
 
-    if (!releaseWorkflow.includes('--notes-file "${{ runner.temp }}/notes.md"')) {
+    if (
+      !releaseWorkflow.includes("Create or verify GitHub release") ||
+      !releaseWorkflow.includes("Existing release ${key} mismatch")
+    ) {
+      fail("retries must verify existing releases instead of failing on duplicate release tags");
+    }
+
+    if (
+      !releaseWorkflow.includes("Check published package version") ||
+      !releaseWorkflow.includes('case "$status" in') ||
+      !releaseWorkflow.includes("steps.registry.outputs.exists == 'false'")
+    ) {
+      fail("retries must verify npm state and publish only when the exact version is absent");
+    }
+
+    if (!releaseWorkflow.includes("NOTES_FILE: ${{ runner.temp }}/notes.md")) {
       fail("the release job must use the notes file at ${{ runner.temp }}/notes.md");
     }
 
-    if (!releaseWorkflow.includes('--target "${{ github.sha }}"')) {
+    if (
+      !releaseWorkflow.includes("RELEASE_SHA: ${{ github.sha }}") ||
+      !releaseWorkflow.includes('--target "$RELEASE_SHA"')
+    ) {
       fail("the release job must target ${{ github.sha }}");
     }
 
