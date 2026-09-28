@@ -54,7 +54,7 @@ document.createTextNode(userInput);
 
 - Always quote attribute values
 - Never place user input in event handlers (`onclick`, `onerror`, etc.)
-- Use `setAttribute()` which auto-encodes
+- `setAttribute()` does not automatically prevent XSS; validate URL attributes such as `href` for safe schemes, and never set event-handler attributes from user input
 
 ### JavaScript Context
 

@@ -303,8 +303,9 @@ data = UserData(**json.loads(untrusted_input))
 import hmac
 import hashlib
 import json
+import os
 
-SECRET_KEY = b'your-secret-key'
+SECRET_KEY = os.environ["SERIALIZATION_SECRET_KEY"].encode()
 
 def serialize_with_signature(data):
     json_data = json.dumps(data)

@@ -93,7 +93,7 @@ def decrypt_ssn(encrypted_ssn):
 # VULNERABLE: HTTP endpoint
 app.run(host='0.0.0.0', port=80)
 
-# SAFE: HTTPS required
+# DEVELOPMENT ONLY: Ad-hoc self-signed TLS is not safe for production.
 app.run(host='0.0.0.0', port=443, ssl_context='adhoc')
 
 # BETTER: Proper TLS configuration
@@ -253,8 +253,7 @@ def secure_zero(data):
         for i in range(len(data)):
             data[i] = 0
     elif isinstance(data, bytes):
-        # Can't modify bytes, but can overwrite the reference
-        pass
+        raise TypeError("Immutable bytes cannot be securely zeroed; use bytearray")
 
 # In Java:
 # char[] password = getPassword();

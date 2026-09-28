@@ -21,11 +21,14 @@ def transfer(from_account, to_account, amount):
 # Attack: Two concurrent transfers can overdraft
 
 # SAFE: Atomic operation with locking
+from collections import defaultdict
 from threading import Lock
 
-account_locks = {}
+account_locks = defaultdict(Lock)
 
 def transfer(from_account, to_account, amount):
+    if from_account.id == to_account.id:
+        return True
     # Acquire locks in consistent order to prevent deadlock
     locks = sorted([from_account.id, to_account.id])
     with account_locks[locks[0]], account_locks[locks[1]]:
@@ -44,8 +47,15 @@ from django.db import transaction
 
 @transaction.atomic
 def transfer(from_account_id, to_account_id, amount):
-    from_account = Account.objects.select_for_update().get(id=from_account_id)
-    to_account = Account.objects.select_for_update().get(id=to_account_id)
+    account_ids = sorted([from_account_id, to_account_id])
+    accounts = {
+        account.id: account
+        for account in Account.objects.select_for_update()
+        .filter(id__in=account_ids)
+        .order_by('id')
+    }
+    from_account = accounts[from_account_id]
+    to_account = accounts[to_account_id]
 
     if from_account.balance >= amount:
         from_account.balance -= amount
@@ -202,8 +212,15 @@ def checkout(cart):
         product.stock -= item.quantity  # Reserve immediately
         product.save()
 
-    # If payment fails, transaction rolls back
-    process_payment()
+    # Queue an idempotent payment intent in the same transaction.
+    PaymentOutbox.objects.create(
+        cart_id=cart.id,
+        idempotency_key=cart.payment_id,
+        status='pending',
+    )
+
+    # An outbox worker processes the payment after this transaction commits,
+    # using the idempotency key and reconciling failures.
 ```
 
 ### 6. Time-Based Attacks
@@ -278,19 +295,19 @@ class OrderStateMachine:
 
 ```python
 # SAFE: Idempotent operations with idempotency keys
-import hashlib
-
+# Pseudocode: require a database UNIQUE constraint on key.
 def process_request(request_data, idempotency_key):
-    # Check if request was already processed
-    existing = ProcessedRequest.query.filter_by(key=idempotency_key).first()
-    if existing:
-        return existing.response  # Return cached response
+    # Atomically insert an in-progress record; only one request can claim the key.
+    record, created = ProcessedRequest.insert_if_absent(
+        key=idempotency_key, status="in-progress"
+    )
+    if not created:
+        if record.status == "completed":
+            return record.response
+        return wait_for_completion(record)
 
-    # Process request
     result = do_processing(request_data)
-
-    # Store for future duplicate requests
-    ProcessedRequest.create(key=idempotency_key, response=result)
+    record.mark_completed(response=result)
     return result
 ```
 

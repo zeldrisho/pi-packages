@@ -20,8 +20,8 @@ Write clear, maintainable technical documentation for different audiences and pu
 
 - Endpoint reference with request/response examples
 - Authentication and error codes
-- Rate limits and pagination
-- SDK examples
+- Rate limits and pagination, when supported by the API
+- SDK examples, when available and verified
 
 ### Runbook
 

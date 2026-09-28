@@ -148,8 +148,12 @@ logger.info(f"API request with key: {mask_token(api_key)}")
 def redact_pii(data):
     sensitive_fields = {'password', 'ssn', 'credit_card', 'api_key', 'token'}
     if isinstance(data, dict):
-        return {k: '[REDACTED]' if k in sensitive_fields else v
-                for k, v in data.items()}
+        return {
+            key: '[REDACTED]' if key in sensitive_fields else redact_pii(value)
+            for key, value in data.items()
+        }
+    if isinstance(data, list):
+        return [redact_pii(value) for value in data]
     return data
 
 logger.debug(f"Request data: {redact_pii(request.json)}")
@@ -259,14 +263,14 @@ handler = RotatingFileHandler(
 # Set restrictive permissions
 os.chmod(log_file, 0o600)  # Owner only
 
-# SAFE: Centralized logging with encryption
+# Centralized logging over TCP (TCP alone does not encrypt data)
 import logging.handlers
 
 syslog_handler = logging.handlers.SysLogHandler(
     address=('secure-syslog.company.com', 514),
     socktype=socket.SOCK_STREAM  # TCP for reliability
 )
-# Use TLS for syslog transport
+# Configure a TLS-capable syslog transport or TLS proxy when encryption is required.
 ```
 
 ---
@@ -337,6 +341,9 @@ def delete_audit_log(log_id):
     AuditLog.query.filter_by(id=log_id).delete()  # Can be deleted
 
 # SAFE: Append-only audit logs
+import hashlib
+import json
+
 class AuditLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     timestamp = db.Column(db.DateTime, nullable=False)
@@ -357,10 +364,19 @@ class AuditLog(db.Model):
             user_id=user_id,
             details=details
         )
-        # Chain checksum
-        entry.checksum = hashlib.sha256(
-            f"{prev_checksum}{entry.timestamp}{entry.event_type}".encode()
-        ).hexdigest()
+        # Chain checksum over canonical serialized event fields
+        payload = json.dumps(
+            {
+                "previous_checksum": prev_checksum,
+                "timestamp": entry.timestamp.isoformat(),
+                "event_type": entry.event_type,
+                "user_id": entry.user_id,
+                "details": entry.details,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        entry.checksum = hashlib.sha256(payload.encode()).hexdigest()
         db.session.add(entry)
         db.session.commit()
         return entry

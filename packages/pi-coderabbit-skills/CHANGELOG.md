@@ -13,5 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - CodeRabbit `autofix` and `code-review` skills adapted for explicit invocation in Pi.
 
+### Changed
+
+- Hardened autofix review-thread error handling and clarified manual invocation and authentication guidance for CodeRabbit reviews.
+
 [Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-coderabbit-skills-v0.1.0...HEAD
 [0.1.0]: https://github.com/zeldrisho/pi-packages/releases/tag/pi-coderabbit-skills-v0.1.0

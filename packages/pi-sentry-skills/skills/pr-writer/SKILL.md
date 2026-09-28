@@ -114,14 +114,14 @@ notice. Omit it when prose is clearer.
 Create new PRs as drafts. Write the body to a temporary Markdown file, then run:
 
 ```bash
-gh pr create --draft --title '<title>' --body-file /tmp/pr-body.md
+gh pr create --draft --title "$title" --body-file /tmp/pr-body.md
 ```
 
 Update existing PRs with `gh api`:
 
 ```bash
 gh api -X PATCH repos/{owner}/{repo}/pulls/PR_NUMBER \
-  -f title='<title>' \
+  -f "title=$title" \
   -F body=@/tmp/pr-body.md
 ```
 

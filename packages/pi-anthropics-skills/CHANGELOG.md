@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Restored pinned upstream skill content, removed bundled auxiliary files, and corrected package license metadata.
+- Clarified documentation API guidance and required evidence for technical-debt findings; removed unrelated text appended to the license.
 
 ## [0.1.1] - 2026-09-23
 

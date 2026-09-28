@@ -72,7 +72,7 @@ def fetch_url(url):
     if parsed.hostname not in ALLOWED_DOMAINS:
         raise ValueError("Domain not allowed")
 
-    return requests.get(url).content
+    return requests.get(url, allow_redirects=False, timeout=(5, 30)).content
 ```
 
 ### 2. Block Internal Networks (Denylist)
@@ -102,6 +102,8 @@ BLOCKED_RANGES = [
 def is_internal_ip(ip_str):
     try:
         ip = ipaddress.ip_address(ip_str)
+        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+            ip = ip.ipv4_mapped
         return any(ip in network for network in BLOCKED_RANGES)
     except ValueError:
         return True  # Invalid IP, block it
@@ -132,7 +134,7 @@ def validate_url(url):
         except socket.gaierror:
             raise ValueError("Could not resolve hostname")
 
-    return True
+    return str(ip)  # Return the address validated above
 ```
 
 ### 3. Disable Redirects
@@ -249,11 +251,13 @@ import requests
 
 class SafeRequests:
     @staticmethod
-    def get(url, **kwargs):
-        validate_url(url)
+    def get(url, pinned_transport, **kwargs):
+        validated_ip = validate_url(url)
         kwargs['allow_redirects'] = False
         kwargs['timeout'] = (5, 30)  # Connect and read timeout
-        return requests.get(url, **kwargs)
+        # Custom transport connects to validated_ip while preserving the URL
+        # hostname for the Host header and TLS certificate verification.
+        return pinned_transport.get(url, resolved_ip=validated_ip, **kwargs)
 ```
 
 ### Node.js
@@ -275,7 +279,11 @@ async function safeFetch(targetUrl) {
     throw new Error("Internal IP not allowed");
   }
 
+  // Custom Undici dispatcher uses only the validated addresses for connection
+  // while preserving the URL hostname for TLS verification.
+  const dispatcher = createPinnedDispatcher(parsed.hostname, [addresses]);
   return fetch(targetUrl, {
+    dispatcher,
     redirect: "error",
     signal: AbortSignal.timeout(30000),
   });
@@ -300,7 +308,9 @@ public class SafeURLConnection {
             throw new SecurityException("Internal IP not allowed");
         }
 
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        // Custom transport connects to `address` while retaining the URL host
+        // for Host and TLS hostname verification; URLConnection alone re-resolves.
+        HttpURLConnection connection = PinnedHttpTransport.open(url, address);
         connection.setInstanceFollowRedirects(false);
         connection.setConnectTimeout(5000);
         connection.setReadTimeout(30000);

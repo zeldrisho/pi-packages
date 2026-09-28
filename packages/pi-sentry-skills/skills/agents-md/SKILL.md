@@ -23,7 +23,7 @@ Goal: concise, actionable agent instructions. Target under 60 lines; never excee
 
 ## File Setup
 
-- Create `AGENTS.md` at the repository root.
+- Create `AGENTS.md` at the repository root for repo-wide guidance, or at the appropriate subtree root for subtree-specific guidance.
 
 ## Default Sections
 

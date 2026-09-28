@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: "Run CodeRabbit CLI reviews, retrieve saved local or GitHub PR fix prompts, and interpret CodeRabbit authentication and review output. Use for CodeRabbit review commands, committed/uncommitted or directory scopes, and CodeRabbit runbooks. Default code-review skill: also trigger for explicit code/PR/quality/security review requests or when a review is needed."
+description: "Run CodeRabbit CLI reviews, retrieve saved local or GitHub PR fix prompts, and interpret CodeRabbit authentication and review output. Use for CodeRabbit review commands, committed/uncommitted or directory scopes, and CodeRabbit runbooks."
 disable-model-invocation: true
 ---
 
@@ -60,7 +60,7 @@ Use `--agent` for output optimized for AI agents:
 coderabbit review --agent
 ```
 
-Run the review directly; the CLI starts browser authentication when needed, including a local callback flow in agent mode. Honor explicit no-login restrictions. If the execution environment hides host credentials or cannot open the callback, use the supported host execution path or hand off `coderabbit auth login`; do not read credential files or request pasted tokens. A sandbox authentication failure alone does not prove the user is logged out on the host.
+Before running the review, ensure that the CLI is authenticated. If authentication is missing, use the supported host execution path or hand off `coderabbit auth login --agent`; do not read credential files or request pasted tokens. A sandbox authentication failure alone does not prove the user is logged out on the host.
 
 If the user asks to review a specific directory, append `--dir <path>`. The directory must be inside an initialized Git working tree.
 

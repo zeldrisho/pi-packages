@@ -30,4 +30,4 @@ Priority = (Impact + Risk) x (6 - Effort)
 
 ## Output
 
-Produce a prioritized list with estimated effort, business justification for each item, and a phased remediation plan that can be done alongside feature work.
+Produce a prioritized list with evidence and source locations, observed consequences, estimated effort, business justification for each item, and a phased remediation plan that can be done alongside feature work.

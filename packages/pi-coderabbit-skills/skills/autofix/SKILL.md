@@ -97,7 +97,7 @@ while :; do
     args+=(-F cursor="$cursor")
   fi
 
-  response=$(gh api graphql "${args[@]}" -f query='query($owner:String!, $repo:String!, $pr:Int!, $cursor:String) {
+  if ! response=$(gh api graphql "${args[@]}" -f query='query($owner:String!, $repo:String!, $pr:Int!, $cursor:String) {
     repository(owner:$owner, name:$repo) {
       pullRequest(number:$pr) {
         title
@@ -124,7 +124,15 @@ while :; do
         }
       }
     }
-  }')
+  }'); then
+    echo "GitHub GraphQL request failed" >&2
+    exit 1
+  fi
+
+  if ! jq -e '(.errors == null or (.errors | length == 0)) and (.data.repository.pullRequest.reviewThreads.nodes | type == "array")' <<<"$response" >/dev/null; then
+    echo "GitHub GraphQL response contained errors or no review-thread data" >&2
+    exit 1
+  fi
 
   all_threads=$(jq -c --argjson response "$response" '
     . + $response.data.repository.pullRequest.reviewThreads.nodes

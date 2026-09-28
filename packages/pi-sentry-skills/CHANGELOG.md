@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Restored pinned upstream skill content and supporting guides, removed bundled auxiliary files, and corrected package license metadata.
 - Updated agents-md guidance and removed security-review skill metadata.
+- Improved PR-writing safety, AGENTS.md scope guidance, and security-review examples and reference routing.
 
 ## [0.1.2] - 2026-09-24
 

@@ -10,7 +10,7 @@ https://cheatsheetseries.owasp.org/
 
 # Security Review Skill
 
-Identify exploitable security vulnerabilities in code. Report only **HIGH CONFIDENCE** findings—clear vulnerable patterns with attacker-controlled input.
+Identify exploitable security vulnerabilities in code. Report only **HIGH CONFIDENCE** findings. For input-driven vulnerabilities, confirm attacker-controlled input; always report confirmed secrets, even when hardcoded or server-controlled.
 
 ## Scope: Research vs. Reporting
 
@@ -42,7 +42,7 @@ Before flagging any issue, you MUST research the codebase to understand:
 
 - Test files (unless explicitly reviewing test security)
 - Dead code, commented code, documentation strings
-- Patterns using **constants** or **server-controlled configuration**
+- Patterns using **constants** or **server-controlled configuration** for input-driven vulnerabilities (this does not exclude confirmed secrets, which are always reportable)
 - Code paths that require prior authentication to reach (note the auth requirement instead)
 
 ### Server-Controlled Values (NOT Attacker-Controlled)
@@ -105,6 +105,7 @@ What type of code am I reviewing?
 | Crypto, secrets, tokens | `cryptography.md`, `data-protection.md`                 |
 | Data serialization      | `deserialization.md`                                    |
 | External requests       | `ssrf.md`                                               |
+| LLM, WebSocket code     | `modern-threats.md`                                     |
 | Business workflows      | `business-logic.md`                                     |
 | GraphQL, REST design    | `api-security.md`                                       |
 | Config, headers, CORS   | `misconfiguration.md`                                   |

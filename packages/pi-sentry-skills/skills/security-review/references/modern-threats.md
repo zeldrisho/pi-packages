@@ -145,13 +145,11 @@ function sanitizeHTML(html) {
 const ws = new WebSocket("wss://api.example.com/ws");
 ws.onopen = () => ws.send(JSON.stringify({ action: "getData" }));
 
-// SAFE: Token-based authentication
-const token = getAuthToken();
-const ws = new WebSocket(`wss://api.example.com/ws?token=${token}`);
-
-// Or via first message
+// SAFE: Send the token in the first message instead of the URL,
+// which may be captured in logs.
+const ws = new WebSocket("wss://api.example.com/ws");
 ws.onopen = () => {
-  ws.send(JSON.stringify({ type: "auth", token: token }));
+  ws.send(JSON.stringify({ type: "auth", token: getAuthToken() }));
 };
 ```
 
@@ -212,17 +210,25 @@ async def handle_message(websocket, message):
 ### Rate Limiting
 
 ```python
-from collections import defaultdict
+from collections import OrderedDict
 import time
 
 class WebSocketRateLimiter:
-    def __init__(self, max_messages=100, window=60):
+    def __init__(self, max_messages=100, window=60, max_clients=10_000):
         self.max_messages = max_messages
         self.window = window
-        self.message_counts = defaultdict(list)
+        self.max_clients = max_clients
+        self.message_counts = OrderedDict()
 
     def is_allowed(self, client_id):
         now = time.time()
+        if client_id not in self.message_counts:
+            if len(self.message_counts) >= self.max_clients:
+                self.message_counts.popitem(last=False)
+            self.message_counts[client_id] = []
+        else:
+            self.message_counts.move_to_end(client_id)
+
         # Remove old entries
         self.message_counts[client_id] = [
             t for t in self.message_counts[client_id]
@@ -254,10 +260,12 @@ def summarize_document(document_content):
 
 ### Prevention Techniques
 
+Structured prompts and heuristic filters cannot block all paraphrased or encoded instructions. Enforce tool authorization, data-access restrictions, and output validation as independent controls.
+
 **1. Input/Output Separation**
 
 ```python
-# SAFE: Structured prompt with clear boundaries
+# Defense in depth: structured prompts and heuristic filtering are not complete security controls.
 def summarize_document(document_content):
     prompt = """You are a document summarizer.
 
@@ -272,9 +280,9 @@ DOCUMENT END
 
 Provide a brief summary of the above document."""
 
-    # Escape potential injection patterns
-    safe_content = escape_prompt_injection(document_content)
-    return llm.complete(prompt.format(document=safe_content))
+    # Heuristic filtering only; this is not a security boundary.
+    filtered_content = escape_prompt_injection(document_content)
+    return llm.complete(prompt.format(document=filtered_content))
 ```
 
 **2. Input Sanitization**
@@ -283,8 +291,8 @@ Provide a brief summary of the above document."""
 import re
 
 def escape_prompt_injection(text):
-    """Remove or escape potential injection patterns."""
-    # Remove common injection patterns
+    """Apply heuristic filtering; this is not prompt-injection protection."""
+    # Replace a limited set of known patterns; this is not comprehensive.
     patterns = [
         r'ignore\s+(all\s+)?(previous|prior)\s+(instructions?|prompts?)',
         r'disregard\s+(all\s+)?(previous|prior)',

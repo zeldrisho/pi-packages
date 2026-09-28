@@ -146,7 +146,7 @@ fetch("/api/transfer", {
 def verify_csrf_header():
     if request.method in ('POST', 'PUT', 'DELETE', 'PATCH'):
         token = request.headers.get('X-CSRF-Token')
-        if not validate_csrf_token(token):
+        if not validate_csrf_token(token, session.id):
             return jsonify({'error': 'CSRF validation failed'}), 403
 ```
 
@@ -244,9 +244,8 @@ def verify_origin():
             return False
         return True
 
-    # No origin info - could be same-origin or direct request
-    # Decision depends on security requirements
-    return True  # Or False for strict validation
+    # Fail closed when neither Origin nor Referer is present.
+    return False
 
 def is_trusted_origin(origin):
     TRUSTED = {'https://example.com', 'https://admin.example.com'}
