@@ -307,6 +307,7 @@ function dictionaryValueTypes(
 	return dictionaryValueTypes(alias.typeAnnotation, environment, nextSubstitutions, nextResolving);
 }
 
+/** Classify a direct dictionary value after resolving aliases; return null when no unsafe value is found. */
 export function classifyUnsafeDictionaryValue(
 	valueType: ESTree.TSType,
 	environment: TypeEnvironment,
@@ -315,6 +316,7 @@ export function classifyUnsafeDictionaryValue(
 	return unsafeValue === null ? null : { kind: "unsafe-dictionary", unsafeValue };
 }
 
+/** Return the first unsafe dictionary value classification represented by a type, or null. */
 export function classifyUnsafeDictionary(
 	type: ESTree.TSType,
 	environment: TypeEnvironment,
@@ -331,6 +333,7 @@ export function classifyUnsafeDictionary(
 	return null;
 }
 
+/** Classify broad or anonymous annotation targets, resolving supported wrappers and visible aliases. */
 export function classifyWideningTarget(
 	type: ESTree.TSType,
 	environment: TypeEnvironment,
@@ -384,6 +387,7 @@ export function classifyWideningTarget(
 	return resolved;
 }
 
+/** Treat a missing Record key or one resolving to an unrestricted key type as broad. */
 function hasBroadRecordKey(
 	type: ESTree.TSTypeReference,
 	environment: TypeEnvironment,
@@ -393,6 +397,7 @@ function hasBroadRecordKey(
 	return key === undefined || isBroadMappedKey(key, environment, substitutions);
 }
 
+/** Resolve substitutions and nongeneric aliases to detect unrestricted keys, guarding against alias cycles. */
 function isBroadMappedKey(
 	type: ESTree.TSType,
 	environment: TypeEnvironment,
@@ -433,6 +438,7 @@ function isBroadMappedKey(
 	return isBroadMappedKey(alias.typeAnnotation, environment, substitutions, nextVisited);
 }
 
+/** Resolve alias substitutions and wrappers to classify broad targets while preserving named object contracts. */
 function classifyAliasBroadTarget(
 	type: ESTree.TSType,
 	environment: TypeEnvironment,
@@ -491,6 +497,7 @@ function classifyAliasBroadTarget(
 	);
 }
 
+/** Recognize nonempty object literals through parentheses, assertions, and non-null wrappers. */
 export function isPopulatedObjectExpression(expression: ESTree.Expression): boolean {
 	let current = expression;
 	while (
@@ -504,6 +511,7 @@ export function isPopulatedObjectExpression(expression: ESTree.Expression): bool
 	return current.type === "ObjectExpression" && current.properties.length > 0;
 }
 
+/** Recognize value-producing syntax used as type evidence after removing transparent expression wrappers. */
 export function isKnownEvidenceExpression(expression: ESTree.Expression): boolean {
 	let current = expression;
 	while (

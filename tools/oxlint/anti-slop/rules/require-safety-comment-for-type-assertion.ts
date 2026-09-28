@@ -14,6 +14,7 @@ const commentOwnerKinds = new Set([
   "VariableDeclaration",
 ]);
 
+/** Recognize const assertions, which do not require a safety justification. */
 function isConstAssertion(node: TypeAssertion): boolean {
   return (
     node.typeAnnotation.type === "TSTypeReference" &&
@@ -22,6 +23,7 @@ function isConstAssertion(node: TypeAssertion): boolean {
   );
 }
 
+/** Read nonempty, trimmed marker names from options, falling back to SAFETY. */
 function configuredSafetyMarkers(option: unknown): readonly string[] {
   if (typeof option !== "object" || option === null || !("markers" in option)) {
     return DEFAULT_SAFETY_MARKERS;
@@ -34,6 +36,7 @@ function configuredSafetyMarkers(option: unknown): readonly string[] {
   return markers.length > 0 ? markers : DEFAULT_SAFETY_MARKERS;
 }
 
+/** Build a literal marker matcher requiring a colon and a nonempty justification. */
 function markerPattern(markers: readonly string[]): RegExp {
   const alternation = markers
     .map((marker) => marker.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`))
@@ -44,6 +47,7 @@ function markerPattern(markers: readonly string[]): RegExp {
   );
 }
 
+/** Check comments attached before an owner for a justification preceding the assertion. */
 function hasSafetyJustificationBefore(
   sourceCode: SourceCode,
   owner: ESTree.Node,
@@ -57,6 +61,7 @@ function hasSafetyJustificationBefore(
     );
 }
 
+/** Search the assertion and its owners for a justification, stopping at its statement or field boundary. */
 function hasSafetyComment(
   sourceCode: SourceCode,
   node: TypeAssertion,
