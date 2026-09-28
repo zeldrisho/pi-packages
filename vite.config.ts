@@ -12,7 +12,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: [["text", { skipFull: false }]],
-      include: ["packages/*/src/**/*.ts"],
+      include: ["**/src/**/*.ts"],
       thresholds: {
         perFile: true,
         lines: 80,

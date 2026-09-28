@@ -1,6 +1,8 @@
 import { defineRule } from "vite-plus/lint/plugins";
 
-import type { ESTree } from "vite-plus/lint/plugins";
+import type { ESTree, SourceCode } from "vite-plus/lint/plugins";
+
+import { resolveVariable } from "../shared/scope.ts";
 
 type RuntimeFunction = ESTree.ArrowFunctionExpression | ESTree.Function;
 
@@ -24,7 +26,17 @@ function isInsideTypeGuard(node: ESTree.Node): boolean {
 }
 
 /** Return whether typeof safely probes for the existence of a possibly absent binding. */
-function isExistenceProbe(node: ESTree.UnaryExpression): boolean {
+function isExistenceProbe(
+	sourceCode: SourceCode,
+	node: ESTree.UnaryExpression,
+): boolean {
+	if (node.argument.type !== "Identifier") return false;
+	if (
+		!sourceCode.isGlobalReference(node.argument) &&
+		resolveVariable(sourceCode, node.argument) !== null
+	) {
+		return false;
+	}
 	const parent = node.parent;
 	if (parent.type !== "BinaryExpression") return false;
 	if (!["===", "!==", "==", "!="].includes(parent.operator)) return false;
@@ -66,7 +78,7 @@ export const noRuntimeTypeofRule = defineRule({
 					option.allowInTypeGuards === true;
 				if (
 					node.operator === "typeof" &&
-					!isExistenceProbe(node) &&
+					!isExistenceProbe(context.sourceCode, node) &&
 					(!allowInTypeGuards || !isInsideTypeGuard(node))
 				) {
 					context.report({ node, messageId: "runtimeTypeof" });

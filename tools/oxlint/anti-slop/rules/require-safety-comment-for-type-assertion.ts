@@ -14,6 +14,14 @@ const commentOwnerKinds = new Set([
   "VariableDeclaration",
 ]);
 
+const statementListKinds = new Set([
+  "BlockStatement",
+  "Program",
+  "StaticBlock",
+  "SwitchCase",
+  "TSModuleBlock",
+]);
+
 /** Recognize const assertions, which do not require a safety justification. */
 function isConstAssertion(node: TypeAssertion): boolean {
   return (
@@ -70,7 +78,10 @@ function hasSafetyComment(
   let current: ESTree.Node = node;
   while (true) {
     if (hasSafetyJustificationBefore(sourceCode, current, node, pattern)) return true;
-    if (commentOwnerKinds.has(current.type)) {
+    if (
+      commentOwnerKinds.has(current.type) ||
+      statementListKinds.has(current.parent.type)
+    ) {
       const exportDeclaration = current.parent;
       return (
         exportDeclaration.type === "ExportNamedDeclaration" &&

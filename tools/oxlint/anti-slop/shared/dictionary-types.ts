@@ -178,9 +178,13 @@ function aliasSubstitution(
 	const arguments_ = type.typeArguments?.params ?? [];
 	const next = new Map(base);
 	for (const [index, parameter] of parameters.entries()) {
-		const argument = arguments_[index] ?? parameter.default;
+		const explicitArgument = arguments_[index];
+		const argument = explicitArgument ?? parameter.default;
 		if (argument === null || argument === undefined) return null;
-		next.set(parameter.name.name, resolvedSubstitutionArgument(argument, next));
+		next.set(
+			parameter.name.name,
+			resolvedSubstitutionArgument(argument, explicitArgument === undefined ? next : base),
+		);
 	}
 	return next;
 }
