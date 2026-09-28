@@ -129,6 +129,22 @@ describe("repository contracts", () => {
         fail(`${manifest.name} must declare its SPDX license expression`);
       }
 
+      let license: string;
+
+      try {
+        license = await readFile(join(packageRoot, "LICENSE"), "utf8");
+      } catch {
+        fail(`${manifest.name} must include a readable LICENSE file`);
+      }
+
+      if (!/\bSource:\s+\S+/i.test(license)) {
+        fail(`${manifest.name} LICENSE must include a Source: attribution`);
+      }
+
+      if (!/(?:licensed|offered) under\s+(?:Apache-2\.0|CC BY-SA 4\.0|MIT)/i.test(license)) {
+        fail(`${manifest.name} LICENSE must document its license scope`);
+      }
+
       const skillsRoot = join(packageRoot, "skills");
       const pending = [skillsRoot];
 
