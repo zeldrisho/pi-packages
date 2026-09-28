@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Preserve short and sparsely extracted pages instead of replacing them with a site's `/llms.txt` index; index fallback is reserved for explicit JavaScript, bot-wall, or consent-interstitial signals
+- Preserve malformed URL fragments as raw text so fragment lookup can report them instead of silently discarding them
 
 ## [0.9.2] - 2026-09-23
 

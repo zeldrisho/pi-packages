@@ -43,7 +43,15 @@ export function resolveFragmentOffset(
   try {
     const hash = new URL(rawUrl).hash;
 
-    if (hash) fragment = decodeURIComponent(hash.slice(1));
+    if (hash) {
+      const rawFragment = hash.slice(1);
+
+      try {
+        fragment = decodeURIComponent(rawFragment);
+      } catch {
+        fragment = rawFragment;
+      }
+    }
   } catch {
     return {};
   }

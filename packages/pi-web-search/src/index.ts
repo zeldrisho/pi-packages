@@ -3,10 +3,12 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
+  SEARCH_CONTEXT_MAX_RESULT_COUNT,
   SEARCH_DEFAULT_RESULT_COUNT,
   SEARCH_MAX_RESULT_COUNT,
   SEARCH_MIN_RESULT_COUNT,
   SEARCH_WEB_MAX_QUERY_CHARACTERS,
+  SEARCH_WEB_MAX_RESULT_COUNT,
 } from "./limits";
 import { formatCollapsibleOutput } from "./render";
 import { SearchRuntime } from "./search";
@@ -42,7 +44,7 @@ export const webSearchParameters = Type.Object({
     Type.Integer({
       minimum: SEARCH_MIN_RESULT_COUNT,
       maximum: SEARCH_MAX_RESULT_COUNT,
-      description: `Maximum results (default: ${SEARCH_DEFAULT_RESULT_COUNT})`,
+      description: `Maximum results (default: ${SEARCH_DEFAULT_RESULT_COUNT}; web max ${SEARCH_WEB_MAX_RESULT_COUNT}, context max ${SEARCH_CONTEXT_MAX_RESULT_COUNT})`,
     }),
   ),
   freshness: Type.Optional(

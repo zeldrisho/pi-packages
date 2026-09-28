@@ -163,7 +163,7 @@ export interface SearchDetails {
 }
 
 function escapeMarkdownLinkText(value: string): string {
-  return value.replace(/([\\[\\]])/g, "\\$1");
+  return value.replace(/([\\[\]])/g, "\\$1");
 }
 
 /** Formats bounded provider results as untrusted Markdown for the tool response. */

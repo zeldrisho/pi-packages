@@ -24,7 +24,7 @@ function isBorrowedMemberName(node: ESTree.Node): boolean {
   if (parent.type !== "ExportSpecifier") return false;
   const declaration = parent.parent;
   return (
-    (parent.local === node || parent.exported === node) &&
+    parent.local === node &&
     declaration.type === "ExportNamedDeclaration" &&
     declaration.source !== null &&
     declaration.source !== undefined
