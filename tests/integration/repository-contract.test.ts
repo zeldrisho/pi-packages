@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { describe, it } from "vite-plus/test";
@@ -7,7 +8,10 @@ const root = resolve(import.meta.dirname, "../..");
 const packagesDirectory = join(root, "packages");
 
 const packageDirectories = (await readdir(packagesDirectory, { withFileTypes: true }))
-  .filter((entry) => entry.isDirectory())
+  .filter(
+    (entry) =>
+      entry.isDirectory() && existsSync(join(packagesDirectory, entry.name, "package.json")),
+  )
   .map((entry) => entry.name)
   .sort();
 
@@ -23,9 +27,9 @@ const expectedFiles = ["src", "CHANGELOG.md"];
 
 const packageSpecificFiles = new Map([["pi-gate", ["config.schema.json"]]]);
 
-const promptPackages = new Set<string>();
+const promptPackages = new Set(["pi-coderabbit"]);
 
-const skillPackages = new Set(["pi-coderabbit-skills", "pi-sentry-skills", "pi-anthropics-skills"]);
+const skillPackages = new Set(["pi-sentry-skills", "pi-anthropics-skills"]);
 
 const themePackages = new Set(["pi-catppuccin"]);
 
@@ -152,7 +156,6 @@ describe("repository contracts", () => {
           const name = frontmatter.match(/^name:\s*(.*?)\s*$/m)?.[1];
 
           const description = frontmatter.match(/^description:\s*(.*?)\s*$/m)?.[1];
-          const disabled = frontmatter.match(/^disable-model-invocation:\s*(.*?)\s*$/m)?.[1];
           const metadata = frontmatter.match(/^metadata:\s*\n((?: {2}.+\n?)*)/m)?.[1];
           const directoryName = path.split(/[\\/]/).at(-2);
 
@@ -167,10 +170,6 @@ describe("repository contracts", () => {
 
           if (!description || description.length > 1024) {
             fail(`${path} must have a nonempty description of at most 1024 characters`);
-          }
-
-          if (packageName === "pi-coderabbit-skills" && disabled !== "true") {
-            fail(`${path} must disable model invocation`);
           }
 
           if (metadata && /^ {2}[A-Za-z0-9_-]+:\s*(?:\n|$)/m.test(metadata)) {
@@ -438,7 +437,7 @@ describe("repository contracts", () => {
       const packageFiles = isPromptPackage
         ? ["prompts", "CHANGELOG.md"]
         : isSkillPackage
-          ? ["skills", "CHANGELOG.md", ...(directory === "pi-coderabbit-skills" ? ["LICENSE"] : [])]
+          ? ["skills", "CHANGELOG.md"]
           : isThemePackage
             ? ["themes", "CHANGELOG.md"]
             : [...expectedFiles, ...(packageSpecificFiles.get(directory) ?? [])];
