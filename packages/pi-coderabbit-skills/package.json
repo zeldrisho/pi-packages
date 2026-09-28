@@ -1,6 +1,6 @@
 {
   "name": "@zeldrisho/pi-coderabbit-skills",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "CodeRabbit skills packaged for Pi",
   "keywords": [
     "code-review",
