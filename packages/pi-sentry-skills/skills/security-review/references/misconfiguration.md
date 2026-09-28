@@ -331,7 +331,7 @@ response.set_cookie('session', value, secure=False, httponly=False, samesite='No
 ### Secure Cookie Configuration
 
 ```python
-# SAFE: Secure cookie settings
+# SAFE: Secure cookie settings; set `domain` only if all subdomains are trusted.
 response.set_cookie(
     'session',
     value,

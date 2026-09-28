@@ -319,11 +319,11 @@ def safe_extract(zip_path, extract_dir):
 
     with zipfile.ZipFile(zip_path, 'r') as zf:
         for member in zf.namelist():
-            # Get absolute path of extracted file
+            # Resolve symlinks before validating the extraction target
             member_path = os.path.realpath(os.path.join(extract_dir, member))
 
-            # Verify it's under extract directory
-            if os.path.commonpath((extract_dir, member_path)) != extract_dir:
+            # Verify it's under extract directory using path components
+            if os.path.commonpath([extract_dir, member_path]) != extract_dir:
                 raise ValueError(f"Path traversal in ZIP: {member}")
 
             # Check for symlinks (additional safety)

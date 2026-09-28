@@ -226,12 +226,7 @@ template.render(name=user_input)
 String query = "//users/user[name='" + userName + "']";
 
 // SAFE: Use parameterized XPath
-xpath.setXPathVariableResolver(name -> {
-    if ("name".equals(name.getLocalPart())) {
-        return userName;
-    }
-    throw new IllegalArgumentException("Unknown XPath variable");
-});
+xpath.setXPathVariableResolver(name -> userName);
 XPathExpression expr = xpath.compile("//users/user[name=$name]");
 ```
 

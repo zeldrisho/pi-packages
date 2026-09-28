@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-28
+
+### Changed
+
+- Restored pinned upstream skill content, removed bundled auxiliary files, and corrected package license metadata.
+- Clarified documentation API guidance and required evidence for technical-debt findings; removed unrelated text appended to the license.
+
 ## [0.1.1] - 2026-09-23
 
 ### Changed
@@ -20,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `documentation`, `testing-strategy`, and `tech-debt` Pi skills from Anthropic's knowledge-work plugins
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-anthropics-skills-v0.1.1...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-anthropics-skills-v0.1.2...HEAD
+[0.1.2]: https://github.com/zeldrisho/pi-packages/compare/pi-anthropics-skills-v0.1.1...pi-anthropics-skills-v0.1.2
 [0.1.1]: https://github.com/zeldrisho/pi-packages/compare/pi-anthropics-skills-v0.1.0...pi-anthropics-skills-v0.1.1
 [0.1.0]: https://github.com/zeldrisho/pi-packages/releases/tag/pi-anthropics-skills-v0.1.0

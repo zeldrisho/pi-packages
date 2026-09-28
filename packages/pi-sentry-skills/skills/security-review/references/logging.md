@@ -148,10 +148,12 @@ logger.info(f"API request with key: {mask_token(api_key)}")
 def redact_pii(data):
     sensitive_fields = {'password', 'ssn', 'credit_card', 'api_key', 'token'}
     if isinstance(data, dict):
-        return {k: '[REDACTED]' if k in sensitive_fields else redact_pii(v)
-                for k, v in data.items()}
+        return {
+            key: '[REDACTED]' if key in sensitive_fields else redact_pii(value)
+            for key, value in data.items()
+        }
     if isinstance(data, list):
-        return [redact_pii(item) for item in data]
+        return [redact_pii(value) for value in data]
     return data
 
 logger.debug(f"Request data: {redact_pii(request.json)}")
@@ -261,15 +263,14 @@ handler = RotatingFileHandler(
 # Set restrictive permissions
 os.chmod(log_file, 0o600)  # Owner only
 
-# Centralized logging over reliable TCP; terminate TLS with a
-# TLS-capable handler or a configured TLS proxy.
+# Centralized logging over TCP (TCP alone does not encrypt data)
 import logging.handlers
 
 syslog_handler = logging.handlers.SysLogHandler(
     address=('secure-syslog.company.com', 514),
-    socktype=socket.SOCK_STREAM  # TCP reliability; not encryption
+    socktype=socket.SOCK_STREAM  # TCP for reliability
 )
-# Ensure the configured transport or proxy provides TLS.
+# Configure a TLS-capable syslog transport or TLS proxy when encryption is required.
 ```
 
 ---
@@ -340,6 +341,9 @@ def delete_audit_log(log_id):
     AuditLog.query.filter_by(id=log_id).delete()  # Can be deleted
 
 # SAFE: Append-only audit logs
+import hashlib
+import json
+
 class AuditLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     timestamp = db.Column(db.DateTime, nullable=False)
@@ -360,8 +364,8 @@ class AuditLog(db.Model):
             user_id=user_id,
             details=details
         )
-        # Chain checksum over every security-relevant field.
-        canonical = json.dumps(
+        # Chain checksum over canonical serialized event fields
+        payload = json.dumps(
             {
                 "previous_checksum": prev_checksum,
                 "timestamp": entry.timestamp.isoformat(),
@@ -371,11 +375,8 @@ class AuditLog(db.Model):
             },
             sort_keys=True,
             separators=(",", ":"),
-            default=str,
         )
-        entry.checksum = hashlib.sha256(
-            canonical.encode()
-        ).hexdigest()
+        entry.checksum = hashlib.sha256(payload.encode()).hexdigest()
         db.session.add(entry)
         db.session.commit()
         return entry

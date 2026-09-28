@@ -54,9 +54,7 @@ document.createTextNode(userInput);
 
 - Always quote attribute values
 - Never place user input in event handlers (`onclick`, `onerror`, etc.)
-- Use `setAttribute()` only for inert attributes such as `class`, `id`, and
-  `aria-*`; validate `href` and `src` URLs separately, and reject event-handler
-  attributes such as `onclick` and `onerror`.
+- `setAttribute()` does not automatically prevent XSS; validate URL attributes such as `href` for safe schemes, and never set event-handler attributes from user input
 
 ### JavaScript Context
 

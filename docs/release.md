@@ -34,7 +34,15 @@ Each package owns its `CHANGELOG.md`. Use [Keep a Changelog 2.0.0](https://keepa
 
 If a tagged release fails, first check `npm view <package>@<version>`. Published versions are permanent: reconcile the existing GitHub release and provenance instead of republishing. If npm does not contain the version, delete the partial GitHub release and remote tag, correct the commit, and recreate the tag.
 
-Trusted publishing cannot publish a package's first registry version ([npm limitation](https://github.com/npm/cli/issues/8544)). Before merging a new package, publish an inspected one-off `0.0.0` with `--tag bootstrap` (do not commit that version), configure the npm trusted publisher for `zeldrisho/pi-packages`, workflow `release.yml`, environment `publish`, then use the normal process. Stop if the package name, version, access, tarball, or publisher settings are unexpected.
+Trusted publishing cannot publish a package's first registry version ([npm limitation](https://github.com/npm/cli/issues/8544)). Before merging a new package, publish an inspected one-off `0.0.0` with `--tag bootstrap` (do not commit that version), configure the npm trusted publisher for `zeldrisho/pi-packages`, workflow `release.yml`, environment `publish`, then use the normal process.
+
+For the one-off manual bootstrap only, use npm directly: set the package manifest to `0.0.0` temporarily, inspect the tarball, then publish from the package directory. Run npm commands from inside that package; the repository root pins pnpm through `packageManager`, while an individual package directory may resolve to npm. Do not use `vp pm` for this bootstrap publish, since its package-manager selection depends on the current directory.
+
+```bash
+npm publish --access public --tag bootstrap
+```
+
+Do not pass pnpm's `--no-git-checks` option to npm; npm warns that it is an unknown configuration option and ignores it. Confirm the publish output names the expected package at `0.0.0` and shows the `bootstrap` tag. If published with the default `latest` tag by mistake, add the `bootstrap` tag with `npm dist-tag add <package>@0.0.0 bootstrap`. Do not try to remove `latest` while it points to the only published version; the registry may reject that operation. The first normal release will move `latest` to its published version. Restore the intended release version in the manifest without committing `0.0.0`. Stop if the package name, version, access, tarball, or publisher settings are unexpected or publishing fails. Normal releases continue to publish through the automated trusted-publishing workflow.
 
 Pause and notify the owner if any manifest, tag, package path, changelog, authentication, OIDC, provenance, or publication detail disagrees or fails.
 

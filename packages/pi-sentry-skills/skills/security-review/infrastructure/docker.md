@@ -98,7 +98,8 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
 
-# MINIMAL: Pin the image digest before treating a base image as trusted
+# SAFE: Use minimal base images; pin registry images to verified digests.
+# Tags such as alpine:3.19 are mutable.
 FROM alpine:3.19
 FROM gcr.io/distroless/nodejs18
 FROM scratch  # Empty base image
@@ -149,8 +150,7 @@ docker history --no-trunc myimage
 ### High-Risk Packages
 
 ```dockerfile
-# FLAG: Packages that increase attack surface
-# SSH access, privilege escalation, network tools, and build tooling:
+# FLAG: These packages increase attack surface.
 RUN apt-get install -y \
     openssh-server \
     sudo \

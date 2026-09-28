@@ -1,7 +1,7 @@
 {
   "name": "@zeldrisho/pi-anthropics-skills",
-  "version": "0.1.1",
-  "description": "Pi adaptations of Anthropic engineering skills, revised for Agent Skills workflows",
+  "version": "0.1.2",
+  "description": "Anthropic engineering skills packaged for Pi",
   "keywords": [
     "documentation",
     "pi",
@@ -14,7 +14,7 @@
   "bugs": {
     "url": "https://github.com/zeldrisho/pi-packages/issues"
   },
-  "license": "(Apache-2.0 AND MIT)",
+  "license": "Apache-2.0",
   "author": "Zeldris",
   "repository": {
     "type": "git",

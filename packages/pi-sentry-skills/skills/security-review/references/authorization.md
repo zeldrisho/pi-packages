@@ -231,11 +231,13 @@ def get_file(filepath):
     return send_file(filepath)
 
 # SAFE: Validate and sanitize path
+from pathlib import Path
+
 @app.route('/files/<path:filepath>')
 def get_file(filepath):
-    base_dir = os.path.realpath('/app/user_files')
-    full_path = os.path.realpath(os.path.join(base_dir, filepath))
-    if os.path.commonpath((base_dir, full_path)) != base_dir:
+    base_dir = Path('/app/user_files').resolve()
+    full_path = (base_dir / filepath).resolve()
+    if not full_path.is_relative_to(base_dir):
         raise PermissionDenied()
     return send_file(full_path)
 ```
@@ -353,16 +355,13 @@ def test_horizontal_access():
     assert response.status_code == 403
 
 def test_idor_enumeration():
-    # Establish a resource owned by another user; do not treat arbitrary 200s
-    # as IDOR without proving the returned resource is unauthorized.
-    owner = create_user()
     attacker = create_user()
+    owner = create_user()
     resource = create_resource(owner=owner)
 
     client.login(attacker)
     response = client.get(f'/api/resources/{resource.id}')
     assert response.status_code in (403, 404)
-    assert response.status_code != 200
 ```
 
 ---

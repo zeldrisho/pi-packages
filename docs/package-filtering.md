@@ -20,20 +20,20 @@ This loads only the `documentation` skill. To select another skill, use its pack
 - `@zeldrisho/pi-anthropics-skills`: `skills/testing-strategy`, `skills/tech-debt`
 - `@zeldrisho/pi-sentry-skills`: `skills/security-review`, `skills/agents-md`, `skills/pr-writer`
 
-The same filtering works for prompt templates. For example, load only CodeRabbit's review prompt:
+The legacy CodeRabbit prompt package is deprecated. Use the replacement skills package and choose the individual skill by package-relative path:
 
 ```json
 {
   "packages": [
     {
-      "source": "npm:@zeldrisho/pi-coderabbit",
-      "prompts": ["prompts/coderabbit-review.md"]
+      "source": "npm:@zeldrisho/pi-coderabbit-skills",
+      "skills": ["skills/code-review"]
     }
   ]
 }
 ```
 
-Use `prompts: []` to load no prompts, or select `prompts/coderabbit-autofix.md` instead. Paths are relative to the package root.
+Select `skills/autofix` for the PR-thread autofix workflow or `skills/code-review` for CodeRabbit CLI review. Both skills require explicit invocation.
 
 ## Filter behavior
 

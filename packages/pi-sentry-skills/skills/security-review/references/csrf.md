@@ -244,7 +244,7 @@ def verify_origin():
             return False
         return True
 
-    # Missing origin metadata is not sufficient for strict CSRF validation.
+    # Fail closed when neither Origin nor Referer is present.
     return False
 
 def is_trusted_origin(origin):
