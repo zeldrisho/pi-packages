@@ -1,0 +1,475 @@
+import { readFile, readdir } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { describe, it } from "vite-plus/test";
+
+const root = resolve(import.meta.dirname, "../..");
+
+const packagesDirectory = join(root, "packages");
+
+const packageDirectories = (await readdir(packagesDirectory, { withFileTypes: true }))
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort();
+
+const readme = await readFile(join(root, "README.md"), "utf8");
+
+const workspace = await readFile(join(root, "pnpm-workspace.yaml"), "utf8");
+
+const lockfile = await readFile(join(root, "pnpm-lock.yaml"), "utf8");
+
+const releaseWorkflow = await readFile(join(root, ".github/workflows/release.yml"), "utf8");
+
+const expectedFiles = ["src", "CHANGELOG.md"];
+
+const packageSpecificFiles = new Map([["pi-gate", ["config.schema.json"]]]);
+
+const promptPackages = new Set<string>();
+
+const skillPackages = new Set(["pi-coderabbit-skills", "pi-sentry-skills", "pi-anthropics-skills"]);
+
+const themePackages = new Set(["pi-catppuccin"]);
+
+const expectedScripts = {
+  check: "vp check",
+  test: "vp test",
+  "test:watch": "vp test --watch",
+  lint: "vp lint",
+  "lint:fix": "vp lint --fix",
+  format: "vp fmt --write",
+  typecheck: "vp check --no-fmt --no-lint",
+};
+
+const expectedTypeScriptConfiguration = {
+  extends: "../../tsconfig.json",
+  include: ["src", "tests"],
+};
+
+const expectedContentOnlyTypeScriptConfiguration = {
+  extends: "../../tsconfig.json",
+  files: [],
+};
+
+const synchronizedInfrastructurePairs = [
+  ["packages/pi-web-fetch/src/cache.ts", "packages/pi-web-search/src/cache.ts"],
+  ["packages/pi-web-fetch/src/inflight.ts", "packages/pi-web-search/src/inflight.ts"],
+  ["packages/pi-web-fetch/src/render.ts", "packages/pi-web-search/src/render.ts"],
+];
+
+/**
+ * Parses the flat version-pinned entries from the workspace overrides section.
+ *
+ * Only the top-level two-space-indented `name: value` entries of the overrides
+ * block are read; comments and blank lines are skipped. The section ends at the
+ * next top-level key. Catalog aliases (`vite` and `vitest`) are returned as
+ * `catalog:` values so callers can skip them.
+ */
+function parseOverrides(yaml: string): Map<string, string> {
+  const overrides = new Map<string, string>();
+  let inOverrides = false;
+
+  for (const line of yaml.split(/\r?\n/)) {
+    if (!inOverrides) {
+      if (/^overrides:\s*$/.test(line)) inOverrides = true;
+      continue;
+    }
+
+    if (/^\S/.test(line)) break;
+    const match = line.match(/^ {2}([A-Za-z0-9@._/*-]+):\s*(?:"([^"]*)"|(\S+))?/);
+
+    if (match) overrides.set(match[1], match[2] ?? match[3] ?? "");
+  }
+
+  return overrides;
+}
+
+/**
+ * Checks if two string arrays contain the same values regardless of order.
+ *
+ * @param actual - The actual array of strings
+ * @param expected - The expected array of strings
+ * @returns `true` if both arrays contain the same values when sorted
+ */
+function sameValues(actual: string[], expected: string[]) {
+  const compare = (left: string, right: string) => left.localeCompare(right);
+
+  return JSON.stringify([...actual].sort(compare)) === JSON.stringify([...expected].sort(compare));
+}
+
+/**
+ * Throws an error indicating a repository contract violation.
+ *
+ * @param message - The violation message to include in the error
+ * @throws Always throws an Error with the prefixed message
+ */
+function fail(message: string): never {
+  throw new Error(`Repository contract violation: ${message}`);
+}
+
+describe("repository contracts", () => {
+  it("validates packaged Agent Skill metadata and local reference paths", async () => {
+    const names = new Set<string>();
+
+    for (const packageName of skillPackages) {
+      const packageRoot = join(root, "packages", packageName);
+      const manifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"));
+
+      if (
+        ![
+          "MIT",
+          "Apache-2.0",
+          "(Apache-2.0 AND MIT)",
+          "(Apache-2.0 AND CC-BY-SA-4.0)",
+          "(Apache-2.0 AND CC-BY-SA-4.0 AND MIT)",
+        ].includes(manifest.license)
+      ) {
+        fail(`${manifest.name} must declare its SPDX license expression`);
+      }
+
+      const skillsRoot = join(packageRoot, "skills");
+      const pending = [skillsRoot];
+
+      while (pending.length > 0) {
+        const directory = pending.pop();
+
+        if (!directory) continue;
+
+        for (const entry of await readdir(directory, { withFileTypes: true })) {
+          const path = join(directory, entry.name);
+
+          if (entry.isDirectory()) {
+            pending.push(path);
+            continue;
+          }
+
+          if (entry.name !== "SKILL.md") continue;
+
+          const source = await readFile(path, "utf8");
+
+          const frontmatter = source.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1];
+
+          if (!frontmatter) fail(`${path} must have YAML frontmatter`);
+
+          const name = frontmatter.match(/^name:\s*(.*?)\s*$/m)?.[1];
+
+          const description = frontmatter.match(/^description:\s*(.*?)\s*$/m)?.[1];
+          const disabled = frontmatter.match(/^disable-model-invocation:\s*(.*?)\s*$/m)?.[1];
+          const metadata = frontmatter.match(/^metadata:\s*\n((?: {2}.+\n?)*)/m)?.[1];
+          const directoryName = path.split(/[\\/]/).at(-2);
+
+          if (!name || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) || name.length > 64) {
+            fail(`${path} has an invalid skill name`);
+          }
+
+          if (name !== directoryName) fail(`${path} name must match its skill directory`);
+
+          if (names.has(name)) fail(`duplicate skill name: ${name}`);
+          names.add(name);
+
+          if (!description || description.length > 1024) {
+            fail(`${path} must have a nonempty description of at most 1024 characters`);
+          }
+
+          if (packageName === "pi-coderabbit-skills" && disabled !== "true") {
+            fail(`${path} must disable model invocation`);
+          }
+
+          if (metadata && /^ {2}[A-Za-z0-9_-]+:\s*(?:\n|$)/m.test(metadata)) {
+            fail(`${path} metadata values must be scalar strings`);
+          }
+
+          for (const reference of source.matchAll(
+            /(?:\.\/)?((?:references|skills)\/[a-zA-Z0-9_./-]+\.md|github\.md)/g,
+          )) {
+            try {
+              await readFile(join(dirname(path), reference[1]));
+            } catch {
+              fail(`${path} references missing file ${reference[1]}`);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it("creates GitHub releases with gh release create on component tag push", () => {
+    if (!releaseWorkflow.includes("gh release create")) {
+      fail("the release job must create GitHub releases with gh release create");
+    }
+
+    if (releaseWorkflow.includes("softprops/action-gh-release")) {
+      fail("the release workflow must not use softprops/action-gh-release");
+    }
+
+    if (!releaseWorkflow.includes("RELEASE_TAG: ${{ github.ref_name }}")) {
+      fail("the release job must pass the tag via RELEASE_TAG: ${{ github.ref_name }} env var");
+    }
+
+    if (!releaseWorkflow.includes('gh release create "$RELEASE_TAG"')) {
+      fail('the release job must create the release with gh release create "$RELEASE_TAG"');
+    }
+
+    if (!releaseWorkflow.includes("--verify-tag")) {
+      fail("the release job must pass --verify-tag to gh release create");
+    }
+
+    if (
+      !releaseWorkflow.includes(
+        '--title "${{ fromJSON(steps.pkg.outputs.result).shortName }} v${{ fromJSON(steps.pkg.outputs.result).version }}"',
+      )
+    ) {
+      fail("the GitHub release title must use the package short name and version");
+    }
+
+    if (!releaseWorkflow.includes('--notes-file "${{ runner.temp }}/notes.md"')) {
+      fail("the release job must use the notes file at ${{ runner.temp }}/notes.md");
+    }
+
+    if (!releaseWorkflow.includes('--target "${{ github.sha }}"')) {
+      fail("the release job must target ${{ github.sha }}");
+    }
+
+    if (
+      !releaseWorkflow.includes("GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}") ||
+      !releaseWorkflow.includes("GH_REPO: ${{ github.repository }}")
+    ) {
+      fail("the release job must set GH_TOKEN and GH_REPO for gh release create");
+    }
+
+    if (!releaseWorkflow.includes("tags:") || !releaseWorkflow.includes('"*-v*.*.*"')) {
+      fail("the release workflow must trigger on component tag pushes (<package>-v<version>)");
+    }
+
+    if (!releaseWorkflow.includes("id-token: write")) {
+      fail("the publishing job must grant id-token: write for npm trusted publishing");
+    }
+
+    if (!releaseWorkflow.includes("environment: publish")) {
+      fail("npm publication must require approval through the protected publish environment");
+    }
+
+    if (!releaseWorkflow.includes("shortName")) {
+      fail("the GitHub release name must use the package short name, not the scoped npm name");
+    }
+
+    if (
+      !releaseWorkflow.includes("scripts/release.ts package") ||
+      !releaseWorkflow.includes("scripts/release.ts notes")
+    ) {
+      fail(
+        "the release job must resolve the package from the tag and read release notes from the CHANGELOG",
+      );
+    }
+  });
+
+  it("README catalog matches active packages", () => {
+    const documentedDirectories = [...readme.matchAll(/\]\(packages\/([A-Za-z0-9._-]+)\)/g)].map(
+      (match) => match[1],
+    );
+
+    const activeDirectories = packageDirectories;
+
+    if (!sameValues(documentedDirectories, activeDirectories)) {
+      fail(
+        `README package catalog does not match active packages: documented=${documentedDirectories
+          .sort((left, right) => left.localeCompare(right))
+          .join(",")} actual=${activeDirectories.join(",")}`,
+      );
+    }
+  });
+
+  it("synchronized infrastructure files are byte-for-byte identical", async () => {
+    for (const [left, right] of synchronizedInfrastructurePairs) {
+      const [leftContents, rightContents] = await Promise.all([
+        readFile(join(root, left)),
+        readFile(join(root, right)),
+      ]);
+
+      if (!leftContents.equals(rightContents)) {
+        fail(`${left} and ${right} must remain byte-for-byte identical; update both intentionally`);
+      }
+    }
+  });
+
+  it("parses wildcard override selectors", () => {
+    const parsed = parseOverrides('overrides:\n  vite@*: "catalog:"\n');
+
+    if (parsed.get("vite@*") !== "catalog:") {
+      fail("parseOverrides must preserve wildcard override selectors");
+    }
+  });
+
+  it("workspace overrides match the lockfile", () => {
+    for (const [name, version] of parseOverrides(workspace)) {
+      if (version === "catalog:") continue;
+      const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const resolved = lockfile.match(new RegExp(`${escapedName}@[^\\s:]+`, "g")) ?? [];
+
+      if (resolved.length === 0) {
+        fail(
+          `${name} is overridden to ${version} but is absent from the lockfile; the override is removable`,
+        );
+      }
+
+      for (const occurrence of resolved) {
+        const resolvedVersion = occurrence.slice(name.length + 1);
+
+        if (resolvedVersion !== version) {
+          fail(
+            `${name} is overridden to ${version} but the lockfile resolves ${resolvedVersion}; update the lockfile or remove the override`,
+          );
+        }
+      }
+    }
+  });
+
+  it("pnpm is the only allowed lockfile — no npm/yarn/bun locks", async () => {
+    // Mirrors `pi` guardrails `no-npm` + `lock-files`: this repo uses `vp`/`pnpm`
+    // via `catalog:` — any `package-lock.json`/`yarn.lock`/`bun.lock` would
+    // indicate a wrong package manager was used and would break workspace
+    // catalog resolution.
+    const rootEntries = await readdir(root);
+
+    const forbidden = [
+      "package-lock.json",
+      "npm-shrinkwrap.json",
+      "yarn.lock",
+      "bun.lock",
+      "bun.lockb",
+    ];
+
+    const found = rootEntries.filter((entry) => forbidden.includes(entry));
+
+    if (found.length > 0) {
+      fail(`repository root must not contain ${found.join(", ")} — use pnpm via vp install`);
+    }
+
+    const packageLocks = await Promise.all(
+      packageDirectories.map(async (directory) => {
+        const entries = await readdir(join(packagesDirectory, directory));
+
+        return entries
+          .filter((entry) => forbidden.includes(entry))
+          .map((entry) => `${directory}/${entry}`);
+      }),
+    );
+
+    const foundInPackages = packageLocks.flat();
+
+    if (foundInPackages.length > 0) {
+      fail(`packages must not contain ${foundInPackages.join(", ")} — use pnpm via vp install`);
+    }
+  });
+
+  it("package src contains only TypeScript — no JS build output", async () => {
+    // Mirrors `pi` guardrails `typescript-only` (blocks `*.js`): published
+    // packages use `files: ["src", ...]` and Pi loads TypeScript directly —
+    // a stray `src/*.js` would be published without a build step.
+    for (const directory of packageDirectories) {
+      if (
+        promptPackages.has(directory) ||
+        skillPackages.has(directory) ||
+        themePackages.has(directory)
+      )
+        continue;
+      const stack = [join(packagesDirectory, directory, "src")];
+
+      while (stack.length > 0) {
+        // SAFETY: stack is non-empty by while condition — pop always returns a string.
+        const current = stack.pop() as string;
+        const entries = await readdir(current, { withFileTypes: true });
+
+        for (const entry of entries) {
+          const full = join(current, entry.name);
+
+          if (entry.isDirectory()) {
+            stack.push(full);
+          } else if (
+            entry.name.endsWith(".js") ||
+            entry.name.endsWith(".cjs") ||
+            entry.name.endsWith(".mjs")
+          ) {
+            const relative = full.slice(root.length + 1);
+            fail(`${relative} must not exist — packages publish TypeScript directly; use *.ts`);
+          }
+        }
+      }
+    }
+  });
+
+  it("packages match the uniform package contracts", async () => {
+    for (const directory of packageDirectories) {
+      const packageDirectory = join(packagesDirectory, directory);
+      const manifest = JSON.parse(await readFile(join(packageDirectory, "package.json"), "utf8"));
+
+      const typeScriptConfiguration = JSON.parse(
+        await readFile(join(packageDirectory, "tsconfig.json"), "utf8"),
+      );
+
+      const isPromptPackage = promptPackages.has(directory);
+      const isSkillPackage = skillPackages.has(directory);
+      const isThemePackage = themePackages.has(directory);
+
+      const expectedName = `@zeldrisho/${directory}`;
+
+      if (manifest.name !== expectedName) {
+        fail(`${directory}/package.json name must be ${expectedName}, received ${manifest.name}`);
+      }
+
+      if (JSON.stringify(manifest.scripts) !== JSON.stringify(expectedScripts)) {
+        fail(`${manifest.name} scripts must match the uniform package scripts`);
+      }
+
+      if (JSON.stringify(manifest.engines) !== JSON.stringify({ node: ">=24" })) {
+        fail(`${manifest.name} engines must require Node >=24`);
+      }
+
+      const expectedPackageTypeScriptConfiguration =
+        isPromptPackage || isSkillPackage || isThemePackage
+          ? expectedContentOnlyTypeScriptConfiguration
+          : expectedTypeScriptConfiguration;
+
+      if (
+        JSON.stringify(typeScriptConfiguration) !==
+        JSON.stringify(expectedPackageTypeScriptConfiguration)
+      ) {
+        fail(`${manifest.name} tsconfig.json does not match its package type`);
+      }
+
+      const packageFiles = isPromptPackage
+        ? ["prompts", "CHANGELOG.md"]
+        : isSkillPackage
+          ? ["skills", "CHANGELOG.md", ...(directory === "pi-coderabbit-skills" ? ["LICENSE"] : [])]
+          : isThemePackage
+            ? ["themes", "CHANGELOG.md"]
+            : [...expectedFiles, ...(packageSpecificFiles.get(directory) ?? [])];
+
+      if (!sameValues(manifest.files ?? [], packageFiles)) {
+        fail(
+          `${manifest.name} files must contain only ${packageFiles.join(", ")}; received ${(manifest.files ?? []).join(", ")}`,
+        );
+      }
+
+      if (isPromptPackage) {
+        if (JSON.stringify(manifest.pi?.prompts) !== JSON.stringify(["./prompts"])) {
+          fail(`${manifest.name} must expose only ./prompts as its Pi prompts`);
+        }
+      } else if (isSkillPackage) {
+        if (JSON.stringify(manifest.pi?.skills) !== JSON.stringify(["./skills"])) {
+          fail(`${manifest.name} must expose only ./skills as its Pi skills`);
+        }
+      } else if (isThemePackage) {
+        if (JSON.stringify(manifest.pi?.themes) !== JSON.stringify(["./themes"])) {
+          fail(`${manifest.name} must expose only ./themes as its Pi themes`);
+        }
+      } else if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(["./src/index.ts"])) {
+        fail(`${manifest.name} must expose only ./src/index.ts as its Pi extension`);
+      }
+
+      if (!readme.includes(`pi install npm:${manifest.name}`)) {
+        fail(`README package catalog is missing the install command for ${manifest.name}`);
+      }
+    }
+  });
+});
+
+console.log(`Repository contracts passed for ${packageDirectories.length} packages.`);
