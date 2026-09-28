@@ -8,7 +8,7 @@ const repoRoot = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   test: {
-    setupFiles: [join(repoRoot, "tests", "cache-env.setup.ts")],
+    setupFiles: [join(repoRoot, "tests", "unit", "cache-env.setup.ts")],
     coverage: {
       provider: "v8",
       reporter: [["text", { skipFull: false }]],

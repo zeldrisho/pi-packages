@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "ready": "vp pm audit -- --audit-level high && vp check && vp test --coverage && vp run test:contracts && vp run pack:dry-run && vp run test:packages",
+    "ready": "vp pm audit -- --audit-level high && vp check && vp test --coverage && vp run pack:dry-run && vp run test:packages",
     "check": "vp check",
     "test": "vp test",
     "lint": "vp lint",
@@ -15,8 +15,8 @@
     "sync:web-modules": "node scripts/sync-web-modules.ts sync --from pi-web-fetch",
     "typecheck": "vp check --no-fmt --no-lint",
     "pack:dry-run": "for package in packages/*; do (cd \"$package\" && vp pm pack -- --dry-run) || exit; done",
-    "test:contracts": "vp test tests/repository-contract.test.ts",
-    "test:packages": "node tests/package-smoke-test.ts",
+    "test:contracts": "vp test tests/integration/repository-contract.test.ts",
+    "test:packages": "node tests/integration/package-smoke-test.ts",
     "benchmark:web-fetch-extraction": "vp exec jiti packages/pi-web-fetch/scripts/benchmark-extraction.ts",
     "benchmark:web-fetch-focus": "vp exec jiti packages/pi-web-fetch/scripts/benchmark-focus.ts",
     "prepare": "vp config"
