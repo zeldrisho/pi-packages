@@ -151,6 +151,11 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
       response.end(`${"a".repeat(1_100)}\n${"b".repeat(1_100)}`);
 
       return;
+    case "/cloudflare-challenge":
+      response.writeHead(403, { "cf-mitigated": "challenge" });
+      response.end("Just a moment...");
+
+      return;
     case "/status":
       response.writeHead(418);
       response.end("teapot");

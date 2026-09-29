@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Return a clear error when a page has no extractable content
+- Retry Cloudflare-blocked npm package pages through the public npm registry endpoint, and identify other Cloudflare challenge responses clearly
 
 ## [0.9.3] - 2026-09-28
 

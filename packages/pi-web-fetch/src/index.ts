@@ -17,7 +17,7 @@ export {
   type ExtractionDiagnostics,
 } from "./evidence";
 
-export { fetchRemoteContent, type FetchRemoteDependencies } from "./fetch";
+export { fetchRemoteContent, npmRegistryFallbackUrl, type FetchRemoteDependencies } from "./fetch";
 
 export { focusMarkdown, type FocusDetails, type FocusResult } from "./focus";
 

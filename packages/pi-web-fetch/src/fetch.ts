@@ -23,6 +23,33 @@ import {
   responseHeaderValues,
 } from "./network-transport";
 
+/** Maps challenged npm package pages to the public registry endpoint. */
+export function npmRegistryFallbackUrl(rawUrl: string): string | undefined {
+  try {
+    const url = new URL(rawUrl);
+
+    if (url.protocol !== "https:" || url.hostname !== "www.npmjs.com") return undefined;
+
+    const segments = url.pathname.split("/").filter(Boolean);
+
+    if (segments[0] !== "package" || (segments.length !== 2 && segments.length !== 3))
+      return undefined;
+
+    const name = segments.length === 3 ? `${segments[1]}/${segments[2]}` : segments[1];
+
+    if (!name || name.includes("\\")) return undefined;
+
+    const registryName = name
+      .split("/")
+      .map((segment) => encodeURIComponent(segment).replace(/^%40/i, "@"))
+      .join("/");
+
+    return `https://registry.npmjs.org/${registryName}/latest`;
+  } catch {
+    return undefined;
+  }
+}
+
 /** @deprecated Prefer diagnoseExtraction for explicit extraction-quality signals. */
 export function detectAppShell(raw: string, markdown: string): boolean {
   return hasExtractionWarning(diagnoseExtraction(raw, markdown));
@@ -98,7 +125,14 @@ async function documentFromResponse(
   const status = response.statusCode ?? 0;
 
   if (status < 200 || status >= 300) {
+    const cloudflareChallenge =
+      responseHeader(response, "cf-mitigated")?.trim().toLowerCase() === "challenge";
+
     response.resume();
+
+    if (cloudflareChallenge) {
+      throw new Error(`web_fetch was blocked by Cloudflare's anti-bot challenge (HTTP ${status}).`);
+    }
 
     const authenticationHint = [401, 403, 404].includes(status)
       ? " The page may be missing, private, or require authentication."
@@ -272,12 +306,28 @@ async function fetchDocument(
     conditionalHeaders["If-Modified-Since"] = cached.validators.lastModified;
 
   try {
-    const { target, response } = await requestFollowingRedirects(
+    let { target, response } = await requestFollowingRedirects(
       normalizeGitHubRawUrl(rawUrl),
       controller.signal,
       dependencies,
       conditionalHeaders,
     );
+
+    if (
+      response.statusCode !== undefined &&
+      responseHeader(response, "cf-mitigated")?.trim().toLowerCase() === "challenge"
+    ) {
+      const fallbackUrl = npmRegistryFallbackUrl(rawUrl);
+
+      if (fallbackUrl) {
+        response.resume();
+        ({ target, response } = await requestFollowingRedirects(
+          fallbackUrl,
+          controller.signal,
+          dependencies,
+        ));
+      }
+    }
 
     if (response.statusCode === 304 && cached) {
       response.resume();
