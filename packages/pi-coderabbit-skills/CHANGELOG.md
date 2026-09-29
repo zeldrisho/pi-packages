@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-28
+
+### Changed
+
+- Removed redundant repository-instructions loading from the `autofix` workflow.
+
 ## [0.1.0] - 2026-09-28
 
 ### Added
@@ -17,5 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Hardened autofix review-thread error handling and clarified manual invocation and authentication guidance for CodeRabbit reviews.
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-coderabbit-skills-v0.1.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-coderabbit-skills-v0.1.1...HEAD
+[0.1.1]: https://github.com/zeldrisho/pi-packages/compare/pi-coderabbit-skills-v0.1.0...pi-coderabbit-skills-v0.1.1
 [0.1.0]: https://github.com/zeldrisho/pi-packages/releases/tag/pi-coderabbit-skills-v0.1.0

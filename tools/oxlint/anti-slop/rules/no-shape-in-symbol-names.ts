@@ -10,8 +10,25 @@ function containsForbiddenSymbolName(name: string): boolean {
 /** Return whether an identifier names a statically accessed member owned by another value. */
 function isBorrowedMemberName(node: ESTree.Node): boolean {
   const parent = node.parent;
-  if (parent === null || parent.type !== "MemberExpression") return false;
-  return parent.property === node && parent.computed === false;
+  if (parent === null) return false;
+  if (parent.type === "MemberExpression") {
+    return parent.property === node && parent.computed === false;
+  }
+  if (parent.type === "ImportSpecifier") {
+    return (
+      parent.imported.type === "Identifier" &&
+      parent.imported === node &&
+      parent.local.name !== parent.imported.name
+    );
+  }
+  if (parent.type !== "ExportSpecifier") return false;
+  const declaration = parent.parent;
+  return (
+    parent.local === node &&
+    declaration.type === "ExportNamedDeclaration" &&
+    declaration.source !== null &&
+    declaration.source !== undefined
+  );
 }
 
 /** Ban the case-insensitive substring "shape" in every JavaScript and TypeScript symbol name. */

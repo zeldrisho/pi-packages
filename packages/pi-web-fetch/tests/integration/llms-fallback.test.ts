@@ -149,6 +149,32 @@ describe("executeWebFetch llms.txt support", () => {
     expect(result.content[0]?.text).toContain("# Example site");
   });
 
+  it("keeps short intentional page content instead of replacing it with /llms.txt", async () => {
+    const { dependencies, requests } = recordingDependencies((href) =>
+      href.endsWith("/llms.txt")
+        ? fakeResponse(200, "text/markdown", LLMS_TXT)
+        : fakeResponse(
+            200,
+            "text/html",
+            "<!doctype html><html><body><main>Not found (code 31).</main></body></html>",
+          ),
+    );
+
+    const requested = "https://short.example.com/production-error?code=31";
+    const result = await executeWebFetch({ url: requested }, undefined, undefined, dependencies);
+
+    expect(result.details.llmsTxtFallback).toBe(false);
+    expect(requests).toContain(requested);
+    expect(result.details.requestedUrl).toBe(
+      "https://short.example.com/production-error?code=REDACTED",
+    );
+    expect(result.details.finalUrl).toBe(
+      "https://short.example.com/production-error?code=REDACTED",
+    );
+    expect(result.content[0]?.text).toContain("Not found (code 31).");
+    expect(result.content[0]?.text).not.toContain("# Example site");
+  });
+
   it("advertises a usable /llms.txt alongside a healthy page", async () => {
     const { dependencies, requests } = recordingDependencies((href) => {
       if (href === "https://indexed.example.com/llms.txt") {

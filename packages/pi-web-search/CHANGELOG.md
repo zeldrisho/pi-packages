@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-09-28
+
+### Changed
+
+- Simplify search guidance to favor broad discovery and avoid overly restrictive `site:` paths
+- Expose only core search controls (`mode`, `count`, `freshness`, and `spellcheck`) in the model-facing tool schema
+
+### Fixed
+
+- Document mode-specific result limits and correctly escape square brackets in rendered result links
+
 ## [0.8.2] - 2026-09-24
 
 ### Fixed
@@ -97,7 +108,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded Brave web search ([cbc9491](https://github.com/zeldrisho/pi-packages/commit/cbc9491dce36555ab91b6bef203ec8b380596a89))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.8.2...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.8.3...HEAD
+[0.8.3]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.8.2...pi-web-search-v0.8.3
 [0.8.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.8.1...pi-web-search-v0.8.2
 [0.8.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.8.0...pi-web-search-v0.8.1
 [0.8.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.7.0...pi-web-search-v0.8.0

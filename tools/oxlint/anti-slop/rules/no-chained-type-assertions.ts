@@ -3,10 +3,12 @@ import type { ESTree } from "vite-plus/lint/plugins";
 
 type TypeAssertionExpression = ESTree.TSAsExpression | ESTree.TSTypeAssertion;
 
+/** Recognize TypeScript as-expressions and angle-bracket type assertions. */
 function isTypeAssertionExpression(node: ESTree.Node): node is TypeAssertionExpression {
   return node.type === "TSAsExpression" || node.type === "TSTypeAssertion";
 }
 
+/** Remove parentheses to expose the expression being asserted. */
 function unwrapParenthesizedExpression(expression: ESTree.Expression): ESTree.Expression {
   let current = expression;
   while (current.type === "ParenthesizedExpression") {
@@ -15,6 +17,7 @@ function unwrapParenthesizedExpression(expression: ESTree.Expression): ESTree.Ex
   return current;
 }
 
+/** Recognize assertions whose target is the special const type reference. */
 function isConstAssertion(node: TypeAssertionExpression): boolean {
   const { typeAnnotation } = node;
   return (
@@ -24,6 +27,7 @@ function isConstAssertion(node: TypeAssertionExpression): boolean {
   );
 }
 
+/** Skip inner assertions so each chain is reported once, ignoring parentheses. */
 function isOutermostAssertionInChain(node: TypeAssertionExpression): boolean {
   let current: ESTree.Expression = node;
   let parent = node.parent;
@@ -36,6 +40,7 @@ function isOutermostAssertionInChain(node: TypeAssertionExpression): boolean {
   return !isTypeAssertionExpression(parent) || parent.expression !== current;
 }
 
+/** Detect chains of multiple assertions containing at least one non-const assertion. */
 function isForbiddenAssertionChain(node: TypeAssertionExpression): boolean {
   let assertionCount = 0;
   let hasNonConstAssertion = false;

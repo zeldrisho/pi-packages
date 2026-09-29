@@ -29,13 +29,6 @@ Reusable GitHub command primitives are also mirrored in [github.md](./github.md)
 
 ## Workflow
 
-### Step 0: Load Repository Instructions (`AGENTS.md`)
-
-Before any autofix actions, search for `AGENTS.md` in the current repository and load applicable instructions.
-
-- If found, follow its build/lint/test/commit guidance throughout the run.
-- If not found, continue with default workflow.
-
 ### Step 1: Check Code Push Status
 
 Check: `git status` + check for unpushed commits
@@ -285,7 +278,6 @@ Use one commit for all applied fixes in this run.
 If a consolidated commit was created:
 
 - Prompt user interactively to run validation before push (recommended, not required).
-- Remind the user of the `AGENTS.md` instructions already loaded in Step 0 (if present).
 - If user agrees, run the requested checks and report results.
 
 ### Step 9: Push Changes

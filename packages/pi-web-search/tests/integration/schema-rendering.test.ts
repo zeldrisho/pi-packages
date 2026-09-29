@@ -23,6 +23,8 @@ describe("web_search schema rendering", () => {
     expect(Check(webSearchParameters, { query: "x", mode: "web" })).toBe(true);
     expect(Check(webSearchParameters, { query: "x", mode: "context" })).toBe(true);
     expect(Check(webSearchParameters, { query: "x", mode: "other" })).toBe(false);
+    expect(JSON.stringify(webSearchParameters)).not.toContain("operators");
+    expect(JSON.stringify(webSearchParameters)).not.toContain("depth");
   });
 
   it("accepts up to the web query limit for either mode at the schema level", () => {

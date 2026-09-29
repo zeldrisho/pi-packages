@@ -51,10 +51,12 @@ export const isInsideBroadEffectHandler = (node: ESTree.Node): boolean => {
 			current.type === "ArrowFunctionExpression" ||
 			current.type === "FunctionExpression"
 		) {
-			return (
+			if (
 				isBroadEffectCatchCall(current.parent) &&
 				current.parent.arguments.includes(current)
-			);
+			) {
+				return true;
+			}
 		}
 		current = current.parent;
 	}
