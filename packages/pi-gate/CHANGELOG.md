@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Prompt before bash commands and write/edit calls that target gate configuration files.
 - Show the number of hidden characters when command text is truncated in a prompt.
 
+### Security
+
+- Escape terminal controls and bound config paths shown in approval prompts.
+
 ## [0.5.0] - 2026-09-24
 
 ### Changed

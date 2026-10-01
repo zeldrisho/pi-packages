@@ -249,7 +249,7 @@ export async function fetchDocumentWithLlmsTxtSupport(
   const candidates = buildLlmsTxtCandidateUrls(rawUrl);
 
   const [primary, blindIndex] = await Promise.all([
-    fetchCompleteDocument(rawUrl, signal, dependencies),
+    fetchCompleteDocument(rawUrl, signal, dependencies, true),
     candidates.length > 0
       ? ensureLlmsTxtIndex(candidates, signal, dependencies)
       : Promise.resolve(undefined),
@@ -270,7 +270,7 @@ export async function fetchDocumentWithLlmsTxtSupport(
     if (described && describedBy) index = { url: describedBy.href, document: described };
   }
 
-  if (isLowQualityDocument(primary)) {
+  if (isLowQualityDocument(primary) || !primary.markdown.trim()) {
     // The page's own advertised Markdown version is strictly better than an index.
     const markdownAlternate = primary.markdownAlternateUrl
       ? toAbsoluteUrl(primary.markdownAlternateUrl)
@@ -288,6 +288,10 @@ export async function fetchDocumentWithLlmsTxtSupport(
     if (index) return { ...index.document, llmsTxtFallback: true };
   } else if (index) {
     return { ...primary, llmsTxtIndexUrl: index.url };
+  }
+
+  if (!primary.markdown.trim()) {
+    throw new Error("web_fetch: Page has no extractable content.");
   }
 
   return primary;

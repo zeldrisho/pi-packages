@@ -121,6 +121,7 @@ async function documentFromResponse(
   response: IncomingMessage,
   signal: AbortSignal,
   extractHtml: typeof extractHtmlToMarkdown,
+  allowEmptyContent = false,
 ): Promise<CompleteDocument> {
   const status = response.statusCode ?? 0;
 
@@ -174,7 +175,8 @@ async function documentFromResponse(
     contentTypeHeader,
   );
 
-  if (!raw.trim()) throw new Error("web_fetch: Page has no extractable content.");
+  if (!raw.trim() && !allowEmptyContent)
+    throw new Error("web_fetch: Page has no extractable content.");
 
   let markdown: string;
   let title: string | undefined;
@@ -216,7 +218,8 @@ async function documentFromResponse(
 
   if (
     !markdown.trim() &&
-    (!links || (links.internal.length === 0 && links.external.length === 0))
+    (!links || (links.internal.length === 0 && links.external.length === 0)) &&
+    !allowEmptyContent
   ) {
     throw new Error("web_fetch: Page has no extractable content.");
   }
@@ -284,6 +287,7 @@ async function fetchDocument(
   signal: AbortSignal | undefined,
   dependencies: FetchRemoteDependencies,
   cached?: CompleteDocument,
+  allowEmptyContent = false,
 ): Promise<{ document: CompleteDocument; revalidated: boolean }> {
   assertAbsoluteHttpUrlForFetch(normalizeGitHubRawUrl(rawUrl));
   const controller = new AbortController();
@@ -347,7 +351,13 @@ async function fetchDocument(
     }
 
     return {
-      document: await documentFromResponse(target, response, controller.signal, extractHtml),
+      document: await documentFromResponse(
+        target,
+        response,
+        controller.signal,
+        extractHtml,
+        allowEmptyContent,
+      ),
       revalidated: false,
     };
   } catch (error) {
@@ -365,8 +375,9 @@ export async function fetchCompleteDocument(
   rawUrl: string,
   signal: AbortSignal | undefined,
   dependencies: FetchRemoteDependencies,
+  allowEmptyContent = false,
 ): Promise<CompleteDocument> {
-  return (await fetchDocument(rawUrl, signal, dependencies)).document;
+  return (await fetchDocument(rawUrl, signal, dependencies, undefined, allowEmptyContent)).document;
 }
 
 /** Revalidates a stale representation with its ETag and Last-Modified validators. */

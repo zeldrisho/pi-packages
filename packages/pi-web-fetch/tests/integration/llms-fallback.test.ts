@@ -430,6 +430,49 @@ describe("executeWebFetch llms.txt support", () => {
     expect(result.content[0]?.text).toContain("# Example site");
   });
 
+  it("uses an advertised Markdown version when HTML extraction is empty", async () => {
+    const markdownVersion = `https://emptyalt.example.com/page-${process.pid}.md`;
+
+    const { dependencies } = recordingDependencies((href) => {
+      if (href === markdownVersion) return fakeResponse(200, "text/markdown", LLMS_TXT);
+
+      if (href.endsWith("/llms.txt")) return fakeResponse(404, "text/plain", "Not Found");
+
+      return fakeResponse(
+        200,
+        "text/html",
+        `<html><head><link rel="alternate" type="text/markdown" href="/page-${process.pid}.md"></head><body></body></html>`,
+      );
+    });
+
+    const result = await executeWebFetch(
+      { url: `https://emptyalt.example.com/page-${process.pid}` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.details.markdownAlternateFallback).toBe(true);
+    expect(result.content[0]?.text).toContain("Markdown version advertised by the site");
+  });
+
+  it("preserves the empty-content error when no fallback is available", async () => {
+    const { dependencies } = recordingDependencies((href) =>
+      href.endsWith("/llms.txt")
+        ? fakeResponse(404, "text/plain", "Not Found")
+        : fakeResponse(200, "text/html", "<html><head></head><body></body></html>"),
+    );
+
+    await expect(
+      executeWebFetch(
+        { url: `https://emptyprimary.example.com/page-${process.pid}` },
+        undefined,
+        undefined,
+        dependencies,
+      ),
+    ).rejects.toThrow("web_fetch: Page has no extractable content.");
+  });
+
   it("keeps the primary page when an advertised Markdown version is unusable", async () => {
     const markdownVersion = `https://altstub.example.com/page-${process.pid}.md`;
 

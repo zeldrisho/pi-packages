@@ -195,7 +195,7 @@ export default function piGate(pi: ExtensionAPI): void {
     const timeoutMs = loadResult.config.promptTimeoutMs;
 
     const promptCommand = configChange
-      ? `  ${command}`
+      ? `  ${formatCommandForDisplay(command)}`
       : formatPromptCommand(command, match.pattern);
 
     try {
