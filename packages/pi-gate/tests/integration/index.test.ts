@@ -531,6 +531,21 @@ describe("piGate extension", () => {
       ]);
     });
 
+    it("keeps approval prompts working when Herdr is not configured", async () => {
+      delete process.env.HERDR_ENV;
+      delete process.env.HERDR_SOCKET_PATH;
+      delete process.env.HERDR_PANE_ID;
+      setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
+      const extension = makeExtension().install();
+      extension.uiState.selectResponse = "Allow";
+
+      expect(
+        await extension.handlers.toolCall!(bashEvent("sudo echo hi"), extension.ctx),
+      ).toBeUndefined();
+      expect(extension.uiState.selectCalls).toHaveLength(1);
+      expect(extension.herdrEvents).toEqual([]);
+    });
+
     it("does not report to Herdr outside a TUI Herdr session", async () => {
       process.env.HERDR_ENV = "1";
       process.env.HERDR_SOCKET_PATH = "/tmp/herdr.sock";

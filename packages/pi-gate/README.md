@@ -45,6 +45,8 @@ The built-in `bash` tool is gated, and `write`/`edit` calls targeting the gate c
 
 The agent receives normal bash output after approval, or a bounded error naming the matched rule after denial or blocking. Dialogs and choices are not sent directly to the agent. RPC hosts use their native selection dialog.
 
+When running in a Herdr-managed TUI pane, pi-gate can report an active approval prompt as `blocked` in Herdr. This is optional: pi-gate works normally without Herdr, and reporting requires Herdr's Pi integration (`herdr integration install pi`). If Herdr or that integration is unavailable, the report is simply ignored.
+
 ## Uninstall
 
 ```bash

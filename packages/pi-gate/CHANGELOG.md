@@ -7,15 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- Match bash config protection against resolved config paths instead of bare filenames, and shorten denial reasons while retaining the matched rule.
-- Give prompt timeouts a distinct denial reason that includes the configured timeout and asks whether to retry.
-
 ## [0.6.0] - 2026-10-01
 
 ### Changed
 
+- Match bash config protection against resolved config paths instead of bare filenames, and shorten denial reasons while retaining the matched rule.
+- Give prompt timeouts a distinct denial reason that includes the configured timeout and asks whether to retry.
 - Normalize rule matching and require allow spans to contain the matches they suppress; compound commands previously allowed by a longer allow rule can now prompt or block.
 - Prompt before bash commands and write/edit calls that target gate configuration files.
 - Show the number of hidden characters when command text is truncated in a prompt.
