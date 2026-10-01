@@ -75,6 +75,16 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
   }
 
   switch (request.url) {
+    case "/empty":
+      response.setHeader("content-type", "text/plain");
+      response.end();
+
+      return;
+    case "/empty-html":
+      response.setHeader("content-type", "text/html; charset=utf-8");
+      response.end("<html><head></head><body></body></html>");
+
+      return;
     case "/html":
       response.setHeader("content-type", "text/html; charset=utf-8");
       response.end(

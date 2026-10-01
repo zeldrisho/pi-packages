@@ -18,6 +18,15 @@ describe("web_fetch transport", () => {
     await fixture.stop();
   });
 
+  it.each(["/empty", "/empty-html"])(
+    "reports empty document content clearly for %s",
+    async (path) => {
+      await expect(
+        fetchRemoteContent(`${origin}${path}`, 0, 6_000, undefined, dependencies),
+      ).rejects.toThrow("web_fetch: Page has no extractable content.");
+    },
+  );
+
   it("pins transport requests to the validated address", async () => {
     const response = await requestPinned(
       {

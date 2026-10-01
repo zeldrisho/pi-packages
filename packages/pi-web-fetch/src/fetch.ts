@@ -140,6 +140,8 @@ async function documentFromResponse(
     contentTypeHeader,
   );
 
+  if (!raw.trim()) throw new Error("web_fetch: Page has no extractable content.");
+
   let markdown: string;
   let title: string | undefined;
   let fragmentOffsets: Record<string, number> | undefined;
@@ -176,6 +178,15 @@ async function documentFromResponse(
   }
 
   const isHtml = contentType === "text/html" || contentType === "application/xhtml+xml";
+  const links = isHtml ? extractDocumentLinks(raw, target.url) : undefined;
+
+  if (
+    !markdown.trim() &&
+    (!links || (links.internal.length === 0 && links.external.length === 0))
+  ) {
+    throw new Error("web_fetch: Page has no extractable content.");
+  }
+
   const extractionDiagnostics = isHtml ? diagnoseExtraction(raw, markdown) : undefined;
 
   const shellSuspected = extractionDiagnostics
@@ -194,7 +205,7 @@ async function documentFromResponse(
     extractor,
     shellSuspected,
     extractionDiagnostics,
-    links: isHtml ? extractDocumentLinks(raw, target.url) : undefined,
+    links,
     validators: etag || lastModified ? { etag, lastModified } : undefined,
     cachedAt: Date.now(),
     llmsTxtDescribedBy: describedBy,

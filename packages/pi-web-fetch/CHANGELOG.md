@@ -7,14 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Return a clear error when a page has no extractable content.
+
 ## [0.9.3] - 2026-09-28
 
 ### Changed
 
 - Remove the rarely needed `maxCharacters` override from the model-facing tool schema; output remains bounded by the default
-- Drop the redundant prompt snippet and all prompt guidelines; shorten the untrusted-content notice
-- Remove model-facing string/offset bounds and enforce them at runtime; show the shortened `llms.txt index:` notice once per origin per session
-- Remove images from Defuddle's Markdown extraction
 
 ### Fixed
 
