@@ -35,7 +35,7 @@ Rules use substring matching and have one of three actions:
 - `block`: deny without asking;
 - `allow`: explicitly permit matches fully contained within its matching text.
 
-Empty or over-1,024-character patterns are ignored, at most 1,000 valid rules are loaded, and commands with no match are allowed. Matching is case-insensitive and collapses whitespace runs. An `allow` suppresses only prompt/block matches fully inside its matching span; otherwise any surviving `block` wins over `prompt`. `promptTimeoutMs` defaults to 30 seconds and is capped at one day. Run `/reload` after editing.
+Empty or over-1,024-character patterns are ignored, at most 1,000 valid rules are loaded, and commands with no match are allowed. Matching is case-insensitive and collapses whitespace runs. An `allow` suppresses only prompt/block matches fully inside its matching span; otherwise any surviving `block` wins over `prompt`. `promptTimeoutMs` defaults to 30 s (maximum one day); a timeout counts as a denial and ends the turn, so raise it for attended sessions. Run `/reload` after editing.
 
 pi-gate is a guard rail, not a sandbox. Substring matching cannot see flag-order variants, `$(…)`, or commands run through other tools; keep `allow` patterns specific. Bash path checks are textual, so a separate earlier `cd ~/.pi/agent` followed by `echo x > gate.json` may not be recognized.
 

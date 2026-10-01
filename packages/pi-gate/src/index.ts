@@ -49,6 +49,10 @@ function reasonRuleName(pattern: string): string {
     : `${safePattern.slice(0, MAX_REASON_RULE_NAME_LENGTH - 1)}…`;
 }
 
+function timeoutReason(pattern: string, timeoutMs: number): string {
+  return `pi-gate: no response to rule "${reasonRuleName(pattern)}" within ${timeoutMs / 1_000}s; command not run. Ask the user whether to retry.`;
+}
+
 function reportHerdrBlocked(pi: ExtensionAPI, ctx: { mode?: string }, active: boolean): void {
   if (
     ctx.mode !== "tui" ||
@@ -185,17 +189,22 @@ export default function piGate(pi: ExtensionAPI): void {
 
     reportHerdrBlocked(pi, ctx, true);
     let choice: string | undefined;
+    let timedOut = false;
+    const timeoutMs = loadResult.config.promptTimeoutMs;
 
     const promptCommand = configChange
       ? `  ${command}`
       : formatPromptCommand(command, match.pattern);
 
     try {
+      const promptStartedAt = Date.now();
       choice = await ctx.ui.select(
         `pi-gate: allow this command?\n\n${promptCommand}\n\nMatched rule: ${rule}${configChange ? "" : "\nMatched command text is wrapped in »…«"}`,
         ["Allow", "Deny"],
-        { timeout: loadResult.config.promptTimeoutMs },
+        { timeout: timeoutMs },
       );
+      // Pi returns undefined for both dismissal and timeout; elapsed time separates the timeout case.
+      timedOut = choice === undefined && Date.now() - promptStartedAt >= timeoutMs;
     } finally {
       reportHerdrBlocked(pi, ctx, false);
     }
@@ -203,9 +212,11 @@ export default function piGate(pi: ExtensionAPI): void {
     if (choice !== "Allow") {
       return {
         block: true,
-        reason: configChange
-          ? CONFIG_CHANGE_REASON
-          : `pi-gate: denied by rule "${reasonRuleName(match.pattern)}". Do not retry or use equivalent commands; ask the user.`,
+        reason: timedOut
+          ? timeoutReason(match.pattern, timeoutMs)
+          : configChange
+            ? CONFIG_CHANGE_REASON
+            : `pi-gate: denied by rule "${reasonRuleName(match.pattern)}". Do not retry or use equivalent commands; ask the user.`,
         terminate: true,
       };
     }

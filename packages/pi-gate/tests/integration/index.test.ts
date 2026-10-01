@@ -42,6 +42,7 @@ interface UiState {
     settings: { timeout?: number } | undefined;
   }>;
   selectResponse: string | undefined;
+  selectDelayMs: number | undefined;
 }
 
 interface FakeUi {
@@ -107,6 +108,10 @@ function createUi(state: UiState, hasUI: boolean): FakeUi {
     select: async (prompt, options, settings) => {
       state.selectCalls.push({ prompt, options, settings });
 
+      if (state.selectDelayMs !== undefined) {
+        await new Promise<void>((resolve) => setTimeout(resolve, state.selectDelayMs));
+      }
+
       return state.selectResponse;
     },
   };
@@ -120,6 +125,7 @@ function createExtensionContext(
     notifyCalls: [],
     selectCalls: [],
     selectResponse: undefined,
+    selectDelayMs: undefined,
   };
 
   const ctx: FakeContext = { ui: createUi(uiState, hasUI), hasUI, mode };
@@ -573,11 +579,24 @@ describe("piGate extension", () => {
       });
     });
 
-    it("auto-denies after the configured prompt timeout", async () => {
-      setConfig(JSON.stringify({ operations: { "rm -rf": "prompt" }, promptTimeoutMs: 12_500 }));
+    it("uses a separate denial reason when the configured prompt timeout expires", async () => {
+      setConfig(JSON.stringify({ operations: { "rm -rf": "prompt" }, promptTimeoutMs: 20 }));
       const { ctx, uiState, handlers } = makeExtension().install();
+      uiState.selectDelayMs = 30;
       const result = await handlers.toolCall!(bashEvent("rm -rf node_modules"), ctx);
-      expect(uiState.selectCalls[0]?.settings).toEqual({ timeout: 12_500 });
+      expect(uiState.selectCalls[0]?.settings).toEqual({ timeout: 20 });
+      expect(result).toEqual({
+        block: true,
+        reason:
+          'pi-gate: no response to rule "rm -rf" within 0.02s; command not run. Ask the user whether to retry.',
+        terminate: true,
+      });
+    });
+
+    it("keeps dismissal on the ordinary denial reason", async () => {
+      setConfig(JSON.stringify({ operations: { "rm -rf": "prompt" }, promptTimeoutMs: 12_500 }));
+      const { ctx, handlers } = makeExtension().install();
+      const result = await handlers.toolCall!(bashEvent("rm -rf node_modules"), ctx);
       expect(result).toEqual({
         block: true,
         reason:
