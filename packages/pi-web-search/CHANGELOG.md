@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Add a one-line untrusted-results notice to every search result and drop unused prompt metadata
+- Hide context mode from the model-facing schema; select it with `PI_WEB_SEARCH_MODE=context`, and set context result counts from the depth preset
+- Compact unrecognized structured snippets
+- Reduce model-facing search parameters to query, freshness, and spellcheck while retaining advanced runtime options and defaults
+
 ## [0.8.3] - 2026-09-28
 
 ### Changed

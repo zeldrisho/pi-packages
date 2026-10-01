@@ -282,7 +282,7 @@ function braveSnippetToMarkdown(value: string): string {
 
     if (rendered !== undefined) return rendered.slice(0, 8000);
 
-    return `\`\`\`json\n${JSON.stringify(parsed, null, 2)}\n\`\`\``.slice(0, 8000);
+    return `\`\`\`json\n${JSON.stringify(parsed)}\n\`\`\``.slice(0, 8000);
   } catch {
     return String(value)
       .replace(/\r\n/g, "\n")

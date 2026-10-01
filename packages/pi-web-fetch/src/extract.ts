@@ -256,7 +256,13 @@ async function runDefuddle(
 
   try {
     const { Defuddle } = await import("defuddle/node");
-    const result = await Defuddle(document, pageUrl, { markdown: true, useAsync: false });
+
+    const result = await Defuddle(document, pageUrl, {
+      markdown: true,
+      useAsync: false,
+      removeImages: true,
+    });
+
     // Let Defuddle's scheduled microtask/macrotask work settle so a detached
     // rejection is observed by the guard instead of reaching the harness.
     await Promise.resolve();

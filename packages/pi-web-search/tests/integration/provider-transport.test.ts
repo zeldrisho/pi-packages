@@ -17,6 +17,39 @@ describe("web_search provider transport", () => {
     },
   );
 
+  it("serializes unrecognized structured snippets compactly", async () => {
+    process.env.BRAVE_SEARCH_API_KEY = "compact-snippet-secret";
+    process.env.PI_WEB_SEARCH_MODE = "context";
+
+    const serialized = JSON.stringify({
+      caption: "Large sample",
+      foo: { bar: "baz", list: [1, 2, 3] },
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({
+          grounding: {
+            generic: [{ title: "T", url: "https://example.com/snippet", snippets: [serialized] }],
+          },
+        }),
+      ),
+    );
+
+    const result = await createSearchTool().execute(
+      "call",
+      { query: "structured" },
+      undefined,
+      undefined,
+    );
+
+    delete process.env.PI_WEB_SEARCH_MODE;
+    expect(result.content[0]?.text).toContain("```json\n   " + serialized + "\n   ```");
+    const pretty = JSON.stringify(JSON.parse(serialized), null, 2);
+    expect((pretty.length - serialized.length) / 4).toBeGreaterThan(10);
+  });
+
   it("uses only Brave's context endpoint without fetching result URLs", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "context-only-secret";
     const resultUrl = "https://example.com/provider-result";

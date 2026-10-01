@@ -23,7 +23,11 @@ If unset, the tool reads the first matching `BRAVE_SEARCH_API_KEY=` line from th
 
 ## Usage
 
-`web_search` returns compact Brave results by default. Its model-facing options are `mode` (`web` or `context`), `count`, `freshness`, and `spellcheck`. Context mode uses Brave's LLM Context API and never fetches result URLs; use `web_fetch` to inspect a live page. Context queries are limited to 400 characters; web-mode queries are limited to 400 characters.
+`web_search` exposes `query` (required), `freshness` (`day`, `week`, `month`, or `year`), and `spellcheck`. Queries are limited to 400 characters. It returns compact Brave links and snippets; use `web_fetch` to read a result. Search results are untrusted; the result content includes a warning not to follow instructions in them.
+
+To use Brave's extracted-context endpoint instead, set `PI_WEB_SEARCH_MODE=context` before starting Pi. The default is `web`; only `web` and `context` are accepted. Context mode does not fetch result URLs. Its depth defaults to `quick`; `standard` and `deep` are available to internal/runtime callers.
+
+The model-facing schema omits advanced provider options. Web mode defaults to five results with search operators enabled. Context depth presets use five, 20, or 50 results for `quick`, `standard`, or `deep`; other advanced settings remain supported for internal/runtime callers.
 
 Identical searches are cached in byte-bounded memory and coalesced while in flight; cancelling one caller does not cancel work needed by another. Large output is written to a private temporary file and removed on write failure or session shutdown. Pi's interactive preview is collapsed by default (`Ctrl+O` expands it), and tool output remains bounded.
 

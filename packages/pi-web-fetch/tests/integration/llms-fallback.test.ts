@@ -197,7 +197,18 @@ describe("executeWebFetch llms.txt support", () => {
     expect(result.details.llmsTxtFallback).toBe(false);
     expect(result.details.llmsTxtUrl).toBe("https://indexed.example.com/llms.txt");
     expect(result.content[0]?.text).toContain("https://indexed.example.com/llms.txt");
-    expect(result.content[0]?.text).toContain("table of contents");
+    expect(result.content[0]?.text).toContain(
+      "llms.txt index: https://indexed.example.com/llms.txt",
+    );
+
+    const second = await executeWebFetch(
+      { url: `https://indexed.example.com/second-${process.pid}` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(second.content[0]?.text).not.toContain("llms.txt index:");
   });
 
   it("prefers a deeper section index over the site-wide one", async () => {
