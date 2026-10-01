@@ -7,12 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-01
+
 ### Changed
 
-- Add a one-line untrusted-results notice to every search result and drop unused prompt metadata
-- Hide context mode from the model-facing schema; select it with `PI_WEB_SEARCH_MODE=context`, and set context result counts from the depth preset
-- Compact unrecognized structured snippets
-- Reduce model-facing search parameters to query, freshness, and spellcheck while retaining advanced runtime options and defaults
+- Reduce the model-facing schema to query, freshness, and spellcheck; use `PI_WEB_SEARCH_MODE=context` to select context mode
+- Default web search to five results without extra snippets; apply context result-count presets by depth
+- Add an untrusted-results notice, remove unused prompt metadata, and compact structured context snippets
 
 ## [0.8.3] - 2026-09-28
 
@@ -115,7 +116,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded Brave web search ([cbc9491](https://github.com/zeldrisho/pi-packages/commit/cbc9491dce36555ab91b6bef203ec8b380596a89))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.8.3...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.9.0...HEAD
+[0.9.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.8.3...pi-web-search-v0.9.0
 [0.8.3]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.8.2...pi-web-search-v0.8.3
 [0.8.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.8.1...pi-web-search-v0.8.2
 [0.8.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.8.0...pi-web-search-v0.8.1
