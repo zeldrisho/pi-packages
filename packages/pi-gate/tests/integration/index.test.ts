@@ -17,13 +17,13 @@ interface BashToolCallEvent {
   input: { command: string };
 }
 
-interface ReadToolCallEvent {
-  toolName: "read";
+interface PathToolCallEvent {
+  toolName: "read" | "write" | "edit";
   toolCallId: string;
   input: { path: string };
 }
 
-type ToolCallEvent = BashToolCallEvent | ReadToolCallEvent;
+type ToolCallEvent = BashToolCallEvent | PathToolCallEvent;
 
 type ToolCallResult = { block: true; reason: string; terminate: true } | undefined;
 
@@ -42,6 +42,7 @@ interface UiState {
     settings: { timeout?: number } | undefined;
   }>;
   selectResponse: string | undefined;
+  selectDelayMs: number | undefined;
 }
 
 interface FakeUi {
@@ -107,6 +108,10 @@ function createUi(state: UiState, hasUI: boolean): FakeUi {
     select: async (prompt, options, settings) => {
       state.selectCalls.push({ prompt, options, settings });
 
+      if (state.selectDelayMs !== undefined) {
+        await new Promise<void>((resolve) => setTimeout(resolve, state.selectDelayMs));
+      }
+
       return state.selectResponse;
     },
   };
@@ -120,6 +125,7 @@ function createExtensionContext(
     notifyCalls: [],
     selectCalls: [],
     selectResponse: undefined,
+    selectDelayMs: undefined,
   };
 
   const ctx: FakeContext = { ui: createUi(uiState, hasUI), hasUI, mode };
@@ -333,7 +339,8 @@ describe("piGate extension", () => {
       expect(uiState.selectCalls).toHaveLength(1);
       expect(result).toEqual({
         block: true,
-        reason: expect.stringContaining("denied, dismissed, or timed out"),
+        reason:
+          'pi-gate: denied by rule "configuration unavailable". Do not retry or use equivalent commands; ask the user.',
         terminate: true,
       });
     });
@@ -391,7 +398,7 @@ describe("piGate extension", () => {
       setConfig(JSON.stringify({ operations: { sudo: "block" } }));
       const { ctx, handlers } = makeExtension().install();
 
-      const readEvent: ReadToolCallEvent = {
+      const readEvent: PathToolCallEvent = {
         toolName: "read",
         toolCallId: "t1",
         input: { path: "/etc/passwd" },
@@ -399,6 +406,50 @@ describe("piGate extension", () => {
 
       const result = await handlers.toolCall!(readEvent, ctx);
       expect(result).toBeUndefined();
+    });
+
+    it("prompts for write and edit calls targeting either config file", async () => {
+      const gatePath = join(workDir, "gate.json");
+      const legacyPath = join(workDir, "pi-gate.json");
+      const { ctx, handlers } = makeExtension().install();
+
+      for (const [toolName, path] of [
+        ["write", gatePath],
+        ["edit", legacyPath],
+      ] as const) {
+        const result = await handlers.toolCall!(
+          {
+            toolName,
+            toolCallId: toolName,
+            input: { path },
+          },
+          ctx,
+        );
+
+        expect(result).toEqual({
+          block: true,
+          reason: "pi-gate: gate config change requires approval",
+          terminate: true,
+        });
+      }
+
+      expect(
+        await handlers.toolCall!(
+          {
+            toolName: "write",
+            toolCallId: "other",
+            input: { path: join(workDir, "notes.txt") },
+          },
+          ctx,
+        ),
+      ).toBeUndefined();
+      expect(
+        await handlers.toolCall!(bashEvent("echo hi > $PI_CODING_AGENT_DIR/gate.json"), ctx),
+      ).toEqual({
+        block: true,
+        reason: "pi-gate: gate config change requires approval",
+        terminate: true,
+      });
     });
 
     it("returns undefined when no rule matches", async () => {
@@ -421,11 +472,15 @@ describe("piGate extension", () => {
       const result = await handlers.toolCall!(bashEvent("sudo apt update"), ctx);
       expect(result).toEqual({
         block: true,
-        reason: 'pi-gate: command blocked by rule "sudo": "block"',
+        reason:
+          'pi-gate: blocked by rule "sudo". Do not retry or use equivalent commands; ask the user.',
         terminate: true,
       });
       expect(uiState.notifyCalls).toEqual([
-        { text: 'pi-gate: command blocked by rule "sudo": "block"', level: "warning" },
+        {
+          text: 'pi-gate: blocked by rule "sudo". Do not retry or use equivalent commands; ask the user.',
+          level: "warning",
+        },
       ]);
     });
 
@@ -436,7 +491,8 @@ describe("piGate extension", () => {
       const result = await handlers.toolCall!(bashEvent("sudo apt update"), ctx);
       expect(result).toEqual({
         block: true,
-        reason: 'pi-gate: command blocked by rule "sudo": "block"',
+        reason:
+          'pi-gate: blocked by rule "sudo". Do not retry or use equivalent commands; ask the user.',
         terminate: true,
       });
       expect(uiState.notifyCalls).toHaveLength(0);
@@ -475,6 +531,21 @@ describe("piGate extension", () => {
       ]);
     });
 
+    it("keeps approval prompts working when Herdr is not configured", async () => {
+      delete process.env.HERDR_ENV;
+      delete process.env.HERDR_SOCKET_PATH;
+      delete process.env.HERDR_PANE_ID;
+      setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
+      const extension = makeExtension().install();
+      extension.uiState.selectResponse = "Allow";
+
+      expect(
+        await extension.handlers.toolCall!(bashEvent("sudo echo hi"), extension.ctx),
+      ).toBeUndefined();
+      expect(extension.uiState.selectCalls).toHaveLength(1);
+      expect(extension.herdrEvents).toEqual([]);
+    });
+
     it("does not report to Herdr outside a TUI Herdr session", async () => {
       process.env.HERDR_ENV = "1";
       process.env.HERDR_SOCKET_PATH = "/tmp/herdr.sock";
@@ -506,7 +577,7 @@ describe("piGate extension", () => {
 
       expect(await handlers.toolCall!(bashEvent(command), ctx)).toBeUndefined();
       expect(uiState.selectCalls[0]?.prompt).toContain("»dangerous« \\u{001b}[31m");
-      expect(uiState.selectCalls[0]?.prompt).toContain("[command display truncated]");
+      expect(uiState.selectCalls[0]?.prompt).toMatch(/\[\d+ more characters hidden\]/u);
       expect(uiState.selectCalls[0]?.prompt).not.toContain("\x1b");
     });
 
@@ -518,20 +589,33 @@ describe("piGate extension", () => {
       expect(result).toEqual({
         block: true,
         reason:
-          'pi-gate: command denied, dismissed, or timed out after matching rule "rm -rf": "prompt"',
+          'pi-gate: denied by rule "rm -rf". Do not retry or use equivalent commands; ask the user.',
         terminate: true,
       });
     });
 
-    it("auto-denies after the configured prompt timeout", async () => {
-      setConfig(JSON.stringify({ operations: { "rm -rf": "prompt" }, promptTimeoutMs: 12_500 }));
+    it("uses a separate denial reason when the configured prompt timeout expires", async () => {
+      setConfig(JSON.stringify({ operations: { "rm -rf": "prompt" }, promptTimeoutMs: 20 }));
       const { ctx, uiState, handlers } = makeExtension().install();
+      uiState.selectDelayMs = 30;
       const result = await handlers.toolCall!(bashEvent("rm -rf node_modules"), ctx);
-      expect(uiState.selectCalls[0]?.settings).toEqual({ timeout: 12_500 });
+      expect(uiState.selectCalls[0]?.settings).toEqual({ timeout: 20 });
       expect(result).toEqual({
         block: true,
         reason:
-          'pi-gate: command denied, dismissed, or timed out after matching rule "rm -rf": "prompt"',
+          'pi-gate: no response to rule "rm -rf" within 0.02s; command not run. Ask the user whether to retry.',
+        terminate: true,
+      });
+    });
+
+    it("keeps dismissal on the ordinary denial reason", async () => {
+      setConfig(JSON.stringify({ operations: { "rm -rf": "prompt" }, promptTimeoutMs: 12_500 }));
+      const { ctx, handlers } = makeExtension().install();
+      const result = await handlers.toolCall!(bashEvent("rm -rf node_modules"), ctx);
+      expect(result).toEqual({
+        block: true,
+        reason:
+          'pi-gate: denied by rule "rm -rf". Do not retry or use equivalent commands; ask the user.',
         terminate: true,
       });
     });
@@ -544,7 +628,7 @@ describe("piGate extension", () => {
       expect(result).toEqual({
         block: true,
         reason:
-          'pi-gate: command blocked because rule "rm -rf": "prompt" requires a prompt, but no UI is available',
+          'pi-gate: rule "rm -rf" needs approval but no UI is available. Do not retry; ask the user.',
         terminate: true,
       });
       expect(uiState.selectCalls).toHaveLength(0);
@@ -567,7 +651,8 @@ describe("piGate extension", () => {
       const blocked = await handlers.toolCall!(bashEvent("sudo apt update"), ctx);
       expect(blocked).toEqual({
         block: true,
-        reason: 'pi-gate: command blocked by rule "sudo apt update": "block"',
+        reason:
+          'pi-gate: blocked by rule "sudo apt update". Do not retry or use equivalent commands; ask the user.',
         terminate: true,
       });
       const allowed = await handlers.toolCall!(bashEvent("sudo apt install foo"), ctx);
@@ -591,7 +676,8 @@ describe("piGate extension", () => {
       const result = await handlers.toolCall!(event, ctx);
       expect(result).toEqual({
         block: true,
-        reason: 'pi-gate: command blocked by rule "sudo": "block"',
+        reason:
+          'pi-gate: blocked by rule "sudo". Do not retry or use equivalent commands; ask the user.',
         terminate: true,
       });
     });

@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import { Check } from "typebox/value";
 import { mapFreshness, normalizeResultFilter, validateProviderRequest } from "../../src/brave";
 import { webSearchParameters } from "../../src/index";
 import { createSearchTool, jsonResponse } from "./harness";
@@ -200,16 +199,37 @@ describe("web_search context tuning", () => {
     expect(url.searchParams.get("country")).toBe("US");
   });
 
-  it("keeps the quick depth budget as the default", async () => {
+  it("selects context mode from PI_WEB_SEARCH_MODE and defaults to quick depth", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "ctx-default-secret";
+    process.env.PI_WEB_SEARCH_MODE = "context";
 
     const url = await runSearchCapturingUrl(
-      { query: "default budget", mode: "context" },
+      { query: "default budget" },
       { grounding: { generic: [] } },
     );
 
+    delete process.env.PI_WEB_SEARCH_MODE;
     expect(url.searchParams.get("context_threshold_mode")).toBe("strict");
+    expect(url.searchParams.get("count")).toBe("5");
     expect(url.searchParams.get("maximum_number_of_tokens")).toBe("2048");
+  });
+
+  it.each([
+    ["quick", "5", "2048"],
+    ["standard", "20", "8192"],
+    ["deep", "50", "16384"],
+  ] as const)("sends the %s preset result/token pair", async (depth, count, tokens) => {
+    process.env.BRAVE_SEARCH_API_KEY = "ctx-preset-secret";
+    process.env.PI_WEB_SEARCH_MODE = "context";
+
+    const url = await runSearchCapturingUrl(
+      { query: `preset ${depth}`, depth },
+      { grounding: { generic: [] } },
+    );
+
+    delete process.env.PI_WEB_SEARCH_MODE;
+    expect(url.searchParams.get("count")).toBe(count);
+    expect(url.searchParams.get("maximum_number_of_tokens")).toBe(tokens);
   });
 
   it("allows up to 50 results in context mode but not 51", async () => {
@@ -261,28 +281,17 @@ describe("web_search context tuning", () => {
 });
 
 describe("web_search code-search schema", () => {
-  it("accepts the new options without union shapes", () => {
-    expect(
-      Check(webSearchParameters, {
-        query: "error TS2307 site:github.com",
-        operators: false,
-        spellcheck: false,
-        resultFilter: "web,discussions,faq",
-        goggles: "https://example.com/docs.goggle",
-        offset: 2,
-        uiLang: "en-US",
-        dateRange: "2025-01-01to2025-06-30",
-      }),
-    ).toBe(true);
-    expect(
-      Check(webSearchParameters, {
-        query: "grounding",
-        mode: "context",
-        threshold: "lenient",
-        depth: "deep",
-        count: 50,
-      }),
-    ).toBe(true);
-    expect(JSON.stringify(webSearchParameters)).not.toContain("anyOf");
+  it("exposes only query, freshness, and spellcheck", () => {
+    const schema = JSON.parse(JSON.stringify(webSearchParameters));
+    expect(Object.keys(schema.properties)).toEqual(["query", "freshness", "spellcheck"]);
+    expect(schema.properties.query.description).toBeUndefined();
+    expect(schema.properties.freshness.enum).toEqual(["day", "week", "month", "year"]);
+    expect(schema.properties.spellcheck.description).toBe(
+      "Set false for exact identifiers/error strings.",
+    );
+    expect(JSON.stringify(schema)).not.toContain("mode");
+    expect(JSON.stringify(schema)).not.toContain("threshold");
+    expect(JSON.stringify(schema)).not.toContain("depth");
+    expect(JSON.stringify(schema)).not.toContain("anyOf");
   });
 });

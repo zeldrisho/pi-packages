@@ -1,6 +1,6 @@
 # @zeldrisho/pi-gate
 
-Pi extension that blocks or confirms `bash` tool calls using a user-provided JSON configuration.
+Pi extension that blocks or confirms `bash` tool calls and protects its configuration from `write` and `edit` calls.
 
 ## Install
 
@@ -33,15 +33,19 @@ Rules use substring matching and have one of three actions:
 
 - `prompt`: ask the user to allow or deny;
 - `block`: deny without asking;
-- `allow`: explicitly permit an exception to a broader match.
+- `allow`: explicitly permit matches fully contained within its matching text.
 
-Empty or over-1,024-character patterns are ignored, at most 1,000 valid rules are loaded, and commands with no match are allowed. The longest matching pattern wins. `promptTimeoutMs` defaults to 30 seconds and is capped at one day. Run `/reload` after editing.
+Empty or over-1,024-character patterns are ignored, at most 1,000 valid rules are loaded, and commands with no match are allowed. Matching is case-insensitive and collapses whitespace runs. An `allow` suppresses only prompt/block matches fully inside its matching span; otherwise any surviving `block` wins over `prompt`. `promptTimeoutMs` defaults to 30 s (maximum one day); a timeout counts as a denial and ends the turn, so raise it for attended sessions. Run `/reload` after editing.
+
+pi-gate is a guard rail, not a sandbox. Substring matching cannot see flag-order variants, `$(…)`, or commands run through other tools; keep `allow` patterns specific. Bash path checks are textual, so a separate earlier `cd ~/.pi/agent` followed by `echo x > gate.json` may not be recognized.
 
 ## Behavior
 
-Only the built-in `bash` tool is gated. Prompt dialogs offer `Allow` and `Deny`, escape terminal controls, and show at most 2,000 command characters and 20 lines; an allowed command executes in full and unchanged. Blocked, denied, dismissed, and timed-out calls request early termination. A parallel batch continues when it contains allowed calls. In non-interactive modes (`-p`, JSON), prompts and blocks deny and request termination.
+The built-in `bash` tool is gated, and `write`/`edit` calls targeting the gate config require approval. Prompt dialogs offer `Allow` and `Deny`, escape terminal controls, and show at most 2,000 command characters and 20 lines; an allowed command executes in full and unchanged. Blocked, denied, dismissed, and timed-out calls request early termination. A parallel batch continues when it contains allowed calls. In non-interactive modes (`-p`, JSON), prompts and blocks deny and request termination.
 
 The agent receives normal bash output after approval, or a bounded error naming the matched rule after denial or blocking. Dialogs and choices are not sent directly to the agent. RPC hosts use their native selection dialog.
+
+When running in a Herdr-managed TUI pane, pi-gate can report an active approval prompt as `blocked` in Herdr. This is optional: pi-gate works normally without Herdr, and reporting requires Herdr's Pi integration (`herdr integration install pi`). If Herdr or that integration is unavailable, the report is simply ignored.
 
 ## Uninstall
 

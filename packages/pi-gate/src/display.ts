@@ -4,7 +4,8 @@ export const MAX_DISPLAY_COMMAND_CHARACTERS = 2_000;
 
 export const MAX_DISPLAY_COMMAND_LINES = 20;
 
-const DISPLAY_TRUNCATION_MARKER = "\n  … [command display truncated]";
+const DISPLAY_TRUNCATION_MARKER = (hiddenCharacters: number): string =>
+  `\n  … [${hiddenCharacters} more characters hidden]`;
 
 const BIDI_CONTROL_CODE_POINTS = new Set([
   0x061c, 0x200e, 0x200f, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069,
@@ -58,8 +59,10 @@ function renderCommandForDisplay(command: string, pattern?: string): string {
   let lineCount = 1;
   let offset = 0;
 
-  const truncate = (closeActiveRange = activeRange !== undefined): string =>
-    output + (closeActiveRange ? "«" : "") + DISPLAY_TRUNCATION_MARKER;
+  const truncate = (
+    hiddenCharacters: number,
+    closeActiveRange = activeRange !== undefined,
+  ): string => output + (closeActiveRange ? "«" : "") + DISPLAY_TRUNCATION_MARKER(hiddenCharacters);
 
   while (offset < command.length) {
     const rawStart = offset;
@@ -90,12 +93,13 @@ function renderCommandForDisplay(command: string, pattern?: string): string {
     const decorated = `${opensRange ? "»" : ""}${rendered}${closesRange ? "«" : ""}`;
 
     if (rendered === "\n") {
-      if (lineCount >= MAX_DISPLAY_COMMAND_LINES) return truncate(wasInsideRange);
+      if (lineCount >= MAX_DISPLAY_COMMAND_LINES)
+        return truncate(command.length - rawStart, wasInsideRange);
       lineCount += 1;
     }
 
     if (output.length + decorated.length > MAX_DISPLAY_COMMAND_CHARACTERS) {
-      return truncate(wasInsideRange);
+      return truncate(command.length - rawStart, wasInsideRange);
     }
 
     output += decorated;

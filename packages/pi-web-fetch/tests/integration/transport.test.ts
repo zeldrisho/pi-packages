@@ -1,9 +1,43 @@
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
-import { createServer } from "node:http";
-import { fetchRemoteContent, requestPinned, type FetchRemoteDependencies } from "../../src/index";
+import { createServer, type IncomingMessage } from "node:http";
+import {
+  fetchRemoteContent,
+  npmRegistryFallbackUrl,
+  requestPinned,
+  type FetchRemoteDependencies,
+} from "../../src/index";
 import { createFetchHarness } from "./harness";
 
+function fixtureResponse(
+  statusCode: number,
+  headers: Record<string, string>,
+  body: string,
+): IncomingMessage {
+  const bytes = Buffer.from(body);
+
+  // SAFETY: This fixture supplies the status, headers, stream, and cleanup methods used by fetch.
+  return {
+    statusCode,
+    headers,
+    resume() {},
+    destroy() {},
+    async *[Symbol.asyncIterator]() {
+      yield bytes;
+    },
+  } as IncomingMessage;
+}
+
 describe("web_fetch transport", () => {
+  it("maps npm package pages to the public registry latest endpoint", () => {
+    expect(npmRegistryFallbackUrl("https://www.npmjs.com/package/cf")).toBe(
+      "https://registry.npmjs.org/cf/latest",
+    );
+    expect(npmRegistryFallbackUrl("https://www.npmjs.com/package/@scope/name")).toBe(
+      "https://registry.npmjs.org/@scope/name/latest",
+    );
+    expect(npmRegistryFallbackUrl("https://www.npmjs.com/package/cf/v/1.0.0")).toBeUndefined();
+    expect(npmRegistryFallbackUrl("https://npmjs.com/package/cf")).toBeUndefined();
+  });
   const fixture = createFetchHarness();
   let origin = "";
   let dependencies: FetchRemoteDependencies;
@@ -17,6 +51,15 @@ describe("web_fetch transport", () => {
   afterAll(async () => {
     await fixture.stop();
   });
+
+  it.each(["/empty", "/empty-html"])(
+    "reports empty document content clearly for %s",
+    async (path) => {
+      await expect(
+        fetchRemoteContent(`${origin}${path}`, 0, 6_000, undefined, dependencies),
+      ).rejects.toThrow("web_fetch: Page has no extractable content.");
+    },
+  );
 
   it("pins transport requests to the validated address", async () => {
     const response = await requestPinned(
@@ -195,6 +238,54 @@ describe("web_fetch transport", () => {
     await expect(
       fetchRemoteContent(`${origin}${path}`, 0, 6_000, undefined, dependencies),
     ).rejects.toThrow(message);
+  });
+
+  it("falls back to the npm registry when a package page is Cloudflare-challenged", async () => {
+    const packageName = `fetch-fallback-${process.pid}`;
+    const packagePage = `https://www.npmjs.com/package/${packageName}`;
+    const registryUrl = `https://registry.npmjs.org/${packageName}/latest`;
+    const requests: string[] = [];
+
+    const fallbackDependencies: FetchRemoteDependencies = {
+      validateUrl: async (value) => {
+        const url = value instanceof URL ? value : new URL(value);
+
+        return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
+      },
+      request: async (target) => {
+        requests.push(target.url.href);
+
+        if (target.url.href === packagePage) {
+          return fixtureResponse(
+            403,
+            { "content-type": "text/html", "cf-mitigated": "challenge" },
+            "Cloudflare challenge",
+          );
+        }
+
+        if (target.url.href === registryUrl) {
+          return fixtureResponse(
+            200,
+            { "content-type": "application/json" },
+            JSON.stringify({ name: packageName, version: "1.2.3" }),
+          );
+        }
+
+        throw new Error(`Unexpected fixture request: ${target.url.href}`);
+      },
+    };
+
+    const result = await fetchRemoteContent(packagePage, 0, 6_000, undefined, fallbackDependencies);
+
+    expect(requests).toEqual([packagePage, registryUrl]);
+    expect(result.markdown).toContain(`"name": "${packageName}"`);
+    expect(result.markdown).toContain('"version": "1.2.3"');
+  });
+
+  it("returns the Cloudflare-specific error for non-npm challenge responses", async () => {
+    await expect(
+      fetchRemoteContent(`${origin}/cloudflare-challenge`, 0, 6_000, undefined, dependencies),
+    ).rejects.toThrow(/blocked by Cloudflare's anti-bot challenge \(HTTP 403\)/);
   });
 
   it("explains that a missing page may be private or require authentication", async () => {

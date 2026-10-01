@@ -20,24 +20,22 @@ describe("web_search schema rendering", () => {
     expect(schema).not.toContain("allOf");
     expect(schema).not.toContain("anyOf");
     expect(Check(webSearchParameters, { query: "x" })).toBe(true);
-    expect(Check(webSearchParameters, { query: "x", mode: "web" })).toBe(true);
-    expect(Check(webSearchParameters, { query: "x", mode: "context" })).toBe(true);
-    expect(Check(webSearchParameters, { query: "x", mode: "other" })).toBe(false);
-    expect(JSON.stringify(webSearchParameters)).not.toContain("operators");
-    expect(JSON.stringify(webSearchParameters)).not.toContain("depth");
+    expect(Object.keys(webSearchParameters.properties)).toEqual([
+      "query",
+      "freshness",
+      "spellcheck",
+    ]);
   });
 
   it("accepts up to the web query limit for either mode at the schema level", () => {
     expect(
       Check(webSearchParameters, {
         query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS),
-        mode: "context",
       }),
     ).toBe(true);
     expect(
       Check(webSearchParameters, {
         query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS),
-        mode: "web",
       }),
     ).toBe(true);
     expect(
@@ -46,16 +44,14 @@ describe("web_search schema rendering", () => {
   });
 
   it("enforces the tighter context query limit at runtime", async () => {
-    // The schema accepts up to the web-mode length for context mode because the
-    // provider rejects union schemas; this test is the runtime enforcement
-    // point for the 400-character context limit (see limits.test.ts).
     process.env.BRAVE_SEARCH_API_KEY = "test-secret";
+    process.env.PI_WEB_SEARCH_MODE = "context";
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     await expect(
       createSearchTool().execute(
         "call",
-        { query: "x".repeat(SEARCH_CONTEXT_MAX_QUERY_CHARACTERS + 1), mode: "context" },
+        { query: "x".repeat(SEARCH_CONTEXT_MAX_QUERY_CHARACTERS + 1) },
         undefined,
         undefined,
       ),
@@ -63,6 +59,7 @@ describe("web_search schema rendering", () => {
       `Search queries cannot exceed ${SEARCH_CONTEXT_MAX_QUERY_CHARACTERS} characters.`,
     );
     expect(fetchMock).not.toHaveBeenCalled();
+    delete process.env.PI_WEB_SEARCH_MODE;
   });
 
   it("fails clearly when the API key is missing", async () => {

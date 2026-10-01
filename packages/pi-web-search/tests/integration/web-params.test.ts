@@ -45,7 +45,10 @@ describe("web_search web-mode parameters", () => {
 
     const url = await runSearchCapturingUrl({ query: "defaults query" });
 
+    expect(url.origin + url.pathname).toBe("https://api.search.brave.com/res/v1/web/search");
     expect(url.searchParams.get("safesearch")).toBe("moderate");
+    expect(url.searchParams.get("operators")).toBe("true");
+    expect(url.searchParams.get("count")).toBe("5");
     expect(url.searchParams.has("country")).toBe(false);
     expect(url.searchParams.has("extra_snippets")).toBe(false);
   });

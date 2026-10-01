@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-01
+
+### Changed
+
+- Reduce the model-facing schema to URL, focus query, and offset; enforce bounds at runtime
+- Remove prompt metadata, shorten the untrusted-content notice, and show the `llms.txt` index notice once per origin per session
+- Remove images from Defuddle's Markdown extraction
+
+### Fixed
+
+- Return a clear error when a page has no extractable content
+- Use advertised Markdown and `/llms.txt` fallbacks for pages with no extractable content, while preserving the empty-content error when no fallback is available.
+- Retry Cloudflare-blocked npm package pages through the public npm registry endpoint, and identify other Cloudflare challenge responses clearly
+
 ## [0.9.3] - 2026-09-28
 
 ### Changed
@@ -175,7 +189,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.9.3...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.10.0...HEAD
+[0.10.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.9.3...pi-web-fetch-v0.10.0
 [0.9.3]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.9.2...pi-web-fetch-v0.9.3
 [0.9.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.9.1...pi-web-fetch-v0.9.2
 [0.9.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.9.0...pi-web-fetch-v0.9.1

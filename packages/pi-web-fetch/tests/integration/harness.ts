@@ -75,6 +75,16 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
   }
 
   switch (request.url) {
+    case "/empty":
+      response.setHeader("content-type", "text/plain");
+      response.end();
+
+      return;
+    case "/empty-html":
+      response.setHeader("content-type", "text/html; charset=utf-8");
+      response.end("<html><head></head><body></body></html>");
+
+      return;
     case "/html":
       response.setHeader("content-type", "text/html; charset=utf-8");
       response.end(
@@ -139,6 +149,11 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
     case "/continuation":
       response.setHeader("content-type", "text/plain");
       response.end(`${"a".repeat(1_100)}\n${"b".repeat(1_100)}`);
+
+      return;
+    case "/cloudflare-challenge":
+      response.writeHead(403, { "cf-mitigated": "challenge" });
+      response.end("Just a moment...");
 
       return;
     case "/status":

@@ -23,6 +23,33 @@ import {
   responseHeaderValues,
 } from "./network-transport";
 
+/** Maps challenged npm package pages to the public registry endpoint. */
+export function npmRegistryFallbackUrl(rawUrl: string): string | undefined {
+  try {
+    const url = new URL(rawUrl);
+
+    if (url.protocol !== "https:" || url.hostname !== "www.npmjs.com") return undefined;
+
+    const segments = url.pathname.split("/").filter(Boolean);
+
+    if (segments[0] !== "package" || (segments.length !== 2 && segments.length !== 3))
+      return undefined;
+
+    const name = segments.length === 3 ? `${segments[1]}/${segments[2]}` : segments[1];
+
+    if (!name || name.includes("\\")) return undefined;
+
+    const registryName = name
+      .split("/")
+      .map((segment) => encodeURIComponent(segment).replace(/^%40/i, "@"))
+      .join("/");
+
+    return `https://registry.npmjs.org/${registryName}/latest`;
+  } catch {
+    return undefined;
+  }
+}
+
 /** @deprecated Prefer diagnoseExtraction for explicit extraction-quality signals. */
 export function detectAppShell(raw: string, markdown: string): boolean {
   return hasExtractionWarning(diagnoseExtraction(raw, markdown));
@@ -94,11 +121,19 @@ async function documentFromResponse(
   response: IncomingMessage,
   signal: AbortSignal,
   extractHtml: typeof extractHtmlToMarkdown,
+  allowEmptyContent = false,
 ): Promise<CompleteDocument> {
   const status = response.statusCode ?? 0;
 
   if (status < 200 || status >= 300) {
+    const cloudflareChallenge =
+      responseHeader(response, "cf-mitigated")?.trim().toLowerCase() === "challenge";
+
     response.resume();
+
+    if (cloudflareChallenge) {
+      throw new Error(`web_fetch was blocked by Cloudflare's anti-bot challenge (HTTP ${status}).`);
+    }
 
     const authenticationHint = [401, 403, 404].includes(status)
       ? " The page may be missing, private, or require authentication."
@@ -140,6 +175,9 @@ async function documentFromResponse(
     contentTypeHeader,
   );
 
+  if (!raw.trim() && !allowEmptyContent)
+    throw new Error("web_fetch: Page has no extractable content.");
+
   let markdown: string;
   let title: string | undefined;
   let fragmentOffsets: Record<string, number> | undefined;
@@ -176,6 +214,16 @@ async function documentFromResponse(
   }
 
   const isHtml = contentType === "text/html" || contentType === "application/xhtml+xml";
+  const links = isHtml ? extractDocumentLinks(raw, target.url) : undefined;
+
+  if (
+    !markdown.trim() &&
+    (!links || (links.internal.length === 0 && links.external.length === 0)) &&
+    !allowEmptyContent
+  ) {
+    throw new Error("web_fetch: Page has no extractable content.");
+  }
+
   const extractionDiagnostics = isHtml ? diagnoseExtraction(raw, markdown) : undefined;
 
   const shellSuspected = extractionDiagnostics
@@ -194,7 +242,7 @@ async function documentFromResponse(
     extractor,
     shellSuspected,
     extractionDiagnostics,
-    links: isHtml ? extractDocumentLinks(raw, target.url) : undefined,
+    links,
     validators: etag || lastModified ? { etag, lastModified } : undefined,
     cachedAt: Date.now(),
     llmsTxtDescribedBy: describedBy,
@@ -239,6 +287,7 @@ async function fetchDocument(
   signal: AbortSignal | undefined,
   dependencies: FetchRemoteDependencies,
   cached?: CompleteDocument,
+  allowEmptyContent = false,
 ): Promise<{ document: CompleteDocument; revalidated: boolean }> {
   assertAbsoluteHttpUrlForFetch(normalizeGitHubRawUrl(rawUrl));
   const controller = new AbortController();
@@ -261,12 +310,28 @@ async function fetchDocument(
     conditionalHeaders["If-Modified-Since"] = cached.validators.lastModified;
 
   try {
-    const { target, response } = await requestFollowingRedirects(
+    let { target, response } = await requestFollowingRedirects(
       normalizeGitHubRawUrl(rawUrl),
       controller.signal,
       dependencies,
       conditionalHeaders,
     );
+
+    if (
+      response.statusCode !== undefined &&
+      responseHeader(response, "cf-mitigated")?.trim().toLowerCase() === "challenge"
+    ) {
+      const fallbackUrl = npmRegistryFallbackUrl(rawUrl);
+
+      if (fallbackUrl) {
+        response.resume();
+        ({ target, response } = await requestFollowingRedirects(
+          fallbackUrl,
+          controller.signal,
+          dependencies,
+        ));
+      }
+    }
 
     if (response.statusCode === 304 && cached) {
       response.resume();
@@ -286,7 +351,13 @@ async function fetchDocument(
     }
 
     return {
-      document: await documentFromResponse(target, response, controller.signal, extractHtml),
+      document: await documentFromResponse(
+        target,
+        response,
+        controller.signal,
+        extractHtml,
+        allowEmptyContent,
+      ),
       revalidated: false,
     };
   } catch (error) {
@@ -304,8 +375,9 @@ export async function fetchCompleteDocument(
   rawUrl: string,
   signal: AbortSignal | undefined,
   dependencies: FetchRemoteDependencies,
+  allowEmptyContent = false,
 ): Promise<CompleteDocument> {
-  return (await fetchDocument(rawUrl, signal, dependencies)).document;
+  return (await fetchDocument(rawUrl, signal, dependencies, undefined, allowEmptyContent)).document;
 }
 
 /** Revalidates a stale representation with its ETag and Last-Modified validators. */

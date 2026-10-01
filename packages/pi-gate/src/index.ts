@@ -1,8 +1,8 @@
 /**
  * pi-gate Extension
  *
- * Intercepts the built-in `bash` tool and gates each command against a
- * user-provided JSON configuration. Without a configuration file, the
+ * Intercepts the built-in `bash` tool and protects the gate configuration
+ * from `write` and `edit` calls. Without a configuration file, the
  * extension creates one with starter rules and a default prompt timeout.
  *
  * Configuration file: `~/.pi/agent/gate.json` (legacy fallback: `pi-gate.json`)
@@ -14,8 +14,9 @@
  * - `block`  - deny the command without asking
  * - `allow`  - explicitly allow (use to carve out an exception)
  *
- * When multiple patterns match a command, the longest pattern wins, so a
- * narrow `allow` rule can override a broader `prompt` or `block` rule.
+ * Matching is case-insensitive and whitespace-normalized. An allow occurrence
+ * suppresses only restrictive occurrences fully contained within its span;
+ * surviving blocks take priority over prompts.
  *
  * On first run, a configuration with the default prompt timeout and starter
  * operation rules is written to `~/.pi/agent/gate.json` when neither file exists.
@@ -28,10 +29,31 @@
 
 import { isToolCallEventType, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { configPath, ensureConfig, loadConfigResult } from "./config";
+import {
+  bashTouchesConfig,
+  CONFIG_CHANGE_REASON,
+  isProtectedConfigPath,
+} from "./config-protection";
 import { resolveRule } from "./rules";
-import { formatPromptCommand, formatRule } from "./display";
+import { formatCommandForDisplay, formatPromptCommand, formatRule } from "./display";
 
 const HERDR_BLOCKED_LABEL = "pi-gate: approval required";
+
+const MAX_REASON_RULE_NAME_LENGTH = 27;
+
+/** Escapes a rule pattern for terminal display and bounds its length in denial messages. */
+function reasonRuleName(pattern: string): string {
+  const safePattern = formatCommandForDisplay(pattern);
+
+  return safePattern.length <= MAX_REASON_RULE_NAME_LENGTH
+    ? safePattern
+    : `${safePattern.slice(0, MAX_REASON_RULE_NAME_LENGTH - 1)}…`;
+}
+
+/** Formats an approval timeout with the matched rule, elapsed limit in seconds, and retry guidance. */
+function timeoutReason(pattern: string, timeoutMs: number): string {
+  return `pi-gate: no response to rule "${reasonRuleName(pattern)}" within ${timeoutMs / 1_000}s; command not run. Ask the user whether to retry.`;
+}
 
 function reportHerdrBlocked(pi: ExtensionAPI, ctx: { mode?: string }, active: boolean): void {
   if (
@@ -119,51 +141,72 @@ export default function piGate(pi: ExtensionAPI): void {
   });
 
   pi.on("tool_call", async (event, ctx) => {
-    if (event.toolName !== "bash") return undefined;
+    let command: string;
+    let configChange = false;
 
-    if (!isToolCallEventType("bash", event)) return undefined;
-    const command = event.input.command;
-
-    if (loadResult.status === "failed") {
-      loadResult = loadConfigResult();
+    if (event.toolName === "bash") {
+      if (!isToolCallEventType("bash", event)) return undefined;
+      command = event.input.command;
+      configChange = bashTouchesConfig(command);
+    } else if (isToolCallEventType("write", event)) {
+      if (!isProtectedConfigPath(event.input.path)) return undefined;
+      command = event.input.path;
+      configChange = true;
+    } else if (isToolCallEventType("edit", event)) {
+      if (!isProtectedConfigPath(event.input.path)) return undefined;
+      command = event.input.path;
+      configChange = true;
+    } else {
+      return undefined;
     }
 
-    const match =
-      loadResult.status === "failed"
+    if (loadResult.status === "failed") loadResult = loadConfigResult();
+
+    const match = configChange
+      ? { pattern: "gate config change requires approval", action: "prompt" as const }
+      : loadResult.status === "failed"
         ? { pattern: "configuration unavailable", action: "prompt" as const }
         : resolveRule(command, loadResult.config.operations);
 
     if (match === null || match.action === "allow") return undefined;
-    const rule = formatRule(match);
+    const rule = configChange ? CONFIG_CHANGE_REASON : formatRule(match);
 
     if (match.action === "block") {
-      const reason = `pi-gate: command blocked by rule ${rule}`;
+      const reason = `pi-gate: blocked by rule "${reasonRuleName(match.pattern)}". Do not retry or use equivalent commands; ask the user.`;
 
-      if (ctx.hasUI) {
-        ctx.ui.notify(reason, "warning");
-      }
+      if (ctx.hasUI) ctx.ui.notify(reason, "warning");
 
       return { block: true, reason, terminate: true };
     }
 
-    // action === "prompt"
     if (!ctx.hasUI) {
       return {
         block: true,
-        reason: `pi-gate: command blocked because rule ${rule} requires a prompt, but no UI is available`,
+        reason: configChange
+          ? CONFIG_CHANGE_REASON
+          : `pi-gate: rule "${reasonRuleName(match.pattern)}" needs approval but no UI is available. Do not retry; ask the user.`,
         terminate: true,
       };
     }
 
     reportHerdrBlocked(pi, ctx, true);
     let choice: string | undefined;
+    let timedOut = false;
+    const timeoutMs = loadResult.config.promptTimeoutMs;
+
+    const promptCommand = configChange
+      ? `  ${formatCommandForDisplay(command)}`
+      : formatPromptCommand(command, match.pattern);
 
     try {
+      const promptStartedAt = Date.now();
       choice = await ctx.ui.select(
-        `pi-gate: allow this command?\n\n${formatPromptCommand(command, match.pattern)}\n\nMatched rule: ${rule}\nMatched command text is wrapped in »…«`,
+        `pi-gate: allow this command?\n\n${promptCommand}\n\nMatched rule: ${rule}${configChange ? "" : "\nMatched command text is wrapped in »…«"}`,
         ["Allow", "Deny"],
-        { timeout: loadResult.config.promptTimeoutMs },
+        { timeout: timeoutMs },
       );
+      // Pi returns undefined for both dismissal and timeout; elapsed time separates the timeout case.
+      timedOut = choice === undefined && Date.now() - promptStartedAt >= timeoutMs;
     } finally {
       reportHerdrBlocked(pi, ctx, false);
     }
@@ -171,7 +214,11 @@ export default function piGate(pi: ExtensionAPI): void {
     if (choice !== "Allow") {
       return {
         block: true,
-        reason: `pi-gate: command denied, dismissed, or timed out after matching rule ${rule}`,
+        reason: timedOut
+          ? timeoutReason(match.pattern, timeoutMs)
+          : configChange
+            ? CONFIG_CHANGE_REASON
+            : `pi-gate: denied by rule "${reasonRuleName(match.pattern)}". Do not retry or use equivalent commands; ask the user.`,
         terminate: true,
       };
     }
