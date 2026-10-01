@@ -195,6 +195,7 @@ export interface WebFetchDetails {
 
 const llmsNoticeOrigins = new Set<string>();
 
+/** Clears per-origin notice history so subsequent fetches can show llms.txt index notices again. */
 export function resetLlmsNoticeOrigins(): void {
   llmsNoticeOrigins.clear();
 }

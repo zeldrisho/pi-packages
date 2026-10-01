@@ -41,6 +41,7 @@ const HERDR_BLOCKED_LABEL = "pi-gate: approval required";
 
 const MAX_REASON_RULE_NAME_LENGTH = 27;
 
+/** Escapes a rule pattern for terminal display and bounds its length in denial messages. */
 function reasonRuleName(pattern: string): string {
   const safePattern = formatCommandForDisplay(pattern);
 
@@ -49,6 +50,7 @@ function reasonRuleName(pattern: string): string {
     : `${safePattern.slice(0, MAX_REASON_RULE_NAME_LENGTH - 1)}…`;
 }
 
+/** Formats an approval timeout with the matched rule, elapsed limit in seconds, and retry guidance. */
 function timeoutReason(pattern: string, timeoutMs: number): string {
   return `pi-gate: no response to rule "${reasonRuleName(pattern)}" within ${timeoutMs / 1_000}s; command not run. Ask the user whether to retry.`;
 }

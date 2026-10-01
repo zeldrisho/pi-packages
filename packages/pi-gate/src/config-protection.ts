@@ -6,10 +6,12 @@ export const CONFIG_CHANGE_REASON = "pi-gate: gate config change requires approv
 
 const CONFIG_NAMES = ["gate.json", "pi-gate.json"] as const;
 
+/** Returns the configured agent directory, defaulting to ~/.pi/agent. */
 function configDirectory(): string {
   return process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent");
 }
 
+/** Resolves symlinks in the nearest existing ancestor and preserves any missing path suffix. */
 function canonicalizeWithExistingParent(path: string): string {
   const absolute = resolve(path);
 
@@ -29,12 +31,14 @@ function canonicalizeWithExistingParent(path: string): string {
   return resolve(realpathSync(parent), ...tail);
 }
 
+/** Returns canonical paths for both the current and legacy gate configuration files. */
 export function protectedConfigPaths(): string[] {
   const directory = configDirectory();
 
   return CONFIG_NAMES.map((name) => canonicalizeWithExistingParent(join(directory, name)));
 }
 
+/** Expands a leading ~ or ~/ using the current user's home directory. */
 function expandHome(path: string): string {
   if (path === "~") return homedir();
 
@@ -43,6 +47,10 @@ function expandHome(path: string): string {
   return path;
 }
 
+/**
+ * Checks whether a path targets either gate configuration file after home expansion
+ * and symlink resolution. Relative paths use the process working directory.
+ */
 export function isProtectedConfigPath(inputPath: string): boolean {
   if (inputPath.length === 0) return false;
   const expanded = expandHome(inputPath);
@@ -54,6 +62,7 @@ export function isProtectedConfigPath(inputPath: string): boolean {
   return protectedConfigPaths().includes(candidate);
 }
 
+/** Returns a tilde-relative path, or undefined when the path is outside the home directory. */
 function homeForm(path: string): string | undefined {
   const home = resolve(homedir());
   const absolute = resolve(path);
@@ -65,6 +74,7 @@ function homeForm(path: string): string | undefined {
   return undefined;
 }
 
+/** Lists unique canonical, configured, tilde, and applicable environment-variable file paths. */
 function configPathForms(name: (typeof CONFIG_NAMES)[number], canonicalPath: string): string[] {
   const configuredDirectory = configDirectory();
   const logicalPath = resolve(configuredDirectory, name);
@@ -80,6 +90,7 @@ function configPathForms(name: (typeof CONFIG_NAMES)[number], canonicalPath: str
   return [...new Set(forms)];
 }
 
+/** Lists unique directory spellings used to recognize relative config filenames in commands. */
 function configDirectoryForms(canonicalPath: string): string[] {
   const configuredDirectory = configDirectory();
   const logicalDirectory = resolve(configuredDirectory);
@@ -95,10 +106,16 @@ function configDirectoryForms(canonicalPath: string): string[] {
   return [...new Set(forms)];
 }
 
+/** Checks for a literal path substring without parsing shell syntax or expanding variables. */
 function commandContainsPath(command: string, path: string): boolean {
   return command.includes(path);
 }
 
+/**
+ * Detects textual references to gate configuration paths in a shell command.
+ * Bare filenames match only when the same command also names the config directory;
+ * this does not resolve shell expressions or track directory changes across calls.
+ */
 export function bashTouchesConfig(command: string): boolean {
   const paths = protectedConfigPaths();
   const pathForms = CONFIG_NAMES.flatMap((name, index) => configPathForms(name, paths[index]!));
