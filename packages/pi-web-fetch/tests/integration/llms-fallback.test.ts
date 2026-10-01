@@ -1,6 +1,7 @@
 import type { IncomingMessage } from "node:http";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vite-plus/test";
-import { executeWebFetch, type FetchRemoteDependencies } from "../../src/index";
+import registerWebFetch, { executeWebFetch, type FetchRemoteDependencies } from "../../src/index";
 import { parseLinkHeaderForAgentHints } from "../../src/fetch";
 import { buildLlmsTxtCandidateUrls } from "../../src/service";
 
@@ -122,6 +123,61 @@ describe("parseLinkHeaderForAgentHints", () => {
 });
 
 describe("executeWebFetch llms.txt support", () => {
+  it("resets once-per-origin notices when a new session starts", async () => {
+    let startSession: (() => void) | undefined;
+
+    // SAFETY: The factory uses only `on` and `registerTool` from this minimal extension host.
+    const extensionApi = Object.assign(Object.create(null) as ExtensionAPI, {
+      on(event: string, handler: () => void) {
+        if (event === "session_start") startSession = handler;
+
+        return () => {};
+      },
+      registerTool() {},
+    });
+
+    registerWebFetch(extensionApi);
+
+    const origin = `https://session-reset-${process.pid}.example.com`;
+
+    const { dependencies } = recordingDependencies((href) =>
+      href.endsWith("/llms.txt")
+        ? fakeResponse(200, "text/markdown", LLMS_TXT)
+        : fakeResponse(200, "text/plain", "Readable page body.\n".repeat(20)),
+    );
+
+    expect(startSession).toBeDefined();
+    startSession?.();
+
+    const first = await executeWebFetch(
+      { url: `${origin}/first` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    const second = await executeWebFetch(
+      { url: `${origin}/second` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(first.content[0]?.text).toContain("llms.txt index:");
+    expect(second.content[0]?.text).not.toContain("llms.txt index:");
+
+    startSession?.();
+
+    const nextSession = await executeWebFetch(
+      { url: `${origin}/third` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(nextSession.content[0]?.text).toContain("llms.txt index:");
+  });
+
   it("serves /llms.txt instead of an app-shell page", async () => {
     const { dependencies, requests } = recordingDependencies((href) => {
       if (href === "https://shell.example.com/llms.txt") {
