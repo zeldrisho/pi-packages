@@ -290,7 +290,10 @@ export async function fetchDocumentWithLlmsTxtSupport(
     return { ...primary, llmsTxtIndexUrl: index.url };
   }
 
-  if (!primary.markdown.trim()) {
+  if (
+    !primary.markdown.trim() &&
+    (!primary.links || (primary.links.internal.length === 0 && primary.links.external.length === 0))
+  ) {
     throw new Error("web_fetch: Page has no extractable content.");
   }
 
