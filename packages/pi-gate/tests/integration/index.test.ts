@@ -17,13 +17,13 @@ interface BashToolCallEvent {
   input: { command: string };
 }
 
-interface ReadToolCallEvent {
-  toolName: "read";
+interface PathToolCallEvent {
+  toolName: "read" | "write" | "edit";
   toolCallId: string;
   input: { path: string };
 }
 
-type ToolCallEvent = BashToolCallEvent | ReadToolCallEvent;
+type ToolCallEvent = BashToolCallEvent | PathToolCallEvent;
 
 type ToolCallResult = { block: true; reason: string; terminate: true } | undefined;
 
@@ -391,7 +391,7 @@ describe("piGate extension", () => {
       setConfig(JSON.stringify({ operations: { sudo: "block" } }));
       const { ctx, handlers } = makeExtension().install();
 
-      const readEvent: ReadToolCallEvent = {
+      const readEvent: PathToolCallEvent = {
         toolName: "read",
         toolCallId: "t1",
         input: { path: "/etc/passwd" },
@@ -399,6 +399,48 @@ describe("piGate extension", () => {
 
       const result = await handlers.toolCall!(readEvent, ctx);
       expect(result).toBeUndefined();
+    });
+
+    it("prompts for write and edit calls targeting either config file", async () => {
+      const gatePath = join(workDir, "gate.json");
+      const legacyPath = join(workDir, "pi-gate.json");
+      const { ctx, handlers } = makeExtension().install();
+
+      for (const [toolName, path] of [
+        ["write", gatePath],
+        ["edit", legacyPath],
+      ] as const) {
+        const result = await handlers.toolCall!(
+          {
+            toolName,
+            toolCallId: toolName,
+            input: { path },
+          },
+          ctx,
+        );
+
+        expect(result).toEqual({
+          block: true,
+          reason: "pi-gate: gate config change requires approval",
+          terminate: true,
+        });
+      }
+
+      expect(
+        await handlers.toolCall!(
+          {
+            toolName: "write",
+            toolCallId: "other",
+            input: { path: join(workDir, "notes.txt") },
+          },
+          ctx,
+        ),
+      ).toBeUndefined();
+      expect(await handlers.toolCall!(bashEvent("echo hi > ~/.pi/agent/gate.json"), ctx)).toEqual({
+        block: true,
+        reason: "pi-gate: gate config change requires approval",
+        terminate: true,
+      });
     });
 
     it("returns undefined when no rule matches", async () => {
@@ -506,7 +548,7 @@ describe("piGate extension", () => {
 
       expect(await handlers.toolCall!(bashEvent(command), ctx)).toBeUndefined();
       expect(uiState.selectCalls[0]?.prompt).toContain("»dangerous« \\u{001b}[31m");
-      expect(uiState.selectCalls[0]?.prompt).toContain("[command display truncated]");
+      expect(uiState.selectCalls[0]?.prompt).toMatch(/\[\d+ more characters hidden\]/u);
       expect(uiState.selectCalls[0]?.prompt).not.toContain("\x1b");
     });
 

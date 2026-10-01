@@ -5,34 +5,86 @@ export interface RuleMatch {
   action: Action;
 }
 
-/**
- * Resolves the rule that applies to a command against the configured rules.
- *
- * Returns `null` when no rule matches, in which case the caller should let the
- * command through. When multiple rules match, the longest pattern wins so
- * that narrow rules can override broader ones.
- *
- * @param command - The bash command to evaluate against the rules
- * @param rules - A map of pattern strings to actions
- * @returns The matched pattern and action, or `null` if no rule matches
- */
-export function resolveRule(command: string, rules: Record<string, Action>): RuleMatch | null {
-  let bestPattern: string | null = null;
-
-  for (const pattern of Object.keys(rules)) {
-    if (!command.includes(pattern)) continue;
-
-    if (bestPattern === null || pattern.length > bestPattern.length) {
-      bestPattern = pattern;
-    }
-  }
-
-  if (bestPattern === null) return null;
-
-  return { pattern: bestPattern, action: rules[bestPattern] };
+interface RuleOccurrence extends RuleMatch {
+  start: number;
+  end: number;
+  normalizedLength: number;
 }
 
-/** Returns only the action selected by {@link resolveRule}. */
+/** Normalize matching text while leaving the original command untouched for display/execution. */
+export function normalizeMatchText(text: string): string {
+  return text.toLowerCase().replace(/\s+/gu, " ");
+}
+
+function findOccurrences(text: string, pattern: string, rule: RuleMatch): RuleOccurrence[] {
+  const occurrences: RuleOccurrence[] = [];
+  let offset = 0;
+
+  while (offset <= text.length - pattern.length) {
+    const start = text.indexOf(pattern, offset);
+
+    if (start === -1) break;
+    occurrences.push({
+      ...rule,
+      start,
+      end: start + pattern.length,
+      normalizedLength: pattern.length,
+    });
+    // Advance one code unit so overlapping occurrences are retained.
+    offset = start + 1;
+  }
+
+  return occurrences;
+}
+
+/**
+ * Resolves all matching spans. An allow only suppresses a prompt/block occurrence
+ * when that allow occurrence fully contains it. A surviving block takes priority
+ * over prompt; the longest pattern for the winning action is reported.
+ */
+export function resolveRule(command: string, rules: Record<string, Action>): RuleMatch | null {
+  const normalizedCommand = normalizeMatchText(command);
+  const occurrences: RuleOccurrence[] = [];
+
+  let acceptedRuleCount = 0;
+
+  for (const [pattern, action] of Object.entries(rules)) {
+    if (acceptedRuleCount >= 1_000) break;
+
+    if (pattern.length === 0 || pattern.length > 1_024) continue;
+    const normalizedPattern = normalizeMatchText(pattern);
+
+    if (!normalizedPattern) continue;
+    occurrences.push(...findOccurrences(normalizedCommand, normalizedPattern, { pattern, action }));
+    acceptedRuleCount += 1;
+  }
+
+  const allows = occurrences.filter((occurrence) => occurrence.action === "allow");
+
+  const surviving = occurrences.filter(
+    (occurrence) =>
+      occurrence.action === "allow" ||
+      !allows.some((allow) => allow.start <= occurrence.start && allow.end >= occurrence.end),
+  );
+
+  const action: Action | null = surviving.some((occurrence) => occurrence.action === "block")
+    ? "block"
+    : surviving.some((occurrence) => occurrence.action === "prompt")
+      ? "prompt"
+      : surviving.some((occurrence) => occurrence.action === "allow")
+        ? "allow"
+        : null;
+
+  if (action === null) return null;
+
+  const winner = surviving
+    .filter((occurrence) => occurrence.action === action)
+    .sort((a, b) => b.normalizedLength - a.normalizedLength)[0];
+
+  return winner ? { pattern: winner.pattern, action: winner.action } : null;
+}
+
+/** Returns the selected action, or null when no rule matches. */
 export function resolveAction(command: string, rules: Record<string, Action>): Action | null {
   return resolveRule(command, rules)?.action ?? null;
 }

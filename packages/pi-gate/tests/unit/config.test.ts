@@ -145,9 +145,9 @@ describe("formatCommandForDisplay", () => {
   });
 
   it("bounds displayed command characters without changing the prefix", () => {
-    const result = formatCommandForDisplay("x".repeat(MAX_DISPLAY_COMMAND_CHARACTERS + 1));
+    const result = formatCommandForDisplay("x".repeat(MAX_DISPLAY_COMMAND_CHARACTERS + 101));
     expect(result).toContain("x".repeat(MAX_DISPLAY_COMMAND_CHARACTERS));
-    expect(result).toContain("[command display truncated]");
+    expect(result).toContain("[101 more characters hidden]");
   });
 
   it("bounds displayed command lines", () => {
@@ -158,7 +158,7 @@ describe("formatCommandForDisplay", () => {
     );
 
     expect(result.split("\n")).toHaveLength(MAX_DISPLAY_COMMAND_LINES + 1);
-    expect(result).toContain("[command display truncated]");
+    expect(result).toMatch(/\[\d+ more characters hidden\]/u);
     expect(result).not.toContain(`line-${MAX_DISPLAY_COMMAND_LINES}`);
   });
 });
@@ -187,8 +187,8 @@ describe("highlightRuleForDisplay", () => {
     );
 
     expect(result).toContain("»command«");
-    expect(result).toContain("[command display truncated]");
-    expect(result).not.toContain("[»command« display truncated]");
+    expect(result).toMatch(/\[\d+ more characters hidden\]/u);
+    expect(result).not.toContain("command« display truncated]");
   });
 });
 
@@ -222,10 +222,14 @@ describe("resolveRule", () => {
     });
   });
 
-  it("returns the longest matching rule", () => {
+  it("allows only when the allow span contains the restrictive match", () => {
     expect(
       resolveRule("rm -rf /", { rm: "block", "rm -rf": "prompt", "rm -rf /": "allow" }),
     ).toEqual({ pattern: "rm -rf /", action: "allow" });
+    expect(resolveRule("rm -rf / && rm", { rm: "block", "rm -rf /": "allow" })).toEqual({
+      pattern: "rm",
+      action: "block",
+    });
   });
 
   it("returns null when no rule matches", () => {
@@ -234,6 +238,21 @@ describe("resolveRule", () => {
 });
 
 describe("resolveAction", () => {
+  it("keeps starter rules from prompting on common safe commands", () => {
+    const starterRules = {
+      "rm -rf": "prompt",
+      sudo: "prompt",
+      "sudo apt update": "allow",
+      "chmod 777": "block",
+      "corepack enable": "block",
+    } as const;
+
+    for (const command of ["ls -la", "pwd", "echo hello", "git status", "cat README.md"]) {
+      expect(resolveAction(command, starterRules), command).toBeNull();
+    }
+
+    expect(resolveAction("sudo apt update", starterRules)).toBe("allow");
+  });
   it("returns null when no rule matches", () => {
     expect(resolveAction("ls -la", { sudo: "block" })).toBeNull();
   });
@@ -243,23 +262,16 @@ describe("resolveAction", () => {
     expect(resolveAction("rm -rf node_modules", { "rm -rf": "prompt" })).toBe<Action>("prompt");
   });
 
-  it("picks the longest pattern when several rules match", () => {
-    const action = resolveAction("rm -rf /", {
+  it("uses block precedence over prompt and allow", () => {
+    const action = resolveAction("rm -rf / && sudo && chmod 777", {
       rm: "block",
       "rm -rf": "prompt",
       "rm -rf /": "allow",
+      sudo: "prompt",
+      "chmod 777": "block",
     });
 
-    expect(action).toBe<Action>("allow");
-  });
-
-  it("uses length, not declaration order, as the tiebreaker", () => {
-    const action = resolveAction("rm -rf /", {
-      "rm -rf /": "allow",
-      "rm -rf": "block",
-    });
-
-    expect(action).toBe<Action>("allow");
+    expect(action).toBe<Action>("block");
   });
 
   it("returns null for an empty rule set", () => {
