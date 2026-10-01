@@ -35,9 +35,19 @@ import {
   isProtectedConfigPath,
 } from "./config-protection";
 import { resolveRule } from "./rules";
-import { formatPromptCommand, formatRule } from "./display";
+import { formatCommandForDisplay, formatPromptCommand, formatRule } from "./display";
 
 const HERDR_BLOCKED_LABEL = "pi-gate: approval required";
+
+const MAX_REASON_RULE_NAME_LENGTH = 27;
+
+function reasonRuleName(pattern: string): string {
+  const safePattern = formatCommandForDisplay(pattern);
+
+  return safePattern.length <= MAX_REASON_RULE_NAME_LENGTH
+    ? safePattern
+    : `${safePattern.slice(0, MAX_REASON_RULE_NAME_LENGTH - 1)}…`;
+}
 
 function reportHerdrBlocked(pi: ExtensionAPI, ctx: { mode?: string }, active: boolean): void {
   if (
@@ -156,7 +166,7 @@ export default function piGate(pi: ExtensionAPI): void {
     const rule = configChange ? CONFIG_CHANGE_REASON : formatRule(match);
 
     if (match.action === "block") {
-      const reason = `pi-gate: command blocked by rule ${rule}`;
+      const reason = `pi-gate: blocked by rule "${reasonRuleName(match.pattern)}". Do not retry or use equivalent commands; ask the user.`;
 
       if (ctx.hasUI) ctx.ui.notify(reason, "warning");
 
@@ -168,7 +178,7 @@ export default function piGate(pi: ExtensionAPI): void {
         block: true,
         reason: configChange
           ? CONFIG_CHANGE_REASON
-          : `pi-gate: command blocked because rule ${rule} requires a prompt, but no UI is available`,
+          : `pi-gate: rule "${reasonRuleName(match.pattern)}" needs approval but no UI is available. Do not retry; ask the user.`,
         terminate: true,
       };
     }
@@ -195,7 +205,7 @@ export default function piGate(pi: ExtensionAPI): void {
         block: true,
         reason: configChange
           ? CONFIG_CHANGE_REASON
-          : `pi-gate: command denied, dismissed, or timed out after matching rule ${rule}`,
+          : `pi-gate: denied by rule "${reasonRuleName(match.pattern)}". Do not retry or use equivalent commands; ask the user.`,
         terminate: true,
       };
     }

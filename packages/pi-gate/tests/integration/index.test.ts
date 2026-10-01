@@ -333,7 +333,8 @@ describe("piGate extension", () => {
       expect(uiState.selectCalls).toHaveLength(1);
       expect(result).toEqual({
         block: true,
-        reason: expect.stringContaining("denied, dismissed, or timed out"),
+        reason:
+          'pi-gate: denied by rule "configuration unavailable". Do not retry or use equivalent commands; ask the user.',
         terminate: true,
       });
     });
@@ -436,7 +437,9 @@ describe("piGate extension", () => {
           ctx,
         ),
       ).toBeUndefined();
-      expect(await handlers.toolCall!(bashEvent("echo hi > ~/.pi/agent/gate.json"), ctx)).toEqual({
+      expect(
+        await handlers.toolCall!(bashEvent("echo hi > $PI_CODING_AGENT_DIR/gate.json"), ctx),
+      ).toEqual({
         block: true,
         reason: "pi-gate: gate config change requires approval",
         terminate: true,
@@ -463,11 +466,15 @@ describe("piGate extension", () => {
       const result = await handlers.toolCall!(bashEvent("sudo apt update"), ctx);
       expect(result).toEqual({
         block: true,
-        reason: 'pi-gate: command blocked by rule "sudo": "block"',
+        reason:
+          'pi-gate: blocked by rule "sudo". Do not retry or use equivalent commands; ask the user.',
         terminate: true,
       });
       expect(uiState.notifyCalls).toEqual([
-        { text: 'pi-gate: command blocked by rule "sudo": "block"', level: "warning" },
+        {
+          text: 'pi-gate: blocked by rule "sudo". Do not retry or use equivalent commands; ask the user.',
+          level: "warning",
+        },
       ]);
     });
 
@@ -478,7 +485,8 @@ describe("piGate extension", () => {
       const result = await handlers.toolCall!(bashEvent("sudo apt update"), ctx);
       expect(result).toEqual({
         block: true,
-        reason: 'pi-gate: command blocked by rule "sudo": "block"',
+        reason:
+          'pi-gate: blocked by rule "sudo". Do not retry or use equivalent commands; ask the user.',
         terminate: true,
       });
       expect(uiState.notifyCalls).toHaveLength(0);
@@ -560,7 +568,7 @@ describe("piGate extension", () => {
       expect(result).toEqual({
         block: true,
         reason:
-          'pi-gate: command denied, dismissed, or timed out after matching rule "rm -rf": "prompt"',
+          'pi-gate: denied by rule "rm -rf". Do not retry or use equivalent commands; ask the user.',
         terminate: true,
       });
     });
@@ -573,7 +581,7 @@ describe("piGate extension", () => {
       expect(result).toEqual({
         block: true,
         reason:
-          'pi-gate: command denied, dismissed, or timed out after matching rule "rm -rf": "prompt"',
+          'pi-gate: denied by rule "rm -rf". Do not retry or use equivalent commands; ask the user.',
         terminate: true,
       });
     });
@@ -586,7 +594,7 @@ describe("piGate extension", () => {
       expect(result).toEqual({
         block: true,
         reason:
-          'pi-gate: command blocked because rule "rm -rf": "prompt" requires a prompt, but no UI is available',
+          'pi-gate: rule "rm -rf" needs approval but no UI is available. Do not retry; ask the user.',
         terminate: true,
       });
       expect(uiState.selectCalls).toHaveLength(0);
@@ -609,7 +617,8 @@ describe("piGate extension", () => {
       const blocked = await handlers.toolCall!(bashEvent("sudo apt update"), ctx);
       expect(blocked).toEqual({
         block: true,
-        reason: 'pi-gate: command blocked by rule "sudo apt update": "block"',
+        reason:
+          'pi-gate: blocked by rule "sudo apt update". Do not retry or use equivalent commands; ask the user.',
         terminate: true,
       });
       const allowed = await handlers.toolCall!(bashEvent("sudo apt install foo"), ctx);
@@ -633,7 +642,8 @@ describe("piGate extension", () => {
       const result = await handlers.toolCall!(event, ctx);
       expect(result).toEqual({
         block: true,
-        reason: 'pi-gate: command blocked by rule "sudo": "block"',
+        reason:
+          'pi-gate: blocked by rule "sudo". Do not retry or use equivalent commands; ask the user.',
         terminate: true,
       });
     });

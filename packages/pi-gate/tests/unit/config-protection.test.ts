@@ -51,9 +51,20 @@ describe("config path protection", () => {
     expect(CONFIG_CHANGE_REASON).toBe("pi-gate: gate config change requires approval");
   });
 
-  it("recognizes config filenames and resolved paths in bash command text", () => {
+  it("matches config paths but does not match unrelated occurrences of config filenames", () => {
+    const config = join(root, ".pi", "agent", "gate.json");
+
     expect(bashTouchesConfig("echo hi > ~/.pi/agent/gate.json")).toBe(true);
-    expect(bashTouchesConfig("cat pi-gate.json")).toBe(true);
+    expect(bashTouchesConfig("cat ~/.pi/agent/gate.json")).toBe(true);
+    expect(bashTouchesConfig(`echo hi > ${config}`)).toBe(true);
+    expect(bashTouchesConfig("echo hi > $PI_CODING_AGENT_DIR/gate.json")).toBe(true);
+    expect(bashTouchesConfig("echo hi > ${PI_CODING_AGENT_DIR}/pi-gate.json")).toBe(true);
+    expect(bashTouchesConfig("cd ~/.pi/agent && echo x > gate.json")).toBe(true);
+
+    expect(bashTouchesConfig('rg "gate.json" packages/pi-gate/README.md')).toBe(false);
+    expect(bashTouchesConfig("git diff -- packages/pi-gate/README.md")).toBe(false);
+    expect(bashTouchesConfig("sed -n 1,5p packages/pi-gate/README.md")).toBe(false);
+    expect(bashTouchesConfig("cat pi-gate.json")).toBe(false);
     expect(bashTouchesConfig("echo ok > notes.txt")).toBe(false);
   });
 });
