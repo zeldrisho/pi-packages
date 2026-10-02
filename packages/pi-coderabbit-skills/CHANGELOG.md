@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Hardened CodeRabbit review authentication guidance and bounded sandbox recovery.
+- Preserve reported autofix finding severities and assess actionability independently.
+
 ## [0.1.1] - 2026-09-28
 
 ### Changed
