@@ -7,24 +7,22 @@
 
 ## Commands
 
-| Task                              | Command                                 |
-| --------------------------------- | --------------------------------------- |
-| Run one test file                 | `vp test <path-to-test>`                |
-| Run one package's tests           | `vp run '@zeldrisho/<package>#test'`    |
-| Check formatting, lint, and types | `vp check`                              |
-| Auto-fix formatting and lint      | `vp check --fix`                        |
-| Focused lint / format / typecheck | `vp lint`, `vp fmt`, `vp run typecheck` |
-| Complete checks before review     | `vp run ready`                          |
-| Normalize changelogs              | `vp run format:changelog`               |
-| Sync shared web modules           | `vp run sync:web-modules`               |
+| Task                          | Command                              |
+| ----------------------------- | ------------------------------------ |
+| Run one test file             | `vp test <path-to-test>`             |
+| Run one package's tests       | `vp run '@zeldrisho/<package>#test'` |
+| Auto-fix formatting and lint  | `vp check --fix`                     |
+| Complete checks before review | `vp run ready`                       |
+| Normalize changelogs          | `vp run format:changelog`            |
+| Sync shared web modules       | `vp run sync:web-modules`            |
 
 ## Key Conventions
 
 - Edit shared `cache.ts`, `inflight.ts`, and `render.ts` in `packages/pi-web-fetch/src/`, then run `vp run sync:web-modules` to update `pi-web-search`.
 - Read `docs/development.md` before runtime or dependency changes, especially its security and regression requirements.
 - Read `docs/architecture.md` before changing package boundaries, network acquisition, caching, or derived views.
-- Follow `docs/release.md` before version bumps, changelog edits, tags, or publishing; push release tags one at a time because GitHub omits tag workflow events when more than three are pushed together.
-- After each Pi package change, update its `CHANGELOG.md` under `Unreleased` if the change is notable to users. Follow `docs/release.md` and run `vp run format:changelog` after editing.
+- Follow `docs/release.md` before version bumps, changelog edits, tags, or publishing.
+- After each Pi package change, update its `CHANGELOG.md` under `Unreleased` if the change is notable to users, then run `vp run format:changelog`.
 - Update work branches from their target before review.
 
 ## External References
