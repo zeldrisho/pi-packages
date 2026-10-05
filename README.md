@@ -16,15 +16,15 @@ Monorepo for my personal Pi extensions, skills, and themes.
 
 Install only the packages or resources you need using the commands above. See each package README for configuration, behavior, and usage.
 
-## Project-local installation
+## Project installation
 
-Add `-l` to install a package only for the current project:
+Add `-l` to install a package for the current project:
 
 ```bash
 pi install -l npm:@zeldrisho/pi-gate
 ```
 
-Remove the project-local package with the same source:
+Remove the project package with the same source:
 
 ```bash
 pi remove -l npm:@zeldrisho/pi-gate

@@ -12,11 +12,21 @@ Pi package of selected [Anthropic engineering skills](https://github.com/anthrop
 
 ```bash
 pi install npm:@zeldrisho/pi-anthropics-skills
-# project-local:
+
+# Project:
 pi install -l npm:@zeldrisho/pi-anthropics-skills
 ```
 
-Select individual skills with [Pi package filtering](../../docs/package-filtering.md).
+Select individual skills with [Pi package filtering](https://github.com/zeldrisho/pi-packages/blob/main/docs/package-filtering.md).
+
+## Uninstall
+
+```bash
+pi remove npm:@zeldrisho/pi-anthropics-skills
+
+# Project:
+pi remove -l npm:@zeldrisho/pi-anthropics-skills
+```
 
 ## License
 
