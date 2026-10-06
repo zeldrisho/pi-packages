@@ -53,4 +53,14 @@ describe("resolveRule", () => {
       }),
     ).toEqual({ pattern: "chmod 777", action: "block" });
   });
+
+  it("preserves action precedence across generated command prefixes", () => {
+    for (let i = 0; i < 128; i += 1) {
+      const suffix = ` /tmp/generated-${i}`;
+      const command = `sudo apt update${suffix}; chmod 777${suffix}`;
+      expect(resolveAction(command, { "sudo apt update": "allow", "chmod 777": "block" })).toBe(
+        "block",
+      );
+    }
+  });
 });

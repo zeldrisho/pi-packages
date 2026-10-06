@@ -54,6 +54,8 @@ minimumReleaseAgeExclude:
   - "@voidzero-dev/vite-plus-linux-x64-musl@1.0.0"
   - "@voidzero-dev/vite-plus-win32-arm64-msvc@1.0.0"
   - "@voidzero-dev/vite-plus-win32-x64-msvc@1.0.0"
+  # Security fix for GHSA-68fv-2mgg-jv7q; exact-version age exemption only.
+  - "source-map-js@1.2.2"
   - "oxlint-tsgolint@7.0.2003"
   - "vite-plus@1.0.0"
 
@@ -64,6 +66,9 @@ overrides:
   # same change. tests/repository-contract.test.ts fails when an overridden
   # package disappears from the dependency graph.
   #
+  # Temporary security override for GHSA-68fv-2mgg-jv7q. Remove when the
+  # toolchain dependency graph resolves source-map-js >=1.2.2 without it.
+  source-map-js: "1.2.2"
   # Dropped with the 0.84.0 catalog bump: undici (GHSA-4cwx-7wf7-3272,
   # GHSA-8xcm-r25x-g524, GHSA-v3r7-h72x-cjcm, GHSA-jr45-8vmc-qm54,
   # GHSA-m8rv-5g2x-5cg5) was forced to 8.9.0 because pi-coding-agent pinned
