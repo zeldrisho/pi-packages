@@ -17,7 +17,7 @@ pi install npm:@zeldrisho/pi-anthropics-skills
 pi install -l npm:@zeldrisho/pi-anthropics-skills
 ```
 
-Select individual skills with [Pi package filtering](https://github.com/zeldrisho/pi-packages/blob/main/docs/package-filtering.md).
+Use `pi config` to enable or disable individual skills interactively.
 
 ## Uninstall
 

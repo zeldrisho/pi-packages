@@ -17,7 +17,7 @@ pi install npm:@zeldrisho/pi-sentry-skills
 pi install -l npm:@zeldrisho/pi-sentry-skills
 ```
 
-Select individual skills with [Pi package filtering](https://github.com/zeldrisho/pi-packages/blob/main/docs/package-filtering.md).
+Use `pi config` to enable or disable individual skills interactively.
 
 ## Uninstall
 

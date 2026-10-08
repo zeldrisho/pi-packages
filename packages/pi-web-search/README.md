@@ -11,6 +11,8 @@ pi install npm:@zeldrisho/pi-web-search
 pi install -l npm:@zeldrisho/pi-web-search
 ```
 
+Use `pi config` to enable or disable this extension interactively. Run `pi list` to see configured packages and their install paths.
+
 ## Configure
 
 Export a Brave Search API key before starting Pi:

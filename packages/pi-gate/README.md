@@ -11,6 +11,8 @@ pi install npm:@zeldrisho/pi-gate
 pi install -l npm:@zeldrisho/pi-gate
 ```
 
+Use `pi config` to enable or disable this extension interactively. Run `pi list` to see configured packages and their install paths.
+
 ## Configure
 
 The extension reads `~/.pi/agent/gate.json`, falling back to legacy `~/.pi/agent/pi-gate.json` only when `gate.json` is absent. Set `PI_CODING_AGENT_DIR` to use a different configuration directory. If both files exist, only `gate.json` is used—even if it is invalid. To migrate, rename `pi-gate.json` to `gate.json` and run `/reload`; existing files are never automatically renamed, merged, or overwritten.

@@ -13,7 +13,7 @@ pi install -l npm:@zeldrisho/pi-catppuccin
 
 ## Configure
 
-Select `catppuccin-mocha` from `/settings`, or set it in `settings.json`:
+If the theme is disabled, enable it under this package in `pi config`. Then select `catppuccin-mocha` from `/settings`, or set it in `settings.json`:
 
 ```json
 {

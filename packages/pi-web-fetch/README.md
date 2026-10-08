@@ -11,6 +11,8 @@ pi install npm:@zeldrisho/pi-web-fetch
 pi install -l npm:@zeldrisho/pi-web-fetch
 ```
 
+Use `pi config` to enable or disable this extension interactively. Run `pi list` to see configured packages and their install paths.
+
 ## Usage
 
 `web_fetch` accepts public HTTP and HTTPS URLs and supports HTML, Markdown, plain text, JSON, and XML. HTML is converted with Defuddle with images removed, with a basic text extractor as fallback. URLs with credentials, local/private/reserved targets, unsafe redirects, responses over 5 MiB, or unsupported content types are rejected.

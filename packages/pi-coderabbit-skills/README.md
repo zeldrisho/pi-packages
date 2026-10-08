@@ -25,7 +25,7 @@ pi install -l npm:@zeldrisho/pi-coderabbit-skills
 
 ## Requirements
 
-The autofix skill requires `gh`, `git`, and `jq`. Code review requires the CodeRabbit CLI. Review each workflow and its security guidance before use. See [Pi package filtering](https://github.com/zeldrisho/pi-packages/blob/main/docs/package-filtering.md) to load individual skills.
+The autofix skill requires `gh`, `git`, and `jq`. Code review requires the CodeRabbit CLI. Review each workflow and its security guidance before use. Use `pi config` to enable or disable individual skills interactively.
 
 ## Uninstall
 
