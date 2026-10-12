@@ -195,6 +195,28 @@ describe("web_search response recovery guidance", () => {
     expect(text).toContain("removing unnecessary quotes");
     expect(text).toContain('mode: "context"');
   });
+
+  it("suggests broadening and web mode when context results are empty", async () => {
+    process.env.BRAVE_SEARCH_API_KEY = "empty-context-results-secret";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse({ grounding: { generic: [] } })),
+    );
+
+    const result = await createSearchTool().execute(
+      "call",
+      { query: 'site:docs.example.com "exact phrase"', mode: "context" },
+      undefined,
+      undefined,
+    );
+
+    const text = result.content[0]?.text ?? "";
+    expect(text).toContain("No context results found");
+    expect(text).not.toContain("No web results found");
+    expect(text).toContain("removing unnecessary quotes");
+    expect(text).toContain('mode: "web"');
+    expect(text).not.toContain('mode: "context"');
+  });
 });
 
 describe("web_search context tuning", () => {
