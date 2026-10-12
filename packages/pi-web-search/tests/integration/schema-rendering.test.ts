@@ -23,6 +23,7 @@ describe("web_search schema rendering", () => {
     expect(Object.keys(webSearchParameters.properties)).toEqual([
       "query",
       "freshness",
+      "mode",
       "spellcheck",
     ]);
   });
@@ -45,13 +46,12 @@ describe("web_search schema rendering", () => {
 
   it("enforces the tighter context query limit at runtime", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "test-secret";
-    process.env.PI_WEB_SEARCH_MODE = "context";
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     await expect(
       createSearchTool().execute(
         "call",
-        { query: "x".repeat(SEARCH_CONTEXT_MAX_QUERY_CHARACTERS + 1) },
+        { query: "x".repeat(SEARCH_CONTEXT_MAX_QUERY_CHARACTERS + 1), mode: "context" },
         undefined,
         undefined,
       ),
@@ -59,7 +59,6 @@ describe("web_search schema rendering", () => {
       `Search queries cannot exceed ${SEARCH_CONTEXT_MAX_QUERY_CHARACTERS} characters.`,
     );
     expect(fetchMock).not.toHaveBeenCalled();
-    delete process.env.PI_WEB_SEARCH_MODE;
   });
 
   it("fails clearly when the API key is missing", async () => {

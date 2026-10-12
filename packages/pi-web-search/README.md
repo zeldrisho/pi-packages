@@ -28,7 +28,9 @@ If unset, the tool reads the first matching `BRAVE_SEARCH_API_KEY=` line from th
 
 `web_search` exposes `query` (required), `freshness` (`day`, `week`, `month`, or `year`), and `spellcheck`. Queries are limited to 400 characters. It returns compact Brave links and snippets; use `web_fetch` to read a result.
 
-To use Brave's extracted-context endpoint instead, set `PI_WEB_SEARCH_MODE=context` before starting Pi. The default is `web`; only `web` and `context` are accepted. Context mode does not fetch result URLs. Its depth defaults to `quick`; `standard` and `deep` are available to internal/runtime callers.
+Search defaults to `web` mode. Set `mode: "context"` on an individual `web_search` call to use Brave's extracted-context endpoint as an alternative when web results are insufficient; no environment variable or reload is needed. Context mode does not fetch result URLs. Its depth defaults to `quick`; `standard` and `deep` are available to internal/runtime callers.
+
+If results are empty or insufficient, broaden the query (fewer quotes; relax nonessential `site:` restrictions) and retry. Preserve required source restrictions. Fetch promising results; if evidence is still insufficient, try `mode: "context"`. No results do not prove absence.
 
 The model-facing schema omits advanced provider options. Web mode defaults to five results with search operators enabled. Context depth presets use five, 20, or 50 results for `quick`, `standard`, or `deep`; other advanced settings remain supported for internal/runtime callers.
 

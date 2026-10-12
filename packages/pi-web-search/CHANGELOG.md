@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add response guidance for empty or insufficient results and expose per-call `mode` selection so agents can retry with context mode without environment configuration
+
 ## [0.9.0] - 2026-10-01
 
 ### Changed
