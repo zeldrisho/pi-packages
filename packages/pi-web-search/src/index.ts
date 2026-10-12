@@ -26,6 +26,11 @@ export const webSearchParameters = Type.Object({
     maxLength: SEARCH_WEB_MAX_QUERY_CHARACTERS,
   }),
   freshness: Type.Optional(StringEnum(["day", "week", "month", "year"] as const)),
+  mode: Type.Optional(
+    StringEnum(["web", "context"] as const, {
+      description: 'Try "context" if web results are insufficient.',
+    }),
+  ),
   spellcheck: Type.Optional(
     Type.Boolean({ description: "Set false for exact identifiers/error strings." }),
   ),

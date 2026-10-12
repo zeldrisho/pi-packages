@@ -19,7 +19,6 @@ describe("web_search provider transport", () => {
 
   it("serializes unrecognized structured snippets compactly", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "compact-snippet-secret";
-    process.env.PI_WEB_SEARCH_MODE = "context";
 
     const serialized = JSON.stringify({
       caption: "Large sample",
@@ -39,12 +38,11 @@ describe("web_search provider transport", () => {
 
     const result = await createSearchTool().execute(
       "call",
-      { query: "structured" },
+      { query: "structured", mode: "context" },
       undefined,
       undefined,
     );
 
-    delete process.env.PI_WEB_SEARCH_MODE;
     expect(result.content[0]?.text).toContain("```json\n   " + serialized + "\n   ```");
     const pretty = JSON.stringify(JSON.parse(serialized), null, 2);
     expect((pretty.length - serialized.length) / 4).toBeGreaterThan(10);

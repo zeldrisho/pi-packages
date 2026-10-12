@@ -12,6 +12,8 @@ const SEARCH_ERROR_EXCERPT_BYTES = 8_192;
  * @returns Normalized text, truncated with ellipsis if needed
  */
 export function normalizeText(value: string, maxLength: number): string {
+  if (maxLength <= 0) return "";
+
   const text = value
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")

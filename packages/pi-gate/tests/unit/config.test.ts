@@ -116,6 +116,23 @@ describe("parseConfig", () => {
     expect(result.operations).toEqual({ "rm -rf": "prompt" });
   });
 
+  it("fails closed for generated malformed operation values while retaining valid rules", () => {
+    const invalidValues: unknown[] = [null, false, 0, [], {}, "", "ALLOW", "execute", "block "];
+
+    for (const invalid of invalidValues) {
+      const config = parseConfig(
+        JSON.stringify({ operations: { safe: "prompt", generated: invalid } }),
+      );
+
+      expect(config.operations).toEqual({ safe: "prompt" });
+      expect(
+        Object.values(config.operations).every((action) =>
+          ["prompt", "block", "allow"].includes(action),
+        ),
+      ).toBe(true);
+    }
+  });
+
   it("skips empty and excessively long patterns", () => {
     const tooLong = "x".repeat(MAX_RULE_PATTERN_LENGTH + 1);
 

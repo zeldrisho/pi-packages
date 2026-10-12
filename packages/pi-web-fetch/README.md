@@ -6,9 +6,12 @@ Pi extension for fetching public HTTP(S) pages as bounded Markdown. No API key i
 
 ```bash
 pi install npm:@zeldrisho/pi-web-fetch
-# project-local:
+
+# Project:
 pi install -l npm:@zeldrisho/pi-web-fetch
 ```
+
+Use `pi config` to enable or disable this extension interactively. Run `pi list` to see configured packages and their install paths.
 
 ## Usage
 
@@ -38,7 +41,9 @@ Requests are coordinated per origin. `429` and `503` responses retry at most twi
 
 ```bash
 pi remove npm:@zeldrisho/pi-web-fetch
-pi remove -l npm:@zeldrisho/pi-web-fetch  # project-local
+
+# Project:
+pi remove -l npm:@zeldrisho/pi-web-fetch
 ```
 
 ## License

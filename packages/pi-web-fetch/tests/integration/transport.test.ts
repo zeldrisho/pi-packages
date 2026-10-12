@@ -171,6 +171,22 @@ describe("web_fetch transport", () => {
     ).rejects.toThrow();
   });
 
+  it("falls back from an immediately unreachable IPv6 address to IPv4", async () => {
+    const response = await requestPinned(
+      {
+        url: new URL(`${origin}/html`),
+        address: "2001:db8::1",
+        family: 6,
+        addresses: ["2001:db8::1", "127.0.0.1"],
+      },
+      new AbortController().signal,
+      { attemptTimeoutMs: 300 },
+    );
+
+    expect(response.statusCode).toBe(200);
+    response.resume();
+  });
+
   it("contains immediate connection failures under concurrent load", async () => {
     const attempts = Array.from({ length: 100 }, () =>
       requestPinned(

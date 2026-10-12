@@ -6,11 +6,14 @@ Catppuccin Mocha theme for Pi, updated for the current Pi theme format.
 
 ```bash
 pi install npm:@zeldrisho/pi-catppuccin
-# project-local:
+
+# Project:
 pi install -l npm:@zeldrisho/pi-catppuccin
 ```
 
-Select `catppuccin-mocha` from `/settings`, or set it in `settings.json`:
+## Configure
+
+If the theme is disabled, enable it under this package in `pi config`. Then select `catppuccin-mocha` from `/settings`, or set it in `settings.json`:
 
 ```json
 {
@@ -21,6 +24,15 @@ Select `catppuccin-mocha` from `/settings`, or set it in `settings.json`:
 ## Attribution
 
 The theme uses only colors from the official [Catppuccin Mocha palette](https://catppuccin.com/palette/#mocha), following Catppuccin’s [style guide](https://github.com/catppuccin/catppuccin/blob/main/docs/style-guide.md) where Pi’s token model allows.
+
+## Uninstall
+
+```bash
+pi remove npm:@zeldrisho/pi-catppuccin
+
+# Project:
+pi remove -l npm:@zeldrisho/pi-catppuccin
+```
 
 ## License
 

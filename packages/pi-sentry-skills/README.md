@@ -12,11 +12,21 @@ Pi package of selected [Sentry agent skills](https://github.com/getsentry/skills
 
 ```bash
 pi install npm:@zeldrisho/pi-sentry-skills
-# project-local:
+
+# Project:
 pi install -l npm:@zeldrisho/pi-sentry-skills
 ```
 
-Select individual skills with [Pi package filtering](../../docs/package-filtering.md).
+Use `pi config` to enable or disable individual skills interactively.
+
+## Uninstall
+
+```bash
+pi remove npm:@zeldrisho/pi-sentry-skills
+
+# Project:
+pi remove -l npm:@zeldrisho/pi-sentry-skills
+```
 
 ## License
 

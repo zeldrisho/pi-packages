@@ -6,9 +6,12 @@ Pi extension that blocks or confirms `bash` tool calls and protects its configur
 
 ```bash
 pi install npm:@zeldrisho/pi-gate
-# project-local:
+
+# Project:
 pi install -l npm:@zeldrisho/pi-gate
 ```
+
+Use `pi config` to enable or disable this extension interactively. Run `pi list` to see configured packages and their install paths.
 
 ## Configure
 
@@ -51,7 +54,9 @@ When running in a Herdr-managed TUI pane, pi-gate can report an active approval 
 
 ```bash
 pi remove npm:@zeldrisho/pi-gate
-pi remove -l npm:@zeldrisho/pi-gate  # project-local
+
+# Project:
+pi remove -l npm:@zeldrisho/pi-gate
 ```
 
 ## License
