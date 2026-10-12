@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-12
+
 ### Added
 
 - Add response guidance for empty or insufficient results and expose per-call `mode` selection so agents can retry with context mode without environment configuration
@@ -120,7 +122,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded Brave web search ([cbc9491](https://github.com/zeldrisho/pi-packages/commit/cbc9491dce36555ab91b6bef203ec8b380596a89))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.9.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.10.0...HEAD
+[0.10.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.9.0...pi-web-search-v0.10.0
 [0.9.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.8.3...pi-web-search-v0.9.0
 [0.8.3]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.8.2...pi-web-search-v0.8.3
 [0.8.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.8.1...pi-web-search-v0.8.2
