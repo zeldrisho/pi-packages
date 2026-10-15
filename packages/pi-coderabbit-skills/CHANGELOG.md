@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Documented structured usage checks and authorized paid-continuation retries while preserving review scope.
+
 ## [0.1.2] - 2026-10-04
 
 ### Changed
