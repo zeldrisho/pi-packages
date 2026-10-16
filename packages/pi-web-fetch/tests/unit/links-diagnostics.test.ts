@@ -13,6 +13,15 @@ describe("bounded extraction diagnostics", () => {
       javascriptRequired: false,
       botWall: true,
     });
+    expect(
+      diagnoseExtraction(
+        "<title>Anubis</title> Anubis is protecting this site with a proof-of-work challenge.",
+        "Anubis challenge",
+      ).botWall,
+    ).toBe(true);
+    expect(
+      diagnoseExtraction("An article about Anubis and proof-of-work systems.", "Article").botWall,
+    ).toBe(false);
     expect(diagnoseExtraction("We use cookies. Accept all cookies.", "")).toMatchObject({
       consentInterstitial: true,
     });

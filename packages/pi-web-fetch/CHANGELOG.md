@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Detect Anubis proof-of-work interstitials, label blocked content, and avoid caching challenge pages
+
 ## [0.10.0] - 2026-10-01
 
 ### Changed

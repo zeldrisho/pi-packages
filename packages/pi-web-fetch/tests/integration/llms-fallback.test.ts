@@ -498,6 +498,29 @@ describe("executeWebFetch llms.txt support", () => {
     expect(result.details.shellSuspected).toBe(true);
   });
 
+  it("reports and does not cache an Anubis challenge", async () => {
+    const { dependencies, requests } = recordingDependencies((href) =>
+      href.endsWith("/llms.txt")
+        ? fakeResponse(404, "text/plain", "Not Found")
+        : fakeResponse(
+            200,
+            "text/html",
+            "<html><head><title>Anubis</title></head><body>Anubis is protecting this site with a proof-of-work challenge. Please wait while your browser verifies the request.</body></html>",
+          ),
+    );
+
+    const url = `https://anubis-${process.pid}.example.com/packaging-guidelines`;
+
+    const first = await executeWebFetch({ url }, undefined, undefined, dependencies);
+    const second = await executeWebFetch({ url }, undefined, undefined, dependencies);
+
+    expect(first.details.extractionDiagnostics?.botWall).toBe(true);
+    expect(first.content[0]?.text).toContain("anti-bot challenge; its content was not retrieved");
+    expect(first.content[0]?.text).toContain("Untrusted page content");
+    expect(second.details.cacheStatus).toBe("miss");
+    expect(requests.filter((request) => request === url)).toHaveLength(2);
+  });
+
   it("caches the per-origin probe across pages on the same origin", async () => {
     const { dependencies, requests } = recordingDependencies((href) =>
       href.endsWith("/llms.txt")
