@@ -20,7 +20,10 @@ describe("bounded extraction diagnostics", () => {
       ).botWall,
     ).toBe(true);
     expect(
-      diagnoseExtraction("An article about Anubis and proof-of-work systems.", "Article").botWall,
+      diagnoseExtraction(
+        "An article about Anubis proof-of-work challenges explains how the system works.",
+        "Article",
+      ).botWall,
     ).toBe(false);
     expect(diagnoseExtraction("We use cookies. Accept all cookies.", "")).toMatchObject({
       consentInterstitial: true,
