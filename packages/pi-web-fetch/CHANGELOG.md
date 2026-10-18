@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Upgrade Defuddle to `^0.19.5` for hardened Markdown escaping and extraction fixes
+
 ### Fixed
 
 - Detect Anubis administrator-protection notices, including pages whose visible text does not contain “challenge”
