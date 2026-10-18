@@ -498,28 +498,47 @@ describe("executeWebFetch llms.txt support", () => {
     expect(result.details.shellSuspected).toBe(true);
   });
 
-  it("reports and does not cache an Anubis challenge", async () => {
-    const { dependencies, requests } = recordingDependencies((href) =>
-      href.endsWith("/llms.txt")
-        ? fakeResponse(404, "text/plain", "Not Found")
-        : fakeResponse(
-            200,
-            "text/html",
-            "<html><head><title>Anubis</title></head><body>The administrator of this website has set up Anubis to protect the server against scrapers. Anubis uses a Proof-of-Work scheme. Please wait while your browser verifies this challenge.</body></html>",
-          ),
-    );
+  it.each([
+    { name: "plain", offset: undefined, query: undefined, fragment: "" },
+    { name: "continuation", offset: 100, query: undefined, fragment: "" },
+    { name: "focus", offset: undefined, query: "Anubis", fragment: "" },
+    { name: "fragment", offset: undefined, query: undefined, fragment: "#verification" },
+  ])(
+    "reports and does not cache an Anubis challenge ($name)",
+    async ({ name, offset, query, fragment }) => {
+      const { dependencies, requests } = recordingDependencies((href) =>
+        href.endsWith("/llms.txt")
+          ? fakeResponse(404, "text/plain", "Not Found")
+          : fakeResponse(
+              200,
+              "text/html",
+              '<html><head><title>Anubis</title></head><body>The administrator of this website has set up Anubis to protect the server against scrapers. Anubis uses a Proof-of-Work scheme in the vein of Hashcash. Please note that Anubis requires the use of modern JavaScript features.<h2 id="verification">Verification</h2><a href="/help">Help</a></body></html>',
+            ),
+      );
 
-    const url = `https://anubis-${process.pid}.example.com/packaging-guidelines`;
+      const url = `https://anubis-${process.pid}.example.com/packaging-guidelines-${name}`;
+      const params = { url: `${url}${fragment}`, offset, query };
 
-    const first = await executeWebFetch({ url }, undefined, undefined, dependencies);
-    const second = await executeWebFetch({ url }, undefined, undefined, dependencies);
+      const first = await executeWebFetch(params, undefined, undefined, dependencies);
+      const second = await executeWebFetch(params, undefined, undefined, dependencies);
 
-    expect(first.details.extractionDiagnostics?.botWall).toBe(true);
-    expect(first.content[0]?.text).toContain("Blocked by an anti-bot challenge (including Anubis)");
-    expect(first.content[0]?.text).toContain("Untrusted page content");
-    expect(second.details.cacheStatus).toBe("miss");
-    expect(requests.filter((request) => request === url)).toHaveLength(2);
-  });
+      expect(first.details.extractionDiagnostics?.botWall).toBe(true);
+      expect(first.content[0]?.text).toBe(
+        "Blocked by an anti-bot challenge. Requested page content is unavailable.",
+      );
+      expect(first.content[0]?.text).not.toContain("administrator");
+      expect(first.details.truncated).toBe(false);
+      expect(first.details.nextOffset).toBeUndefined();
+      expect(first.details.totalCharacters).toBe(0);
+      expect(first.details.characterCount).toBe(0);
+      expect(first.details.offset).toBe(0);
+      expect(first.details.focus).toBeUndefined();
+      expect(first.details.outline.headings).toEqual([]);
+      expect(first.details.links).toBeUndefined();
+      expect(second.details.cacheStatus).toBe("miss");
+      expect(requests.filter((request) => request === url)).toHaveLength(2);
+    },
+  );
 
   it("caches the per-origin probe across pages on the same origin", async () => {
     const { dependencies, requests } = recordingDependencies((href) =>

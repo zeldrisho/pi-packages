@@ -41,8 +41,6 @@ const ANUBIS_MARKER = /\banubis\b/i;
 
 const PROOF_OF_WORK_MARKER = /proof[\s-]+of[\s-]+work/i;
 
-const CHALLENGE_MARKER = /\bchallenge\b/i;
-
 const ANUBIS_PROTECTION_MARKERS = [
   /\banubis\s+is\s+protecting\s+this\s+site\b/i,
   /\badministrator\b.{0,160}\bset\s+up\s+anubis\b.{0,160}\bprotect\s+the\s+server\b/i,
@@ -64,8 +62,7 @@ export function diagnoseExtraction(raw: string, markdown: string): ExtractionDia
       BOT_MARKERS.some((marker) => marker.test(raw)) ||
       (ANUBIS_MARKER.test(raw) &&
         ANUBIS_PROTECTION_MARKERS.some((marker) => marker.test(raw)) &&
-        PROOF_OF_WORK_MARKER.test(raw) &&
-        CHALLENGE_MARKER.test(raw)),
+        PROOF_OF_WORK_MARKER.test(raw)),
     consentInterstitial: CONSENT_MARKERS.some((marker) => marker.test(raw)),
     sparseExtraction:
       raw.length > 4_000 && markdown.length < 1_024 && markdown.length < raw.length * 0.008,

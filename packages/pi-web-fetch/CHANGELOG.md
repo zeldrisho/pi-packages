@@ -7,13 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- Simplify the anti-bot challenge notice so agents can quickly identify that requested page content is unavailable
-
 ### Fixed
 
-- Detect Anubis protection pages that describe administrator-configured server protection, including COPR challenge pages
+- Detect Anubis administrator-protection notices, including pages whose visible text does not contain “challenge”
+- Return only a short notice for detected anti-bot pages, omitting challenge text, links, and continuation; do not cache blocked pages
 
 ## [0.10.1] - 2026-10-17
 
