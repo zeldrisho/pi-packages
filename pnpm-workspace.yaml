@@ -14,50 +14,96 @@ allowBuilds:
   protobufjs: false
 
 catalog:
-  "@earendil-works/pi-ai": "^0.99.1"
-  "@earendil-works/pi-coding-agent": "^0.99.1"
-  "@earendil-works/pi-tui": "^0.99.1"
-  "@types/node": "^26.5.1"
-  "@vitest/coverage-v8": 5.0.1
-  typebox: "^1.3.30"
+  "@earendil-works/pi-ai": "^1.3.0"
+  "@earendil-works/pi-coding-agent": "^1.3.0"
+  "@earendil-works/pi-tui": "^1.3.0"
+  "@types/node": "^26.6.5"
+  "@vitest/coverage-v8": 5.0.5
+  typebox: "^1.4.2"
   typescript: "^7.0.2"
-  vite: npm:@voidzero-dev/vite-plus-core@1.0.0
-  vite-plus: 1.0.0
-  vitest: 5.0.1
+  vite: npm:@voidzero-dev/vite-plus-core@1.3.0
+  vite-plus: 1.3.0
+  vitest: 5.0.5
 
 minimumReleaseAgeExclude:
   # Exact-version exemptions still within the 7-day release-age window as of
   # 2026-09-30. Recheck timestamps after every migration/catalog update;
   # remove entries once their versions age past the window.
-  - "@earendil-works/pi-ai@0.99.1"
-  - "@earendil-works/pi-coding-agent@0.99.1"
-  - "@earendil-works/pi-tui@0.99.1"
-  - "@earendil-works/chord@0.99.1"
-  - "@earendil-works/pi-agent-core@0.99.1"
-  - "@earendil-works/pi-codemode@0.99.1"
-  - "@earendil-works/pi-mcp@0.99.1"
-  - "@earendil-works/pi-telemetry@0.99.1"
-  - "@oxlint-tsgolint/darwin-arm64@7.0.2003"
-  - "@oxlint-tsgolint/darwin-x64@7.0.2003"
-  - "@oxlint-tsgolint/linux-arm64@7.0.2003"
-  - "@oxlint-tsgolint/linux-x64@7.0.2003"
-  - "@oxlint-tsgolint/win32-arm64@7.0.2003"
-  - "@oxlint-tsgolint/win32-x64@7.0.2003"
+  # Exact-version exemptions for reviewed releases still inside the 7-day minimum age as of 2026-10-18; remove entries once they age past the window.
+  - "@earendil-works/pi-ai@1.3.0"
+  - "@earendil-works/pi-coding-agent@1.3.0"
+  - "@earendil-works/pi-tui@1.3.0"
+  - "@earendil-works/pi-agent-core@1.3.0"
+  - "@earendil-works/pi-codemode@1.3.0"
+  - "@earendil-works/pi-mcp@1.3.0"
+  - "@earendil-works/pi-telemetry@1.3.0"
+  - "@oxc-project/runtime@0.154.0"
+  - "@oxc-project/types@0.154.0"
+  - "@oxfmt/binding-android-arm-eabi@0.73.0"
+  - "@oxfmt/binding-android-arm64@0.73.0"
+  - "@oxfmt/binding-darwin-arm64@0.73.0"
+  - "@oxfmt/binding-darwin-x64@0.73.0"
+  - "@oxfmt/binding-freebsd-x64@0.73.0"
+  - "@oxfmt/binding-linux-arm-gnueabihf@0.73.0"
+  - "@oxfmt/binding-linux-arm-musleabihf@0.73.0"
+  - "@oxfmt/binding-linux-arm64-gnu@0.73.0"
+  - "@oxfmt/binding-linux-arm64-musl@0.73.0"
+  - "@oxfmt/binding-linux-ppc64-gnu@0.73.0"
+  - "@oxfmt/binding-linux-riscv64-gnu@0.73.0"
+  - "@oxfmt/binding-linux-riscv64-musl@0.73.0"
+  - "@oxfmt/binding-linux-s390x-gnu@0.73.0"
+  - "@oxfmt/binding-linux-x64-gnu@0.73.0"
+  - "@oxfmt/binding-linux-x64-musl@0.73.0"
+  - "@oxfmt/binding-openharmony-arm64@0.73.0"
+  - "@oxfmt/binding-win32-arm64-msvc@0.73.0"
+  - "@oxfmt/binding-win32-ia32-msvc@0.73.0"
+  - "@oxfmt/binding-win32-x64-msvc@0.73.0"
+  - "@oxlint/binding-android-arm-eabi@1.88.0"
+  - "@oxlint/binding-android-arm64@1.88.0"
+  - "@oxlint/binding-darwin-arm64@1.88.0"
+  - "@oxlint/binding-darwin-x64@1.88.0"
+  - "@oxlint/binding-freebsd-x64@1.88.0"
+  - "@oxlint/binding-linux-arm-gnueabihf@1.88.0"
+  - "@oxlint/binding-linux-arm-musleabihf@1.88.0"
+  - "@oxlint/binding-linux-arm64-gnu@1.88.0"
+  - "@oxlint/binding-linux-arm64-musl@1.88.0"
+  - "@oxlint/binding-linux-ppc64-gnu@1.88.0"
+  - "@oxlint/binding-linux-riscv64-gnu@1.88.0"
+  - "@oxlint/binding-linux-riscv64-musl@1.88.0"
+  - "@oxlint/binding-linux-s390x-gnu@1.88.0"
+  - "@oxlint/binding-linux-x64-gnu@1.88.0"
+  - "@oxlint/binding-linux-x64-musl@1.88.0"
+  - "@oxlint/binding-openharmony-arm64@1.88.0"
+  - "@oxlint/binding-win32-arm64-msvc@1.88.0"
+  - "@oxlint/binding-win32-ia32-msvc@1.88.0"
+  - "@oxlint/binding-win32-x64-msvc@1.88.0"
+  - "@oxlint/plugins@1.88.0"
+  - "@vitest/browser-preview@5.0.5"
+  - "@vitest/browser@5.0.5"
+  - "@vitest/mocker@5.0.5"
+  - "@vitest/pretty-format@5.0.5"
+  - "@vitest/snapshot@5.0.5"
+  - "@vitest/spy@5.0.5"
+  - "@vitest/ui@5.0.5"
+  - "@vitest/utils@5.0.5"
+  - "@vitest/coverage-v8@5.0.5"
+  - "oxfmt@0.73.0"
+  - "oxlint@1.88.0"
+  - "@voidzero-dev/vite-plus-core@1.3.0"
+  - "@voidzero-dev/vite-plus-darwin-arm64@1.3.0"
+  - "@voidzero-dev/vite-plus-darwin-x64@1.3.0"
+  - "@voidzero-dev/vite-plus-linux-arm64-gnu@1.3.0"
+  - "@voidzero-dev/vite-plus-linux-arm64-musl@1.3.0"
+  - "@voidzero-dev/vite-plus-linux-x64-gnu@1.3.0"
+  - "@voidzero-dev/vite-plus-linux-x64-musl@1.3.0"
+  - "@voidzero-dev/vite-plus-win32-arm64-msvc@1.3.0"
+  - "@voidzero-dev/vite-plus-win32-x64-msvc@1.3.0"
+  - "oxlint-tsgolint@7.0.2004"
+  - "typebox@1.4.2"
+  - "vite-plus@1.3.0"
+  - "vitest@5.0.5"
   - "@vitest/istanbul-lib-coverage@1.0.2"
   - "@vitest/istanbul-lib-report@1.0.2"
-  - "@voidzero-dev/vite-plus-core@1.0.0"
-  - "@voidzero-dev/vite-plus-darwin-arm64@1.0.0"
-  - "@voidzero-dev/vite-plus-darwin-x64@1.0.0"
-  - "@voidzero-dev/vite-plus-linux-arm64-gnu@1.0.0"
-  - "@voidzero-dev/vite-plus-linux-arm64-musl@1.0.0"
-  - "@voidzero-dev/vite-plus-linux-x64-gnu@1.0.0"
-  - "@voidzero-dev/vite-plus-linux-x64-musl@1.0.0"
-  - "@voidzero-dev/vite-plus-win32-arm64-msvc@1.0.0"
-  - "@voidzero-dev/vite-plus-win32-x64-msvc@1.0.0"
-  # Security fix for GHSA-68fv-2mgg-jv7q; exact-version age exemption only.
-  - "source-map-js@1.2.2"
-  - "oxlint-tsgolint@7.0.2003"
-  - "vite-plus@1.0.0"
 
 overrides:
   # Dependency-override lifecycle, tracked in issue #37
@@ -65,10 +111,6 @@ overrides:
   # condition on every catalog or lockfile bump and drop the override in the
   # same change. tests/repository-contract.test.ts fails when an overridden
   # package disappears from the dependency graph.
-  #
-  # Temporary security override for GHSA-68fv-2mgg-jv7q. Remove when the
-  # toolchain dependency graph resolves source-map-js >=1.2.2 without it.
-  source-map-js: "1.2.2"
   # Dropped with the 0.84.0 catalog bump: undici (GHSA-4cwx-7wf7-3272,
   # GHSA-8xcm-r25x-g524, GHSA-v3r7-h72x-cjcm, GHSA-jr45-8vmc-qm54,
   # GHSA-m8rv-5g2x-5cg5) was forced to 8.9.0 because pi-coding-agent pinned

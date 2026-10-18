@@ -1,6 +1,6 @@
 {
   "name": "@zeldrisho/pi-web-fetch",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": "Pi extension for secure, bounded public web page fetching and Markdown extraction",
   "keywords": [
     "pi",
@@ -38,7 +38,7 @@
     "typecheck": "vp check --no-fmt --no-lint"
   },
   "dependencies": {
-    "defuddle": "^0.19.4",
+    "defuddle": "^0.19.5",
     "linkedom": "^0.18.13"
   },
   "devDependencies": {

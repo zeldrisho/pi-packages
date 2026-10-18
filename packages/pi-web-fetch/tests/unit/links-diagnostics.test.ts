@@ -21,7 +21,31 @@ describe("bounded extraction diagnostics", () => {
     ).toBe(true);
     expect(
       diagnoseExtraction(
+        "<title>Anubis</title> The administrator of this website has set up Anubis to protect the server against scrapers. Anubis uses a Proof-of-Work scheme. This challenge protects the server.",
+        "",
+      ).botWall,
+    ).toBe(true);
+    expect(
+      diagnoseExtraction(
+        "Making sure you're not a bot! Loading...You are seeing this because the administrator of this website has set up Anubis to protect the server against the scourge of AI companies aggressively scraping websites. Anubis uses a Proof-of-Work scheme in the vein of Hashcash. Please note that Anubis requires the use of modern JavaScript features.",
+        "",
+      ).botWall,
+    ).toBe(true);
+    expect(
+      diagnoseExtraction(
+        'The administrator of this website has set <a href="/setup">up</a> Anubis to protect the server. Anubis uses a Proof-of-Work scheme.',
+        "",
+      ).botWall,
+    ).toBe(true);
+    expect(
+      diagnoseExtraction(
         "An article about Anubis proof-of-work challenges explains how the system works.",
+        "Article",
+      ).botWall,
+    ).toBe(false);
+    expect(
+      diagnoseExtraction(
+        "An administrator set up Anubis for a discussion about proof-of-work challenge systems.",
         "Article",
       ).botWall,
     ).toBe(false);

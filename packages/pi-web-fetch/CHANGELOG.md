@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-10-18
+
+### Changed
+
+- Upgrade Defuddle to `^0.19.5` for hardened Markdown escaping and extraction fixes
+
+### Fixed
+
+- Detect Anubis administrator-protection notices, including pages whose visible text does not contain “challenge”
+- Return only a short notice for detected anti-bot pages, omitting challenge text, links, and continuation; do not cache blocked pages
+
 ## [0.10.1] - 2026-10-17
 
 ### Fixed
@@ -195,7 +206,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.10.1...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.10.2...HEAD
+[0.10.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.10.1...pi-web-fetch-v0.10.2
 [0.10.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.10.0...pi-web-fetch-v0.10.1
 [0.10.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.9.3...pi-web-fetch-v0.10.0
 [0.9.3]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.9.2...pi-web-fetch-v0.9.3
