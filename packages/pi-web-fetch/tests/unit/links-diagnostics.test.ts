@@ -33,6 +33,12 @@ describe("bounded extraction diagnostics", () => {
     ).toBe(true);
     expect(
       diagnoseExtraction(
+        'The administrator of this website has set <a href="/setup">up</a> Anubis to protect the server. Anubis uses a Proof-of-Work scheme.',
+        "",
+      ).botWall,
+    ).toBe(true);
+    expect(
+      diagnoseExtraction(
         "An article about Anubis proof-of-work challenges explains how the system works.",
         "Article",
       ).botWall,

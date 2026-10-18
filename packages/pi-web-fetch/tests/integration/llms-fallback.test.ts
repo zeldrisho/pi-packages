@@ -512,7 +512,7 @@ describe("executeWebFetch llms.txt support", () => {
           : fakeResponse(
               200,
               "text/html",
-              '<html><head><title>Anubis</title></head><body>The administrator of this website has set up Anubis to protect the server against scrapers. Anubis uses a Proof-of-Work scheme in the vein of Hashcash. Please note that Anubis requires the use of modern JavaScript features.<h2 id="verification">Verification</h2><a href="/help">Help</a></body></html>',
+              '<html><head><title>Anubis</title></head><body>The administrator of this website has set <a href="/setup">up</a> Anubis to protect the server against scrapers. Anubis uses a Proof-of-Work scheme in the vein of Hashcash. Please note that Anubis requires the use of modern JavaScript features.<h2 id="verification">Verification</h2><a href="/help">Help</a></body></html>',
             ),
       );
 
@@ -523,6 +523,7 @@ describe("executeWebFetch llms.txt support", () => {
       const second = await executeWebFetch(params, undefined, undefined, dependencies);
 
       expect(first.details.extractionDiagnostics?.botWall).toBe(true);
+      expect(first.details.title).toBeUndefined();
       expect(first.content[0]?.text).toBe(
         "Blocked by an anti-bot challenge. Requested page content is unavailable.",
       );

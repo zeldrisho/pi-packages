@@ -394,7 +394,13 @@ export async function executeWebFetch(
 
   // Keep acquisition diagnostics, but never expose challenge prose, links, or continuation.
   if (blocked)
-    document = { ...document, markdown: "", links: undefined, fragmentOffsets: undefined };
+    document = {
+      ...document,
+      markdown: "",
+      title: undefined,
+      links: undefined,
+      fragmentOffsets: undefined,
+    };
   const resolvedFragment = resolveFragmentOffset(document, params.url);
   const fragmentOffset = resolvedFragment.offset;
   const fragmentMatched = resolvedFragment.fragment !== undefined && fragmentOffset !== undefined;

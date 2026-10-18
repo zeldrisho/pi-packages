@@ -56,13 +56,15 @@ const CONSENT_MARKERS = [
 
 /** Produces explicit, bounded extraction-quality signals instead of one opaque shell flag. */
 export function diagnoseExtraction(raw: string, markdown: string): ExtractionDiagnostics {
+  const anubisText = raw.replace(/<[^>]*>/g, " ");
+
   return {
     javascriptRequired: JAVASCRIPT_MARKERS.some((marker) => marker.test(raw)),
     botWall:
       BOT_MARKERS.some((marker) => marker.test(raw)) ||
-      (ANUBIS_MARKER.test(raw) &&
-        ANUBIS_PROTECTION_MARKERS.some((marker) => marker.test(raw)) &&
-        PROOF_OF_WORK_MARKER.test(raw)),
+      (ANUBIS_MARKER.test(anubisText) &&
+        ANUBIS_PROTECTION_MARKERS.some((marker) => marker.test(anubisText)) &&
+        PROOF_OF_WORK_MARKER.test(anubisText)),
     consentInterstitial: CONSENT_MARKERS.some((marker) => marker.test(raw)),
     sparseExtraction:
       raw.length > 4_000 && markdown.length < 1_024 && markdown.length < raw.length * 0.008,
