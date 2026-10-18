@@ -56,7 +56,8 @@ const CONSENT_MARKERS = [
 
 /** Produces explicit, bounded extraction-quality signals instead of one opaque shell flag. */
 export function diagnoseExtraction(raw: string, markdown: string): ExtractionDiagnostics {
-  const anubisText = raw.replace(/<[^>]*>/g, " ");
+  const { document } = parseHTML(raw);
+  const anubisText = [...document.childNodes].map((node) => node.textContent ?? "").join(" ");
 
   return {
     javascriptRequired: JAVASCRIPT_MARKERS.some((marker) => marker.test(raw)),
