@@ -505,7 +505,7 @@ describe("executeWebFetch llms.txt support", () => {
         : fakeResponse(
             200,
             "text/html",
-            "<html><head><title>Anubis</title></head><body>Anubis is protecting this site with a proof-of-work challenge. Please wait while your browser verifies the request.</body></html>",
+            "<html><head><title>Anubis</title></head><body>The administrator of this website has set up Anubis to protect the server against scrapers. Anubis uses a Proof-of-Work scheme. Please wait while your browser verifies this challenge.</body></html>",
           ),
     );
 

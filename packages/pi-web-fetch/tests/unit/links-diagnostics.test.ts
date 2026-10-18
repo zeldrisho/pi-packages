@@ -21,7 +21,19 @@ describe("bounded extraction diagnostics", () => {
     ).toBe(true);
     expect(
       diagnoseExtraction(
+        "<title>Anubis</title> The administrator of this website has set up Anubis to protect the server against scrapers. Anubis uses a Proof-of-Work scheme. This challenge protects the server.",
+        "",
+      ).botWall,
+    ).toBe(true);
+    expect(
+      diagnoseExtraction(
         "An article about Anubis proof-of-work challenges explains how the system works.",
+        "Article",
+      ).botWall,
+    ).toBe(false);
+    expect(
+      diagnoseExtraction(
+        "An administrator set up Anubis for a discussion about proof-of-work challenge systems.",
         "Article",
       ).botWall,
     ).toBe(false);

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Detect Anubis protection pages that describe administrator-configured server protection, including COPR challenge pages
+
 ## [0.10.1] - 2026-10-17
 
 ### Fixed
