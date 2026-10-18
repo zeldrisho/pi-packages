@@ -515,7 +515,7 @@ describe("executeWebFetch llms.txt support", () => {
     const second = await executeWebFetch({ url }, undefined, undefined, dependencies);
 
     expect(first.details.extractionDiagnostics?.botWall).toBe(true);
-    expect(first.content[0]?.text).toContain("anti-bot challenge; its content was not retrieved");
+    expect(first.content[0]?.text).toContain("Blocked by an anti-bot challenge (including Anubis)");
     expect(first.content[0]?.text).toContain("Untrusted page content");
     expect(second.details.cacheStatus).toBe("miss");
     expect(requests.filter((request) => request === url)).toHaveLength(2);

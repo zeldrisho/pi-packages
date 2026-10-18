@@ -458,7 +458,7 @@ export async function executeWebFetch(
     "",
     ...(result.extractionDiagnostics?.botWall
       ? [
-          "[The requested page returned an anti-bot challenge; its content was not retrieved. Any text below is the challenge page, not the requested content.]",
+          "[Blocked by an anti-bot challenge (including Anubis). Requested page content is unavailable.]",
           "",
         ]
       : []),
