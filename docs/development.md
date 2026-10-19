@@ -48,7 +48,7 @@ vp run benchmark:web-fetch-extraction
 
 ## Verification
 
-`vp run ready` runs the dependency audit, formatting, linting, type checking, tests, repository contracts, tarball inspection, and packaged smoke tests. Tarballs should contain only the package README, changelog, license, manifest, runtime `src/` files, and explicitly contracted metadata such as `pi-gate`'s schema.
+`vp run ready` runs the dependency audit, formatting, linting, type checking, tests, repository contracts, tarball inspection, and packaged smoke tests. Tarballs should contain only the package README, changelog, license, manifest, runtime `src/` files, and explicitly contracted metadata such as `pi-gate`'s schema. `pi-web-fetch` also packages its generated JavaScript Anubis worker and solver under `workers/` because Node cannot strip TypeScript from worker files installed under `node_modules`; regenerate them with `vp run build:anubis-worker`.
 
 The deterministic suites use local fixtures and mocked Brave responses. Manually verify affected behavior, including missing keys and both search modes; fetch formats, redirects, blocked targets, limits, caching, coalescing, cancellation, and continuation; and temporary-file cleanup. Load a package in an isolated session with `pi -e ./packages/<name>`.
 

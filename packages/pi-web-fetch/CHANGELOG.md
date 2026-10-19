@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Publish JavaScript Anubis worker artifacts so proof-of-work runs in installed packages on Node 24.
 - Group acquisition, networking, challenge, and document-processing modules into dedicated source directories; clarify end-user documentation.
 
 ### Fixed

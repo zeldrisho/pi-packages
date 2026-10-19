@@ -335,7 +335,7 @@ type AnubisWorkerMessage =
 
 /** Runs one solve request in a sandboxed worker thread, terminating it on abort. */
 function solveInWorker(request: AnubisWorkerRequest, signal: AbortSignal): Promise<AnubisSolution> {
-  const worker = new Worker(new URL("./anubis-worker.js", import.meta.url), {
+  const worker = new Worker(new URL("../../workers/anubis-worker.js", import.meta.url), {
     workerData: request,
     resourceLimits: { maxOldGenerationSizeMb: 64, maxYoungGenerationSizeMb: 16 },
   });
