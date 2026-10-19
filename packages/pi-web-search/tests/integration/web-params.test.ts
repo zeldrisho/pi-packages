@@ -111,7 +111,7 @@ describe("web_search extra snippets rendering", () => {
     expect(snippet).toContain("second excerpt");
   });
 
-  it("rejects web-only options in context mode before contacting the provider", async () => {
+  it("rejects web-only options in Answers mode before contacting the provider", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "context-secret";
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -119,7 +119,7 @@ describe("web_search extra snippets rendering", () => {
     await expect(
       createSearchTool().execute(
         "call",
-        { query: "context query", mode: "context", extraSnippets: true },
+        { query: "answers query", mode: "answers", extraSnippets: true },
         undefined,
         undefined,
       ),
@@ -127,7 +127,7 @@ describe("web_search extra snippets rendering", () => {
     await expect(
       createSearchTool().execute(
         "call",
-        { query: "context query", mode: "context", operators: true },
+        { query: "answers query", mode: "answers", operators: true },
         undefined,
         undefined,
       ),
@@ -135,28 +135,11 @@ describe("web_search extra snippets rendering", () => {
     await expect(
       createSearchTool().execute(
         "call",
-        { query: "context query", mode: "context", offset: 1 },
+        { query: "answers query", mode: "answers", offset: 1 },
         undefined,
         undefined,
       ),
     ).rejects.toThrow("only supported in web mode");
     expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("allows shared options (country, spellcheck, goggles) in context mode", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "context-shared-secret";
-
-    const url = await runSearchCapturingUrl({
-      query: "shared options query",
-      mode: "context",
-      country: "DE",
-      spellcheck: false,
-      goggles: "https://example.com/docs.goggle",
-    });
-
-    expect(url.origin + url.pathname).toBe("https://api.search.brave.com/res/v1/llm/context");
-    expect(url.searchParams.get("country")).toBe("DE");
-    expect(url.searchParams.get("spellcheck")).toBe("false");
-    expect(url.searchParams.get("goggles")).toBe("https://example.com/docs.goggle");
   });
 });

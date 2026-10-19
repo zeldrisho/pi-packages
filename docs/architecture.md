@@ -40,7 +40,7 @@ flowchart LR
   G -- no --> H[Private temporary file]
 ```
 
-The API key is read at request time and excluded from cache keys, output, and errors. Context mode uses only Brave's context endpoint and never fetches result URLs. Large formatted results use a package-owned temporary directory and are removed after write failure or session shutdown.
+The API key is read at request time and excluded from cache keys, output, and errors. Web and Answers modes are explicit, separately cached requests with no automatic switching. Answers uses Brave's chat-completions endpoint through the same bounded, timeout- and cancellation-aware transport, parsing SSE citation and usage tags into generated-answer metadata rather than search-result evidence. Neither mode fetches result URLs. Generated answers remain untrusted and do not imply correctness. Large formatted results use a package-owned temporary directory and are removed after write failure or session shutdown.
 
 ## Data flow invariants
 

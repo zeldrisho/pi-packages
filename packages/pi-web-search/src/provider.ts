@@ -105,19 +105,19 @@ async function readResponseText(
 }
 
 /**
- * Performs an HTTP request and parses the response as JSON with timeout and size limits.
+ * Performs an HTTP request and reads bounded text with timeout and size limits.
  *
  * @param url - URL to request
  * @param init - Fetch request init options
  * @param signal - Optional abort signal for cancellation
- * @returns Promise resolving to the parsed JSON response
+ * @returns Promise resolving to the bounded response text
  * @throws {Error} When request times out, is cancelled, or response is too large
  */
-export async function requestJson<T>(
+export async function requestText(
   url: string | URL,
   init: RequestInit,
   signal: AbortSignal | undefined,
-): Promise<T> {
+): Promise<string> {
   const controller = new AbortController();
   let timedOut = false;
 
@@ -128,6 +128,8 @@ export async function requestJson<T>(
 
   const cancel = () => controller.abort();
   signal?.addEventListener("abort", cancel, { once: true });
+
+  if (signal?.aborted) controller.abort();
 
   try {
     const response = await fetch(url, { ...init, signal: controller.signal });
@@ -147,8 +149,7 @@ export async function requestJson<T>(
       throw new Error(`Search provider returned HTTP ${response.status}${body ? `: ${body}` : ""}`);
     }
 
-    // SAFETY: the caller supplies the expected response shape T; JSON.parse yields the decoded document.
-    return JSON.parse(await readResponseText(response, SEARCH_MAX_RESPONSE_BYTES)) as T;
+    return await readResponseText(response, SEARCH_MAX_RESPONSE_BYTES);
   } catch (error) {
     if (timedOut)
       throw new Error(`Web search timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds.`);
@@ -159,4 +160,14 @@ export async function requestJson<T>(
     clearTimeout(timeout);
     signal?.removeEventListener("abort", cancel);
   }
+}
+
+/** Uses the shared bounded transport to decode a provider JSON response. */
+export async function requestJson<T>(
+  url: string | URL,
+  init: RequestInit,
+  signal: AbortSignal | undefined,
+): Promise<T> {
+  // SAFETY: callers supply the expected provider shape; transport bounds the decoded document.
+  return JSON.parse(await requestText(url, init, signal)) as T;
 }

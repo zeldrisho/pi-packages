@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { searchBraveWeb } from "../../src/brave";
 import {
-  SEARCH_CONTEXT_MAX_QUERY_CHARACTERS,
+  SEARCH_WEB_MAX_QUERY_CHARACTERS,
   SEARCH_MAX_RESULT_COUNT,
   SEARCH_MIN_RESULT_COUNT,
 } from "../../src/limits";
@@ -12,91 +12,23 @@ describe("web_search provider transport", () => {
     "rejects invalid provider result counts (%s)",
     async (count) => {
       await expect(
-        searchBraveWeb("query", count, undefined, undefined, undefined, "transport-secret"),
+        searchBraveWeb("query", count, undefined, undefined, "transport-secret"),
       ).rejects.toThrow("Search result count must be an integer");
     },
   );
 
-  it("serializes unrecognized structured snippets compactly", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "compact-snippet-secret";
-
-    const serialized = JSON.stringify({
-      caption: "Large sample",
-      foo: { bar: "baz", list: [1, 2, 3] },
-    });
-
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        jsonResponse({
-          grounding: {
-            generic: [{ title: "T", url: "https://example.com/snippet", snippets: [serialized] }],
-          },
-        }),
-      ),
-    );
-
-    const result = await createSearchTool().execute(
-      "call",
-      { query: "structured", mode: "context" },
-      undefined,
-      undefined,
-    );
-
-    expect(result.content[0]?.text).toContain("```json\n   " + serialized + "\n   ```");
-    const pretty = JSON.stringify(JSON.parse(serialized), null, 2);
-    expect((pretty.length - serialized.length) / 4).toBeGreaterThan(10);
-  });
-
-  it("uses only Brave's context endpoint without fetching result URLs", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "context-only-secret";
-    const resultUrl = "https://example.com/provider-result";
-
-    const fetchMock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) =>
-      jsonResponse({
-        grounding: {
-          generic: [{ title: "Provider context", url: resultUrl, snippets: ["Extracted"] }],
-        },
-      }),
-    );
-
-    vi.stubGlobal("fetch", fetchMock);
-
-    await createSearchTool().execute(
-      "call",
-      {
-        query: "provider-only context",
-        mode: "context",
-        freshness: "day",
-        language: "en",
-      },
-      undefined,
-      undefined,
-    );
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const input = fetchMock.mock.calls[0][0];
-    const requestedUrl = new URL(input instanceof Request ? input.url : input.toString());
-    expect(requestedUrl.origin + requestedUrl.pathname).toBe(
-      "https://api.search.brave.com/res/v1/llm/context",
-    );
-    expect(requestedUrl.searchParams.get("freshness")).toBe("pd");
-    expect(requestedUrl.searchParams.get("search_lang")).toBe("en");
-    expect(requestedUrl.toString()).not.toContain(resultUrl);
-  });
-
-  it("rejects context queries beyond the provider limit", async () => {
+  it("rejects Answers queries beyond the tool limit", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "context-secret";
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     await expect(
       createSearchTool().execute(
         "call",
-        { query: "x".repeat(SEARCH_CONTEXT_MAX_QUERY_CHARACTERS + 1), mode: "context" },
+        { query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS + 1), mode: "answers" },
         undefined,
         undefined,
       ),
-    ).rejects.toThrow(`cannot exceed ${SEARCH_CONTEXT_MAX_QUERY_CHARACTERS} characters`);
+    ).rejects.toThrow(`cannot exceed ${SEARCH_WEB_MAX_QUERY_CHARACTERS} characters`);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

@@ -93,6 +93,18 @@ export function jsonResponse(value: any, status = 200): Response {
   });
 }
 
+/** Deterministic Answers SSE fixture, including completion sentinel. */
+export function answerResponse(contents: string[], status = 200): Response {
+  const events = contents
+    .map((content) => `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`)
+    .join("");
+
+  return new Response(`${events}data: [DONE]\n\n`, {
+    status,
+    headers: { "content-type": "text/event-stream" },
+  });
+}
+
 export const renderTheme: RenderTheme = {
   fg: (_color, text) => text,
   bold: (text) => text,
@@ -100,10 +112,15 @@ export const renderTheme: RenderTheme = {
 
 const originalApiKey = process.env.BRAVE_SEARCH_API_KEY;
 
+const originalAnswersApiKey = process.env.BRAVE_ANSWERS_API_KEY;
+
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
 
   if (originalApiKey === undefined) delete process.env.BRAVE_SEARCH_API_KEY;
   else process.env.BRAVE_SEARCH_API_KEY = originalApiKey;
+
+  if (originalAnswersApiKey === undefined) delete process.env.BRAVE_ANSWERS_API_KEY;
+  else process.env.BRAVE_ANSWERS_API_KEY = originalAnswersApiKey;
 });

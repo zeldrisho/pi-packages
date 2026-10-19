@@ -64,7 +64,6 @@ describe("web_search honest-evidence details", () => {
       requestedCount: 3,
       returnedCount: 3,
       dropped: 0,
-      freshness: undefined,
       truncated: false,
       uniqueDomains: 1,
       topDomainShare: 1,
@@ -97,7 +96,7 @@ describe("web_search honest-evidence details", () => {
     expect(result.details.evidence.dropped).toBe(0);
   });
 
-  it("includes freshness in the evidence summary", async () => {
+  it("omits freshness from the evidence summary", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "fresh-secret";
     vi.stubGlobal(
       "fetch",
@@ -110,11 +109,11 @@ describe("web_search honest-evidence details", () => {
 
     const result = await createSearchTool().execute(
       "call",
-      { query: "fresh", count: 1, freshness: "week" },
+      { query: "unfiltered", count: 1 },
       undefined,
       undefined,
     );
 
-    expect(result.details.evidence.freshness).toBe("week");
+    expect(result.details.evidence).not.toHaveProperty("freshness");
   });
 });

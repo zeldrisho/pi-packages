@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add explicit `answers` mode for Brave-generated answers with parsed source citations and usage metadata, using a separate `BRAVE_ANSWERS_API_KEY` credential
+
+### Changed
+
+- Show recovery guidance only for empty or partial web results and remove the provider/mode line from response text
+- Group duplicate Answers source URLs in rendered output while preserving inline citation numbers and original metadata
+
+### Removed
+
+- Remove context mode, its tuning options, and the spellcheck and freshness request parameters; modes remain separate with no automatic switching
+
 ## [0.10.0] - 2026-10-12
 
 ### Added

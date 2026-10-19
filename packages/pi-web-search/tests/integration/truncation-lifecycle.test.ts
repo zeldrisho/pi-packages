@@ -1,28 +1,22 @@
 import { readFile, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 import { describe, expect, it, vi } from "vite-plus/test";
-import { createSearchHarness, jsonResponse } from "./harness";
+import { answerResponse, createSearchHarness } from "./harness";
 
 describe("web_search truncation lifecycle", () => {
-  it("writes truncated context output to a temporary file", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "large-context-secret";
-
-    const generic = Array.from({ length: 20 }, (_, index) => ({
-      title: `Result ${index}`,
-      url: `https://example.com/${index}`,
-      snippets: ["a".repeat(8_000), "b".repeat(8_000), "c".repeat(8_000)],
-    }));
+  it("writes truncated Answers output to a temporary file", async () => {
+    process.env.BRAVE_ANSWERS_API_KEY = "large-answer-secret";
 
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => jsonResponse({ grounding: { generic } })),
+      vi.fn(async () => answerResponse(["a".repeat(60_000)])),
     );
 
     const harness = createSearchHarness();
 
     const result = await harness.tool.execute(
       "call",
-      { query: "large context output", mode: "context", count: 20 },
+      { query: "large answer output", mode: "answers" },
       undefined,
       undefined,
     );

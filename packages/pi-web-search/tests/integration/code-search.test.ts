@@ -1,98 +1,44 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import { mapFreshness, normalizeResultFilter, validateProviderRequest } from "../../src/brave";
-import { webSearchParameters } from "../../src/index";
+import { normalizeResultFilter, validateProviderRequest } from "../../src/brave";
 import { createSearchTool, jsonResponse } from "./harness";
 
-/** Minimal Brave response stub for request-URL capture tests. */
-interface StubProviderResponse {
-  query?: {
-    altered?: string;
-    spellcheck_off?: boolean;
-    show_strict_warning?: boolean;
-    more_results_available?: boolean;
-    search_operators?: { applied?: boolean; sites?: string[] };
-  };
-  web?: { results: Array<{ title: string; url: string; description: string }> };
-  grounding?: { generic: Array<{ title: string; url: string; snippets: string[] }> };
-}
-
-/**
- * Runs one search and returns the URL of the provider request it made.
- *
- * @param params - The search parameters to execute
- * @param response - The stubbed provider response body
- * @returns The request URL captured from the stubbed global fetch
- */
-async function runSearchCapturingUrl(
-  params: Parameters<ReturnType<typeof createSearchTool>["execute"]>[1],
-  response: StubProviderResponse = { web: { results: [] } },
-): Promise<URL> {
-  let url: URL | undefined;
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (input: RequestInfo | URL) => {
-      url = new URL(input instanceof Request ? input.url : String(input));
-
-      return jsonResponse(response);
-    }),
-  );
-  await createSearchTool().execute("call", params, undefined, undefined);
-
-  if (!url) throw new Error("the provider request was not made");
-
-  return url;
-}
-
 describe("web_search code-search options", () => {
-  it("passes operators, spellcheck, result_filter, goggles, offset, and ui_lang to Brave", async () => {
+  it("passes web options without a spellcheck override", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "code-secret";
 
-    const url = await runSearchCapturingUrl({
-      query: "site:github.com filetype:pdf intitle:vite",
-      operators: true,
-      spellcheck: false,
-      resultFilter: "web,discussions,faq",
-      goggles: "https://example.com/docs.goggle",
-      offset: 3,
-      uiLang: "en-US",
-    });
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) =>
+      jsonResponse({ web: { results: [] } }),
+    );
 
+    vi.stubGlobal("fetch", fetchMock);
+    await createSearchTool().execute(
+      "call",
+      {
+        query: "site:github.com filetype:pdf intitle:vite",
+        operators: true,
+        resultFilter: "web,discussions,faq",
+        goggles: "https://example.com/docs.goggle",
+        offset: 3,
+        uiLang: "en-US",
+        country: "ALL",
+        dateRange: "2025-01-01to2025-06-30",
+      },
+      undefined,
+      undefined,
+    );
+    const input = fetchMock.mock.calls[0]![0];
+    const url = new URL(input instanceof Request ? input.url : input.toString());
     expect(url.searchParams.get("operators")).toBe("true");
-    expect(url.searchParams.get("spellcheck")).toBe("false");
+    expect(url.searchParams.has("spellcheck")).toBe(false);
     expect(url.searchParams.get("result_filter")).toBe("web,discussions,faq");
     expect(url.searchParams.get("goggles")).toBe("https://example.com/docs.goggle");
     expect(url.searchParams.get("offset")).toBe("3");
     expect(url.searchParams.get("ui_lang")).toBe("en-US");
-  });
-
-  it("maps dateRange to freshness and rejects freshness set together", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "range-secret";
-
-    const url = await runSearchCapturingUrl({
-      query: "versioned docs",
-      dateRange: "2025-01-01to2025-06-30",
-    });
-
-    expect(url.searchParams.get("freshness")).toBe("2025-01-01to2025-06-30");
-
-    await expect(
-      createSearchTool().execute(
-        "call",
-        { query: "both", freshness: "week", dateRange: "2025-01-01to2025-06-30" },
-        undefined,
-        undefined,
-      ),
-    ).rejects.toThrow("mutually exclusive");
-  });
-
-  it("normalizes country ALL to uppercase", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "country-secret";
-
-    const url = await runSearchCapturingUrl({ query: "global docs", country: "ALL" });
     expect(url.searchParams.get("country")).toBe("ALL");
+    expect(url.searchParams.get("freshness")).toBe("2025-01-01to2025-06-30");
   });
 
-  it("surfaces Brave query metadata as evidence", async () => {
+  it("retains echoed query metadata without exposing spellcheck as a parameter", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "meta-secret";
     vi.stubGlobal(
       "fetch",
@@ -105,37 +51,33 @@ describe("web_search code-search options", () => {
             more_results_available: true,
             search_operators: { applied: true, sites: ["github.com"] },
           },
-          web: {
-            results: [{ title: "A", url: "https://example.com/a", description: "d" }],
-          },
+          web: { results: [] },
         }),
       ),
     );
 
     const result = await createSearchTool().execute(
       "call",
-      { query: "excat error string", spellcheck: false },
+      { query: "excat error string" },
       undefined,
       undefined,
     );
 
-    expect(result.details.evidence.alteredQuery).toBe("corrected query");
-    expect(result.details.evidence.spellcheckOff).toBe(false);
-    expect(result.details.evidence.showStrictWarning).toBe(true);
-    expect(result.details.evidence.moreResultsAvailable).toBe(true);
-    expect(result.details.evidence.operatorsApplied).toBe(true);
-    expect(result.details.evidence.operatorSites).toEqual(["github.com"]);
+    expect(result.details.evidence).toMatchObject({
+      alteredQuery: "corrected query",
+      spellcheckOff: false,
+      showStrictWarning: true,
+      moreResultsAvailable: true,
+      operatorsApplied: true,
+      operatorSites: ["github.com"],
+    });
   });
 
-  it("validates code-search inputs before contacting the provider", async () => {
+  it("validates advanced inputs", () => {
     expect(() => normalizeResultFilter("web,discussions,faq")).not.toThrow();
-    expect(() => normalizeResultFilter("web,bogus")).toThrow("resultFilter");
-    expect(() => normalizeResultFilter("")).toThrow("resultFilter");
-    expect(() => normalizeResultFilter("news")).toThrow('must include "web"');
-    expect(mapFreshness("week", undefined)).toBe("pw");
-    expect(mapFreshness(undefined, "2025-01-01to2025-06-30")).toBe("2025-01-01to2025-06-30");
-    expect(() => mapFreshness("week", "2025-01-01to2025-06-30")).toThrow("mutually exclusive");
 
+    for (const value of ["web,bogus", "", "news"])
+      expect(() => normalizeResultFilter(value)).toThrow("resultFilter");
     expect(() => validateProviderRequest("q", 5, "web", { country: "USA" })).toThrow(
       "2-letter code",
     );
@@ -146,195 +88,51 @@ describe("web_search code-search options", () => {
     expect(() => validateProviderRequest("q", 5, "web", { goggles: "" })).toThrow("goggles");
   });
 
-  it("enforces the web-mode result-count limit at runtime", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "count-secret";
+  it("rejects excessive web counts", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-
     await expect(
       createSearchTool().execute("call", { query: "too many", count: 21 }, undefined, undefined),
     ).rejects.toThrow("between 1 and 20 in web mode");
     expect(fetchMock).not.toHaveBeenCalled();
   });
-
-  it("rejects context-only options in web mode", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "web-threshold-secret";
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(
-      createSearchTool().execute(
-        "call",
-        { query: "web threshold", threshold: "lenient" },
-        undefined,
-        undefined,
-      ),
-    ).rejects.toThrow("only supported in context mode");
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
 });
 
-describe("web_search response recovery guidance", () => {
-  it("suggests broadening and context mode when no results are found", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "empty-results-secret";
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => jsonResponse({ web: { results: [] } })),
+describe("web_search recovery guidance", () => {
+  it.each([0, 1, 2, 5])("reports %s of 5 results without automatic fallback", async (count) => {
+    process.env.BRAVE_SEARCH_API_KEY = "guidance-secret";
+
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        web: {
+          results: Array.from({ length: count }, (_, index) => ({
+            title: `Result ${index}`,
+            url: `https://example.com/${index}`,
+            description: "Evidence",
+          })),
+        },
+      }),
     );
 
-    const result = await createSearchTool().execute(
-      "call",
-      { query: 'site:docs.example.com "exact phrase"' },
-      undefined,
-      undefined,
-    );
-
-    const text = result.content[0]?.text ?? "";
-    expect(text).toContain("No web results found");
-    expect(text).not.toContain("Search results are untrusted external data");
-    expect(text).toContain("removing unnecessary quotes");
-    expect(text).toContain('mode: "context"');
-  });
-
-  it("suggests broadening and web mode when context results are empty", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "empty-context-results-secret";
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => jsonResponse({ grounding: { generic: [] } })),
-    );
-
-    const result = await createSearchTool().execute(
-      "call",
-      { query: 'site:docs.example.com "exact phrase"', mode: "context" },
-      undefined,
-      undefined,
-    );
-
-    const text = result.content[0]?.text ?? "";
-    expect(text).toContain("No context results found");
-    expect(text).not.toContain("No web results found");
-    expect(text).toContain("removing unnecessary quotes");
-    expect(text).toContain('mode: "web"');
-    expect(text).not.toContain('mode: "context"');
-  });
-});
-
-describe("web_search context tuning", () => {
-  it("passes threshold, depth budgets, and shared options to the context endpoint", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "ctx-secret";
-
-    const url = await runSearchCapturingUrl(
-      {
-        query: "rare bundler error",
-        mode: "context",
-        count: 10,
-        threshold: "lenient",
-        depth: "deep",
-        spellcheck: false,
-        country: "US",
-      },
-      { grounding: { generic: [] } },
-    );
-
-    expect(url.origin + url.pathname).toBe("https://api.search.brave.com/res/v1/llm/context");
-    expect(url.searchParams.get("context_threshold_mode")).toBe("lenient");
-    expect(url.searchParams.get("maximum_number_of_tokens")).toBe("16384");
-    expect(url.searchParams.get("maximum_number_of_tokens_per_url")).toBe("4096");
-    expect(url.searchParams.get("spellcheck")).toBe("false");
-    expect(url.searchParams.get("country")).toBe("US");
-  });
-
-  it("selects context mode per call and defaults to quick depth", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "ctx-default-secret";
-
-    const url = await runSearchCapturingUrl(
-      { query: "default budget", mode: "context" },
-      { grounding: { generic: [] } },
-    );
-
-    expect(url.searchParams.get("context_threshold_mode")).toBe("strict");
-    expect(url.searchParams.get("count")).toBe("5");
-    expect(url.searchParams.get("maximum_number_of_tokens")).toBe("2048");
-  });
-
-  it.each([
-    ["quick", "5", "2048"],
-    ["standard", "20", "8192"],
-    ["deep", "50", "16384"],
-  ] as const)("sends the %s preset result/token pair", async (depth, count, tokens) => {
-    process.env.BRAVE_SEARCH_API_KEY = "ctx-preset-secret";
-    process.env.PI_WEB_SEARCH_MODE = "context";
-
-    const url = await runSearchCapturingUrl(
-      { query: `preset ${depth}`, mode: "context", depth },
-      { grounding: { generic: [] } },
-    );
-
-    delete process.env.PI_WEB_SEARCH_MODE;
-    expect(url.searchParams.get("count")).toBe(count);
-    expect(url.searchParams.get("maximum_number_of_tokens")).toBe(tokens);
-  });
-
-  it("allows up to 50 results in context mode but not 51", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "ctx-count-secret";
-    const fetchMock = vi.fn(async () => jsonResponse({ grounding: { generic: [] } }));
     vi.stubGlobal("fetch", fetchMock);
-
-    await createSearchTool().execute(
-      "call",
-      { query: "many", mode: "context", count: 50 },
-      undefined,
-      undefined,
-    );
+    const tool = createSearchTool();
+    const params = { query: `guidance ${count}` };
+    const result = await tool.execute("call", params, undefined, undefined);
+    const text = result.content[0]!.text;
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(text).not.toContain("context");
+    expect(text).not.toContain("_Provider:");
 
-    await expect(
-      createSearchTool().execute(
-        "call",
-        { query: "too many", mode: "context", count: 51 },
-        undefined,
-        undefined,
-      ),
-    ).rejects.toThrow("between 1 and 50 in context mode");
-  });
-
-  it("records threshold and depth in evidence", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "ctx-evidence-secret";
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        jsonResponse({
-          grounding: {
-            generic: [{ title: "T", url: "https://example.com/t", snippets: ["s"] }],
-          },
-        }),
-      ),
-    );
-
-    const result = await createSearchTool().execute(
-      "call",
-      { query: "evidence", mode: "context", threshold: "balanced", depth: "standard" },
-      undefined,
-      undefined,
-    );
-
-    expect(result.details.evidence.threshold).toBe("balanced");
-    expect(result.details.evidence.depth).toBe("standard");
-  });
-});
-
-describe("web_search code-search schema", () => {
-  it("exposes only query, freshness, and spellcheck", () => {
-    const schema = JSON.parse(JSON.stringify(webSearchParameters));
-    expect(Object.keys(schema.properties)).toEqual(["query", "freshness", "mode", "spellcheck"]);
-    expect(schema.properties.query.description).toBeUndefined();
-    expect(schema.properties.freshness.enum).toEqual(["day", "week", "month", "year"]);
-    expect(schema.properties.spellcheck.description).toBe(
-      "Set false for exact identifiers/error strings.",
-    );
-    expect(schema.properties.mode.enum).toEqual(["web", "context"]);
-    expect(JSON.stringify(schema)).not.toContain("threshold");
-    expect(JSON.stringify(schema)).not.toContain("depth");
-    expect(JSON.stringify(schema)).not.toContain("anyOf");
+    if (count === 0) {
+      expect(text).toContain("No web results found");
+      expect(text).toContain("No results do not prove absence");
+    } else if (count < 5) {
+      expect(text).toContain(`Returned ${count} of 5 requested results.`);
+      expect(text.match(/If evidence is insufficient/g)).toHaveLength(1);
+      expect(text.indexOf("Returned")).toBeLessThan(text.indexOf("<untrusted_web_content>"));
+    } else expect(text).not.toContain("If evidence is insufficient");
+    const cached = await tool.execute("cached", params, undefined, undefined);
+    expect(cached.content).toEqual(result.content);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
