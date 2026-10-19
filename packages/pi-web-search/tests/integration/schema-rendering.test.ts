@@ -17,10 +17,10 @@ describe("web_search schema rendering", () => {
     expect(schema).not.toContain("allOf");
     expect(schema).not.toContain("anyOf");
     expect(Check(webSearchParameters, { query: "x" })).toBe(true);
-    expect(Object.keys(webSearchParameters.properties)).toEqual(["query", "mode"]);
+    expect(Object.keys(webSearchParameters.properties)).toEqual(["query"]);
   });
 
-  it("accepts up to the web query limit for either mode at the schema level", () => {
+  it("accepts up to the query limit at the schema level", () => {
     expect(
       Check(webSearchParameters, {
         query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS),
@@ -36,14 +36,14 @@ describe("web_search schema rendering", () => {
     ).toBe(false);
   });
 
-  it("enforces the Answers query limit at runtime", async () => {
+  it("enforces the query limit at runtime", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "test-secret";
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     await expect(
       createSearchTool().execute(
         "call",
-        { query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS + 1), mode: "answers" },
+        { query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS + 1) },
         undefined,
         undefined,
       ),

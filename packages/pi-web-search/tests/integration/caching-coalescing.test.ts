@@ -30,7 +30,7 @@ describe("web_search caching coalescing", () => {
     expect(second.details.cached).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(second)).not.toContain("cache-secret");
-    expect(updates).toEqual(["Searching the web with brave (web)…", "Using cached brave results…"]);
+    expect(updates).toEqual(["Searching the web…", "Using cached results…"]);
   });
 
   it("coalesces concurrent searches without letting one caller cancel another", async () => {

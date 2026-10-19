@@ -100,8 +100,9 @@ function resolveCacheDirectory(name: string): string {
 /** Parameters for a web search operation. */
 export interface SearchParameters {
   query: string;
-  count?: number;
+  /** @deprecated The model-facing mode selector was removed; search always starts with web. */
   mode?: SearchMode;
+  count?: number;
   language?: string;
   country?: string;
   safesearch?: SafesearchMode;
@@ -323,12 +324,8 @@ export class SearchRuntime {
 
     if (!query) throw new Error("Search query cannot be empty.");
 
-    const mode = params.mode ?? "web";
+    const mode: SearchMode = "web";
     const count = params.count ?? SEARCH_DEFAULT_RESULT_COUNT;
-
-    if (mode === "answers" && params.count !== undefined) {
-      throw new Error("The count option is only supported in web mode.");
-    }
 
     const webExtras = {
       country: params.country,
@@ -343,7 +340,7 @@ export class SearchRuntime {
     };
 
     validateProviderRequest(query, count, mode, webExtras);
-    const keyName = mode === "answers" ? "BRAVE_ANSWERS_API_KEY" : "BRAVE_SEARCH_API_KEY";
+    const keyName = "BRAVE_SEARCH_API_KEY";
     const credentials = await resolveApiKey(cwd, keyName);
 
     if (!credentials) {
@@ -372,45 +369,33 @@ export class SearchRuntime {
       content: [
         {
           type: "text",
-          text: cached
-            ? `Using cached ${provider} results…`
-            : `Searching the web with ${provider} (${mode})…`,
+          text: cached ? "Using cached results…" : "Searching the web…",
         },
       ],
       details: {},
     });
 
-    const payload =
+    let payload =
       cachedPayload ??
       (await inflightSearches.run(
         cacheKey,
         async (sharedSignal) => {
           let entry: CachedSearch;
 
-          if (mode === "answers") {
-            const answer = await searchBraveAnswers(query, sharedSignal, credentials.key, {
-              country: params.country,
-              language: params.language,
-              safesearch: params.safesearch,
-            });
+          const found = await searchBraveWeb(
+            query,
+            count,
+            params.language,
+            sharedSignal,
+            credentials.key,
+            { ...webExtras, operators: params.operators ?? true },
+          );
 
-            entry = { results: [], meta: {}, availableCount: 0, answer };
-          } else {
-            const found = await searchBraveWeb(
-              query,
-              count,
-              params.language,
-              sharedSignal,
-              credentials.key,
-              { ...webExtras, operators: params.operators ?? true },
-            );
-
-            entry = {
-              results: found.results.filter((result) => result.url).slice(0, count),
-              meta: found.meta,
-              availableCount: found.results.length,
-            };
-          }
+          entry = {
+            results: found.results.filter((result) => result.url).slice(0, count),
+            meta: found.meta,
+            availableCount: found.results.length,
+          };
 
           searchCache.set(cacheKey, entry, Date.now() + CACHE_TTL_MS);
 
@@ -419,6 +404,43 @@ export class SearchRuntime {
         signal,
         "Web search was cancelled.",
       ));
+
+    if (payload.results.length === 0 && !payload.answer) {
+      const answerCredentials = await resolveApiKey(cwd, "BRAVE_ANSWERS_API_KEY");
+
+      if (answerCredentials) {
+        try {
+          const answerKey = JSON.stringify({ version: 2, provider, mode: "answers", query, cwd });
+          const cachedAnswer = searchCache.get(answerKey);
+          payload =
+            cachedAnswer ??
+            (await inflightSearches.run(
+              answerKey,
+              async (sharedSignal) => {
+                const answer = await searchBraveAnswers(
+                  query,
+                  sharedSignal,
+                  answerCredentials.key,
+                  {
+                    country: params.country,
+                    language: params.language,
+                    safesearch: params.safesearch,
+                  },
+                );
+
+                const entry: CachedSearch = { results: [], meta: {}, availableCount: 0, answer };
+                searchCache.set(answerKey, entry, Date.now() + CACHE_TTL_MS);
+
+                return entry;
+              },
+              signal,
+              "Web search was cancelled.",
+            ));
+        } catch (error) {
+          if (signal?.aborted) throw error;
+        }
+      }
+    }
 
     const meta = payload.meta;
     const results = payload.results.filter((result) => result.url).slice(0, count);
