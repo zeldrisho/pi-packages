@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Align syntax and link colors with Catppuccin's style guide and use a subtler selection background.
+
 ## [0.1.0] - 2026-09-21
 
 ### Added
