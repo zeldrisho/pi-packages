@@ -7,6 +7,16 @@ import { executeWebFetch, resetLlmsNoticeOrigins } from "./service";
 
 export { ExpiringLruCache } from "./cache";
 
+export {
+  hasAnubisMarkers,
+  parseAnubisChallenge,
+  solveAnubisChallenge,
+  type AnubisChallenge,
+  type AnubisSolveContext,
+} from "./anubis";
+
+export { CookieJar } from "./cookies";
+
 export type { FetchResult } from "./content";
 
 export {

@@ -69,6 +69,44 @@ function normalizeSelectorUnsafeIds(document: Document): void {
   }
 }
 
+/** Head-level elements that carry metadata rather than readable body content. */
+const HEAD_TAGS = new Set(["TITLE", "BASE", "LINK", "META", "STYLE"]);
+
+function isElementNode(node: ChildNode): node is Element {
+  return node.nodeType === 1;
+}
+
+/**
+ * linkedom parses HTML that omits `<html>`/`<head>`/`<body>` as a fragment: the first
+ * element becomes the document root and `document.body` is left detached and empty.
+ * HTML5 permits those omissions, but body-based extraction (Defuddle and the plain-text
+ * fallback) then sees nothing. Rebuild a well-formed `<html>` document, moving the
+ * fragment's top-level nodes into `<head>` or `<body>` as appropriate.
+ */
+function normalizeFragmentDocument(document: Document): void {
+  const root = document.documentElement;
+
+  if (!root || root.tagName === "HTML") return;
+
+  const html = document.createElement("html");
+  const head = document.createElement("head");
+  const body = document.createElement("body");
+  html.appendChild(head);
+  html.appendChild(body);
+
+  const nodes = root.tagName === "BODY" ? [...root.childNodes] : [...document.childNodes];
+
+  for (const node of nodes) {
+    if (!isElementNode(node)) continue;
+    const tagName = node.tagName;
+
+    if (tagName === "HTML" || tagName === "BODY" || tagName === "HEAD") continue;
+    (HEAD_TAGS.has(tagName) ? head : body).appendChild(node);
+  }
+
+  document.insertBefore(html, document.firstChild);
+}
+
 /**
  * Extracts normalized plain text from HTML when structured Markdown extraction is unavailable.
  *
@@ -77,6 +115,7 @@ function normalizeSelectorUnsafeIds(document: Document): void {
  */
 export function htmlToMarkdownFallback(html: string): string {
   const { document } = parseHTML(html);
+  normalizeFragmentDocument(document);
 
   for (const element of document.querySelectorAll(
     "script, style, svg, noscript, template, iframe, nav, header, footer, aside, form",
@@ -352,6 +391,7 @@ export async function extractHtmlToMarkdown(
   try {
     assertAbsoluteHttpUrl(baseUrl);
     const { document } = parseHTML(html);
+    normalizeFragmentDocument(document);
     // Defuddle parses URL metadata without using its explicit page URL as the
     // base. Resolve relative values first so it does not log ERR_INVALID_URL
     // through Pi's TUI even though extraction succeeds.

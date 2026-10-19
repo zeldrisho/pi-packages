@@ -179,11 +179,10 @@ async function probeUsableRawText(
       if (existing) return existing;
 
       try {
-        const document = await fetchCompleteDocument(
-          candidate.toString(),
-          sharedSignal,
-          dependencies,
-        );
+        const document = await fetchCompleteDocument(candidate.toString(), sharedSignal, {
+          ...dependencies,
+          solveAnubisChallenges: false,
+        });
 
         const available = isUsableLlmsTxtIndex(document) ? document : undefined;
         const result = { document: available, expires: Date.now() + CACHE_TTL_MS };
@@ -294,6 +293,10 @@ export async function fetchDocumentWithLlmsTxtSupport(
     !primary.markdown.trim() &&
     (!primary.links || (primary.links.internal.length === 0 && primary.links.external.length === 0))
   ) {
+    // A JavaScript CAPTCHA or bot wall can be text-empty. Surface it as the standard
+    // blocked document rather than a misleading "no content" error.
+    if (primary.extractionDiagnostics?.botWall) return primary;
+
     throw new Error("web_fetch: Page has no extractable content.");
   }
 

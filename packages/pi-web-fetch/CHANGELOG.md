@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Solve Anubis proof-of-work interstitials and return the real page instead of a block
+
 ### Fixed
 
 - Decompress bounded gzip, deflate, and Brotli HTTP responses before decoding text
+- Report JavaScript CAPTCHA pages (Cap, reCAPTCHA, hCaptcha, Turnstile) as the standard blocked result instead of an empty page
+- Extract content from HTML pages that omit the `<html>`, `<head>`, and `<body>` tags, which previously extracted as empty
 
 ## [0.10.2] - 2026-10-18
 

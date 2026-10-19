@@ -9,7 +9,9 @@ import {
 export { normalizeGitHubRawUrl, parseLinkHeaderForAgentHints } from "./fetch-metadata";
 
 import { awaitWithAbort } from "./abort";
+import { hasAnubisMarkers, parseAnubisChallenge, solveAnubisChallenge } from "./anubis";
 import { sliceCompleteDocument, type CompleteDocument, type FetchResult } from "./content";
+import { CookieJar } from "./cookies";
 import { diagnoseExtraction, extractDocumentLinks, hasExtractionWarning } from "./evidence";
 import { extractHtmlToMarkdown } from "./extract";
 import { requestFollowingRedirects, type RedirectDependencies } from "./network-redirects";
@@ -67,6 +69,8 @@ export interface LinkHeaderAgentHints {
 export interface FetchRemoteDependencies extends RedirectDependencies {
   extractHtml?: typeof extractHtmlToMarkdown;
   timeoutMs?: number;
+  /** When false, an Anubis interstitial is reported as blocked instead of solved. Defaults to true. */
+  solveAnubisChallenges?: boolean;
 }
 
 /**
@@ -106,71 +110,70 @@ function normalizeContentType(header: string): string | undefined {
   return normalized[0];
 }
 
-/**
- * Converts a successful HTTP response into a complete document.
- *
- * HTML content is extracted to Markdown, JSON is pretty-printed when valid, and other supported content is returned as trimmed text.
- *
- * @param target - The validated target associated with the response
- * @param response - The HTTP response to process
- * @param signal - Signal used to cancel HTML extraction
- * @returns The document URL, content type, content, optional title, and extractor type
- * @throws If the response has an unsuccessful status or an unsupported content type
- */
-async function documentFromResponse(
-  target: ValidatedTarget,
-  response: IncomingMessage,
-  signal: AbortSignal,
-  extractHtml: typeof extractHtmlToMarkdown,
-  allowEmptyContent = false,
-): Promise<CompleteDocument> {
+/** Content types other than `text/*` that web_fetch extracts. */
+const ALLOWED_CONTENT_TYPES = [
+  "application/json",
+  "application/markdown",
+  "application/x-markdown",
+  "application/xml",
+  "application/xhtml+xml",
+];
+
+/** A response body decoded once so challenge detection and extraction share it. */
+interface DecodedBody {
+  raw: string;
+  contentTypeHeader: string;
+  contentType: string;
+}
+
+/** Returns the combined Content-Type header value, defaulting to plain text. */
+function responseContentTypeHeader(response: IncomingMessage): string {
+  return responseHeaderValues(response, "content-type").join(", ") || "text/plain";
+}
+
+/** Narrows a media type to the HTML variants web_fetch extracts. */
+function isHtmlContentType(
+  value: string | undefined,
+): value is "text/html" | "application/xhtml+xml" {
+  return value === "text/html" || value === "application/xhtml+xml";
+}
+
+/** Narrows a media type to those web_fetch is willing to read. */
+function isAllowedContentType(value: string | undefined): value is string {
+  return (
+    value !== undefined && (value.startsWith("text/") || ALLOWED_CONTENT_TYPES.includes(value))
+  );
+}
+
+/** Throws the established error for a response whose status is not successful. */
+function assertSuccessfulResponse(response: IncomingMessage): void {
   const status = response.statusCode ?? 0;
 
-  if (status < 200 || status >= 300) {
-    const cloudflareChallenge =
-      responseHeader(response, "cf-mitigated")?.trim().toLowerCase() === "challenge";
+  if (status >= 200 && status < 300) return;
 
-    response.resume();
+  const cloudflareChallenge =
+    responseHeader(response, "cf-mitigated")?.trim().toLowerCase() === "challenge";
 
-    if (cloudflareChallenge) {
-      throw new Error(`web_fetch was blocked by Cloudflare's anti-bot challenge (HTTP ${status}).`);
-    }
+  response.resume();
 
-    const authenticationHint = [401, 403, 404].includes(status)
-      ? " The page may be missing, private, or require authentication."
-      : "";
-
-    throw new Error(`web_fetch returned HTTP ${status}.${authenticationHint}`);
+  if (cloudflareChallenge) {
+    throw new Error(`web_fetch was blocked by Cloudflare's anti-bot challenge (HTTP ${status}).`);
   }
 
-  const contentTypeHeader =
-    responseHeaderValues(response, "content-type").join(", ") || "text/plain";
+  const authenticationHint = [401, 403, 404].includes(status)
+    ? " The page may be missing, private, or require authentication."
+    : "";
 
-  const contentType = normalizeContentType(contentTypeHeader);
+  throw new Error(`web_fetch returned HTTP ${status}.${authenticationHint}`);
+}
 
-  const linkHints = parseLinkHeaderForAgentHints(
-    responseHeader(response, "link") ?? "",
-    target.url,
-  );
-
-  const allowed =
-    contentType !== undefined &&
-    (contentType.startsWith("text/") ||
-      [
-        "application/json",
-        "application/markdown",
-        "application/x-markdown",
-        "application/xml",
-        "application/xhtml+xml",
-      ].includes(contentType));
-
-  if (!allowed) {
-    response.destroy();
-    throw new Error(
-      `web_fetch does not support ${contentType ?? (contentTypeHeader || "this content type")}.`,
-    );
-  }
-
+/** Reads, decompresses, and decodes a response body once. */
+async function decodeResponseBody(
+  response: IncomingMessage,
+  signal: AbortSignal,
+  contentTypeHeader: string,
+  contentType: string,
+): Promise<DecodedBody> {
   const rawBytes = await readResponseBytes(response, FETCH_MAX_BYTES, signal);
 
   const raw = decodeResponse(
@@ -178,8 +181,37 @@ async function documentFromResponse(
     contentTypeHeader,
   );
 
+  return { raw, contentTypeHeader, contentType };
+}
+
+/**
+ * Converts an already-decoded successful response into a complete document.
+ *
+ * @param target - The validated target associated with the response
+ * @param response - The HTTP response whose headers describe the document
+ * @param body - The decoded body shared with challenge detection
+ * @param signal - Signal used to cancel HTML extraction
+ * @param extractHtml - HTML extractor implementation
+ * @param allowEmptyContent - Whether an empty document is acceptable
+ * @returns The complete extracted document
+ */
+async function documentFromDecoded(
+  target: ValidatedTarget,
+  response: IncomingMessage,
+  body: DecodedBody,
+  signal: AbortSignal,
+  extractHtml: typeof extractHtmlToMarkdown,
+  allowEmptyContent: boolean,
+): Promise<CompleteDocument> {
+  const { raw, contentType, contentTypeHeader } = body;
+
   if (!raw.trim() && !allowEmptyContent)
     throw new Error("web_fetch: Page has no extractable content.");
+
+  const linkHints = parseLinkHeaderForAgentHints(
+    responseHeader(response, "link") ?? "",
+    target.url,
+  );
 
   let markdown: string;
   let title: string | undefined;
@@ -188,7 +220,7 @@ async function documentFromResponse(
   let describedBy: string | undefined = linkHints.describedBy;
   let markdownAlternateUrl: string | undefined = linkHints.markdownAlternate;
 
-  if (contentType === "text/html" || contentType === "application/xhtml+xml") {
+  if (isHtmlContentType(contentType)) {
     const extracted = await awaitWithAbort(extractHtml(raw, target.url), signal);
     markdown = extracted.markdown;
     title = extracted.title;
@@ -216,7 +248,7 @@ async function documentFromResponse(
     }
   }
 
-  const isHtml = contentType === "text/html" || contentType === "application/xhtml+xml";
+  const isHtml = isHtmlContentType(contentType);
   const links = isHtml ? extractDocumentLinks(raw, target.url) : undefined;
 
   if (
@@ -251,6 +283,117 @@ async function documentFromResponse(
     llmsTxtDescribedBy: describedBy,
     markdownAlternateUrl,
   };
+}
+
+/**
+ * Converts a successful HTTP response into a complete document.
+ *
+ * HTML content is extracted to Markdown, JSON is pretty-printed when valid, and other supported content is returned as trimmed text.
+ *
+ * @param target - The validated target associated with the response
+ * @param response - The HTTP response to process
+ * @param signal - Signal used to cancel HTML extraction
+ * @param extractHtml - HTML extractor implementation
+ * @param allowEmptyContent - Whether an empty document is acceptable
+ * @returns The document URL, content type, content, optional title, and extractor type
+ * @throws If the response has an unsuccessful status or an unsupported content type
+ */
+async function documentFromResponse(
+  target: ValidatedTarget,
+  response: IncomingMessage,
+  signal: AbortSignal,
+  extractHtml: typeof extractHtmlToMarkdown,
+  allowEmptyContent = false,
+): Promise<CompleteDocument> {
+  assertSuccessfulResponse(response);
+
+  const contentTypeHeader = responseContentTypeHeader(response);
+  const contentType = normalizeContentType(contentTypeHeader);
+
+  if (!isAllowedContentType(contentType)) {
+    response.destroy();
+    throw new Error(
+      `web_fetch does not support ${contentType ?? (contentTypeHeader || "this content type")}.`,
+    );
+  }
+
+  const body = await decodeResponseBody(response, signal, contentTypeHeader, contentType);
+
+  return documentFromDecoded(target, response, body, signal, extractHtml, allowEmptyContent);
+}
+
+/**
+ * Converts one acquisition response into a document, solving a same-origin
+ * Anubis interstitial at most once before extraction.
+ *
+ * @param target - The validated target associated with the response
+ * @param response - The HTTP response to process
+ * @param signal - Signal used to cancel extraction and challenge solving
+ * @param extractHtml - HTML extractor implementation
+ * @param allowEmptyContent - Whether an empty document is acceptable
+ * @param dependencies - Fetch dependencies, including the acquisition cookie jar
+ * @param allowSolve - Whether an Anubis challenge may be solved on this pass
+ * @returns The complete extracted document
+ */
+async function documentFromAcquisition(
+  target: ValidatedTarget,
+  response: IncomingMessage,
+  signal: AbortSignal,
+  extractHtml: typeof extractHtmlToMarkdown,
+  allowEmptyContent: boolean,
+  dependencies: FetchRemoteDependencies,
+  allowSolve: boolean,
+): Promise<CompleteDocument> {
+  const status = response.statusCode ?? 0;
+  const contentTypeHeader = responseContentTypeHeader(response);
+  const contentType = normalizeContentType(contentTypeHeader);
+
+  if (
+    allowSolve &&
+    dependencies.solveAnubisChallenges !== false &&
+    status >= 200 &&
+    status < 300 &&
+    isHtmlContentType(contentType)
+  ) {
+    const body = await decodeResponseBody(response, signal, contentTypeHeader, contentType);
+
+    if (hasAnubisMarkers(body.raw)) {
+      const challenge = parseAnubisChallenge(body.raw, target.url);
+
+      if (challenge) {
+        try {
+          const passed = await solveAnubisChallenge({
+            challenge,
+            pageUrl: target.url,
+            raw: body.raw,
+            dependencies,
+            signal,
+          });
+
+          return await documentFromAcquisition(
+            passed.target,
+            passed.response,
+            signal,
+            extractHtml,
+            allowEmptyContent,
+            dependencies,
+            false,
+          );
+        } catch (error) {
+          if (signal.aborted || (error instanceof Error && error.name === "AbortError"))
+            throw error;
+          // Any other failure degrades to the standard blocked output below.
+        }
+      }
+
+      // An unsolvable challenge, denial, or error page is returned as blocked.
+      return documentFromDecoded(target, response, body, signal, extractHtml, allowEmptyContent);
+    }
+
+    return documentFromDecoded(target, response, body, signal, extractHtml, allowEmptyContent);
+  }
+
+  return documentFromResponse(target, response, signal, extractHtml, allowEmptyContent);
 }
 
 /**
@@ -312,11 +455,18 @@ async function fetchDocument(
   if (cached?.validators?.lastModified)
     conditionalHeaders["If-Modified-Since"] = cached.validators.lastModified;
 
+  // Cookies live only for this acquisition; challenge handshakes never persist or
+  // cross into another fetch.
+  const requestDependencies: FetchRemoteDependencies = {
+    ...dependencies,
+    cookies: dependencies.cookies ?? new CookieJar(),
+  };
+
   try {
     let { target, response } = await requestFollowingRedirects(
       normalizeGitHubRawUrl(rawUrl),
       controller.signal,
-      dependencies,
+      requestDependencies,
       conditionalHeaders,
     );
 
@@ -331,7 +481,7 @@ async function fetchDocument(
         ({ target, response } = await requestFollowingRedirects(
           fallbackUrl,
           controller.signal,
-          dependencies,
+          requestDependencies,
         ));
       }
     }
@@ -354,12 +504,14 @@ async function fetchDocument(
     }
 
     return {
-      document: await documentFromResponse(
+      document: await documentFromAcquisition(
         target,
         response,
         controller.signal,
         extractHtml,
         allowEmptyContent,
+        requestDependencies,
+        true,
       ),
       revalidated: false,
     };

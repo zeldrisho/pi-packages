@@ -13,6 +13,8 @@ let versionedContinuationRequests = 0;
 
 let coalescedRequests = 0;
 
+let captchaChallengeRequests = 0;
+
 let stalledBodyReady: (() => void) | null = null;
 
 /**
@@ -165,6 +167,26 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
       response.end("Just a moment...");
 
       return;
+    case "/captcha-challenge": {
+      captchaChallengeRequests += 1;
+      response.setHeader("content-type", "text/html; charset=utf-8");
+      response.end(
+        [
+          '<!DOCTYPE html><html lang="en"><head><title>Security check</title>',
+          '<script src="https://cap.example.test/assets/cap-loader.js" async defer></script>',
+          "</head><body>",
+          '<form action="/captcha-challenge" method="POST" id="captcha-form">',
+          '<div id="captcha" class="cap-captcha" data-sitekey="test"></div>',
+          "</form>",
+          "<noscript><p>Enable JavaScript to continue.</p></noscript>",
+          "<script>function captchaCallback() {}</script>",
+          "</body></html>",
+        ].join(""),
+      );
+
+      return;
+    }
+
     case "/status":
       response.writeHead(418);
       response.end("teapot");
@@ -229,6 +251,10 @@ export function createFetchHarness() {
       coalescedRequests = 0;
     },
     coalescedRequests: () => coalescedRequests,
+    resetCaptchaChallengeRequests() {
+      captchaChallengeRequests = 0;
+    },
+    captchaChallengeRequests: () => captchaChallengeRequests,
     waitForStalledBody: () =>
       new Promise<void>((resolve) => {
         stalledBodyReady = resolve;

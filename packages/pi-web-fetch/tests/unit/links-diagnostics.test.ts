@@ -58,6 +58,28 @@ describe("bounded extraction diagnostics", () => {
       extractedCharacters: 4,
     });
   });
+
+  it("flags JavaScript CAPTCHA interstitials as bot walls", () => {
+    const capPage = [
+      '<!DOCTYPE html><html lang="en"><head><title>Security check</title>',
+      '<script src="https://cap.example.test/assets/cap-loader.js" async defer></script>',
+      '</head><body><form action="/x" method="POST" id="captcha-form">',
+      '<div id="captcha" class="cap-captcha" data-sitekey="test"></div></form>',
+      "<noscript><p>Enable JavaScript to continue.</p></noscript></body></html>",
+    ].join("");
+
+    expect(diagnoseExtraction(capPage, "")).toMatchObject({
+      javascriptRequired: true,
+      botWall: true,
+    });
+
+    // Generic widget markers only imply a wall when the page also extracts no text.
+    expect(
+      diagnoseExtraction('<html><body><div id="captcha"></div></body></html>', "").botWall,
+    ).toBe(true);
+    const richPage = `<html><body><article>${"word ".repeat(500)}<div id="captcha"></div></article></body></html>`;
+    expect(diagnoseExtraction(richPage, "word ".repeat(500)).botWall).toBe(false);
+  });
 });
 
 describe("bounded extracted links", () => {
