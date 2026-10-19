@@ -6,7 +6,7 @@ import {
   solveAnubisRequest,
   solveAnubisSha256Hex,
   solveAnubisWasm,
-} from "../../src/anubis-solver";
+} from "../../src/challenges/anubis-solver.ts";
 
 const fixture = readFileSync(new URL("../fixtures/anubis-sha256.wasm", import.meta.url));
 

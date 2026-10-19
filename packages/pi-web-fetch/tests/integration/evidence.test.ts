@@ -2,7 +2,7 @@ import type { IncomingMessage } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { executeWebFetch, type FetchRemoteDependencies } from "../../src/index";
 import { classifyContentKind, classifyConfidence } from "../../src/service";
-import { detectAppShell, normalizeGitHubRawUrl } from "../../src/fetch";
+import { detectAppShell, normalizeGitHubRawUrl } from "../../src/acquisition/fetch.ts";
 import { createFetchHarness } from "./harness";
 
 /** Builds a minimal HTTP response for offline fetch testing. */

@@ -3,7 +3,7 @@ import {
   createDocumentOutline,
   MAX_OUTLINE_HEADING_CHARACTERS,
   MAX_OUTLINE_HEADINGS,
-} from "../../src/outline";
+} from "../../src/document/outline.ts";
 
 describe("document outlines", () => {
   it("reports ATX headings, levels, and section word counts", () => {

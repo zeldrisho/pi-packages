@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Type, type Static } from "typebox";
 import { Parse } from "typebox/value";
-import { fetchCompleteDocument } from "../src/fetch";
+import { fetchCompleteDocument } from "../src/acquisition/fetch.ts";
 
 const CorpusEntrySchema = Type.Object({
   name: Type.String({ minLength: 1 }),

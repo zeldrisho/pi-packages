@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Simplify the user guide and clarify the query limit, persistent caching, and Answers mode behavior.
 - Show recovery guidance only for empty or partial web results and remove the provider/mode line from response text
 - Group duplicate Answers source URLs in rendered output while preserving inline citation numbers and original metadata
 

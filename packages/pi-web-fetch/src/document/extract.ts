@@ -1,9 +1,9 @@
 import { parseHTML } from "linkedom";
 import type { DefuddleResponse } from "defuddle/node";
-import { stripExtractedCssCruft } from "./markdown-cleanup";
-import { buildFragmentOffsets } from "./fragment-index";
+import { stripExtractedCssCruft } from "./markdown-cleanup.ts";
+import { buildFragmentOffsets } from "./fragment-index.ts";
 
-export { stripExtractedCssCruft } from "./markdown-cleanup";
+export { stripExtractedCssCruft } from "./markdown-cleanup.ts";
 
 const RAW_ID_SELECTOR_SAFE = /^-?[_a-zA-Z][-_a-zA-Z0-9]*$/;
 

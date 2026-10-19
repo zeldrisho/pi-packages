@@ -1,8 +1,8 @@
 import type { IncomingMessage } from "node:http";
-import { awaitWithAbort } from "./abort";
-import type { CookieJar } from "./cookies";
-import { validateRemoteUrl, type ValidatedTarget } from "./network-policy";
-import { requestPinned, responseHeader } from "./network-transport";
+import { awaitWithAbort } from "../abort";
+import type { CookieJar } from "./cookies.ts";
+import { validateRemoteUrl, type ValidatedTarget } from "./network-policy.ts";
+import { requestPinned, responseHeader } from "./network-transport.ts";
 
 /** Maximum number of HTTP redirects to follow before aborting. */
 export const FETCH_MAX_REDIRECTS = 5;

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vite-plus/test";
-import { diagnoseExtraction } from "../../src/evidence";
-import { extractHtmlToMarkdown } from "../../src/extract";
+import { diagnoseExtraction } from "../../src/document/evidence.ts";
+import { extractHtmlToMarkdown } from "../../src/document/extract.ts";
 
 const substantial =
   "Readable issue context with reproduction details and expected behavior. ".repeat(12);

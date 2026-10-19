@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { extractHtmlToMarkdown, htmlToMarkdownFallback } from "../../src/extract";
+import { extractHtmlToMarkdown, htmlToMarkdownFallback } from "../../src/document/extract.ts";
 
 // Real pages (for example packages.fedoraproject.org) emit valid HTML5 that omits
 // <html>, <head>, and <body>. linkedom parses that as a fragment, so extraction must

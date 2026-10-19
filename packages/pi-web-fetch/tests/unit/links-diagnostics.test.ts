@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { diagnoseExtraction, extractDocumentLinks } from "../../src/evidence";
+import { diagnoseExtraction, extractDocumentLinks } from "../../src/document/evidence.ts";
 
 describe("bounded extraction diagnostics", () => {
   it("distinguishes JavaScript requirements, bot walls, consent, and sparse extraction", () => {

@@ -1,4 +1,4 @@
-import type { CompleteDocument } from "./content";
+import type { CompleteDocument } from "./content.ts";
 
 /** Removes a URL fragment before acquisition so fragment variants share cache entries. */
 export function urlWithoutFragment(rawUrl: string): string {

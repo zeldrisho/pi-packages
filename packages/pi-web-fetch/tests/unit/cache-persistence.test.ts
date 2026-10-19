@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import { ExpiringLruCache, stableKeyHash, type CachePersistence } from "../../src/cache";
-import type { CompleteDocument } from "../../src/content";
+import type { CompleteDocument } from "../../src/document/content.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
 

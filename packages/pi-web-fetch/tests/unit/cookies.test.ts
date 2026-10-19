@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { CookieJar } from "../../src/cookies";
+import { CookieJar } from "../../src/network/cookies.ts";
 
 function response(...setCookies: string[]) {
   return { headers: { "set-cookie": setCookies } };

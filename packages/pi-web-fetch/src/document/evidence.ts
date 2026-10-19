@@ -1,5 +1,5 @@
 import { parseHTML } from "linkedom";
-import { hasAnubisMarkers } from "./anubis";
+import { hasAnubisMarkers } from "../challenges/anubis.ts";
 
 const MAX_LINKS = 16;
 

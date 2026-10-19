@@ -7,7 +7,7 @@ Pi package of [CodeRabbit skills](https://github.com/coderabbitai/skills), adapt
 | `autofix`     | Review unresolved CodeRabbit PR threads and apply individually approved fixes |
 | `code-review` | Run CodeRabbit CLI reviews and related workflows                              |
 
-Both skills set `disable-model-invocation: true` and must be invoked explicitly:
+Both skills must be invoked explicitly:
 
 ```text
 /skill:autofix

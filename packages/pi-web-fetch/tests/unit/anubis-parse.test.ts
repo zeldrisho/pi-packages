@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { hasAnubisMarkers, parseAnubisChallenge } from "../../src/anubis";
+import { hasAnubisMarkers, parseAnubisChallenge } from "../../src/challenges/anubis.ts";
 
 interface ChallengeOverrides {
   version?: string;

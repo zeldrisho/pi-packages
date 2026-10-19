@@ -4,19 +4,34 @@ import {
   markdownFragmentOffsets,
   normalizeGitHubRawUrl,
   parseLinkHeaderForAgentHints,
-} from "./fetch-metadata";
+} from "./fetch-metadata.ts";
 
-export { normalizeGitHubRawUrl, parseLinkHeaderForAgentHints } from "./fetch-metadata";
+export { normalizeGitHubRawUrl, parseLinkHeaderForAgentHints } from "./fetch-metadata.ts";
 
-import { awaitWithAbort } from "./abort";
-import { hasAnubisMarkers, parseAnubisChallenge, solveAnubisChallenge } from "./anubis";
-import { sliceCompleteDocument, type CompleteDocument, type FetchResult } from "./content";
-import { CookieJar } from "./cookies";
-import { diagnoseExtraction, extractDocumentLinks, hasExtractionWarning } from "./evidence";
-import { extractHtmlToMarkdown } from "./extract";
-import { requestFollowingRedirects, type RedirectDependencies } from "./network-redirects";
-import type { ValidatedTarget } from "./network-policy";
-import { redactUrlForDisplay } from "./redact";
+import { awaitWithAbort } from "../abort";
+import {
+  hasAnubisMarkers,
+  parseAnubisChallenge,
+  solveAnubisChallenge,
+} from "../challenges/anubis.ts";
+import {
+  sliceCompleteDocument,
+  type CompleteDocument,
+  type FetchResult,
+} from "../document/content.ts";
+import { CookieJar } from "../network/cookies.ts";
+import {
+  diagnoseExtraction,
+  extractDocumentLinks,
+  hasExtractionWarning,
+} from "../document/evidence.ts";
+import { extractHtmlToMarkdown } from "../document/extract.ts";
+import {
+  requestFollowingRedirects,
+  type RedirectDependencies,
+} from "../network/network-redirects.ts";
+import type { ValidatedTarget } from "../network/network-policy.ts";
+import { redactUrlForDisplay } from "../redact";
 import {
   decodeResponse,
   decompressResponse,
@@ -24,7 +39,7 @@ import {
   readResponseBytes,
   responseHeader,
   responseHeaderValues,
-} from "./network-transport";
+} from "../network/network-transport.ts";
 
 /** Maps challenged npm package pages to the public registry endpoint. */
 export function npmRegistryFallbackUrl(rawUrl: string): string | undefined {

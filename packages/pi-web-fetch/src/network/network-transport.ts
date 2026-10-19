@@ -3,7 +3,7 @@ import { request as httpsRequest } from "node:https";
 import { isIP, type LookupFunction } from "node:net";
 import { brotliDecompressSync, gunzipSync, inflateSync } from "node:zlib";
 import { formatSize } from "@earendil-works/pi-coding-agent";
-import type { ValidatedTarget } from "./network-policy";
+import type { ValidatedTarget } from "./network-policy.ts";
 
 /** Maximum size in bytes for raw HTTP response bodies. */
 export const FETCH_MAX_BYTES = 5 * 1_024 * 1_024;

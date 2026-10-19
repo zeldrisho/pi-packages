@@ -1,4 +1,4 @@
-# Anubis WebAssembly fixtures
+# Anubis WebAssembly fixture provenance
 
 ## `anubis-sha256.wasm`
 

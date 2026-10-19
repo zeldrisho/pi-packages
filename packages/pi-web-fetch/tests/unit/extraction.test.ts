@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import type { DefuddleResponse } from "defuddle/node";
-import { extractHtmlToMarkdown, stripExtractedCssCruft } from "../../src/extract";
+import { extractHtmlToMarkdown, stripExtractedCssCruft } from "../../src/document/extract.ts";
 
 // Mock defuddle/node so we can induce failures. The factory keeps the real
 // implementation by default (the other tests exercise the real extractor) and

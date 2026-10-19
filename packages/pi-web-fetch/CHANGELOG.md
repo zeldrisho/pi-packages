@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Solve Anubis proof-of-work interstitials and return the real page instead of a block
 
+### Changed
+
+- Group acquisition, networking, challenge, and document-processing modules into dedicated source directories; clarify end-user documentation.
+
 ### Fixed
 
 - Decompress bounded gzip, deflate, and Brotli HTTP responses before decoding text

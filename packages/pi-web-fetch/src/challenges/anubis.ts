@@ -2,15 +2,22 @@ import { createHash } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import { Worker } from "node:worker_threads";
 import { parseHTML } from "linkedom";
-import { requestFollowingRedirects, type RedirectDependencies } from "./network-redirects";
-import type { ValidatedTarget } from "./network-policy";
-import { decompressResponse, readResponseBytes, responseHeader } from "./network-transport";
+import {
+  requestFollowingRedirects,
+  type RedirectDependencies,
+} from "../network/network-redirects.ts";
+import type { ValidatedTarget } from "../network/network-policy.ts";
+import {
+  decompressResponse,
+  readResponseBytes,
+  responseHeader,
+} from "../network/network-transport.ts";
 import {
   ANUBIS_MAX_RANDOM_DATA_BYTES,
   ANUBIS_MAX_WASM_BYTES,
   type AnubisWorkerRequest,
   type AnubisSolution,
-} from "./anubis-solver";
+} from "./anubis-solver.ts";
 
 /** Matches the script markers every Anubis challenge, denial, and error page carries. */
 const ANUBIS_SCRIPT_MARKER = /id=["']anubis_(?:challenge|version)["']/i;

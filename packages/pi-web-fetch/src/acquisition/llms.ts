@@ -1,7 +1,7 @@
-import { ExpiringLruCache } from "./cache";
-import type { CompleteDocument } from "./content";
-import { fetchCompleteDocument, type FetchRemoteDependencies } from "./fetch";
-import { InflightCoalescer } from "./inflight";
+import { ExpiringLruCache } from "../cache";
+import type { CompleteDocument } from "../document/content.ts";
+import { fetchCompleteDocument, type FetchRemoteDependencies } from "./fetch.ts";
+import { InflightCoalescer } from "../inflight";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
 

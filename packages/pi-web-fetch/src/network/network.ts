@@ -4,7 +4,7 @@ export {
   validateRemoteUrl,
   type ResolveAddresses,
   type ValidatedTarget,
-} from "./network-policy";
+} from "./network-policy.ts";
 
 export {
   decodeResponse,
@@ -13,4 +13,4 @@ export {
   readResponseBytes,
   requestPinned,
   responseHeader,
-} from "./network-transport";
+} from "./network-transport.ts";

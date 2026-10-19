@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vite-plus/test";
-import { sliceCompleteDocument } from "../../src/content";
-import { htmlToMarkdownFallback } from "../../src/extract";
+import { sliceCompleteDocument } from "../../src/document/content.ts";
+import { htmlToMarkdownFallback } from "../../src/document/extract.ts";
 import registerWebFetch from "../../src/index";
 
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
