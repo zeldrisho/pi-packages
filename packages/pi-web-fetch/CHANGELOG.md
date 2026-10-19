@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-19
+
+### Added
+
+- Solve Anubis proof-of-work interstitials and return the real page instead of a block
+
+### Changed
+
+- Publish JavaScript Anubis worker artifacts so proof-of-work runs in installed packages on Node 24.
+- Group acquisition, networking, challenge, and document-processing modules into dedicated source directories; clarify end-user documentation.
+
+### Fixed
+
+- Decompress bounded gzip, deflate, and Brotli HTTP responses before decoding text
+- Report JavaScript CAPTCHA pages (Cap, reCAPTCHA, hCaptcha, Turnstile) as the standard blocked result instead of an empty page
+- Extract content from HTML pages that omit the `<html>`, `<head>`, and `<body>` tags, which previously extracted as empty
+
 ## [0.10.2] - 2026-10-18
 
 ### Changed
@@ -206,7 +223,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.10.2...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.11.0...HEAD
+[0.11.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.10.2...pi-web-fetch-v0.11.0
 [0.10.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.10.1...pi-web-fetch-v0.10.2
 [0.10.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.10.0...pi-web-fetch-v0.10.1
 [0.10.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.9.3...pi-web-fetch-v0.10.0

@@ -7,11 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-19
+
+### Changed
+
+- Align syntax and link colors with Catppuccin's style guide and use a subtler selection background.
+
 ## [0.1.0] - 2026-09-21
 
 ### Added
 
 - Catppuccin Mocha theme for Pi
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-catppuccin-v0.1.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-catppuccin-v0.1.1...HEAD
+[0.1.1]: https://github.com/zeldrisho/pi-packages/compare/pi-catppuccin-v0.1.0...pi-catppuccin-v0.1.1
 [0.1.0]: https://github.com/zeldrisho/pi-packages/releases/tag/pi-catppuccin-v0.1.0

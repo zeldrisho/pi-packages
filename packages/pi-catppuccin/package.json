@@ -1,6 +1,6 @@
 {
   "name": "@zeldrisho/pi-catppuccin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Catppuccin Mocha theme for Pi",
   "keywords": [
     "catppuccin",
@@ -14,7 +14,7 @@
     "url": "https://github.com/zeldrisho/pi-packages/issues"
   },
   "license": "MIT",
-  "author": "Zeldris",
+  "author": "zeldrisho",
   "repository": {
     "type": "git",
     "url": "https://github.com/zeldrisho/pi-packages.git",

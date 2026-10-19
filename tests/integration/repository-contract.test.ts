@@ -25,7 +25,10 @@ const releaseWorkflow = await readFile(join(root, ".github/workflows/release.yml
 
 const expectedFiles = ["src", "CHANGELOG.md"];
 
-const packageSpecificFiles = new Map([["pi-gate", ["config.schema.json"]]]);
+const packageSpecificFiles = new Map([
+  ["pi-gate", ["config.schema.json"]],
+  ["pi-web-fetch", ["workers"]],
+]);
 
 const promptPackages = new Set(["pi-coderabbit"]);
 

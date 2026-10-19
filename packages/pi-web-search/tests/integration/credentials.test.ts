@@ -21,10 +21,13 @@ let workspaceDirectory = "";
 
 const originalApiKey = process.env.BRAVE_SEARCH_API_KEY;
 
+const originalAnswersApiKey = process.env.BRAVE_ANSWERS_API_KEY;
+
 beforeEach(async () => {
   // Tests manage the environment explicitly so a developer's real key
   // cannot leak into resolution-order expectations.
   delete process.env.BRAVE_SEARCH_API_KEY;
+  delete process.env.BRAVE_ANSWERS_API_KEY;
   agentDirectory = await mkdtemp(join(tmpdir(), "ws-cred-agent-"));
   workspaceDirectory = await mkdtemp(join(tmpdir(), "ws-cwd-"));
 });
@@ -32,6 +35,9 @@ beforeEach(async () => {
 afterEach(async () => {
   if (originalApiKey === undefined) delete process.env.BRAVE_SEARCH_API_KEY;
   else process.env.BRAVE_SEARCH_API_KEY = originalApiKey;
+
+  if (originalAnswersApiKey === undefined) delete process.env.BRAVE_ANSWERS_API_KEY;
+  else process.env.BRAVE_ANSWERS_API_KEY = originalAnswersApiKey;
   await Promise.all([
     rm(agentDirectory, { recursive: true, force: true }),
     rm(workspaceDirectory, { recursive: true, force: true }),
@@ -85,6 +91,63 @@ describe("resolveApiKey", () => {
     // reaches tool output must be the source label only.
     expect(resolved?.source).toBe("environment");
     expect(Object.keys(resolved ?? {}).sort()).toEqual(["key", "source"]);
+  });
+});
+
+describe("Answers key resolution", () => {
+  it("selects only the named key from .env text", () => {
+    const text = 'BRAVE_SEARCH_API_KEY=web-key\nBRAVE_ANSWERS_API_KEY="answers-key"\n';
+    expect(extractKeyValue(text, "BRAVE_ANSWERS_API_KEY")).toBe("answers-key");
+    expect(extractKeyValue(text)).toBe("web-key");
+  });
+
+  it("resolves Answers environment, workspace, and agent keys in order", async () => {
+    process.env.BRAVE_SEARCH_API_KEY = "web-key";
+    process.env.BRAVE_ANSWERS_API_KEY = "answers-env";
+    await writeFile(
+      join(workspaceDirectory, ".env"),
+      "BRAVE_SEARCH_API_KEY=web-workspace\nBRAVE_ANSWERS_API_KEY=answers-workspace\n",
+    );
+    await writeFile(join(agentDirectory, ".env"), "BRAVE_ANSWERS_API_KEY=answers-agent\n");
+    expect(await resolveApiKey(workspaceDirectory, "BRAVE_ANSWERS_API_KEY")).toEqual({
+      key: "answers-env",
+      source: "environment",
+    });
+    delete process.env.BRAVE_ANSWERS_API_KEY;
+    expect(await resolveApiKey(workspaceDirectory, "BRAVE_ANSWERS_API_KEY")).toEqual({
+      key: "answers-workspace",
+      source: "workspace .env",
+    });
+    await rm(join(workspaceDirectory, ".env"));
+    expect(await resolveApiKey(workspaceDirectory, "BRAVE_ANSWERS_API_KEY")).toEqual({
+      key: "answers-agent",
+      source: "agent .env",
+    });
+  });
+
+  it("does not reuse the web key and fails before any request", async () => {
+    process.env.BRAVE_SEARCH_API_KEY = "web-only";
+    await writeFile(join(workspaceDirectory, ".env"), "BRAVE_SEARCH_API_KEY=workspace-web-only\n");
+    await writeFile(join(agentDirectory, ".env"), "BRAVE_SEARCH_API_KEY=agent-web-only\n");
+    expect(await resolveApiKey(workspaceDirectory, "BRAVE_ANSWERS_API_KEY")).toBeUndefined();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { createSearchTool } = await import("./harness");
+    await expect(
+      createSearchTool().execute(
+        "call",
+        { query: "missing Answers key", mode: "answers" },
+        undefined,
+        undefined,
+        { cwd: workspaceDirectory },
+      ),
+    ).rejects.toThrow("BRAVE_ANSWERS_API_KEY is required for answers mode");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not reuse the Answers key for web mode", async () => {
+    process.env.BRAVE_ANSWERS_API_KEY = "answers-only";
+    expect(await resolveApiKey(workspaceDirectory)).toBeUndefined();
   });
 });
 

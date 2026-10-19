@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { focusMarkdown } from "../../src/focus";
+import { focusMarkdown } from "../../src/document/focus.ts";
 
 describe("query-focused Markdown", () => {
   it("selects matching sections while preserving source order", () => {

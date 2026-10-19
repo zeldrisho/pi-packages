@@ -18,21 +18,20 @@ export {
   type SearchTruncationDetails,
 } from "./search";
 
-export type { BraveQueryMeta, ContextDepth, ContextThresholdMode, SearchResponse } from "./brave";
+export type { BraveQueryMeta, SearchMode, SearchResponse } from "./brave";
+
+export type { BraveAnswer } from "./answers";
 
 export const webSearchParameters = Type.Object({
   query: Type.String({
     minLength: 1,
     maxLength: SEARCH_WEB_MAX_QUERY_CHARACTERS,
   }),
-  freshness: Type.Optional(StringEnum(["day", "week", "month", "year"] as const)),
   mode: Type.Optional(
-    StringEnum(["web", "context"] as const, {
-      description: 'Try "context" if web results are insufficient.',
+    StringEnum(["web", "answers"] as const, {
+      description:
+        '"web" (default): links and snippets. "answers": AI-generated answer with citations; requires Brave Answers plan.',
     }),
-  ),
-  spellcheck: Type.Optional(
-    Type.Boolean({ description: "Set false for exact identifiers/error strings." }),
   ),
 });
 
@@ -40,7 +39,7 @@ export const webSearchParameters = Type.Object({
  * Pi web search extension that registers the web_search tool.
  *
  * Provides a tool for searching the public web using Brave Search API with
- * support for both compact web results and extracted context modes.
+ * support for compact web results and explicitly selected generated answers.
  *
  * @param pi - The extension API instance
  */
@@ -51,7 +50,8 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "web_search",
     label: "Web Search",
-    description: "Search the public web (links + snippets). Read a result with web_fetch.",
+    description:
+      "Search the public web (links + snippets), or select answers for a generated, cited response. Verify sources with web_fetch.",
     parameters: webSearchParameters,
 
     renderCall(args, theme) {

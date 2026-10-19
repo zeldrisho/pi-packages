@@ -10,7 +10,7 @@ export interface ResolvedApiKey {
   source: ApiKeySource;
 }
 
-const KEY_NAME = "BRAVE_SEARCH_API_KEY";
+export type ApiKeyName = "BRAVE_SEARCH_API_KEY" | "BRAVE_ANSWERS_API_KEY";
 
 const MAX_DOT_ENV_BYTES = 64 * 1024;
 
@@ -20,9 +20,12 @@ const MAX_DOT_ENV_BYTES = 64 * 1024;
  * Only the extracted value is used; file contents are never echoed into
  * errors or tool output.
  */
-export function extractKeyValue(text: string): string | undefined {
+export function extractKeyValue(
+  text: string,
+  keyName: ApiKeyName = "BRAVE_SEARCH_API_KEY",
+): string | undefined {
   for (const line of text.split(/\r?\n/)) {
-    const match = line.match(/^\s*BRAVE_SEARCH_API_KEY\s*=\s*(.*)$/);
+    const match = line.match(new RegExp(`^\\s*${keyName}\\s*=\\s*(.*)$`));
 
     if (!match) continue;
     let value = match[1].trim();
@@ -47,7 +50,7 @@ export function extractKeyValue(text: string): string | undefined {
  * @param path - Path to the .env file
  * @returns The extracted API key or undefined if file cannot be read or key is not found
  */
-async function readDotEnvKey(path: string): Promise<string | undefined> {
+async function readDotEnvKey(path: string, keyName: ApiKeyName): Promise<string | undefined> {
   let handle: Awaited<ReturnType<typeof open>> | undefined;
 
   try {
@@ -55,7 +58,7 @@ async function readDotEnvKey(path: string): Promise<string | undefined> {
     const buffer = Buffer.alloc(MAX_DOT_ENV_BYTES);
     const { bytesRead } = await handle.read(buffer, 0, MAX_DOT_ENV_BYTES, 0);
 
-    return extractKeyValue(buffer.toString("utf8", 0, bytesRead));
+    return extractKeyValue(buffer.toString("utf8", 0, bytesRead), keyName);
   } catch {
     return undefined;
   } finally {
@@ -71,16 +74,19 @@ async function readDotEnvKey(path: string): Promise<string | undefined> {
  * @param cwd - The workspace directory whose `.env` is consulted second
  * @returns The key and its source, or `undefined` when no source provides one
  */
-export async function resolveApiKey(cwd: string): Promise<ResolvedApiKey | undefined> {
-  const fromEnvironment = process.env[KEY_NAME];
+export async function resolveApiKey(
+  cwd: string,
+  keyName: ApiKeyName = "BRAVE_SEARCH_API_KEY",
+): Promise<ResolvedApiKey | undefined> {
+  const fromEnvironment = process.env[keyName];
 
   if (fromEnvironment) return { key: fromEnvironment, source: "environment" };
 
-  const fromWorkspace = await readDotEnvKey(join(cwd, ".env"));
+  const fromWorkspace = await readDotEnvKey(join(cwd, ".env"), keyName);
 
   if (fromWorkspace) return { key: fromWorkspace, source: "workspace .env" };
 
-  const fromAgent = await readDotEnvKey(join(getAgentDir(), ".env"));
+  const fromAgent = await readDotEnvKey(join(getAgentDir(), ".env"), keyName);
 
   if (fromAgent) return { key: fromAgent, source: "agent .env" };
 

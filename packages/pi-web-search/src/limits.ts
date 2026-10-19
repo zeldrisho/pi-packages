@@ -4,22 +4,11 @@ export const SEARCH_DEFAULT_RESULT_COUNT = 5;
 /** Minimum allowed result count. */
 export const SEARCH_MIN_RESULT_COUNT = 1;
 
-/**
- * Maximum allowed result count at the schema level (superset of both modes).
- * Web mode is limited to {@link SEARCH_WEB_MAX_RESULT_COUNT} and context mode
- * to {@link SEARCH_CONTEXT_MAX_RESULT_COUNT}; the tighter per-mode limit is
- * enforced at runtime because the provider rejects union schemas.
- */
-export const SEARCH_MAX_RESULT_COUNT = 50;
+/** Maximum allowed web result count; Answers does not accept a result count. */
+export const SEARCH_MAX_RESULT_COUNT = 20;
 
 /** Maximum result count for web-mode search (Brave allows 1-20). */
 export const SEARCH_WEB_MAX_RESULT_COUNT = 20;
-
-/** Maximum result count for context-mode search (Brave allows 1-50). */
-export const SEARCH_CONTEXT_MAX_RESULT_COUNT = 50;
-
-/** Maximum query length for context-based search (characters). */
-export const SEARCH_CONTEXT_MAX_QUERY_CHARACTERS = 400;
 
 /** Maximum query length for web search (characters). */
 export const SEARCH_WEB_MAX_QUERY_CHARACTERS = 400;

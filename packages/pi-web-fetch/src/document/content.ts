@@ -1,5 +1,5 @@
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@earendil-works/pi-coding-agent";
-import type { ExtractedLinks, ExtractionDiagnostics } from "./evidence";
+import type { ExtractedLinks, ExtractionDiagnostics } from "./evidence.ts";
 
 const CONTENT_LINE_BUDGET = Math.max(1, DEFAULT_MAX_LINES - 10);
 

@@ -8,13 +8,13 @@ import {
   truncateHead,
 } from "@earendil-works/pi-coding-agent";
 import { ExpiringLruCache, stableKeyHash, type CachePersistence } from "./cache";
-import { sliceCompleteDocument, type CompleteDocument } from "./content";
-import { revalidateCompleteDocument, type FetchRemoteDependencies } from "./fetch";
-import { fetchDocumentWithLlmsTxtSupport } from "./llms";
-import { focusMarkdown, type FocusDetails } from "./focus";
-import { resolveFragmentOffset, urlWithoutFragment } from "./fragments";
+import { sliceCompleteDocument, type CompleteDocument } from "./document/content.ts";
+import { revalidateCompleteDocument, type FetchRemoteDependencies } from "./acquisition/fetch.ts";
+import { fetchDocumentWithLlmsTxtSupport } from "./acquisition/llms.ts";
+import { focusMarkdown, type FocusDetails } from "./document/focus.ts";
+import { resolveFragmentOffset, urlWithoutFragment } from "./document/fragments.ts";
 import { InflightCoalescer } from "./inflight";
-import { createDocumentOutline, type DocumentOutline } from "./outline";
+import { createDocumentOutline, type DocumentOutline } from "./document/outline.ts";
 import { redactUrlForDisplay } from "./redact";
 import {
   FETCH_DEFAULT_MAX_CHARACTERS,
@@ -129,7 +129,7 @@ export function classifyConfidence(
   return markdownLength >= 200 ? "medium" : "low";
 }
 
-export { buildLlmsTxtCandidateUrls } from "./llms";
+export { buildLlmsTxtCandidateUrls } from "./acquisition/llms.ts";
 
 /** Resolves the private, cross-session cache directory for a web tool. */
 function resolveCacheDirectory(name: string): string {

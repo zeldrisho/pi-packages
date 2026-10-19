@@ -3,7 +3,7 @@
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { focusMarkdown } from "../src/focus";
+import { focusMarkdown } from "../src/document/focus.ts";
 
 interface FocusCase {
   name: string;

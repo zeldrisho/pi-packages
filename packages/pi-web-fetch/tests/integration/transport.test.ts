@@ -206,6 +206,13 @@ describe("web_fetch transport", () => {
     expect(outcomes.every((outcome) => outcome.status === "rejected")).toBe(true);
   });
 
+  it("decompresses gzip-encoded text before decoding its charset", async () => {
+    const result = await fetchRemoteContent(`${origin}/gzip`, 0, 6_000, undefined, dependencies);
+
+    expect(result.markdown).toContain("Readable compressed build log");
+    expect(result.markdown).toContain("second line");
+  });
+
   it("extracts HTML while removing executable content", async () => {
     const result = await fetchRemoteContent(`${origin}/html`, 0, 6_000, undefined, dependencies);
     expect(result.markdown).toContain("Hello");

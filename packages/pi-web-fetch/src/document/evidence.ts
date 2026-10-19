@@ -1,4 +1,5 @@
 import { parseHTML } from "linkedom";
+import { hasAnubisMarkers } from "../challenges/anubis.ts";
 
 const MAX_LINKS = 16;
 
@@ -28,7 +29,11 @@ export interface ExtractedLinks {
   omittedExternal: number;
 }
 
-const JAVASCRIPT_MARKERS = [/please\s+enable\s+javascript/i, /javascript\s+(?:is\s+)?required/i];
+const JAVASCRIPT_MARKERS = [
+  /(?:please|you\s+(?:need|must)\s+to)\s+enable\s+javascript/i,
+  /enable\s+javascript\s+to\s+(?:continue|run\s+this\s+app)/i,
+  /javascript\s+(?:is\s+)?required/i,
+];
 
 const BOT_MARKERS = [
   /are\s+you\s+a\s+robot/i,
@@ -36,6 +41,25 @@ const BOT_MARKERS = [
   /checking\s+your\s+browser/i,
   /<title>\s*just\s+a\s+moment/i,
 ];
+
+// CAPTCHA interstitials (Cap, reCAPTCHA, hCaptcha, Turnstile) are JavaScript-only
+// challenge shells that carry no readable text. The loader/class names below appear
+// only on challenge shells; generic widget markers additionally require an empty
+// extraction so a content-rich page that merely embeds a CAPTCHA is not misreported.
+const CAPTCHA_LOADER_MARKERS = [
+  /\bcap-loader\.js\b/i,
+  /\bcap-captcha\b/i,
+  /\bid=["']captcha-form["']/i,
+];
+
+const CAPTCHA_WIDGET_MARKERS = [
+  /\bid=["']captcha["']/i,
+  /\bclass=["'][^"']*\bg-recaptcha\b/i,
+  /\bclass=["'][^"']*\bh-captcha\b/i,
+  /\bclass=["'][^"']*\bcf-turnstile\b/i,
+];
+
+const CAPTCHA_CHALLENGE_MAX_MARKDOWN_CHARACTERS = 200;
 
 const ANUBIS_MARKER = /\banubis\b/i;
 
@@ -59,10 +83,17 @@ export function diagnoseExtraction(raw: string, markdown: string): ExtractionDia
   const { document } = parseHTML(raw);
   const anubisText = [...document.childNodes].map((node) => node.textContent ?? "").join(" ");
 
+  const captchaChallenge =
+    CAPTCHA_LOADER_MARKERS.some((marker) => marker.test(raw)) ||
+    (markdown.trim().length < CAPTCHA_CHALLENGE_MAX_MARKDOWN_CHARACTERS &&
+      CAPTCHA_WIDGET_MARKERS.some((marker) => marker.test(raw)));
+
   return {
     javascriptRequired: JAVASCRIPT_MARKERS.some((marker) => marker.test(raw)),
     botWall:
+      hasAnubisMarkers(raw) ||
       BOT_MARKERS.some((marker) => marker.test(raw)) ||
+      captchaChallenge ||
       (ANUBIS_MARKER.test(anubisText) &&
         ANUBIS_PROTECTION_MARKERS.some((marker) => marker.test(anubisText)) &&
         PROOF_OF_WORK_MARKER.test(anubisText)),

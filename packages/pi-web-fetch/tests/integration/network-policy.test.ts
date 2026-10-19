@@ -4,7 +4,7 @@ import {
   BLOCKED_IPV6_RANGES,
   isPrivateAddress,
   validateRemoteUrl,
-} from "../../src/network-policy";
+} from "../../src/network/network-policy.ts";
 
 describe("web_fetch address policy", () => {
   it.each([

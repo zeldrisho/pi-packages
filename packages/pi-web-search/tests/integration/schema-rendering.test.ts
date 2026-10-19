@@ -1,10 +1,7 @@
 import { Check } from "typebox/value";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { webSearchParameters } from "../../src/index";
-import {
-  SEARCH_CONTEXT_MAX_QUERY_CHARACTERS,
-  SEARCH_WEB_MAX_QUERY_CHARACTERS,
-} from "../../src/limits";
+import { SEARCH_WEB_MAX_QUERY_CHARACTERS } from "../../src/limits";
 import { createSearchTool, jsonResponse, renderTheme } from "./harness";
 
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
@@ -20,12 +17,7 @@ describe("web_search schema rendering", () => {
     expect(schema).not.toContain("allOf");
     expect(schema).not.toContain("anyOf");
     expect(Check(webSearchParameters, { query: "x" })).toBe(true);
-    expect(Object.keys(webSearchParameters.properties)).toEqual([
-      "query",
-      "freshness",
-      "mode",
-      "spellcheck",
-    ]);
+    expect(Object.keys(webSearchParameters.properties)).toEqual(["query", "mode"]);
   });
 
   it("accepts up to the web query limit for either mode at the schema level", () => {
@@ -44,19 +36,19 @@ describe("web_search schema rendering", () => {
     ).toBe(false);
   });
 
-  it("enforces the tighter context query limit at runtime", async () => {
+  it("enforces the Answers query limit at runtime", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "test-secret";
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     await expect(
       createSearchTool().execute(
         "call",
-        { query: "x".repeat(SEARCH_CONTEXT_MAX_QUERY_CHARACTERS + 1), mode: "context" },
+        { query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS + 1), mode: "answers" },
         undefined,
         undefined,
       ),
     ).rejects.toThrow(
-      `Search queries cannot exceed ${SEARCH_CONTEXT_MAX_QUERY_CHARACTERS} characters.`,
+      `Search queries cannot exceed ${SEARCH_WEB_MAX_QUERY_CHARACTERS} characters.`,
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -87,7 +79,7 @@ describe("web_search schema rendering", () => {
       expect(url.origin + url.pathname).toBe("https://api.search.brave.com/res/v1/web/search");
       expect(url.searchParams.get("q")).toBe("pi extensions");
       expect(url.searchParams.get("count")).toBe("2");
-      expect(url.searchParams.get("freshness")).toBe("pw");
+      expect(url.searchParams.has("freshness")).toBe(false);
       expect(url.searchParams.get("search_lang")).toBe("en-US");
       expect(new Headers(init?.headers).get("X-Subscription-Token")).toBe("test-secret");
 
@@ -109,7 +101,7 @@ describe("web_search schema rendering", () => {
 
     const result = await createSearchTool().execute(
       "call",
-      { query: " pi extensions ", count: 2, freshness: "week", language: "en-US" },
+      { query: " pi extensions ", count: 2, language: "en-US" },
       undefined,
       undefined,
     );
@@ -165,7 +157,7 @@ describe("web_search schema rendering", () => {
 
     expect(collapsed).toContain("First title");
     expect(collapsed).toContain("more lines");
-    expect(collapsed).not.toContain("Second title");
+    expect(collapsed).not.toContain("Third title");
     expect(expanded).toContain("Third title");
     expect(expanded).not.toContain("more lines");
     expect(

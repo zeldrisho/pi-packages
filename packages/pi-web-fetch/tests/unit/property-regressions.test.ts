@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { isPrivateAddress } from "../../src/network-policy";
+import { isPrivateAddress } from "../../src/network/network-policy.ts";
 import { redactUrlForDisplay } from "../../src/redact";
 
 /** Small deterministic PRNG so failures are reproducible without an extra dependency. */

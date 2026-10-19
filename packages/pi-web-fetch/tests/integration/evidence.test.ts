@@ -2,7 +2,7 @@ import type { IncomingMessage } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { executeWebFetch, type FetchRemoteDependencies } from "../../src/index";
 import { classifyContentKind, classifyConfidence } from "../../src/service";
-import { detectAppShell, normalizeGitHubRawUrl } from "../../src/fetch";
+import { detectAppShell, normalizeGitHubRawUrl } from "../../src/acquisition/fetch.ts";
 import { createFetchHarness } from "./harness";
 
 /** Builds a minimal HTTP response for offline fetch testing. */
@@ -375,5 +375,19 @@ describe("web_fetch honest-evidence details", () => {
     expect(result.details.finalUrl).toBe(expectedFinal);
     expect(result.details.extractor).toBe("raw");
     expect(result.details.confidence).toBe("high");
+  });
+
+  it("reports the standard block for a JavaScript CAPTCHA interstitial", async () => {
+    fixture.resetCaptchaChallengeRequests();
+    const url = `${origin}/captcha-challenge`;
+
+    const first = await executeWebFetch({ url }, undefined, undefined, dependencies);
+    const second = await executeWebFetch({ url }, undefined, undefined, dependencies);
+
+    expect(first.content[0].text).toContain("Blocked by an anti-bot challenge.");
+    expect(first.details.extractionDiagnostics?.botWall).toBe(true);
+    expect(second.content[0].text).toContain("Blocked by an anti-bot challenge.");
+    // Blocked challenge results are never cached, so the second call refetches.
+    expect(fixture.captchaChallengeRequests()).toBe(2);
   });
 });

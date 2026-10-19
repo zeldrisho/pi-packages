@@ -31,7 +31,7 @@ function expectCommonTruncationContract(
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  delete process.env.BRAVE_SEARCH_API_KEY;
+  delete process.env.BRAVE_ANSWERS_API_KEY;
 });
 
 describe("web tool truncation contract", () => {
@@ -58,20 +58,16 @@ describe("web tool truncation contract", () => {
     });
     expect(fetchResult.details.nextOffset).toBe(fetchResult.details.truncation.nextOffset);
 
-    process.env.BRAVE_SEARCH_API_KEY = "contract-secret";
+    process.env.BRAVE_ANSWERS_API_KEY = "contract-secret";
 
-    const generic = Array.from({ length: 20 }, (_, index) => ({
-      title: `Contract result ${index}`,
-      url: `https://search-contract.example/${index}`,
-      snippets: ["a".repeat(8_000), "b".repeat(8_000), "c".repeat(8_000)],
-    }));
+    const answerEvent = JSON.stringify({ choices: [{ delta: { content: "a".repeat(60_000) } }] });
 
     vi.stubGlobal(
       "fetch",
       vi.fn(
         async () =>
-          new Response(JSON.stringify({ grounding: { generic } }), {
-            headers: { "content-type": "application/json" },
+          new Response(`data: ${answerEvent}\n\ndata: [DONE]\n\n`, {
+            headers: { "content-type": "text/event-stream" },
           }),
       ),
     );
@@ -80,7 +76,7 @@ describe("web tool truncation contract", () => {
 
     try {
       const searchResult = await runtime.execute(
-        { query: "repository truncation contract", mode: "context", count: 20 },
+        { query: "repository truncation contract", mode: "answers" },
         undefined,
         undefined,
       );

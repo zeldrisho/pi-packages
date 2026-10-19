@@ -34,10 +34,6 @@ Remove the project package with the same source:
 pi remove -l npm:@zeldrisho/pi-gate
 ```
 
-## Development
-
-See the [development guide](docs/development.md) for contributor setup and verification.
-
 ## License
 
 [MIT](LICENSE)

@@ -7,7 +7,17 @@ import { executeWebFetch, resetLlmsNoticeOrigins } from "./service";
 
 export { ExpiringLruCache } from "./cache";
 
-export type { FetchResult } from "./content";
+export {
+  hasAnubisMarkers,
+  parseAnubisChallenge,
+  solveAnubisChallenge,
+  type AnubisChallenge,
+  type AnubisSolveContext,
+} from "./challenges/anubis.ts";
+
+export { CookieJar } from "./network/cookies.ts";
+
+export type { FetchResult } from "./document/content.ts";
 
 export {
   diagnoseExtraction,
@@ -15,13 +25,21 @@ export {
   type ExtractedLink,
   type ExtractedLinks,
   type ExtractionDiagnostics,
-} from "./evidence";
+} from "./document/evidence.ts";
 
-export { fetchRemoteContent, npmRegistryFallbackUrl, type FetchRemoteDependencies } from "./fetch";
+export {
+  fetchRemoteContent,
+  npmRegistryFallbackUrl,
+  type FetchRemoteDependencies,
+} from "./acquisition/fetch.ts";
 
-export { focusMarkdown, type FocusDetails, type FocusResult } from "./focus";
+export { focusMarkdown, type FocusDetails, type FocusResult } from "./document/focus.ts";
 
-export { createDocumentOutline, type DocumentOutline, type OutlineHeading } from "./outline";
+export {
+  createDocumentOutline,
+  type DocumentOutline,
+  type OutlineHeading,
+} from "./document/outline.ts";
 
 export { redactUrlForDisplay } from "./redact";
 
@@ -39,7 +57,7 @@ export {
   requestPinned,
   validateRemoteUrl,
   type ValidatedTarget,
-} from "./network";
+} from "./network/network.ts";
 
 export const webFetchParameters = Type.Object({
   url: Type.String(),

@@ -1,6 +1,4 @@
 import {
-  SEARCH_CONTEXT_MAX_QUERY_CHARACTERS,
-  SEARCH_CONTEXT_MAX_RESULT_COUNT,
   SEARCH_MAX_DATE_RANGE_CHARACTERS,
   SEARCH_MAX_GOGGLES_CHARACTERS,
   SEARCH_MAX_OFFSET,
@@ -24,33 +22,31 @@ export function validateProviderRequest(
   mode: SearchMode,
   extras?: ProviderRequestExtras,
 ): void {
+  if (mode !== "web" && mode !== "answers")
+    throw new Error('Search mode must be "web" or "answers".');
+
   if (
-    mode === "context" &&
+    mode === "answers" &&
     (extras?.extraSnippets !== undefined ||
       extras?.operators !== undefined ||
       extras?.resultFilter !== undefined ||
       extras?.offset !== undefined ||
       extras?.uiLang !== undefined ||
-      extras?.dateRange !== undefined)
+      extras?.dateRange !== undefined ||
+      extras?.goggles !== undefined)
   ) {
     throw new Error(
-      "The extraSnippets, operators, resultFilter, offset, uiLang, and dateRange options are only supported in web mode.",
+      "The extraSnippets, operators, resultFilter, offset, uiLang, dateRange, and goggles options are only supported in web mode.",
     );
   }
 
-  if (mode === "web" && (extras?.threshold !== undefined || extras?.depth !== undefined)) {
-    throw new Error("The threshold and depth options are only supported in context mode.");
-  }
-
-  const maximumQueryCharacters =
-    mode === "context" ? SEARCH_CONTEXT_MAX_QUERY_CHARACTERS : SEARCH_WEB_MAX_QUERY_CHARACTERS;
+  const maximumQueryCharacters = SEARCH_WEB_MAX_QUERY_CHARACTERS;
 
   if (query.length > maximumQueryCharacters) {
     throw new Error(`Search queries cannot exceed ${maximumQueryCharacters} characters.`);
   }
 
-  const maximumCount =
-    mode === "context" ? SEARCH_CONTEXT_MAX_RESULT_COUNT : SEARCH_WEB_MAX_RESULT_COUNT;
+  const maximumCount = SEARCH_WEB_MAX_RESULT_COUNT;
 
   if (!Number.isInteger(count) || count < SEARCH_MIN_RESULT_COUNT || count > maximumCount) {
     throw new Error(

@@ -28,7 +28,9 @@ Retryable `429` and `503` responses honor capped `Retry-After` values or capped 
 
 HTML evidence distinguishes JavaScript-required pages, bot walls, consent interstitials, and sparse extraction. Links are bounded metadata only; unsafe schemes and credentials are rejected, and links are never traversed implicitly.
 
-The blocked-address table in `packages/pi-web-fetch/src/network-policy.ts` follows the [IANA IPv4](https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml) and [IPv6](https://www.iana.org/assignments/iana-ipv6/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml) special-purpose registries. Review it at least quarterly, record the date beside the table, and update endpoint fixtures from reviewed registry data. Registry changes require a security review preserving DNS-answer validation, address pinning, and redirect revalidation.
+In-process Anubis proof-of-work interstitials are solved inside the same boundary: challenge and pass requests reuse the pinned transport, a server-provided WebAssembly module runs in a worker thread terminated on cancellation with allowlisted imports and a byte/time budget, and cookies live in memory for one acquisition. Methods or extensions outside the in-process set report the standard block.
+
+The blocked-address table in `packages/pi-web-fetch/src/network/network-policy.ts` follows the [IANA IPv4](https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml) and [IPv6](https://www.iana.org/assignments/iana-ipv6/iana-ipv6-special-registry/iana-ipv6-special-registry.xhtml) special-purpose registries. Review it at least quarterly, record the date beside the table, and update endpoint fixtures from reviewed registry data. Registry changes require a security review preserving DNS-answer validation, address pinning, and redirect revalidation.
 
 ## Web search boundary
 
@@ -40,7 +42,7 @@ flowchart LR
   G -- no --> H[Private temporary file]
 ```
 
-The API key is read at request time and excluded from cache keys, output, and errors. Context mode uses only Brave's context endpoint and never fetches result URLs. Large formatted results use a package-owned temporary directory and are removed after write failure or session shutdown.
+The API key is read at request time and excluded from cache keys, output, and errors. Web and Answers modes are explicit, separately cached requests with no automatic switching. Answers uses Brave's chat-completions endpoint through the same bounded, timeout- and cancellation-aware transport, parsing SSE citation and usage tags into generated-answer metadata rather than search-result evidence. Neither mode fetches result URLs. Generated answers remain untrusted and do not imply correctness. Large formatted results use a package-owned temporary directory and are removed after write failure or session shutdown.
 
 ## Data flow invariants
 

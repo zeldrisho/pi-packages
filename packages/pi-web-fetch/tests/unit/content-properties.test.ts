@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { sliceCompleteDocument } from "../../src/content";
+import { sliceCompleteDocument } from "../../src/document/content.ts";
 
 function* values(seed: number): Generator<number> {
   let state = seed >>> 0;

@@ -1,6 +1,6 @@
 {
   "name": "@zeldrisho/pi-web-search",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Pi extension for bounded Brave web search and LLM context retrieval",
   "keywords": [
     "brave-search",
@@ -15,7 +15,7 @@
     "url": "https://github.com/zeldrisho/pi-packages/issues"
   },
   "license": "MIT",
-  "author": "Zeldris",
+  "author": "zeldrisho",
   "repository": {
     "type": "git",
     "url": "https://github.com/zeldrisho/pi-packages.git",

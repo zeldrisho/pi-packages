@@ -1,8 +1,9 @@
 import { request as httpRequest, type IncomingMessage } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { isIP, type LookupFunction } from "node:net";
+import { brotliDecompressSync, gunzipSync, inflateSync } from "node:zlib";
 import { formatSize } from "@earendil-works/pi-coding-agent";
-import type { ValidatedTarget } from "./network-policy";
+import type { ValidatedTarget } from "./network-policy.ts";
 
 /** Maximum size in bytes for raw HTTP response bodies. */
 export const FETCH_MAX_BYTES = 5 * 1_024 * 1_024;
@@ -285,6 +286,41 @@ export async function readResponseBytes(
  * @param contentTypeHeader - Value of the Content-Type response header
  * @returns Decoded response string
  */
+/** Decompresses supported HTTP content codings while bounding expansion. */
+export function decompressResponse(
+  bytes: Uint8Array,
+  contentEncoding: string | undefined,
+): Uint8Array {
+  const encodings = (contentEncoding ?? "identity")
+    .split(",")
+    .map((encoding) => encoding.trim().toLowerCase())
+    .filter((encoding) => encoding && encoding !== "identity");
+
+  for (const encoding of encodings.reverse()) {
+    try {
+      const options = { maxOutputLength: FETCH_MAX_BYTES };
+
+      if (encoding === "gzip" || encoding === "x-gzip") bytes = gunzipSync(bytes, options);
+      else if (encoding === "deflate") bytes = inflateSync(bytes, options);
+      else if (encoding === "br") bytes = brotliDecompressSync(bytes, options);
+      else throw new Error(`unsupported content encoding: ${encoding}`);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("unsupported content encoding:"))
+        throw error;
+
+      if (error instanceof Error && "code" in error && error.code === "ERR_BUFFER_TOO_LARGE") {
+        throw new Error(
+          `web_fetch decompressed response exceeds the ${formatSize(FETCH_MAX_BYTES)} limit.`,
+        );
+      }
+
+      throw new Error(`web_fetch could not decode ${encoding}-encoded response.`);
+    }
+  }
+
+  return bytes;
+}
+
 export function decodeResponse(bytes: Uint8Array, contentTypeHeader: string): string {
   const charset = contentTypeHeader.match(/(?:^|;)\s*charset\s*=\s*["']?([^;"'\s]+)/i)?.[1];
 

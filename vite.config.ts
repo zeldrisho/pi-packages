@@ -26,6 +26,8 @@ export default defineConfig({
     ignorePatterns: [
       "coverage/**",
       "dist/**",
+      "packages/pi-web-fetch/workers/anubis-solver.js",
+      "packages/pi-web-fetch/workers/anubis-worker.js",
       "pnpm-lock.yaml",
       ".agent/**",
       ".agents/**",
@@ -49,6 +51,8 @@ export default defineConfig({
     ignorePatterns: [
       "coverage/**",
       "dist/**",
+      "packages/pi-web-fetch/workers/anubis-solver.js",
+      "packages/pi-web-fetch/workers/anubis-worker.js",
       ".agent/**",
       ".agents/**",
       ".claude/**",

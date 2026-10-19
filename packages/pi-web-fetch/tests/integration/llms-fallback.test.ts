@@ -2,7 +2,7 @@ import type { IncomingMessage } from "node:http";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vite-plus/test";
 import registerWebFetch, { executeWebFetch, type FetchRemoteDependencies } from "../../src/index";
-import { parseLinkHeaderForAgentHints } from "../../src/fetch";
+import { parseLinkHeaderForAgentHints } from "../../src/acquisition/fetch.ts";
 import { buildLlmsTxtCandidateUrls } from "../../src/service";
 
 /** Builds a minimal HTTP response for offline fetch testing. */

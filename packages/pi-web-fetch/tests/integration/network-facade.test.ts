@@ -4,7 +4,7 @@ import {
   isPrivateAddress,
   requestPinned,
   validateRemoteUrl,
-} from "../../src/network";
+} from "../../src/network/network.ts";
 
 describe("network compatibility facade", () => {
   it("delegates behavior to the underlying modules", async () => {
