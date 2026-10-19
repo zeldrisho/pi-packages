@@ -17,6 +17,7 @@ import type { ValidatedTarget } from "./network-policy";
 import { redactUrlForDisplay } from "./redact";
 import {
   decodeResponse,
+  decompressResponse,
   FETCH_MAX_BYTES,
   readResponseBytes,
   responseHeader,
@@ -170,8 +171,10 @@ async function documentFromResponse(
     );
   }
 
+  const rawBytes = await readResponseBytes(response, FETCH_MAX_BYTES, signal);
+
   const raw = decodeResponse(
-    await readResponseBytes(response, FETCH_MAX_BYTES, signal),
+    decompressResponse(rawBytes, responseHeader(response, "content-encoding")),
     contentTypeHeader,
   );
 

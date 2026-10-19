@@ -8,6 +8,7 @@ export {
 
 export {
   decodeResponse,
+  decompressResponse,
   FETCH_MAX_BYTES,
   readResponseBytes,
   requestPinned,

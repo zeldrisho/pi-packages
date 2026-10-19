@@ -1,5 +1,6 @@
 import { once } from "node:events";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { gzipSync } from "node:zlib";
 import type { AddressInfo } from "node:net";
 import {
   FETCH_MAX_BYTES,
@@ -75,6 +76,14 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
   }
 
   switch (request.url) {
+    case "/gzip": {
+      response.setHeader("content-type", "text/plain; charset=utf-8");
+      response.setHeader("content-encoding", "gzip");
+      response.end(gzipSync("Readable compressed build log\nsecond line"));
+
+      return;
+    }
+
     case "/empty":
       response.setHeader("content-type", "text/plain");
       response.end();

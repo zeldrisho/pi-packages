@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Decompress bounded gzip, deflate, and Brotli HTTP responses before decoding text
+
 ## [0.10.2] - 2026-10-18
 
 ### Changed
