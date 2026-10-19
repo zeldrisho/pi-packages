@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-19
+
 ### Added
 
 - Add explicit `answers` mode for Brave-generated answers with parsed source citations and usage metadata, using a separate `BRAVE_ANSWERS_API_KEY` credential
@@ -136,7 +138,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded Brave web search ([cbc9491](https://github.com/zeldrisho/pi-packages/commit/cbc9491dce36555ab91b6bef203ec8b380596a89))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.10.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.11.0...HEAD
+[0.11.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.10.0...pi-web-search-v0.11.0
 [0.10.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.9.0...pi-web-search-v0.10.0
 [0.9.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.8.3...pi-web-search-v0.9.0
 [0.8.3]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.8.2...pi-web-search-v0.8.3
