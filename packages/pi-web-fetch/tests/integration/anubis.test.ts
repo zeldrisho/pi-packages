@@ -260,7 +260,9 @@ function handlePass(url: URL, request: IncomingMessage, response: ServerResponse
   }
 
   response.setHeader("set-cookie", "techaro.lol-anubis-auth=token; Path=/");
-  response.writeHead(302, { location: url.searchParams.get("redir") ?? "/" });
+  // Keep the fixture redirect target fixed; production redirect handling is
+  // covered separately and this server must never reflect query input into a header.
+  response.writeHead(302, { location: "/protected/fast" });
   response.end();
 }
 
