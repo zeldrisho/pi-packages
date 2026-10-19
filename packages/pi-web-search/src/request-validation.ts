@@ -36,7 +36,7 @@ export function validateProviderRequest(
       extras?.goggles !== undefined)
   ) {
     throw new Error(
-      "The extraSnippets, operators, resultFilter, offset, uiLang, and dateRange options are only supported in web mode.",
+      "The extraSnippets, operators, resultFilter, offset, uiLang, dateRange, and goggles options are only supported in web mode.",
     );
   }
 

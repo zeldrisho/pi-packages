@@ -29,7 +29,11 @@ export interface ExtractedLinks {
   omittedExternal: number;
 }
 
-const JAVASCRIPT_MARKERS = [/enable\s+javascript/i, /javascript\s+(?:is\s+)?required/i];
+const JAVASCRIPT_MARKERS = [
+  /(?:please|you\s+(?:need|must)\s+to)\s+enable\s+javascript/i,
+  /enable\s+javascript\s+to\s+(?:continue|run\s+this\s+app)/i,
+  /javascript\s+(?:is\s+)?required/i,
+];
 
 const BOT_MARKERS = [
   /are\s+you\s+a\s+robot/i,

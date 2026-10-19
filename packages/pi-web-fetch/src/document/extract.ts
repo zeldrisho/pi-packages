@@ -100,7 +100,17 @@ function normalizeFragmentDocument(document: Document): void {
     if (!isElementNode(node)) continue;
     const tagName = node.tagName;
 
-    if (tagName === "HTML" || tagName === "BODY" || tagName === "HEAD") continue;
+    if (tagName === "HTML") continue;
+
+    if (tagName === "HEAD" || tagName === "BODY") {
+      const destination = tagName === "HEAD" ? head : body;
+
+      while (node.firstChild) destination.appendChild(node.firstChild);
+
+      node.remove();
+      continue;
+    }
+
     (HEAD_TAGS.has(tagName) ? head : body).appendChild(node);
   }
 

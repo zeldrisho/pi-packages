@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { parseAnswerStream } from "../../src/answers";
+import { validateProviderRequest } from "../../src/request-validation";
 import { answerResponse, createSearchTool, jsonResponse } from "./harness";
 
 const citation = '<citation>{"number":1,"url":"https://example.com/source"}</citation>';
@@ -165,6 +166,12 @@ describe("Answers mode", () => {
       ),
     ).rejects.toThrow("only supported in web mode");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("names goggles in the web-only option error", () => {
+    expect(() =>
+      validateProviderRequest("query", 5, "answers", { goggles: "https://example.com/goggle" }),
+    ).toThrow("goggles options are only supported in web mode");
   });
 
   it("parses UTF-8 and SSE data split across network chunks", async () => {

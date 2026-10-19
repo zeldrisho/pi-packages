@@ -9,6 +9,12 @@ describe("bounded extraction diagnostics", () => {
       consentInterstitial: false,
       sparseExtraction: false,
     });
+    expect(
+      diagnoseExtraction(
+        `<article>${"Readable content. ".repeat(50)}<noscript>Enable JavaScript to view comments.</noscript></article>`,
+        "Readable content. ".repeat(50),
+      ).javascriptRequired,
+    ).toBe(false);
     expect(diagnoseExtraction("Checking your browser to verify you are human", "")).toMatchObject({
       javascriptRequired: false,
       botWall: true,

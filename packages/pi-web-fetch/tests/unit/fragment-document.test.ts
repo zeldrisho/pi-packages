@@ -33,6 +33,19 @@ describe("tag-omitted HTML5 documents", () => {
     expect(htmlToMarkdownFallback(fragment)).toContain("Releases Overview");
   });
 
+  it("preserves explicit head and body contents in a fragment", async () => {
+    const explicitWrappers =
+      "<!DOCTYPE html><head><title>Wrapped title</title></head><body><h1>Wrapped article</h1><p>Wrapped body text.</p></body>";
+
+    const url = new URL("https://example.test/wrapped");
+    const result = await extractHtmlToMarkdown(explicitWrappers, url);
+
+    expect(result.title).toBe("Wrapped title");
+    expect(result.markdown).toContain("Wrapped article");
+    expect(result.markdown).toContain("Wrapped body text.");
+    expect(htmlToMarkdownFallback(explicitWrappers)).toContain("Wrapped body text.");
+  });
+
   it("still extracts a well-formed document", async () => {
     const result = await extractHtmlToMarkdown(
       "<html><head><title>Full</title></head><body><h1>Heading</h1><p>Body text.</p></body></html>",
