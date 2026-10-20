@@ -101,6 +101,7 @@ describe("web_search code-search options", () => {
 describe("web_search recovery guidance", () => {
   it.each([0, 1, 2, 5])("reports %s of 5 results without automatic fallback", async (count) => {
     process.env.BRAVE_SEARCH_API_KEY = "guidance-secret";
+    delete process.env.BRAVE_ANSWERS_API_KEY;
 
     const fetchMock = vi.fn(async () =>
       jsonResponse({

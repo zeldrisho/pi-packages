@@ -108,7 +108,7 @@ describe("Answers mode", () => {
     expect(second.content).toEqual(first.content);
     expect(second.details.answer).toEqual(first.details.answer);
     await tool.execute("w", { query: params.query }, undefined, undefined);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("preserves the untrusted wrapper and warns for missing citations", async () => {

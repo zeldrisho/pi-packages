@@ -324,8 +324,12 @@ export class SearchRuntime {
 
     if (!query) throw new Error("Search query cannot be empty.");
 
-    const mode: SearchMode = "web";
+    const mode: SearchMode = params.mode ?? "web";
     const count = params.count ?? SEARCH_DEFAULT_RESULT_COUNT;
+
+    if (mode === "answers" && params.count !== undefined) {
+      throw new Error("The count option is only supported in web mode.");
+    }
 
     const webExtras = {
       country: params.country,
@@ -340,7 +344,7 @@ export class SearchRuntime {
     };
 
     validateProviderRequest(query, count, mode, webExtras);
-    const keyName = "BRAVE_SEARCH_API_KEY";
+    const keyName = mode === "answers" ? "BRAVE_ANSWERS_API_KEY" : "BRAVE_SEARCH_API_KEY";
     const credentials = await resolveApiKey(cwd, keyName);
 
     if (!credentials) {
@@ -382,20 +386,30 @@ export class SearchRuntime {
         async (sharedSignal) => {
           let entry: CachedSearch;
 
-          const found = await searchBraveWeb(
-            query,
-            count,
-            params.language,
-            sharedSignal,
-            credentials.key,
-            { ...webExtras, operators: params.operators ?? true },
-          );
+          if (mode === "answers") {
+            const answer = await searchBraveAnswers(query, sharedSignal, credentials.key, {
+              country: params.country,
+              language: params.language,
+              safesearch: params.safesearch,
+            });
 
-          entry = {
-            results: found.results.filter((result) => result.url).slice(0, count),
-            meta: found.meta,
-            availableCount: found.results.length,
-          };
+            entry = { results: [], meta: {}, availableCount: 0, answer };
+          } else {
+            const found = await searchBraveWeb(
+              query,
+              count,
+              params.language,
+              sharedSignal,
+              credentials.key,
+              { ...webExtras, operators: params.operators ?? true },
+            );
+
+            entry = {
+              results: found.results.filter((result) => result.url).slice(0, count),
+              meta: found.meta,
+              availableCount: found.results.length,
+            };
+          }
 
           searchCache.set(cacheKey, entry, Date.now() + CACHE_TTL_MS);
 
