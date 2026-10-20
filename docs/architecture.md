@@ -43,7 +43,8 @@ flowchart LR
   F -- no --> H[Format output]
   G --> H
   H --> I{Within Pi limits?}
-  G -- no --> H[Private temporary file]
+  G -- no --> H[Format output]
+  I -- no --> J[Private temporary file]
 ```
 
 The API key is read at request time and excluded from cache keys, output, and errors. Web search runs first; when it returns no usable results, the extension optionally tries Brave Answers using its separate key. Answers uses Brave's chat-completions endpoint through the same bounded, timeout- and cancellation-aware transport, parsing SSE citation and usage tags into generated-answer metadata rather than search-result evidence. The two request types are separately cached; Answers failures do not conceal cancellation. Neither mode fetches result URLs. Generated answers remain untrusted and do not imply correctness. Large formatted results use a package-owned temporary directory and are removed after write failure or session shutdown.

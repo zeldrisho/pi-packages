@@ -13,7 +13,9 @@ async function runSearchCapturingUrl(params: SearchParameters): Promise<URL> {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
-      url = new URL(input instanceof Request ? input.url : String(input));
+      const requestUrl = new URL(input instanceof Request ? input.url : String(input));
+
+      if (requestUrl.pathname.endsWith("/web/search")) url = requestUrl;
 
       return jsonResponse({ web: { results: [] } });
     }),

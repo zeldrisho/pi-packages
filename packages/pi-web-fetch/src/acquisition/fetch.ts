@@ -494,7 +494,7 @@ async function fetchDocument(
     if ([404, 406].includes(response.statusCode ?? 0)) {
       response.resume();
       ({ target, response } = await requestFollowingRedirects(
-        requestUrl,
+        target.url,
         controller.signal,
         requestDependencies,
         { Accept: "text/html, text/plain;q=0.9, */*;q=0.1" },
