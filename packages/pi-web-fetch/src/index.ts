@@ -61,10 +61,8 @@ export {
 
 export const webFetchParameters = Type.Object({
   url: Type.String(),
-  query: Type.Optional(Type.String({ description: "Return only matching sections (long pages)." })),
-  offset: Type.Optional(
-    Type.Integer({ description: "Character offset; use nextOffset to continue." }),
-  ),
+  query: Type.Optional(Type.String({ description: "Find sections matching this text." })),
+  offset: Type.Optional(Type.Integer({ description: "Start at this character offset." })),
 });
 
 /**
@@ -80,7 +78,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "web_fetch",
     label: "Web Fetch",
-    description: "Fetch a public HTTP(S) page as Markdown (6,000 chars per call).",
+    description: "Read a public webpage as Markdown.",
     parameters: webFetchParameters,
 
     renderCall(args, theme) {

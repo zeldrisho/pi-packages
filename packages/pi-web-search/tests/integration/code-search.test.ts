@@ -2,6 +2,16 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { normalizeResultFilter, validateProviderRequest } from "../../src/brave";
 import { createSearchTool, jsonResponse } from "./harness";
 
+vi.mock("../../src/credentials", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/credentials")>();
+
+  return {
+    ...actual,
+    resolveApiKey: (cwd: string, keyName?: "BRAVE_SEARCH_API_KEY" | "BRAVE_ANSWERS_API_KEY") =>
+      keyName === "BRAVE_ANSWERS_API_KEY" ? undefined : actual.resolveApiKey(cwd, keyName),
+  };
+});
+
 describe("web_search code-search options", () => {
   it("passes web options without a spellcheck override", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "code-secret";
@@ -101,6 +111,7 @@ describe("web_search code-search options", () => {
 describe("web_search recovery guidance", () => {
   it.each([0, 1, 2, 5])("reports %s of 5 results without automatic fallback", async (count) => {
     process.env.BRAVE_SEARCH_API_KEY = "guidance-secret";
+    delete process.env.BRAVE_ANSWERS_API_KEY;
 
     const fetchMock = vi.fn(async () =>
       jsonResponse({

@@ -1,5 +1,4 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { StringEnum } from "@earendil-works/pi-ai";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { SEARCH_WEB_MAX_QUERY_CHARACTERS } from "./limits";
@@ -27,19 +26,13 @@ export const webSearchParameters = Type.Object({
     minLength: 1,
     maxLength: SEARCH_WEB_MAX_QUERY_CHARACTERS,
   }),
-  mode: Type.Optional(
-    StringEnum(["web", "answers"] as const, {
-      description:
-        '"web" (default): links and snippets. "answers": AI-generated answer with citations; requires Brave Answers plan.',
-    }),
-  ),
 });
 
 /**
  * Pi web search extension that registers the web_search tool.
  *
  * Provides a tool for searching the public web using Brave Search API with
- * support for compact web results and explicitly selected generated answers.
+ * support for web results and generated-answer fallback when no results are found.
  *
  * @param pi - The extension API instance
  */
@@ -50,8 +43,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "web_search",
     label: "Web Search",
-    description:
-      "Search the public web (links + snippets), or select answers for a generated, cited response. Verify sources with web_fetch.",
+    description: "Search the web. Use web_fetch to read sources.",
     parameters: webSearchParameters,
 
     renderCall(args, theme) {

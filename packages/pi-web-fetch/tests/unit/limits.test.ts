@@ -12,10 +12,8 @@ describe("web_fetch limit contracts", () => {
     const schema = JSON.parse(JSON.stringify(webFetchParameters));
     expect(Object.keys(schema.properties)).toEqual(["url", "query", "offset"]);
     expect(schema.properties.url.description).toBeUndefined();
-    expect(schema.properties.query.description).toBe("Return only matching sections (long pages).");
-    expect(schema.properties.offset.description).toBe(
-      "Character offset; use nextOffset to continue.",
-    );
+    expect(schema.properties.query.description).toBe("Find sections matching this text.");
+    expect(schema.properties.offset.description).toBe("Start at this character offset.");
     expect(JSON.stringify(schema)).not.toContain("maxCharacters");
     expect(
       Check(webFetchParameters, {

@@ -8,11 +8,14 @@ import { createSearchTool, jsonResponse, type SearchParameters } from "./harness
  * @returns The request URL captured from the stubbed global fetch
  */
 async function runSearchCapturingUrl(params: SearchParameters): Promise<URL> {
+  delete process.env.BRAVE_ANSWERS_API_KEY;
   let url: URL | undefined;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
-      url = new URL(input instanceof Request ? input.url : String(input));
+      const requestUrl = new URL(input instanceof Request ? input.url : String(input));
+
+      if (requestUrl.pathname.endsWith("/web/search")) url = requestUrl;
 
       return jsonResponse({ web: { results: [] } });
     }),

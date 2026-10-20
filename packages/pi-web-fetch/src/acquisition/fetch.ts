@@ -478,12 +478,28 @@ async function fetchDocument(
   };
 
   try {
+    const requestUrl = normalizeGitHubRawUrl(rawUrl);
+
     let { target, response } = await requestFollowingRedirects(
-      normalizeGitHubRawUrl(rawUrl),
+      requestUrl,
       controller.signal,
       requestDependencies,
       conditionalHeaders,
     );
+
+    // Some servers route Markdown negotiation to a missing representation even
+    // though their HTML page exists (for example, Redis documentation URLs).
+    // Retry only these representation-related statuses, through the same
+    // validated redirect/network boundary, with HTML preferred.
+    if ([404, 406].includes(response.statusCode ?? 0)) {
+      response.resume();
+      ({ target, response } = await requestFollowingRedirects(
+        target.url,
+        controller.signal,
+        requestDependencies,
+        { Accept: "text/html, text/plain;q=0.9, */*;q=0.1" },
+      ));
+    }
 
     if (
       response.statusCode !== undefined &&
