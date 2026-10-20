@@ -1,7 +1,7 @@
 {
   "name": "@zeldrisho/pi-web-search",
   "version": "0.12.0",
-  "description": "Pi extension for bounded Brave web search and LLM context retrieval",
+  "description": "Pi extension for bounded Brave web search with generated-answer fallback",
   "keywords": [
     "brave-search",
     "pi",
@@ -39,7 +39,6 @@
     "typecheck": "vp check --no-fmt --no-lint"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "catalog:",
     "@earendil-works/pi-coding-agent": "catalog:",
     "@earendil-works/pi-tui": "catalog:",
     "typebox": "catalog:",
@@ -48,7 +47,6 @@
     "vite-plus": "catalog:"
   },
   "peerDependencies": {
-    "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
     "@earendil-works/pi-tui": "*",
     "typebox": "*"

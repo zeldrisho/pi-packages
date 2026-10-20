@@ -1,7 +1,7 @@
 {
   "name": "@zeldrisho/pi-gate",
   "version": "0.6.0",
-  "description": "Pi extension that blocks or confirms bash commands based on a user-provided JSON configuration",
+  "description": "Pi extension that gates bash commands and protects its configuration from tool edits",
   "keywords": [
     "command-blocking",
     "command-confirmation",

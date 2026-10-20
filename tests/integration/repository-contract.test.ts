@@ -441,23 +441,64 @@ describe("repository contracts", () => {
       const isThemePackage = themePackages.has(directory);
 
       const expectedName = `@zeldrisho/${directory}`;
+      const packageReadme = `https://github.com/zeldrisho/pi-packages/tree/main/packages/${directory}#readme`;
+      const packagePath = join("packages", directory);
+      const isContentOnly = isPromptPackage || isSkillPackage || isThemePackage;
+      const changelog = await readFile(join(packageDirectory, "CHANGELOG.md"), "utf8");
+      const latestChangelogVersion = changelog.match(/^## \[(\d+\.\d+\.\d+)\]/m)?.[1];
 
       if (manifest.name !== expectedName) {
         fail(`${directory}/package.json name must be ${expectedName}, received ${manifest.name}`);
       }
 
-      if (JSON.stringify(manifest.scripts) !== JSON.stringify(expectedScripts)) {
-        fail(`${manifest.name} scripts must match the uniform package scripts`);
+      if (
+        !manifest.description ||
+        manifest.description.length > 200 ||
+        !Array.isArray(manifest.keywords) ||
+        !manifest.keywords.includes("pi-package")
+      ) {
+        fail(`${manifest.name} must have a concise description and pi-package keyword`);
       }
 
-      if (JSON.stringify(manifest.engines) !== JSON.stringify({ node: ">=24" })) {
-        fail(`${manifest.name} engines must require Node >=24`);
+      if (
+        manifest.homepage !== packageReadme ||
+        manifest.bugs?.url !== "https://github.com/zeldrisho/pi-packages/issues" ||
+        manifest.repository?.type !== "git" ||
+        manifest.repository?.url !== "https://github.com/zeldrisho/pi-packages.git" ||
+        manifest.repository?.directory !== packagePath ||
+        manifest.author !== "zeldrisho" ||
+        manifest.publishConfig?.access !== "public"
+      ) {
+        fail(`${manifest.name} has inconsistent publication metadata`);
       }
 
-      const expectedPackageTypeScriptConfiguration =
-        isPromptPackage || isSkillPackage || isThemePackage
-          ? expectedContentOnlyTypeScriptConfiguration
-          : expectedTypeScriptConfiguration;
+      if (latestChangelogVersion !== manifest.version) {
+        fail(`${manifest.name} version must match its latest changelog heading`);
+      }
+
+      if (["README.md", "LICENSE"].some((file) => (manifest.files ?? []).includes(file))) {
+        fail(`${manifest.name} must rely on npm's automatic README and LICENSE inclusion`);
+      }
+
+      if (!isContentOnly) {
+        if (JSON.stringify(manifest.scripts) !== JSON.stringify(expectedScripts)) {
+          fail(`${manifest.name} scripts must match the extension package scripts`);
+        }
+      } else if (manifest.scripts || manifest.devDependencies) {
+        fail(`${manifest.name} content-only packages must not declare package-local tooling`);
+      }
+
+      if (!isPromptPackage && !isSkillPackage && !isThemePackage) {
+        if (JSON.stringify(manifest.engines) !== JSON.stringify({ node: ">=24" })) {
+          fail(`${manifest.name} extensions must require Node >=24`);
+        }
+      } else if (manifest.engines) {
+        fail(`${manifest.name} content-only packages must not impose a Node engine requirement`);
+      }
+
+      const expectedPackageTypeScriptConfiguration = isContentOnly
+        ? expectedContentOnlyTypeScriptConfiguration
+        : expectedTypeScriptConfiguration;
 
       if (
         JSON.stringify(typeScriptConfiguration) !==
@@ -478,6 +519,18 @@ describe("repository contracts", () => {
         fail(
           `${manifest.name} files must contain only ${packageFiles.join(", ")}; received ${(manifest.files ?? []).join(", ")}`,
         );
+      }
+
+      const piPaths = Object.values(manifest.pi ?? {}).flatMap((paths) =>
+        Array.isArray(paths)
+          ? paths.filter((path): path is string => typeof path === "string")
+          : [],
+      );
+
+      for (const path of [...packageFiles, ...piPaths]) {
+        if (!existsSync(join(packageDirectory, path))) {
+          fail(`${manifest.name} references missing package path ${path}`);
+        }
       }
 
       if (isPromptPackage) {
