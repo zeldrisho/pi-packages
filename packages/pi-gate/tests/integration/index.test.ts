@@ -233,7 +233,7 @@ describe("legacy configuration fallback", () => {
     expect(existsSync(join(workDir, "gate.json"))).toBe(false);
     expect(readFileSync(path, "utf-8")).toBe(content);
     await handlers.sessionStart!({ reason: "startup" }, ctx);
-    expect(uiState.notifyCalls[0]?.text).toContain(path);
+    expect(uiState.notifyCalls).toHaveLength(0);
     expect(
       await handlers.toolCall!(
         { toolName: "bash", toolCallId: "legacy", input: { command: "sudo true" } },
@@ -348,9 +348,7 @@ describe("piGate extension", () => {
     it("creates and loads a default config with starter rules when the file is missing", async () => {
       const { ctx, uiState, handlers } = makeExtension().install();
       await handlers.sessionStart!({ reason: "startup" }, ctx);
-      expect(uiState.notifyCalls).toHaveLength(1);
-      expect(uiState.notifyCalls[0]?.level).toBe("info");
-      expect(uiState.notifyCalls[0]?.text).toContain("5 operation rules");
+      expect(uiState.notifyCalls).toHaveLength(0);
       expect(loadConfig()).toEqual({
         promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS,
         operations: {
@@ -372,20 +370,18 @@ describe("piGate extension", () => {
       expect(uiState.notifyCalls[0]?.text).toContain("is empty");
     });
 
-    it("informs when the config file has rules", async () => {
+    it("does not notify when the config file has rules", async () => {
       setConfig(JSON.stringify({ operations: { sudo: "block", "rm -rf": "prompt" } }));
       const { ctx, uiState, handlers } = makeExtension().install();
       await handlers.sessionStart!({ reason: "startup" }, ctx);
-      expect(uiState.notifyCalls).toHaveLength(1);
-      expect(uiState.notifyCalls[0]?.level).toBe("info");
-      expect(uiState.notifyCalls[0]?.text).toContain("2 operation rules");
+      expect(uiState.notifyCalls).toHaveLength(0);
     });
 
-    it("uses singular phrasing for a single rule", async () => {
+    it("does not notify when a single rule is loaded", async () => {
       setConfig(JSON.stringify({ operations: { sudo: "block" } }));
       const { ctx, uiState, handlers } = makeExtension().install();
       await handlers.sessionStart!({ reason: "startup" }, ctx);
-      expect(uiState.notifyCalls[0]?.text).toContain("1 operation rule ");
+      expect(uiState.notifyCalls).toHaveLength(0);
     });
   });
 
