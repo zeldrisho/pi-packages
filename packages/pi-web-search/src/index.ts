@@ -43,8 +43,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "web_search",
     label: "Web Search",
-    description:
-      "Search the public web for links and snippets. If no results are found, automatically try a generated answer. Verify sources with web_fetch.",
+    description: "Search the web. Use web_fetch to read sources.",
     parameters: webSearchParameters,
 
     renderCall(args, theme) {

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Simplify the model-facing web search tool description.
 - Remove the model-facing mode selector and automatically try a Brave-generated answer when web search returns no usable results.
 - Remove provider branding from progress notices.
 

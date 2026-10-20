@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Simplify the model-facing fetch tool and parameter descriptions.
+
 ### Fixed
 
 - Retry 404 and 406 responses to Markdown-negotiated requests with HTML preferred, allowing pages whose HTML representation is available to fetch successfully.
