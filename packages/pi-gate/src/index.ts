@@ -115,26 +115,19 @@ export default function piGate(pi: ExtensionAPI): void {
     const path = configPath();
     const ruleCount = Object.keys(config.operations).length;
 
-    if (loadResult.status === "loaded") {
-      if (ruleCount === 0) {
-        ctx.ui.notify(
-          `pi-gate: ${path} is empty; no commands are gated. Add rules to the "operations" object to start gating.`,
-          "warning",
-        );
-      } else {
-        ctx.ui.notify(
-          `pi-gate: ${ruleCount} operation rule${ruleCount === 1 ? "" : "s"} loaded from ${path}`,
-          "info",
-        );
-      }
+    if (loadResult.status === "loaded" && ruleCount === 0) {
+      ctx.ui.notify(
+        `pi-gate: ${path} is empty; no commands are gated. Add rules to the "operations" object to start gating.`,
+        "warning",
+      );
     } else if (loadResult.status === "failed") {
       ctx.ui.notify(
         "pi-gate: configuration exists but could not be loaded; prompting for all commands until it is fixed.",
         "warning",
       );
-    } else {
+    } else if (loadResult.status === "missing") {
       ctx.ui.notify(
-        `pi-gate: no configuration found at ${configPath()}; all commands are allowed until it is created.`,
+        `pi-gate: no configuration found at ${path}; all commands are allowed until it is created.`,
         "warning",
       );
     }
