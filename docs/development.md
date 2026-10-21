@@ -50,7 +50,19 @@ vp run benchmark:web-fetch-extraction
 
 `vp run ready` runs the dependency audit, formatting, linting, type checking, tests, repository contracts, tarball inspection, and packaged smoke tests. Tarballs should contain only the package README, changelog, license, manifest, runtime `src/` files, and explicitly contracted metadata such as `pi-gate`'s schema. `pi-web-fetch` also packages its generated JavaScript Anubis worker and solver under `workers/` because Node cannot strip TypeScript from worker files installed under `node_modules`; regenerate them with `vp run build:anubis-worker`.
 
-The deterministic suites use local fixtures and mocked Brave responses. Manually verify affected behavior, including missing keys and both search modes; fetch formats, redirects, blocked targets, limits, caching, coalescing, cancellation, and continuation; and temporary-file cleanup. Load a package in an isolated session with `pi -e ./packages/<name>`.
+The deterministic suites use local fixtures and mocked Brave responses. Manually verify affected behavior, including missing keys and both search modes; fetch formats, redirects, blocked targets, limits, caching, coalescing, cancellation, and continuation; and temporary-file cleanup. For manual end-to-end verification, run the changed extension through Pi with a real tool invocation—not only a direct call to its implementation or a load-only smoke test. Use a no-session invocation with the local extension, for example:
+
+```bash
+cache_dir=$(mktemp -d)
+XDG_CACHE_HOME="$cache_dir" pi --no-session --no-extensions --no-mcp \
+  --no-skills --no-prompt-templates --no-themes \
+  -e ./packages/<name>/src/index.ts -p 'Use <tool> to verify <behavior>.'
+status=$?
+rm -rf "$cache_dir"
+exit "$status"
+```
+
+Disable extension discovery to avoid collisions with globally installed copies; `--no-extensions` still allows the explicitly supplied `-e` extension. Use an isolated temporary cache when testing behavior that may be masked by stale persistent entries. If the check requires external services or model credentials, run it when available and report any limitation rather than treating the smoke test as completed.
 
 Before review, inspect the final diff for unrelated behavior, new network paths, cache changes, implicit mutation, forceful fallbacks, and output growth. Run focused tests, `vp check --fix`, required normalization tasks, and finally `vp run ready`.
 

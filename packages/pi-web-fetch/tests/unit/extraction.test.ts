@@ -85,6 +85,17 @@ describe("extracted CSS cleanup", () => {
 });
 
 describe("HTML extraction", () => {
+  it("maps section wrapper fragments to retained content when the heading is omitted", async () => {
+    const result = await extractHtmlToMarkdown(
+      `<main><div id="intro"><p>${longText()}</p></div><div id="install"><h1>Installation</h1><p>Before you can run hooks, install the pre-commit package manager.</p><pre>pip install pre-commit</pre></div></main>`,
+      new URL("https://example.com/guide"),
+    );
+
+    const offset = result.fragmentOffsets?.install;
+    expect(offset).toBeDefined();
+    expect(result.markdown.slice(offset)).toContain("Before you can run hooks");
+  });
+
   it("records fragment offsets for headings and explicit anchors", async () => {
     const result = await extractHtmlToMarkdown(
       `<main><h1>Guide</h1><h2 id="get-started">Get started</h2><p>Install it.</p><h2>Next steps</h2></main>`,

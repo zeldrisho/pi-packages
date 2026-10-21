@@ -82,7 +82,30 @@ export function buildFragmentOffsets(
       if (text) {
         const textOffset = markdown.toLowerCase().indexOf(text.toLowerCase());
 
-        if (textOffset >= 0) offsets[id] = textOffset;
+        if (textOffset >= 0) {
+          offsets[id] = textOffset;
+          continue;
+        }
+      }
+
+      // Section wrapper IDs often precede headings omitted by extraction. Fall
+      // back to the first retained paragraph/list/code block inside the section.
+      for (const descendant of element.querySelectorAll<HTMLElement>("p, li, pre, blockquote")) {
+        const content = (descendant.textContent ?? "").replace(/\s+/g, " ").trim();
+
+        if (content.length < 12) continue;
+        const normalizedMarkdown = markdown.replace(/\s+/g, " ").toLowerCase();
+        const normalizedContent = content.toLowerCase();
+        const position = normalizedMarkdown.indexOf(normalizedContent);
+
+        if (position >= 0) {
+          // Translate the normalized position back into the original Markdown.
+          const text = content.slice(0, Math.min(content.length, 80));
+          const offset = markdown.toLowerCase().indexOf(text.toLowerCase());
+
+          if (offset >= 0) offsets[id] = offset;
+          break;
+        }
       }
     }
   }
