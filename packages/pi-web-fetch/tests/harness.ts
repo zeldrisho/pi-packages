@@ -50,6 +50,15 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
     return;
   }
 
+  if (request.url?.startsWith("/fragment-index")) {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(
+      `<html><head><title>Reference index</title></head><body><main><article><h1>Reference index</h1><p>${"Browse the package configuration reference for complete settings information. ".repeat(12)}</p><ul><li><a href="/settings/dependency-resolution#trustpolicyexclude">trustPolicyExclude</a></li></ul></article></main></body></html>`,
+    );
+
+    return;
+  }
+
   if (request.url?.startsWith("/focused")) {
     response.setHeader("content-type", "text/plain");
     response.end(

@@ -17,6 +17,24 @@ describe("web_fetch caching", () => {
     await fixture.stop();
   });
 
+  it("suggests a linked page with the requested fragment when the local fragment is missing", async () => {
+    const result = await executeWebFetch(
+      { url: `${origin}/fragment-index#trustpolicyexclude` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.content[0].text).toContain("fragment was not found");
+    expect(result.content[0].text).toContain(
+      `${origin}/settings/dependency-resolution#trustpolicyexclude`,
+    );
+    expect(result.details.fragment).toMatchObject({
+      requested: "trustpolicyexclude",
+      matched: false,
+    });
+  });
+
   it("starts GitHub-style source fetches at line fragments", async () => {
     const result = await executeWebFetch(
       { url: `${origin}/line-fragments.rs#L3` },

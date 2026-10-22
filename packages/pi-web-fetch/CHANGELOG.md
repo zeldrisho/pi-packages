@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Suggest links to pages containing a requested fragment when it is absent from the current page.
 - Handle empty and text-only HTML fragments without a null-document parser crash.
 - Resolve section wrapper fragments when extracted headings are omitted.
 

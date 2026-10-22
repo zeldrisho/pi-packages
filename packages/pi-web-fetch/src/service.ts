@@ -404,6 +404,35 @@ export async function executeWebFetch(
   const resolvedFragment = resolveFragmentOffset(document, params.url);
   const fragmentOffset = resolvedFragment.offset;
   const fragmentMatched = resolvedFragment.fragment !== undefined && fragmentOffset !== undefined;
+
+  const fragmentSuggestions =
+    resolvedFragment.fragment !== undefined && !fragmentMatched
+      ? [
+          ...(document.links?.internal ?? []).map((link) => link.url),
+          ...(document.links?.external ?? []).map((link) => link.url),
+          ...[...document.markdown.matchAll(/\]\(([^)]+)\)/g)].map((match) => match[1]),
+        ]
+          .filter((url) => {
+            try {
+              const linkedUrl = new URL(url, document.url);
+
+              if (decodeURIComponent(linkedUrl.hash.slice(1)) !== resolvedFragment.fragment) {
+                return false;
+              }
+
+              linkedUrl.hash = "";
+              const sourceUrl = new URL(document.url);
+              sourceUrl.hash = "";
+
+              return linkedUrl.href !== sourceUrl.href;
+            } catch {
+              return false;
+            }
+          })
+          .slice(0, 3)
+          .map((url) => redactUrlForDisplay(new URL(url, document.url).href))
+      : [];
+
   const startingOffset = explicitOffset ?? fragmentOffset ?? FETCH_DEFAULT_OFFSET;
 
   const hasFragmentRange =
@@ -489,7 +518,13 @@ export async function executeWebFetch(
           ? [`llms.txt index: ${redactUrlForDisplay(result.llmsTxtIndexUrl)}`, ""]
           : []),
         ...(resolvedFragment.fragment !== undefined && !fragmentMatched
-          ? ["[The requested URL fragment was not found; showing the page from the beginning.]", ""]
+          ? [
+              "[The requested URL fragment was not found; showing the page from the beginning.]",
+              ...(fragmentSuggestions.length
+                ? [`[This page links to the requested fragment: ${fragmentSuggestions.join(", ")}]`]
+                : []),
+              "",
+            ]
           : []),
         ...(fragmentMatched ? ["[Starting at the requested URL fragment.]", ""] : []),
         ...(focused
