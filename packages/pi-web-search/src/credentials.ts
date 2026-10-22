@@ -25,7 +25,10 @@ export function extractKeyValue(
   keyName: ApiKeyName = "BRAVE_SEARCH_API_KEY",
 ): string | undefined {
   for (const line of text.split(/\r?\n/)) {
-    const match = line.match(new RegExp(`^\\s*${keyName}\\s*=\\s*(.*)$`));
+    const match =
+      keyName === "BRAVE_SEARCH_API_KEY"
+        ? line.match(/^\s*BRAVE_SEARCH_API_KEY\s*=\s*(.*)$/)
+        : line.match(/^\s*BRAVE_ANSWERS_API_KEY\s*=\s*(.*)$/);
 
     if (!match) continue;
     let value = match[1].trim();

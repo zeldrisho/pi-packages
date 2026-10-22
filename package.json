@@ -16,8 +16,8 @@
     "build:anubis-worker": "vp exec tsc --ignoreConfig packages/pi-web-fetch/src/challenges/anubis-worker.ts packages/pi-web-fetch/src/challenges/anubis-solver.ts --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir packages/pi-web-fetch/workers --skipLibCheck --rewriteRelativeImportExtensions --types node",
     "typecheck": "vp check --no-fmt --no-lint",
     "pack:dry-run": "for package in packages/*; do (cd \"$package\" && vp pm pack -- --dry-run) || exit; done",
-    "test:contracts": "vp test tests/integration/repository-contract.test.ts",
-    "test:packages": "node tests/integration/package-smoke-test.ts",
+    "test:contracts": "vp test tests/repository-contract.test.ts",
+    "test:packages": "node tests/package-smoke-test.ts",
     "benchmark:web-fetch-extraction": "vp exec jiti packages/pi-web-fetch/scripts/benchmark-extraction.ts",
     "benchmark:web-fetch-focus": "vp exec jiti packages/pi-web-fetch/scripts/benchmark-focus.ts",
     "prepare": "vp config"
