@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Prefer native Markdown representations during content negotiation while retaining supported text formats.
+
 ### Fixed
 
 - Resolve section wrapper fragments when extracted headings are omitted.

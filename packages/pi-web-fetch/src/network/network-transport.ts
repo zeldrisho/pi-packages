@@ -113,7 +113,8 @@ async function requestOnce(
         lookup,
         signal: controller.signal,
         headers: {
-          Accept: "text/markdown, text/html, text/plain, application/json;q=0.9, */*;q=0.1",
+          Accept:
+            "text/markdown;q=1.0, text/x-markdown;q=0.9, text/plain;q=0.8, text/html;q=0.7, application/xhtml+xml;q=0.7, application/json;q=0.7, application/xml;q=0.7, */*;q=0.1",
           "User-Agent": "Mozilla/5.0 (compatible; PiWebFetch/1.0; +https://pi.dev)",
           ...headers,
         },

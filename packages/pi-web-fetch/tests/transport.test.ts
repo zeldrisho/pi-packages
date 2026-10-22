@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { createServer, type IncomingMessage } from "node:http";
+import type { AddressInfo } from "node:net";
 import {
   fetchRemoteContent,
   npmRegistryFallbackUrl,
@@ -60,6 +61,44 @@ describe("web_fetch transport", () => {
       ).rejects.toThrow("web_fetch: Page has no extractable content.");
     },
   );
+
+  it("prefers Markdown while advertising the supported text representations", async () => {
+    let accept = "";
+
+    const server = createServer((request, response) => {
+      accept = request.headers.accept ?? "";
+      response.end("ok");
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", resolve);
+    });
+
+    try {
+      // SAFETY: The server has successfully listened on a TCP port above.
+      const address = server.address() as AddressInfo;
+
+      const response = await requestPinned(
+        {
+          url: new URL(`http://accept-header-test.invalid:${address.port}/`),
+          address: "127.0.0.1",
+          family: 4,
+          addresses: ["127.0.0.1"],
+        },
+        new AbortController().signal,
+      );
+
+      response.resume();
+
+      expect(accept).toBe(
+        "text/markdown;q=1.0, text/x-markdown;q=0.9, text/plain;q=0.8, text/html;q=0.7, application/xhtml+xml;q=0.7, application/json;q=0.7, application/xml;q=0.7, */*;q=0.1",
+      );
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
 
   it("pins transport requests to the validated address", async () => {
     const response = await requestPinned(
