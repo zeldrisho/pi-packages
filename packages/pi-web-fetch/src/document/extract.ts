@@ -86,7 +86,7 @@ function isElementNode(node: ChildNode): node is Element {
 function normalizeFragmentDocument(document: Document): void {
   const root = document.documentElement;
 
-  if (!root || root.tagName === "HTML") return;
+  if (root?.tagName === "HTML") return;
 
   const html = document.createElement("html");
   const head = document.createElement("head");
@@ -94,9 +94,18 @@ function normalizeFragmentDocument(document: Document): void {
   html.appendChild(head);
   html.appendChild(body);
 
-  const nodes = root.tagName === "BODY" ? [...root.childNodes] : [...document.childNodes];
+  const nodes = root
+    ? root.tagName === "BODY"
+      ? [...root.childNodes]
+      : [...document.childNodes]
+    : [...document.childNodes];
 
   for (const node of nodes) {
+    if (node.nodeType === 3) {
+      body.appendChild(node);
+      continue;
+    }
+
     if (!isElementNode(node)) continue;
     const tagName = node.tagName;
 

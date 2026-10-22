@@ -16,6 +16,27 @@ const fragment = [
 ].join("\n");
 
 describe("tag-omitted HTML5 documents", () => {
+  it.each(["", "  \n ", "<!-- empty -->", "<!doctype html>"])(
+    "handles rootless document input %j without throwing",
+    async (input) => {
+      const url = new URL("https://example.test/empty");
+
+      await expect(extractHtmlToMarkdown(input, url)).resolves.toMatchObject({
+        markdown: "",
+        extractor: "basic",
+      });
+      expect(htmlToMarkdownFallback(input)).toBe("");
+    },
+  );
+
+  it("preserves rootless text content in both extraction paths", async () => {
+    const input = "Plain text from a rootless document";
+    const result = await extractHtmlToMarkdown(input, new URL("https://example.test/text"));
+
+    expect(result.markdown).toContain(input);
+    expect(htmlToMarkdownFallback(input)).toBe(input);
+  });
+
   it("extracts content and title when html/head/body tags are omitted", async () => {
     const result = await extractHtmlToMarkdown(
       fragment,
