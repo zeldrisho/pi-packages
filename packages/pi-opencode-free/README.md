@@ -57,7 +57,7 @@ The proxy must expose an OpenAI-compatible `/chat/completions` endpoint and shou
 
 - Free-tier availability, rate limits, and model names can change at any time.
 - This package is unofficial and is not affiliated with OpenCode.
-- Requests go only to the configured base URL. Set `OPENCODE_FREE_BASE_URL` only to a proxy you trust, because that proxy receives your prompts and the bearer token.
+- Inference and `/models` requests use the configured base URL. Model catalog discovery always contacts `pi.dev` at a fixed URL, so `OPENCODE_FREE_BASE_URL` does not redirect it. Set `OPENCODE_FREE_BASE_URL` only to a proxy you trust, because that proxy receives your prompts and the bearer token.
 
 ## Uninstall
 

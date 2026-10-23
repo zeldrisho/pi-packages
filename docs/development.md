@@ -54,11 +54,11 @@ The deterministic suites use local fixtures and mocked Brave responses. Manually
 
 ```bash
 cache_dir=$(mktemp -d)
+trap 'rm -rf -- "$cache_dir"' EXIT
 XDG_CACHE_HOME="$cache_dir" pi --no-session --no-extensions --no-mcp \
   --no-skills --no-prompt-templates --no-themes \
   -e ./packages/<name>/src/index.ts -p 'Use <tool> to verify <behavior>.'
 status=$?
-rm -rf "$cache_dir"
 exit "$status"
 ```
 

@@ -36,6 +36,45 @@ interface FragmentOffsets {
   [fragment: string]: number;
 }
 
+interface NormalizedMarkdown {
+  text: string;
+  offsets: number[];
+}
+
+/**
+ * Collapses whitespace and lowercases Markdown while retaining the source
+ * offset of every resulting character.
+ */
+function normalizeMarkdown(markdown: string): NormalizedMarkdown {
+  const characters: string[] = [];
+  const offsets: number[] = [];
+  let index = 0;
+
+  while (index < markdown.length) {
+    const character = markdown[index] ?? "";
+
+    if (/\s/u.test(character)) {
+      let end = index + 1;
+
+      while (end < markdown.length && /\s/u.test(markdown[end] ?? "")) end += 1;
+
+      characters.push(" ");
+      offsets.push(index);
+      index = end;
+      continue;
+    }
+
+    for (const lowered of character.toLowerCase()) {
+      characters.push(lowered);
+      offsets.push(index);
+    }
+
+    index += 1;
+  }
+
+  return { text: characters.join(""), offsets };
+}
+
 export function buildFragmentOffsets(
   document: Document,
   markdown: string,
@@ -58,6 +97,7 @@ export function buildFragmentOffsets(
 
   const offsets: Record<string, number> = {};
   const used = new Set<number>();
+  let normalizedMarkdown: NormalizedMarkdown | undefined;
 
   for (const element of document.querySelectorAll<HTMLElement>("[id], a[name]")) {
     const id =
@@ -94,16 +134,14 @@ export function buildFragmentOffsets(
         const content = (descendant.textContent ?? "").replace(/\s+/g, " ").trim();
 
         if (content.length < 12) continue;
-        const normalizedMarkdown = markdown.replace(/\s+/g, " ").toLowerCase();
+        normalizedMarkdown ??= normalizeMarkdown(markdown);
         const normalizedContent = content.toLowerCase();
-        const position = normalizedMarkdown.indexOf(normalizedContent);
+        const position = normalizedMarkdown.text.indexOf(normalizedContent);
 
         if (position >= 0) {
-          // Translate the normalized position back into the original Markdown.
-          const text = content.slice(0, Math.min(content.length, 80));
-          const offset = markdown.toLowerCase().indexOf(text.toLowerCase());
+          const offset = normalizedMarkdown.offsets[position];
 
-          if (offset >= 0) offsets[id] = offset;
+          if (offset !== undefined) offsets[id] = offset;
           break;
         }
       }

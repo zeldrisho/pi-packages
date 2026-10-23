@@ -1,4 +1,6 @@
+import { parseHTML } from "linkedom";
 import { describe, expect, it } from "vite-plus/test";
+import { buildFragmentOffsets } from "../src/document/fragment-index.ts";
 import { extractHtmlToMarkdown, htmlToMarkdownFallback } from "../src/document/extract.ts";
 
 // Real pages (for example packages.fedoraproject.org) emit valid HTML5 that omits
@@ -52,6 +54,17 @@ describe("tag-omitted HTML5 documents", () => {
   it("extracts plain text via the fallback when tags are omitted", () => {
     expect(htmlToMarkdownFallback(fragment)).toContain("Line-oriented search tool.");
     expect(htmlToMarkdownFallback(fragment)).toContain("Releases Overview");
+  });
+
+  it("maps whitespace-normalized wrapper content to the original Markdown offset", () => {
+    const { document } = parseHTML(
+      '<main><div id="intro"><p>Before\n  you can run hooks</p></div></main>',
+    );
+
+    const markdown = "Intro.\n\nBefore\nyou can run hooks\n";
+    const offsets = buildFragmentOffsets(document, markdown);
+
+    expect(offsets.intro).toBe(markdown.indexOf("Before"));
   });
 
   it("preserves explicit head and body contents in a fragment", async () => {
