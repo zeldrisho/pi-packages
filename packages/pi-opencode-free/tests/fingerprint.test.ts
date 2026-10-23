@@ -42,6 +42,13 @@ describe("opencode session identity", () => {
     expect(() => createCanonicalSessionId(new Uint8Array(19))).toThrow(/at least 20 bytes/u);
   });
 
+  it("keeps the suffix well formed when seed bytes are rejected", () => {
+    const id = createCanonicalSessionId(Uint8Array.from({ length: 20 }, () => 0xff));
+
+    expect(id).toMatch(SESSION_PATTERN);
+    expect(id).toHaveLength(30);
+  });
+
   it("creates a fresh twenty-byte seed", () => {
     const seed = createSessionSeed();
 

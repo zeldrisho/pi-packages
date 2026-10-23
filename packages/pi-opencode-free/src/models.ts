@@ -57,6 +57,20 @@ export interface DiscoverFreeModelsOptions {
 }
 
 /**
+ * Removes trailing slash characters without a backtracking regular expression.
+ *
+ * @param value - URL text to normalize
+ * @returns The value without trailing slashes
+ */
+export function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+
+  while (end > 0 && value.charCodeAt(end - 1) === 0x2f) end -= 1;
+
+  return value.slice(0, end);
+}
+
+/**
  * Resolves the provider base URL, allowing a local proxy or alternate gateway.
  *
  * @param environment - Environment variables visible to the extension
@@ -67,7 +81,7 @@ export function resolveBaseUrl(environment: Record<string, string | undefined>):
 
   if (!configured) return DEFAULT_BASE_URL;
 
-  return configured.replace(/\/+$/u, "");
+  return stripTrailingSlashes(configured);
 }
 
 /**

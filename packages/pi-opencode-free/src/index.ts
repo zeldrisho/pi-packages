@@ -15,6 +15,7 @@ import {
   resolveApiKey,
   resolveBaseUrl,
   storedModelsFromConfigs,
+  stripTrailingSlashes,
   type FreeChatModelConfig,
 } from "./models.ts";
 import { isProviderRequestPayload, normalizeFreeRequestPayload } from "./request.ts";
@@ -85,7 +86,7 @@ async function refreshModels(
   sessionId: string,
   cliVersion: string,
 ): Promise<FreeChatModelConfig[]> {
-  const baseUrl = (context.baseUrl ?? fallbackBaseUrl).replace(/\/+$/u, "");
+  const baseUrl = stripTrailingSlashes(context.baseUrl ?? fallbackBaseUrl);
   const cachedModels = configsFromStoredModels(context.stored?.models ?? [], PROVIDER_ID);
   const fallbackModels = cachedModels.length > 0 ? cachedModels : initialFreeModels();
 

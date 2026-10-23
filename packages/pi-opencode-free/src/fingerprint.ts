@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { ProviderHeaders } from "@earendil-works/pi-ai";
 
 /**
@@ -38,6 +38,45 @@ const SESSION_HEX_LENGTH = 12;
 const SESSION_SUFFIX_LENGTH = 14;
 
 const SESSION_SEED_LENGTH = 20;
+
+/** Largest multiple of the base62 alphabet size that fits in a byte. */
+const BASE62_UNBIASED_LIMIT = BASE62.length * 4;
+
+/**
+ * Renders the base62 suffix without modulo bias.
+ *
+ * Bytes at or above the largest full multiple of the alphabet are rejected so
+ * every digit keeps the same probability. Deterministic hash output supplies
+ * more bytes if the seed runs out after rejections.
+ *
+ * @param seed - At least twenty bytes; the suffix starts at byte six
+ * @returns Exactly fourteen base62 characters
+ */
+function createSessionSuffix(seed: Uint8Array): string {
+  const digits: string[] = [];
+  let bytes: Uint8Array = seed.subarray(6, SESSION_SEED_LENGTH);
+  let counter = 0;
+
+  while (digits.length < SESSION_SUFFIX_LENGTH) {
+    for (const byte of bytes) {
+      if (digits.length === SESSION_SUFFIX_LENGTH) break;
+
+      if (byte >= BASE62_UNBIASED_LIMIT) continue;
+
+      let index = byte;
+
+      while (index >= BASE62.length) index -= BASE62.length;
+      digits.push(BASE62[index] ?? "0");
+    }
+
+    if (digits.length === SESSION_SUFFIX_LENGTH) break;
+
+    counter += 1;
+    bytes = createHash("sha256").update(seed).update(String(counter)).digest();
+  }
+
+  return digits.join("");
+}
 
 /**
  * Resolves the client version carried by the request fingerprint.
@@ -131,14 +170,7 @@ export function createCanonicalSessionId(seed: Uint8Array = createSessionSeed())
 
   const encoded = ~((timestampBits << 12n) | SESSION_COUNTER) & SESSION_MASK_48;
 
-  let suffix = "";
-
-  for (let index = 6; index < SESSION_SEED_LENGTH; index += 1) {
-    const byte = seed[index] ?? 0;
-    suffix += BASE62[byte % BASE62.length];
-  }
-
-  return `${SESSION_PREFIX}${encoded.toString(16).padStart(SESSION_HEX_LENGTH, "0")}${suffix.slice(0, SESSION_SUFFIX_LENGTH)}`;
+  return `${SESSION_PREFIX}${encoded.toString(16).padStart(SESSION_HEX_LENGTH, "0")}${createSessionSuffix(seed)}`;
 }
 
 /**
