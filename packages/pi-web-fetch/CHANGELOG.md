@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Show discovered `llms.txt` indexes on every fetch result so the index remains visible when fetching multiple pages from the same origin.
 - Prefer native Markdown representations during content negotiation while retaining supported text formats.
 
 ### Fixed

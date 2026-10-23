@@ -3,7 +3,7 @@ import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { redactUrlForDisplay } from "./redact";
 import { formatCollapsibleOutput } from "./render";
-import { executeWebFetch, resetLlmsNoticeOrigins } from "./service";
+import { executeWebFetch } from "./service";
 
 export { ExpiringLruCache } from "./cache";
 
@@ -71,10 +71,6 @@ export const webFetchParameters = Type.Object({
  * @param pi - The extension API instance
  */
 export default function (pi: ExtensionAPI) {
-  // SAFETY: The host provides `on`; minimal extension test doubles may omit it.
-  (pi as ExtensionAPI & { on?: ExtensionAPI["on"] }).on?.("session_start", () =>
-    resetLlmsNoticeOrigins(),
-  );
   pi.registerTool({
     name: "web_fetch",
     label: "Web Fetch",

@@ -193,13 +193,6 @@ export interface WebFetchDetails {
   fragment?: { requested: string; matched: boolean; offset?: number };
 }
 
-const llmsNoticeOrigins = new Set<string>();
-
-/** Clears per-origin notice history so subsequent fetches can show llms.txt index notices again. */
-export function resetLlmsNoticeOrigins(): void {
-  llmsNoticeOrigins.clear();
-}
-
 interface WebFetchUpdate {
   content: Array<{ type: "text"; text: string }>;
   details: Record<string, never>;
@@ -489,13 +482,7 @@ export async function executeWebFetch(
   const contentKind = classifyContentKind(rawFinalUrl, result.extractor, shellSuspected);
   const confidence = classifyConfidence(result.extractor, shellSuspected, result.markdown.length);
 
-  const llmsNoticeOrigin = result.llmsTxtIndexUrl
-    ? new URL(result.llmsTxtIndexUrl).origin
-    : undefined;
-
-  const showLlmsNotice = Boolean(llmsNoticeOrigin && !llmsNoticeOrigins.has(llmsNoticeOrigin));
-
-  if (showLlmsNotice && llmsNoticeOrigin) llmsNoticeOrigins.add(llmsNoticeOrigin);
+  const showLlmsNotice = Boolean(result.llmsTxtIndexUrl);
 
   const output = blocked
     ? "Blocked by an anti-bot challenge. Requested page content is unavailable."

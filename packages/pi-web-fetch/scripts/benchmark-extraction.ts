@@ -44,7 +44,7 @@ const defaultCorpusPath = resolve(scriptDirectory, "extraction-corpus.json");
 
 function usage(): string {
   return [
-    "Usage: vp exec jiti scripts/benchmark-extraction.ts [options]",
+    "Usage: node scripts/benchmark-extraction.ts [options]",
     "",
     "Options:",
     "  --corpus <path>   Corpus JSON path",

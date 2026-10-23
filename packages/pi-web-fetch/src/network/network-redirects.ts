@@ -1,5 +1,5 @@
 import type { IncomingMessage } from "node:http";
-import { awaitWithAbort } from "../abort";
+import { awaitWithAbort } from "../abort.ts";
 import type { CookieJar } from "./cookies.ts";
 import { validateRemoteUrl, type ValidatedTarget } from "./network-policy.ts";
 import { requestPinned, responseHeader } from "./network-transport.ts";
