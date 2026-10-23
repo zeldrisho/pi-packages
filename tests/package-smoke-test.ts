@@ -18,6 +18,7 @@ const tarballDirectory = join(temporaryDirectory, "tarballs");
 const fixtureDirectory = join(temporaryDirectory, "fixture");
 
 const piEcosystemDependencies = [
+  "@earendil-works/pi-ai",
   "@earendil-works/pi-coding-agent",
   "@earendil-works/pi-tui",
 ] as const;
