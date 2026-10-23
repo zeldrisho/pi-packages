@@ -3,7 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   DEFAULT_BASE_URL,
-  MODELS_DEV_URL,
+  MODEL_CATALOG_URL,
   configsFromStoredModels,
   discoverFreeModels,
   initialFreeModels,
@@ -19,10 +19,12 @@ interface FetchCall {
   signal: AbortSignal | null | undefined;
 }
 
-function jsonResponse(body: string, status = 200): Response {
+const FUTURE_LAST_MODIFIED = "Wed, 21 Oct 2099 07:28:00 GMT";
+
+function jsonResponse(body: string, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(body, {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...headers },
   });
 }
 
@@ -51,28 +53,59 @@ function requireModels(models: FreeChatModelConfig[] | undefined): FreeChatModel
   return models;
 }
 
-const freeBeam = {
+const remoteBeam = {
   id: "beam-free",
   name: "Beam Free",
+  provider: "opencode",
+  api: "openai-completions",
+  baseUrl: "https://opencode.ai/inference/v1",
   reasoning: true,
-  reasoning_options: [{ type: "effort", values: ["low", "high"] }],
-  tool_call: true,
-  modalities: { input: ["text", "image"], output: ["text"] },
-  limit: { context: 400_000, output: 50_000 },
-  cost: { input: 0, output: 0 },
+  input: ["text", "image"],
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  contextWindow: 1_048_576,
+  maxTokens: 131_072,
+  compat: {
+    supportsStore: false,
+    supportsDeveloperRole: false,
+    supportsStrictMode: true,
+    maxTokensField: "max_tokens",
+  },
+  thinkingLevelMap: {
+    off: null,
+    low: "low",
+    medium: "medium",
+    high: "high",
+    max: null,
+  },
 };
 
-const freeDeepSeek = {
+const remoteDeepSeek = {
   id: "deepseek-v4.1-flash-free",
   name: "DeepSeek V4.1 Flash Free",
+  provider: "opencode",
+  api: "openai-completions",
+  baseUrl: "https://opencode.ai/inference/v1",
   reasoning: true,
-  reasoning_options: [{ type: "effort", values: ["low", "high", "max"] }],
-  tool_call: true,
-  interleaved: { field: "reasoning_content" },
-  modalities: { input: ["text", "image"], output: ["text"] },
-  limit: { context: 200_000, output: 32_000 },
-  cost: { input: 0, output: 0 },
+  input: ["text"],
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  contextWindow: 200_000,
+  maxTokens: 32_000,
+  compat: {
+    supportsStore: false,
+    supportsDeveloperRole: false,
+    supportsStrictMode: true,
+    maxTokensField: "max_tokens",
+    requiresReasoningContentOnAssistantMessages: true,
+  },
+  thinkingLevelMap: {
+    off: null,
+    low: "low",
+    high: "high",
+    max: "max",
+  },
 };
+
+const remoteCatalog = [remoteBeam, remoteDeepSeek];
 
 const storedModel: Model<"openai-completions"> = {
   id: "stored-free",
@@ -177,34 +210,55 @@ describe("stored model conversion", () => {
 });
 
 describe("free model discovery", () => {
-  it("intersects live models with free chat metadata", async () => {
+  it("intersects live models with Pi's native free chat catalog", async () => {
     const { fetcher, calls } = createFetcher((url) => {
-      if (url === MODELS_DEV_URL) {
+      if (url === MODEL_CATALOG_URL) {
         return jsonResponse(
-          JSON.stringify({
-            opencode: {
-              models: {
-                "beam-free": freeBeam,
-                "deepseek-v4.1-flash-free": freeDeepSeek,
-                "paid-model": {
-                  id: "paid-model",
-                  cost: { input: 1, output: 2 },
-                  tool_call: true,
-                },
-                "jev-1.13-free": {
-                  id: "jev-1.13-free",
-                  cost: { input: 0, output: 0 },
-                  tool_call: false,
-                },
-                "anthropic-only-free": {
-                  id: "anthropic-only-free",
-                  cost: { input: 0, output: 0 },
-                  tool_call: true,
-                  provider: { api: "https://opencode.ai/inference/anthropic/v1" },
-                },
-              },
+          JSON.stringify([
+            ...remoteCatalog,
+            {
+              id: "big-pickle",
+              name: "Big Pickle Native",
+              provider: "opencode",
+              api: "openai-completions",
+              baseUrl: "https://opencode.ai/inference/v1",
+              reasoning: true,
+              input: ["text"],
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+              contextWindow: 300_000,
+              maxTokens: 64_000,
             },
-          }),
+            {
+              id: "paid-model",
+              provider: "opencode",
+              api: "openai-completions",
+              input: ["text"],
+              cost: { input: 1, output: 2 },
+              contextWindow: 100_000,
+              maxTokens: 10_000,
+              reasoning: false,
+            },
+            {
+              id: "jev-1.13-free",
+              provider: "opencode",
+              api: "typesafe-system-one",
+              input: ["text"],
+              cost: { input: 0, output: 0 },
+              contextWindow: 32_000,
+            },
+            {
+              id: "anthropic-only-free",
+              provider: "opencode",
+              api: "anthropic-messages",
+              input: ["text"],
+              cost: { input: 0, output: 0 },
+              contextWindow: 100_000,
+              maxTokens: 10_000,
+              reasoning: false,
+            },
+          ]),
+          200,
+          { "last-modified": FUTURE_LAST_MODIFIED },
         );
       }
 
@@ -213,6 +267,7 @@ describe("free model discovery", () => {
           data: [
             { id: "beam-free" },
             { id: "deepseek-v4.1-flash-free" },
+            { id: "big-pickle" },
             { id: "paid-model" },
             { id: "jev-1.13-free" },
             { id: "anthropic-only-free" },
@@ -232,17 +287,21 @@ describe("free model discovery", () => {
       }),
     );
 
-    expect(models.map((model) => model.id)).toEqual(["beam-free", "deepseek-v4.1-flash-free"]);
+    expect(models.map((model) => model.id)).toEqual([
+      "beam-free",
+      "deepseek-v4.1-flash-free",
+      "big-pickle",
+    ]);
 
     const beam = models[0];
     expect(beam?.name).toBe("Beam Free");
     expect(beam?.input).toEqual(["text", "image"]);
-    expect(beam?.contextWindow).toBe(400_000);
-    expect(beam?.maxTokens).toBe(50_000);
+    expect(beam?.contextWindow).toBe(1_048_576);
+    expect(beam?.maxTokens).toBe(131_072);
     expect(beam?.thinkingLevelMap).toMatchObject({
       off: null,
       low: "low",
-      medium: null,
+      medium: "medium",
       high: "high",
       max: null,
     });
@@ -250,23 +309,48 @@ describe("free model discovery", () => {
     const deepSeek = models[1];
     expect(deepSeek?.compat).toMatchObject({ requiresReasoningContentOnAssistantMessages: true });
 
+    const bigPickle = models[2];
+    expect(bigPickle?.name).toBe("Big Pickle Native");
+    expect(bigPickle?.contextWindow).toBe(300_000);
+
     const liveCall = calls.find((call) => call.url === "http://proxy.test/v1/models");
     expect(liveCall?.headers.get("accept")).toBe("application/json");
     expect(liveCall?.headers.get("x-test-header")).toBe("yes");
+
+    const catalogCall = calls.find((call) => call.url === MODEL_CATALOG_URL);
+    expect(catalogCall?.headers.get("accept")).toBe("application/json");
   });
 
-  it("returns undefined when the metadata catalog is unavailable", async () => {
+  it("uses bundled native metadata when pi.dev has no newer catalog", async () => {
+    const { fetcher } = createFetcher((url) =>
+      url === MODEL_CATALOG_URL
+        ? jsonResponse(JSON.stringify(remoteCatalog), 200, {
+            "last-modified": "Thu, 01 Jan 1970 00:00:00 GMT",
+          })
+        : jsonResponse(JSON.stringify({ data: [{ id: "big-pickle" }, { id: "beam-free" }] })),
+    );
+
+    const models = requireModels(
+      await discoverFreeModels({
+        baseUrl: DEFAULT_BASE_URL,
+        headers: {},
+        signal: new AbortController().signal,
+        fetcher,
+        allowNetwork: true,
+      }),
+    );
+
+    expect(models.map((model) => model.id)).toEqual(["big-pickle"]);
+    expect(models[0]?.name).not.toBe("Big Pickle Native");
+  });
+
+  it("returns undefined when the native catalog is unavailable", async () => {
     const { fetcher } = createFetcher((url) => {
-      if (url === MODELS_DEV_URL) return jsonResponse("unavailable", 503);
+      if (url === MODEL_CATALOG_URL) return jsonResponse("unavailable", 503);
 
       return jsonResponse(
         JSON.stringify({
-          data: [
-            { id: "beam-free" },
-            { id: "jev-1.13-free" },
-            { id: "big-pickle" },
-            { id: "paid-model" },
-          ],
+          data: [{ id: "beam-free" }, { id: "big-pickle" }, { id: "paid-model" }],
         }),
       );
     });
@@ -283,7 +367,13 @@ describe("free model discovery", () => {
   });
 
   it("returns undefined when the live endpoint fails", async () => {
-    const { fetcher } = createFetcher(() => jsonResponse("nope", 500));
+    const { fetcher } = createFetcher((url) =>
+      url === MODEL_CATALOG_URL
+        ? jsonResponse(JSON.stringify(remoteCatalog), 200, {
+            "last-modified": FUTURE_LAST_MODIFIED,
+          })
+        : jsonResponse("nope", 500),
+    );
 
     const models = await discoverFreeModels({
       baseUrl: DEFAULT_BASE_URL,
@@ -298,8 +388,10 @@ describe("free model discovery", () => {
 
   it("returns undefined on malformed live JSON", async () => {
     const { fetcher } = createFetcher((url) =>
-      url === MODELS_DEV_URL
-        ? jsonResponse(JSON.stringify({ opencode: { models: {} } }))
+      url === MODEL_CATALOG_URL
+        ? jsonResponse(JSON.stringify(remoteCatalog), 200, {
+            "last-modified": FUTURE_LAST_MODIFIED,
+          })
         : jsonResponse("{"),
     );
 
@@ -316,8 +408,10 @@ describe("free model discovery", () => {
 
   it("returns undefined on an empty live list", async () => {
     const { fetcher } = createFetcher((url) =>
-      url === MODELS_DEV_URL
-        ? jsonResponse(JSON.stringify({ opencode: { models: {} } }))
+      url === MODEL_CATALOG_URL
+        ? jsonResponse(JSON.stringify(remoteCatalog), 200, {
+            "last-modified": FUTURE_LAST_MODIFIED,
+          })
         : jsonResponse(JSON.stringify({ data: [] })),
     );
 
@@ -334,17 +428,24 @@ describe("free model discovery", () => {
 
   it("returns undefined when no live model is known to be free", async () => {
     const { fetcher } = createFetcher((url) =>
-      url === MODELS_DEV_URL
+      url === MODEL_CATALOG_URL
         ? jsonResponse(
-            JSON.stringify({
-              opencode: {
-                models: {
-                  "paid-model": { id: "paid-model", cost: { input: 1, output: 1 } },
-                },
+            JSON.stringify([
+              {
+                id: "paid-model",
+                provider: "opencode",
+                api: "openai-completions",
+                input: ["text"],
+                cost: { input: 1, output: 1 },
+                contextWindow: 100_000,
+                maxTokens: 10_000,
+                reasoning: false,
               },
-            }),
+            ]),
+            200,
+            { "last-modified": FUTURE_LAST_MODIFIED },
           )
-        : jsonResponse(JSON.stringify({ data: [{ id: "paid-model" }] })),
+        : jsonResponse(JSON.stringify({ data: [{ id: "paid-model" }, { id: "unknown" }] })),
     );
 
     const models = await discoverFreeModels({
@@ -358,9 +459,9 @@ describe("free model discovery", () => {
     expect(models).toBeUndefined();
   });
 
-  it("returns undefined on a malformed metadata catalog", async () => {
+  it("returns undefined on a malformed native catalog", async () => {
     const { fetcher } = createFetcher((url) =>
-      url === MODELS_DEV_URL
+      url === MODEL_CATALOG_URL
         ? jsonResponse(JSON.stringify({ opencode: null }))
         : jsonResponse(JSON.stringify({ data: [{ id: "beam-free" }] })),
     );

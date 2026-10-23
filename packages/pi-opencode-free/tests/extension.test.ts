@@ -14,7 +14,7 @@ import piOpencodeFree, {
   type OpencodeFreeDependencies,
 } from "../src/index";
 import { DEFAULT_CLI_VERSION, FINGERPRINT_MARKER_HEADER, buildUserAgent } from "../src/fingerprint";
-import { MODELS_DEV_URL, initialFreeModels } from "../src/models";
+import { MODEL_CATALOG_URL, initialFreeModels } from "../src/models";
 import type { ProviderRequestPayload } from "../src/request";
 
 interface FakeEvent {
@@ -161,31 +161,49 @@ const storedModel: Model<"openai-completions"> = {
   reasoning: false,
 };
 
-const discoveryCatalog = {
-  opencode: {
-    models: {
-      "beam-free": {
-        id: "beam-free",
-        name: "Beam Free",
-        tool_call: true,
-        modalities: { input: ["text"], output: ["text"] },
-        limit: { context: 128_000, output: 16_384 },
-        cost: { input: 0, output: 0 },
-      },
-      "deepseek-v4.1-flash-free": {
-        id: "deepseek-v4.1-flash-free",
-        name: "DeepSeek V4.1 Flash Free",
-        tool_call: true,
-        reasoning: true,
-        interleaved: { field: "reasoning_content" },
-        modalities: { input: ["text"], output: ["text"] },
-        limit: { context: 200_000, output: 32_000 },
-        cost: { input: 0, output: 0 },
-      },
-      "paid-model": { id: "paid-model", cost: { input: 1, output: 1 } },
+const discoveryCatalog = [
+  {
+    id: "beam-free",
+    name: "Beam Free",
+    provider: "opencode",
+    api: "openai-completions",
+    baseUrl: "https://opencode.ai/inference/v1",
+    reasoning: true,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 1_048_576,
+    maxTokens: 131_072,
+  },
+  {
+    id: "deepseek-v4.1-flash-free",
+    name: "DeepSeek V4.1 Flash Free",
+    provider: "opencode",
+    api: "openai-completions",
+    baseUrl: "https://opencode.ai/inference/v1",
+    reasoning: true,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 200_000,
+    maxTokens: 32_000,
+    compat: {
+      supportsStore: false,
+      supportsDeveloperRole: false,
+      supportsStrictMode: true,
+      maxTokensField: "max_tokens",
+      requiresReasoningContentOnAssistantMessages: true,
     },
   },
-};
+  {
+    id: "paid-model",
+    provider: "opencode",
+    api: "openai-completions",
+    input: ["text"],
+    cost: { input: 1, output: 1 },
+    contextWindow: 100_000,
+    maxTokens: 10_000,
+    reasoning: false,
+  },
+];
 
 function discoveryFetcher(calls: string[]): typeof fetch {
   return async (input) => {
@@ -193,7 +211,15 @@ function discoveryFetcher(calls: string[]): typeof fetch {
 
     calls.push(url);
 
-    if (url === MODELS_DEV_URL) return jsonResponse(JSON.stringify(discoveryCatalog));
+    if (url === MODEL_CATALOG_URL) {
+      return new Response(JSON.stringify(discoveryCatalog), {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+          "last-modified": "Wed, 21 Oct 2099 07:28:00 GMT",
+        },
+      });
+    }
 
     if (url.endsWith("/models")) {
       return jsonResponse(
@@ -285,7 +311,7 @@ describe("opencode-free extension", () => {
     const models = await refreshModels(config, context);
 
     expect(models.map((model) => model.id)).toEqual(["beam-free", "deepseek-v4.1-flash-free"]);
-    expect(calls).toEqual(["http://proxy.test/v1/models", MODELS_DEV_URL]);
+    expect(calls).toEqual(["http://proxy.test/v1/models", MODEL_CATALOG_URL]);
 
     expect(publications).toHaveLength(1);
 

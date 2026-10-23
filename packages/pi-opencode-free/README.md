@@ -23,7 +23,7 @@ Restart Pi after installing. Use `pi config` to enable or disable the extension,
 
 The picker may say "Only showing models from configured providers. Use /login to add providers." You do not need to run `/login`; OpenCode Free is already configured.
 
-The model list is synced from OpenCode and checked against [models.dev](https://models.dev), so models appear and disappear as OpenCode's free catalog changes. After a successful sync, the catalog is cached for later sessions. If Pi starts without network access or the sync fails, it uses the last synced catalog, or the free models in Pi's bundled OpenCode catalog on a first offline run. If the list looks stale, restart Pi to trigger another sync.
+The model list is synced from OpenCode and matched against Pi's native OpenCode catalog from [pi.dev](https://pi.dev/models), the same catalog Pi uses for model capabilities and compatibility. Models appear and disappear as OpenCode's free catalog changes. After a successful sync, the catalog is cached for later sessions. If Pi starts without network access or the sync fails, it uses the last synced catalog, or the free models in Pi's bundled OpenCode catalog on a first offline run. If the list looks stale, restart Pi to trigger another sync.
 
 ## Troubleshooting
 
@@ -33,7 +33,7 @@ If **OpenCode Free** does not appear in `/model`:
 - Confirm it is enabled with `pi config`.
 - Restart Pi after installing or enabling it.
 
-If the provider appears but no models are listed, check that this machine can reach `https://opencode.ai` and `https://models.dev`. Discovery needs both; when it cannot run, the extension falls back to the cached catalog or Pi's bundled OpenCode catalog.
+If the provider appears but no models are listed, check that this machine can reach `https://opencode.ai` and `https://pi.dev`. Discovery needs both; when it cannot run, the extension falls back to the cached catalog or Pi's bundled OpenCode catalog.
 
 ## Configuration
 

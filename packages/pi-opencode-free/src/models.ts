@@ -1,84 +1,42 @@
 import { isModelType, type AnyModel, type Api, type Model } from "@earendil-works/pi-ai";
-import { getBuiltinModels } from "@earendil-works/pi-ai/providers/all";
+import {
+  getBuiltinModelDataGeneratedAt,
+  getBuiltinModels,
+} from "@earendil-works/pi-ai/providers/all";
 import type { ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 
 /** Default OpenAI-compatible OpenCode inference endpoint. */
 export const DEFAULT_BASE_URL = "https://opencode.ai/inference/v1";
 
-/** Public models catalog used to confirm which live models are free. */
-export const MODELS_DEV_URL = "https://models.dev/api.json";
+/** Pi's native OpenCode catalog overlay, as served by pi.dev. */
+export const MODEL_CATALOG_URL = "https://pi.dev/api/models/providers/opencode?types=chat";
 
 const DEFAULT_PUBLIC_API_KEY = "public";
 
 /** Chat model configuration accepted by `ProviderConfig.models`. */
 export type FreeChatModelConfig = Extract<ProviderModelConfig, { reasoning: boolean }>;
 
-const DEFAULT_CONTEXT_WINDOW = 128_000;
+interface RemoteCost {
+  input?: number;
+  output?: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+}
 
-const DEFAULT_MAX_TOKENS = 16_384;
-
-const ZERO_COST = {
-  input: 0,
-  output: 0,
-  cacheRead: 0,
-  cacheWrite: 0,
-} as const;
-
-const OPENCODE_COMPAT: NonNullable<FreeChatModelConfig["compat"]> = {
-  supportsStore: false,
-  supportsDeveloperRole: false,
-  supportsStrictMode: true,
-  maxTokensField: "max_tokens",
-};
-
-const DEEPSEEK_COMPAT: NonNullable<FreeChatModelConfig["compat"]> = {
-  ...OPENCODE_COMPAT,
-  requiresReasoningContentOnAssistantMessages: true,
-};
-
-const REASONING_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const;
-
-const EFFORT_LEVEL_NAMES = new Set(["minimal", "low", "medium", "high", "xhigh", "max"]);
-
-interface ModelsDevReasoningOption {
+interface RemoteCatalogEntry {
+  id: string;
   type?: string;
-  values?: readonly string[];
-}
-
-interface ModelsDevModel {
-  id?: string;
   name?: string;
+  api?: string;
+  input?: readonly string[];
+  cost?: RemoteCost;
+  contextWindow?: number;
+  maxTokens?: number;
   reasoning?: boolean;
-  reasoning_options?: readonly ModelsDevReasoningOption[];
-  tool_call?: boolean;
-  interleaved?: {
-    field?: string;
-  };
-  modalities?: {
-    input?: readonly string[];
-    output?: readonly string[];
-  };
-  limit?: {
-    context?: number;
-    output?: number;
-  };
-  cost?: {
-    input?: number;
-    output?: number;
-    cache_read?: number;
-    cache_write?: number;
-  };
-  provider?: {
-    api?: string;
-  };
-}
-
-interface ModelsDevProvider {
-  models?: Record<string, ModelsDevModel>;
-}
-
-interface ModelsDevCatalog {
-  opencode?: ModelsDevProvider;
+  thinkingLevelMap?: FreeChatModelConfig["thinkingLevelMap"];
+  compat?: FreeChatModelConfig["compat"];
+  inputLimits?: FreeChatModelConfig["inputLimits"];
+  promptCache?: FreeChatModelConfig["promptCache"];
 }
 
 interface LiveModel {
@@ -206,7 +164,11 @@ export function storedModelsFromConfigs(
 }
 
 /**
- * Discovers free chat models from the live endpoint and models.dev.
+ * Discovers free chat models from the live endpoint and Pi's native catalog.
+ *
+ * The live endpoint decides which models currently exist. Pi's OpenCode
+ * catalog supplies their capabilities and compatibility flags, so this
+ * extension does not maintain a second metadata translation.
  *
  * @param options - Endpoint, headers, abort signal, and fetcher
  * @returns Free chat model configurations, or `undefined` when discovery cannot verify them
@@ -218,12 +180,12 @@ export async function discoverFreeModels(
 
   const [liveIds, catalog] = await Promise.all([
     fetchLiveModelIds(options),
-    fetchModelsDevCatalog(options),
+    fetchModelCatalog(options),
   ]);
 
   if (!liveIds || liveIds.length === 0 || !catalog) return undefined;
 
-  const models = selectFreeModels(liveIds, freeMetadataById(catalog));
+  const models = selectFreeModels(liveIds, freeCatalogModels(catalog));
 
   return models.length > 0 ? models : undefined;
 }
@@ -237,6 +199,20 @@ function freeBuiltinModels(): Map<string, FreeChatModelConfig> {
     if (model.cost.input !== 0 || model.cost.output !== 0) continue;
 
     models.set(model.id, fromModel(model));
+  }
+
+  return models;
+}
+
+function freeCatalogModels(
+  catalog: readonly RemoteCatalogEntry[],
+): Map<string, FreeChatModelConfig> {
+  const models = freeBuiltinModels();
+
+  for (const entry of catalog) {
+    const config = configFromRemote(entry);
+
+    if (config) models.set(config.id, config);
   }
 
   return models;
@@ -264,114 +240,62 @@ function fromModel(model: Model<Api>): FreeChatModelConfig {
   return config;
 }
 
-function selectFreeModels(
-  liveIds: readonly string[],
-  metadata: ReadonlyMap<string, ModelsDevModel>,
-): FreeChatModelConfig[] {
-  const builtIn = freeBuiltinModels();
-  const models: FreeChatModelConfig[] = [];
+function configFromRemote(entry: RemoteCatalogEntry): FreeChatModelConfig | undefined {
+  if (entry.type !== undefined && entry.type !== "chat") return undefined;
 
-  for (const id of liveIds) {
-    const entry = metadata.get(id);
+  if (entry.api !== "openai-completions") return undefined;
 
-    if (!entry) continue;
+  if (entry.cost?.input !== 0 || entry.cost.output !== 0) return undefined;
 
-    models.push(builtIn.get(id) ?? modelFromMetadata(id, entry));
-  }
+  if (!isPositiveInteger(entry.contextWindow)) return undefined;
 
-  return models;
-}
+  if (!isPositiveInteger(entry.maxTokens)) return undefined;
 
-function freeMetadataById(catalog: ModelsDevCatalog): Map<string, ModelsDevModel> {
-  const models = new Map<string, ModelsDevModel>();
-  const catalogModels = catalog.opencode?.models;
+  if (entry.reasoning !== true && entry.reasoning !== false) return undefined;
 
-  if (!catalogModels) return models;
-
-  for (const [key, entry] of Object.entries(catalogModels)) {
-    if (!isFreeChatMetadata(entry)) continue;
-
-    models.set(entry.id ?? key, entry);
-  }
-
-  return models;
-}
-
-function isFreeChatMetadata(entry: ModelsDevModel): boolean {
-  if (entry.cost?.input !== 0 || entry.cost?.output !== 0) return false;
-
-  if (entry.tool_call === false) return false;
-
-  const providerApi = entry.provider?.api;
-
-  if (providerApi && !providerApi.includes("openai")) return false;
-
-  const outputModalities = entry.modalities?.output;
-
-  return !outputModalities || outputModalities.includes("text");
-}
-
-function modelFromMetadata(id: string, metadata: ModelsDevModel): FreeChatModelConfig {
-  const contextWindow = positiveInteger(metadata.limit?.context) ?? DEFAULT_CONTEXT_WINDOW;
+  if (!entry.input || !isStringArray(entry.input)) return undefined;
 
   const config: FreeChatModelConfig = {
-    id,
-    name: metadata.name?.trim() || id,
-    input: metadata.modalities?.input?.includes("image") ? ["text", "image"] : ["text"],
-    cost: ZERO_COST,
-    contextWindow,
-    maxTokens:
-      positiveInteger(metadata.limit?.output) ?? Math.min(DEFAULT_MAX_TOKENS, contextWindow),
-    reasoning: metadata.reasoning === true,
-    compat: OPENCODE_COMPAT,
+    id: entry.id,
+    name: entry.name?.trim() || entry.id,
+    input: entry.input.includes("image") ? ["text", "image"] : ["text"],
+    cost: {
+      input: 0,
+      output: 0,
+      cacheRead: entry.cost.cacheRead ?? 0,
+      cacheWrite: entry.cost.cacheWrite ?? 0,
+    },
+    contextWindow: Math.floor(entry.contextWindow),
+    maxTokens: Math.floor(entry.maxTokens),
+    reasoning: entry.reasoning,
   };
 
-  const thinkingLevelMap = thinkingMapFromOptions(metadata.reasoning_options);
+  if (entry.thinkingLevelMap) config.thinkingLevelMap = entry.thinkingLevelMap;
 
-  if (thinkingLevelMap) config.thinkingLevelMap = thinkingLevelMap;
+  if (entry.compat) config.compat = entry.compat;
 
-  if (metadata.interleaved?.field === "reasoning_content" && id.includes("deepseek")) {
-    config.compat = DEEPSEEK_COMPAT;
-  }
+  if (entry.inputLimits) config.inputLimits = entry.inputLimits;
+
+  if (entry.promptCache) config.promptCache = entry.promptCache;
 
   return config;
 }
 
-function positiveInteger(value: number | undefined): number | undefined {
-  if (value === undefined || !Number.isFinite(value) || value <= 0) return undefined;
+function selectFreeModels(
+  liveIds: readonly string[],
+  metadata: ReadonlyMap<string, FreeChatModelConfig>,
+): FreeChatModelConfig[] {
+  const models: FreeChatModelConfig[] = [];
 
-  return Math.floor(value);
-}
+  for (const id of liveIds) {
+    const config = metadata.get(id);
 
-function thinkingMapFromOptions(
-  options: readonly ModelsDevReasoningOption[] | undefined,
-): FreeChatModelConfig["thinkingLevelMap"] | undefined {
-  if (!options) return undefined;
+    if (!config) continue;
 
-  for (const option of options) {
-    if (option.type !== "effort" || !option.values) continue;
-
-    return effortThinkingMap(option.values);
+    models.push(config);
   }
 
-  return undefined;
-}
-
-function effortThinkingMap(
-  values: readonly string[],
-): NonNullable<FreeChatModelConfig["thinkingLevelMap"]> {
-  const supported = new Set(values);
-
-  const map: NonNullable<FreeChatModelConfig["thinkingLevelMap"]> = {
-    off: supported.has("none") ? "none" : null,
-    minimal: supported.has("minimal") ? "minimal" : null,
-  };
-
-  for (const level of REASONING_LEVELS) {
-    map[level] = supported.has(level) && EFFORT_LEVEL_NAMES.has(level) ? level : null;
-  }
-
-  return map;
+  return models;
 }
 
 async function fetchLiveModelIds(
@@ -401,11 +325,11 @@ async function fetchLiveModelIds(
   }
 }
 
-async function fetchModelsDevCatalog(
+async function fetchModelCatalog(
   options: DiscoverFreeModelsOptions,
-): Promise<ModelsDevCatalog | undefined> {
+): Promise<readonly RemoteCatalogEntry[] | undefined> {
   try {
-    const response = await options.fetcher(MODELS_DEV_URL, {
+    const response = await options.fetcher(MODEL_CATALOG_URL, {
       headers: { Accept: "application/json" },
       signal: options.signal,
     });
@@ -414,10 +338,21 @@ async function fetchModelsDevCatalog(
 
     const body: unknown = await response.json();
 
-    return isModelsDevCatalog(body) ? body : undefined;
+    if (!isRemoteCatalog(body)) return undefined;
+
+    return isCatalogNewer(response.headers.get("last-modified")) ? body : [];
   } catch {
     return undefined;
   }
+}
+
+function isCatalogNewer(lastModified: string | null): boolean {
+  const remoteGeneratedAt = Date.parse(lastModified ?? "");
+  const localGeneratedAt = getBuiltinModelDataGeneratedAt();
+
+  if (Number.isNaN(remoteGeneratedAt)) return localGeneratedAt === undefined;
+
+  return localGeneratedAt === undefined || remoteGeneratedAt > localGeneratedAt;
 }
 
 function isLiveModelsResponse(value: unknown): value is LiveModelsResponse {
@@ -440,26 +375,36 @@ function isLiveModel(value: unknown): value is LiveModel {
   return typeof value.id === "string";
 }
 
-function isModelsDevCatalog(value: unknown): value is ModelsDevCatalog {
-  if (value === null || typeof value !== "object" || !("opencode" in value)) return false;
+function isRemoteCatalog(value: unknown): value is readonly RemoteCatalogEntry[] {
+  if (!Array.isArray(value)) return false;
 
-  return isModelsDevProvider(value.opencode);
-}
-
-function isModelsDevProvider(value: unknown): value is ModelsDevProvider {
-  if (value === null || typeof value !== "object" || !("models" in value)) return false;
-
-  const models = value.models;
-
-  if (models === null || typeof models !== "object" || Array.isArray(models)) return false;
-
-  for (const entry of Object.values(models)) {
-    if (!isModelsDevModel(entry)) return false;
+  for (const model of value) {
+    if (!isRemoteCatalogEntry(model)) return false;
   }
 
   return true;
 }
 
-function isModelsDevModel(value: unknown): value is ModelsDevModel {
-  return value !== null && typeof value === "object";
+function isRemoteCatalogEntry(value: unknown): value is RemoteCatalogEntry {
+  return (
+    value !== null && typeof value === "object" && "id" in value && typeof value.id === "string"
+  );
+}
+
+function isStringArray(value: unknown): value is readonly string[] {
+  if (!Array.isArray(value)) return false;
+
+  for (const item of value) {
+    if (typeof item !== "string") return false;
+  }
+
+  return true;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return isFiniteNumber(value) && value > 0;
 }
