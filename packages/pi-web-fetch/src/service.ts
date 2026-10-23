@@ -193,13 +193,6 @@ export interface WebFetchDetails {
   fragment?: { requested: string; matched: boolean; offset?: number };
 }
 
-const llmsNoticeOrigins = new Set<string>();
-
-/** Clears per-origin notice history so subsequent fetches can show llms.txt index notices again. */
-export function resetLlmsNoticeOrigins(): void {
-  llmsNoticeOrigins.clear();
-}
-
 interface WebFetchUpdate {
   content: Array<{ type: "text"; text: string }>;
   details: Record<string, never>;
@@ -286,7 +279,24 @@ interface FetchAcquisition {
 
 const inflightFetches = new InflightCoalescer<string, FetchAcquisition>(MAX_INFLIGHT_REQUESTS);
 
-/** Executes a validated web fetch, including caching, focusing, and bounded pagination. */
+/**
+ * Executes a validated web fetch, including caching, focusing, and bounded pagination.
+ *
+ * A URL fragment selects the starting heading, anchor, or source range unless
+ * an explicit offset is supplied. A query selects sections before pagination.
+ * Missing fragments may suggest up to three links to other pages with that
+ * fragment. Discovered llms.txt index URLs appear on every unblocked result,
+ * including cache hits. Detected bot-wall documents return a blocked result
+ * without page content.
+ *
+ * @param params - Fetch options; offsets and character limits count UTF-16 code units
+ * @param params.offset - Integer from 0 to 20,000,000; applies to the focused view when querying
+ * @param params.maxCharacters - Integer from 1,000 to 30,000; defaults to 6,000 before line/byte limits
+ * @param signal - Cancels acquisition; fresh cache hits do not consult this signal
+ * @param onUpdate - Receives cache or acquisition progress before content is returned
+ * @returns Bounded text output and metadata, including cache, fragment, and continuation details
+ * @throws For invalid parameter limits; acquisition, cancellation, and progress callback errors propagate
+ */
 export async function executeWebFetch(
   params: WebFetchParameters,
   signal: AbortSignal | undefined,
@@ -404,6 +414,35 @@ export async function executeWebFetch(
   const resolvedFragment = resolveFragmentOffset(document, params.url);
   const fragmentOffset = resolvedFragment.offset;
   const fragmentMatched = resolvedFragment.fragment !== undefined && fragmentOffset !== undefined;
+
+  const fragmentSuggestions =
+    resolvedFragment.fragment !== undefined && !fragmentMatched
+      ? [
+          ...(document.links?.internal ?? []).map((link) => link.url),
+          ...(document.links?.external ?? []).map((link) => link.url),
+          ...[...document.markdown.matchAll(/\]\(([^)]+)\)/g)].map((match) => match[1]),
+        ]
+          .filter((url) => {
+            try {
+              const linkedUrl = new URL(url, document.url);
+
+              if (decodeURIComponent(linkedUrl.hash.slice(1)) !== resolvedFragment.fragment) {
+                return false;
+              }
+
+              linkedUrl.hash = "";
+              const sourceUrl = new URL(document.url);
+              sourceUrl.hash = "";
+
+              return linkedUrl.href !== sourceUrl.href;
+            } catch {
+              return false;
+            }
+          })
+          .slice(0, 3)
+          .map((url) => redactUrlForDisplay(new URL(url, document.url).href))
+      : [];
+
   const startingOffset = explicitOffset ?? fragmentOffset ?? FETCH_DEFAULT_OFFSET;
 
   const hasFragmentRange =
@@ -460,13 +499,7 @@ export async function executeWebFetch(
   const contentKind = classifyContentKind(rawFinalUrl, result.extractor, shellSuspected);
   const confidence = classifyConfidence(result.extractor, shellSuspected, result.markdown.length);
 
-  const llmsNoticeOrigin = result.llmsTxtIndexUrl
-    ? new URL(result.llmsTxtIndexUrl).origin
-    : undefined;
-
-  const showLlmsNotice = Boolean(llmsNoticeOrigin && !llmsNoticeOrigins.has(llmsNoticeOrigin));
-
-  if (showLlmsNotice && llmsNoticeOrigin) llmsNoticeOrigins.add(llmsNoticeOrigin);
+  const showLlmsNotice = Boolean(result.llmsTxtIndexUrl);
 
   const output = blocked
     ? "Blocked by an anti-bot challenge. Requested page content is unavailable."
@@ -489,7 +522,13 @@ export async function executeWebFetch(
           ? [`llms.txt index: ${redactUrlForDisplay(result.llmsTxtIndexUrl)}`, ""]
           : []),
         ...(resolvedFragment.fragment !== undefined && !fragmentMatched
-          ? ["[The requested URL fragment was not found; showing the page from the beginning.]", ""]
+          ? [
+              "[The requested URL fragment was not found; showing the page from the beginning.]",
+              ...(fragmentSuggestions.length
+                ? [`[This page links to the requested fragment: ${fragmentSuggestions.join(", ")}]`]
+                : []),
+              "",
+            ]
           : []),
         ...(fragmentMatched ? ["[Starting at the requested URL fragment.]", ""] : []),
         ...(focused

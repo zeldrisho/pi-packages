@@ -19,13 +19,22 @@ const MAX_DOT_ENV_BYTES = 64 * 1024;
  *
  * Only the extracted value is used; file contents are never echoed into
  * errors or tool output.
+ * Reads the first matching assignment, trimming surrounding whitespace and
+ * removing paired single or double quotes. Does not interpret `export`,
+ * inline comments, escapes, or variable expansion.
+ *
+ * @param keyName - Selects the Search or Answers key; defaults to the Search key
+ * @returns The value, or `undefined` when the first assignment is empty or no assignment matches
  */
 export function extractKeyValue(
   text: string,
   keyName: ApiKeyName = "BRAVE_SEARCH_API_KEY",
 ): string | undefined {
   for (const line of text.split(/\r?\n/)) {
-    const match = line.match(new RegExp(`^\\s*${keyName}\\s*=\\s*(.*)$`));
+    const match =
+      keyName === "BRAVE_SEARCH_API_KEY"
+        ? line.match(/^\s*BRAVE_SEARCH_API_KEY\s*=\s*(.*)$/)
+        : line.match(/^\s*BRAVE_ANSWERS_API_KEY\s*=\s*(.*)$/);
 
     if (!match) continue;
     let value = match[1].trim();

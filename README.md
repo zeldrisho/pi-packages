@@ -7,6 +7,7 @@ Monorepo for my personal Pi extensions, skills, and themes.
 | Package                                                            | Type      | Purpose                                                | Install                                          |
 | ------------------------------------------------------------------ | --------- | ------------------------------------------------------ | ------------------------------------------------ |
 | [`@zeldrisho/pi-gate`](packages/pi-gate)                           | Extension | Block or confirm bash commands from a user JSON config | `pi install npm:@zeldrisho/pi-gate`              |
+| [`@zeldrisho/pi-opencode-free`](packages/pi-opencode-free)         | Extension | Use OpenCode's free-tier models                        | `pi install npm:@zeldrisho/pi-opencode-free`     |
 | [`@zeldrisho/pi-web-fetch`](packages/pi-web-fetch)                 | Extension | Fetch public web pages as bounded Markdown             | `pi install npm:@zeldrisho/pi-web-fetch`         |
 | [`@zeldrisho/pi-web-search`](packages/pi-web-search)               | Extension | Search the web with Brave Search                       | `pi install npm:@zeldrisho/pi-web-search`        |
 | [`@zeldrisho/pi-anthropics-skills`](packages/pi-anthropics-skills) | Skills    | Skills adapted from Anthropic                          | `pi install npm:@zeldrisho/pi-anthropics-skills` |

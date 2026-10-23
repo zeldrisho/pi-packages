@@ -7,7 +7,7 @@ coverage/
 # Dependencies and package caches
 node_modules/
 .pnpm-store/
-.pi/npm/
+.pi/
 
 # Logs and environment
 *.log

@@ -19,6 +19,8 @@
 
 ## Key Conventions
 
+- Use Conventional Commits.
+
 - Edit shared `cache.ts`, `inflight.ts`, and `render.ts` in `packages/pi-web-fetch/src/`, then run `vp run sync:web-modules` to update `pi-web-search`.
 - Read `docs/development.md` before runtime or dependency changes, especially its security and regression requirements.
 - Read `docs/architecture.md` before changing package boundaries, network acquisition, caching, or derived views.

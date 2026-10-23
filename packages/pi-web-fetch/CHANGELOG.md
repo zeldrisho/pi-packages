@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-23
+
+### Changed
+
+- Show discovered `llms.txt` indexes on every fetch result so the index remains visible when fetching multiple pages from the same origin.
+- Prefer native Markdown representations during content negotiation while retaining supported text formats.
+
+### Fixed
+
+- Suggest links to pages containing a requested fragment when it is absent from the current page.
+- Handle empty and text-only HTML fragments without a null-document parser crash.
+- Resolve section wrapper fragments when extracted headings are omitted.
+
 ## [0.11.1] - 2026-10-20
 
 ### Changed
@@ -233,7 +246,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.11.1...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.12.0...HEAD
+[0.12.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.11.1...pi-web-fetch-v0.12.0
 [0.11.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.11.0...pi-web-fetch-v0.11.1
 [0.11.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.10.2...pi-web-fetch-v0.11.0
 [0.10.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.10.1...pi-web-fetch-v0.10.2

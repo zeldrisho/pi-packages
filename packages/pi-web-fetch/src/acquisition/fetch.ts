@@ -8,7 +8,7 @@ import {
 
 export { normalizeGitHubRawUrl, parseLinkHeaderForAgentHints } from "./fetch-metadata.ts";
 
-import { awaitWithAbort } from "../abort";
+import { awaitWithAbort } from "../abort.ts";
 import {
   hasAnubisMarkers,
   parseAnubisChallenge,
@@ -31,7 +31,7 @@ import {
   type RedirectDependencies,
 } from "../network/network-redirects.ts";
 import type { ValidatedTarget } from "../network/network-policy.ts";
-import { redactUrlForDisplay } from "../redact";
+import { redactUrlForDisplay } from "../redact.ts";
 import {
   decodeResponse,
   decompressResponse,
