@@ -75,6 +75,14 @@ function normalizeMarkdown(markdown: string): NormalizedMarkdown {
   return { text: characters.join(""), offsets };
 }
 
+/**
+ * Maps HTML ids, named anchors, and Markdown heading slugs to extracted Markdown positions.
+ * HTML anchors match headings or retained text, including section descendants;
+ * anchors with no matching content are omitted.
+ *
+ * @param originalIds - Original ids for elements renamed during extraction; override current ids
+ * @returns Zero-based UTF-16 code-unit offsets into `markdown`, keyed by fragment without `#`
+ */
 export function buildFragmentOffsets(
   document: Document,
   markdown: string,

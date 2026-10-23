@@ -82,6 +82,8 @@ function isElementNode(node: ChildNode): node is Element {
  * HTML5 permits those omissions, but body-based extraction (Defuddle and the plain-text
  * fallback) then sees nothing. Rebuild a well-formed `<html>` document, moving the
  * fragment's top-level nodes into `<head>` or `<body>` as appropriate.
+ * Empty and text-only documents also receive these wrappers, with text moved
+ * into the body. Documents already rooted at `<html>` are left unchanged.
  */
 function normalizeFragmentDocument(document: Document): void {
   const root = document.documentElement;

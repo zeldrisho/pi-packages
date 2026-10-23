@@ -113,7 +113,8 @@ export function initialFreeModels(): FreeChatModelConfig[] {
 }
 
 /**
- * Restores cached free models from Pi's persisted model store.
+ * Restores this provider's cached OpenAI-completions chat models from Pi's persisted store.
+ * Model costs are preserved without checking whether they are zero.
  *
  * @param models - Models from `RefreshModelsContext.stored`
  * @param providerId - Provider id that owns the cached catalog
@@ -183,9 +184,14 @@ export function storedModelsFromConfigs(
  * The live endpoint decides which models currently exist. Pi's OpenCode
  * catalog supplies their capabilities and compatibility flags, so this
  * extension does not maintain a second metadata translation.
+ * A newer remote catalog overlays bundled metadata; otherwise bundled metadata
+ * is used. Both endpoints must respond successfully. Fetch, HTTP, JSON parsing,
+ * and response-shape failures return `undefined`, as do disabled networking,
+ * an already-aborted signal, and an empty intersection.
  *
  * @param options - Endpoint, headers, abort signal, and fetcher
  * @returns Free chat model configurations, or `undefined` when discovery cannot verify them
+ * @throws If model metadata conversion fails, such as for a non-string catalog name
  */
 export async function discoverFreeModels(
   options: DiscoverFreeModelsOptions,
@@ -204,6 +210,7 @@ export async function discoverFreeModels(
   return models.length > 0 ? models : undefined;
 }
 
+/** Indexes bundled OpenAI-completions models with zero input and output costs by model id. */
 function freeBuiltinModels(): Map<string, FreeChatModelConfig> {
   const models = new Map<string, FreeChatModelConfig>();
 
@@ -218,6 +225,7 @@ function freeBuiltinModels(): Map<string, FreeChatModelConfig> {
   return models;
 }
 
+/** Overlays qualifying remote entries on bundled models; rejected or absent entries leave them intact. */
 function freeCatalogModels(
   catalog: readonly RemoteCatalogEntry[],
 ): Map<string, FreeChatModelConfig> {
@@ -232,6 +240,7 @@ function freeCatalogModels(
   return models;
 }
 
+/** Copies model capabilities into a provider configuration, omitting provider and endpoint identity. */
 function fromModel(model: Model<Api>): FreeChatModelConfig {
   const config: FreeChatModelConfig = {
     id: model.id,
@@ -254,6 +263,13 @@ function fromModel(model: Model<Api>): FreeChatModelConfig {
   return config;
 }
 
+/**
+ * Converts a zero-input/output-cost OpenAI-completions chat entry with positive
+ * finite limits, reasoning, and input metadata, or returns `undefined` when those checks fail.
+ * Positive fractional token limits are rounded down; cache costs are preserved.
+ *
+ * @throws If an otherwise qualifying entry has a non-null name that is not a string
+ */
 function configFromRemote(entry: RemoteCatalogEntry): FreeChatModelConfig | undefined {
   if (entry.type !== undefined && entry.type !== "chat") return undefined;
 
@@ -295,6 +311,7 @@ function configFromRemote(entry: RemoteCatalogEntry): FreeChatModelConfig | unde
   return config;
 }
 
+/** Selects live ids with known free metadata, preserving live order and duplicate ids. */
 function selectFreeModels(
   liveIds: readonly string[],
   metadata: ReadonlyMap<string, FreeChatModelConfig>,
@@ -312,6 +329,11 @@ function selectFreeModels(
   return models;
 }
 
+/**
+ * Fetches `/models` with the supplied headers and signal, omitting empty ids.
+ * Returns `undefined` on HTTP, fetch, JSON parsing, or response-shape failure,
+ * including an aborted fetch; a valid empty list returns an empty array.
+ */
 async function fetchLiveModelIds(
   options: DiscoverFreeModelsOptions,
 ): Promise<readonly string[] | undefined> {
@@ -339,6 +361,11 @@ async function fetchLiveModelIds(
   }
 }
 
+/**
+ * Fetches Pi's OpenCode catalog with the supplied signal and without provider headers.
+ * Returns an empty array when the bundled catalog is at least as recent, or
+ * `undefined` on HTTP, fetch, JSON parsing, or response-shape failure, including abort.
+ */
 async function fetchModelCatalog(
   options: DiscoverFreeModelsOptions,
 ): Promise<readonly RemoteCatalogEntry[] | undefined> {
@@ -360,6 +387,10 @@ async function fetchModelCatalog(
   }
 }
 
+/**
+ * Compares the remote Last-Modified date with the bundled catalog timestamp.
+ * A missing or invalid remote date qualifies only when no bundled timestamp exists.
+ */
 function isCatalogNewer(lastModified: string | null): boolean {
   const remoteGeneratedAt = Date.parse(lastModified ?? "");
   const localGeneratedAt = getBuiltinModelDataGeneratedAt();
@@ -369,6 +400,7 @@ function isCatalogNewer(lastModified: string | null): boolean {
   return localGeneratedAt === undefined || remoteGeneratedAt > localGeneratedAt;
 }
 
+/** Requires a `data` array whose entries all have string ids; an empty array is valid. */
 function isLiveModelsResponse(value: unknown): value is LiveModelsResponse {
   if (value === null || typeof value !== "object" || !("data" in value)) return false;
 
@@ -383,12 +415,14 @@ function isLiveModelsResponse(value: unknown): value is LiveModelsResponse {
   return true;
 }
 
+/** Checks only for a string id, allowing empty ids and leaving other fields unchecked. */
 function isLiveModel(value: unknown): value is LiveModel {
   if (value === null || typeof value !== "object" || !("id" in value)) return false;
 
   return typeof value.id === "string";
 }
 
+/** Accepts an empty catalog or entries with string ids; capability fields are not validated here. */
 function isRemoteCatalog(value: unknown): value is readonly RemoteCatalogEntry[] {
   if (!Array.isArray(value)) return false;
 
@@ -399,12 +433,14 @@ function isRemoteCatalog(value: unknown): value is readonly RemoteCatalogEntry[]
   return true;
 }
 
+/** Checks only for a string id, leaving optional catalog metadata unchecked. */
 function isRemoteCatalogEntry(value: unknown): value is RemoteCatalogEntry {
   return (
     value !== null && typeof value === "object" && "id" in value && typeof value.id === "string"
   );
 }
 
+/** Accepts arrays containing only strings, including empty arrays. */
 function isStringArray(value: unknown): value is readonly string[] {
   if (!Array.isArray(value)) return false;
 
@@ -415,10 +451,12 @@ function isStringArray(value: unknown): value is readonly string[] {
   return true;
 }
 
+/** Excludes NaN and infinities when validating numeric model limits. */
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+/** Accepts finite values greater than zero, including fractions that callers round down. */
 function isPositiveInteger(value: unknown): value is number {
   return isFiniteNumber(value) && value > 0;
 }

@@ -42,6 +42,7 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 
 const defaultCorpusPath = resolve(scriptDirectory, "extraction-corpus.json");
 
+/** Returns command-line help text without writing it to an output stream. */
 function usage(): string {
   return [
     "Usage: node scripts/benchmark-extraction.ts [options]",

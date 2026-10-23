@@ -51,12 +51,15 @@ function responseTooLargeMessage(
 /**
  * Sends a request to a specific validated network address.
  *
+ * The default Accept header prefers Markdown over other supported text formats.
+ *
  * @param target - The validated request target.
  * @param address - The IPv4 or IPv6 address to use for the connection.
  * @param signal - Signal used to cancel the request.
- * @param attemptTimeoutMs - Maximum time allowed for the connection attempt.
- * @returns The received response.
- * @throws If `address` is not a valid IPv4 or IPv6 address.
+ * @param attemptTimeoutMs - Deadline in milliseconds until response headers arrive.
+ * @param headers - Request headers that can override the default Accept and User-Agent headers.
+ * @returns The response once headers arrive, regardless of HTTP status; its body is not read.
+ * @throws If the address is invalid, the deadline expires, the signal aborts, or the HTTP request fails.
  */
 async function requestOnce(
   target: ValidatedTarget,

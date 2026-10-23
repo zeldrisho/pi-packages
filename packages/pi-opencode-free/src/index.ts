@@ -35,8 +35,13 @@ export interface OpencodeFreeDependencies {
 /**
  * Registers the OpenCode free provider and its request hooks.
  *
+ * Seeds the catalog from bundled models, rotates session identity on session
+ * start, and normalizes requests for this provider. Discovery runs when Pi
+ * invokes the registered model refresh hook.
+ *
  * @param pi - Extension API supplied by Pi
  * @param dependencies - Runtime dependencies for discovery and session generation
+ * @throws If seed generation fails or returns fewer than twenty bytes; Pi API errors propagate
  */
 export function registerOpencodeFree(
   pi: ExtensionAPI,
@@ -79,6 +84,15 @@ export function registerOpencodeFree(
   pi.registerProvider(PROVIDER_ID, config);
 }
 
+/**
+ * Refreshes the catalog, falling back to stored models or bundled models when
+ * offline, canceled, or discovery returns no usable models. Discovery has an
+ * eight-second abort deadline. Successful results are published for persistence;
+ * publication failures are ignored and the discovered models are still returned.
+ *
+ * @param fallbackBaseUrl - Endpoint used when the refresh context has no override
+ * @throws Propagates model metadata conversion errors from discovery
+ */
 async function refreshModels(
   context: RefreshModelsContext,
   dependencies: OpencodeFreeDependencies,

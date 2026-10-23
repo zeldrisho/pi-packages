@@ -138,7 +138,8 @@ export const READ_TOOL = {
 /**
  * Creates the random seed backing a canonical session id.
  *
- * @returns Twenty random bytes: five for the encoded time half and fifteen for the suffix
+ * @returns Twenty cryptographically random bytes for a canonical session identifier
+ * @throws If cryptographic random byte generation fails
  */
 export function createSessionSeed(): Uint8Array {
   return randomBytes(SESSION_SEED_LENGTH);
@@ -150,10 +151,11 @@ export function createSessionSeed(): Uint8Array {
  * The 48-bit hex half reproduces `Identifier.descending()` with the counter
  * pinned to one, so the low twelve bits always read `ffe`. The high 36 bits are
  * derived from the seed, matching the reference implementation, while the
- * fourteen-character suffix uses the remaining seed bytes.
+ * fourteen-character suffix is derived from the seed.
  *
  * @param seed - At least twenty bytes; defaults to fresh cryptographic randomness
  * @returns A `ses_` identifier accepted by the free-tier gate
+ * @throws If the seed contains fewer than twenty bytes or default seed generation fails
  */
 export function createCanonicalSessionId(seed: Uint8Array = createSessionSeed()): string {
   if (seed.length < SESSION_SEED_LENGTH) {
@@ -198,6 +200,8 @@ export function buildFingerprintHeaders(sessionId: string, cliVersion: string) {
  *
  * The marker header keeps the mutation from leaking into built-in providers
  * that share the OpenCode endpoint but do not use the free-tier fingerprint.
+ * Matching header names are replaced case-insensitively, and the legacy
+ * `x-opencode-request` header is removed. Unmarked requests are left unchanged.
  *
  * @param headers - Mutable request headers supplied by Pi
  * @param sessionId - Canonical session identifier for the active Pi session
@@ -226,6 +230,7 @@ export function applyFingerprintHeaders(
   return true;
 }
 
+/** Checks for a case-insensitive marker header whose value is exactly `"1"`. */
 function hasFingerprintMarker(headers: ProviderHeaders): boolean {
   for (const [name, value] of Object.entries(headers)) {
     if (name.toLowerCase() === FINGERPRINT_MARKER_HEADER && value === "1") return true;
@@ -234,6 +239,7 @@ function hasFingerprintMarker(headers: ProviderHeaders): boolean {
   return false;
 }
 
+/** Replaces all case variants of a header in place with the supplied spelling and value. */
 function setHeader(headers: ProviderHeaders, name: string, value: string): void {
   for (const existing of Object.keys(headers)) {
     if (existing.toLowerCase() === name.toLowerCase()) delete headers[existing];

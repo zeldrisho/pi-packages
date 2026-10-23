@@ -279,7 +279,24 @@ interface FetchAcquisition {
 
 const inflightFetches = new InflightCoalescer<string, FetchAcquisition>(MAX_INFLIGHT_REQUESTS);
 
-/** Executes a validated web fetch, including caching, focusing, and bounded pagination. */
+/**
+ * Executes a validated web fetch, including caching, focusing, and bounded pagination.
+ *
+ * A URL fragment selects the starting heading, anchor, or source range unless
+ * an explicit offset is supplied. A query selects sections before pagination.
+ * Missing fragments may suggest up to three links to other pages with that
+ * fragment. Discovered llms.txt index URLs appear on every unblocked result,
+ * including cache hits. Detected bot-wall documents return a blocked result
+ * without page content.
+ *
+ * @param params - Fetch options; offsets and character limits count UTF-16 code units
+ * @param params.offset - Integer from 0 to 20,000,000; applies to the focused view when querying
+ * @param params.maxCharacters - Integer from 1,000 to 30,000; defaults to 6,000 before line/byte limits
+ * @param signal - Cancels acquisition; fresh cache hits do not consult this signal
+ * @param onUpdate - Receives cache or acquisition progress before content is returned
+ * @returns Bounded text output and metadata, including cache, fragment, and continuation details
+ * @throws For invalid parameter limits; acquisition, cancellation, and progress callback errors propagate
+ */
 export async function executeWebFetch(
   params: WebFetchParameters,
   signal: AbortSignal | undefined,

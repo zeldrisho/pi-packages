@@ -60,8 +60,9 @@ export function isProviderRequestPayload(value: unknown): value is ProviderReque
  * Applies the free-tier request contract to a provider payload.
  *
  * The request must stream and must declare a tool named exactly `read`.
- * `tool_choice: "none"` is removed because the gate rejects it, while every
- * other field and tool declaration is preserved.
+ * Both `tool_choice: "none"` and `tool_choice: { type: "none" }` are removed
+ * because the gate rejects them, while every other field and tool declaration
+ * is preserved. The original payload is not mutated.
  *
  * @param payload - Validated provider request payload
  * @returns A normalized copy suitable for the free-tier endpoint
@@ -83,6 +84,7 @@ export function normalizeFreeRequestPayload(
   return normalized;
 }
 
+/** Reuses tools containing an exact `read` name, or returns a new list with the default appended. */
 function appendReadTool(tools: readonly ToolDeclaration[] | undefined): readonly ToolDeclaration[] {
   if (!tools) return [READ_TOOL];
 
@@ -93,18 +95,21 @@ function appendReadTool(tools: readonly ToolDeclaration[] | undefined): readonly
   return [...tools, READ_TOOL];
 }
 
+/** Recognizes both the string and object forms of the rejected `none` tool choice. */
 function isNoneToolChoice(value: unknown): value is "none" | ToolChoiceObject {
   if (value === "none") return true;
 
   return value !== null && typeof value === "object" && "type" in value && value.type === "none";
 }
 
+/** Accepts any string or non-null object without validating a particular tool-choice schema. */
 function isToolChoice(value: unknown): value is string | ToolChoiceObject {
   if (typeof value === "string") return true;
 
   return value !== null && typeof value === "object";
 }
 
+/** Requires a function object with a string name; other declaration fields are not validated. */
 function isToolDeclaration(value: unknown): value is ToolDeclaration {
   if (value === null || typeof value !== "object" || !("function" in value)) return false;
 
