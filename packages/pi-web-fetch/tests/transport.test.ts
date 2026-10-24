@@ -129,65 +129,82 @@ describe("web_fetch transport", () => {
     response.resume();
   });
 
-  it("abandons a hanging address and falls back inside the connect deadline", async () => {
-    // Accept connections on a second loopback address without sending response
-    // headers, so the first attempt deterministically hangs until its deadline.
-    // The URL uses a unique hostname so the keep-alive agent does not reuse a
-    // socket pooled under the fixture origin; the pinned lookup resolves it.
-    const fixturePort = new URL(origin).port;
-    const hanging = createServer(() => {});
+  it("abandons a hanging attempt and falls back inside the connect deadline", async () => {
+    // Repeat the pinned address so both attempts use the standard loopback
+    // interface: extra 127/8 aliases are not configured on every platform.
+    // The first request stalls; only the fallback receives response headers.
+    let attempts = 0;
+
+    const server = createServer((_request, response) => {
+      attempts += 1;
+
+      if (attempts > 1) response.end("fallback");
+    });
+
     await new Promise<void>((resolve, reject) => {
-      hanging.once("error", reject);
-      hanging.listen(Number(fixturePort), "127.0.0.2", resolve);
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", resolve);
     });
 
     try {
+      // SAFETY: The server has successfully listened on a TCP port above.
+      const address = server.address() as AddressInfo;
       const started = Date.now();
 
       const response = await requestPinned(
         {
-          url: new URL(`http://hanging-test.invalid:${fixturePort}/html`),
-          address: "127.0.0.2",
+          url: new URL(`http://hanging-test.invalid:${address.port}/html`),
+          address: "127.0.0.1",
           family: 4,
-          addresses: ["127.0.0.2", "127.0.0.1"],
+          addresses: ["127.0.0.1", "127.0.0.1"],
         },
         new AbortController().signal,
         { attemptTimeoutMs: 300 },
       );
 
       expect(response.statusCode).toBe(200);
-      // The first (hanging) address must have burned its connect deadline.
+      expect(attempts).toBe(2);
       expect(Date.now() - started).toBeGreaterThanOrEqual(300);
       response.resume();
     } finally {
-      hanging.closeAllConnections();
-      await new Promise<void>((resolve) => hanging.close(() => resolve()));
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });
 
   it("reports the connect deadline as an unreachable address", async () => {
     // A single hanging address must fail with the friendly deadline message
     // instead of leaking the HTTP client's raw AbortError to the caller.
-    const fixturePort = new URL(origin).port;
-    const hanging = createServer(() => {});
+    let attempts = 0;
+
+    const hanging = createServer(() => {
+      attempts += 1;
+    });
+
     await new Promise<void>((resolve, reject) => {
       hanging.once("error", reject);
-      hanging.listen(Number(fixturePort), "127.0.0.2", resolve);
+      hanging.listen(0, "127.0.0.1", resolve);
     });
 
     try {
+      // SAFETY: The server has successfully listened on a TCP port above.
+      const address = hanging.address() as AddressInfo;
+      const started = Date.now();
+
       await expect(
         requestPinned(
           {
-            url: new URL(`http://hanging-only-test.invalid:${fixturePort}/html`),
-            address: "127.0.0.2",
+            url: new URL(`http://hanging-only-test.invalid:${address.port}/html`),
+            address: "127.0.0.1",
             family: 4,
-            addresses: ["127.0.0.2"],
+            addresses: ["127.0.0.1"],
           },
           new AbortController().signal,
           { attemptTimeoutMs: 300 },
         ),
-      ).rejects.toThrow("web_fetch could not reach 127.0.0.2 within 300 ms.");
+      ).rejects.toThrow("web_fetch could not reach 127.0.0.1 within 300 ms.");
+      expect(attempts).toBe(1);
+      expect(Date.now() - started).toBeGreaterThanOrEqual(300);
     } finally {
       hanging.closeAllConnections();
       await new Promise<void>((resolve) => hanging.close(() => resolve()));

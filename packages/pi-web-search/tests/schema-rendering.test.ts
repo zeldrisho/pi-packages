@@ -172,6 +172,12 @@ describe("web_search schema rendering", () => {
       .render(200)
       .join("\n");
 
+    expect(tool.annotations).toEqual({
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true,
+    });
+    expect(collapsed).toContain("3 results · miss");
     expect(collapsed).toContain("First title");
     expect(collapsed).toContain("more lines");
     expect(collapsed).not.toContain("Third title");
@@ -182,10 +188,24 @@ describe("web_search schema rendering", () => {
     ).toContain("web_search pi extensions");
     expect(
       tool
-        .renderResult(result, { expanded: false, isPartial: true }, renderTheme)
+        .renderResult(
+          { ...result, content: [{ type: "text", text: "Using cached results…" }] },
+          { expanded: false, isPartial: true },
+          renderTheme,
+        )
         .render(200)
         .join("\n"),
-    ).toContain("Searching…");
+    ).toContain("Using cached results…");
+    expect(
+      tool
+        .renderResult(
+          { ...result, details: { ...result.details, cached: true, truncated: true } },
+          { expanded: false, isPartial: false },
+          renderTheme,
+        )
+        .render(200)
+        .join("\n"),
+    ).toContain("3 results · cached · truncated");
     expect(
       tool
         .renderResult(

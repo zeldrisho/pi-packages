@@ -4,6 +4,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   DEFAULT_BASE_URL,
   MODEL_CATALOG_URL,
+  catalogFromStoredEntry,
   configsFromStoredModels,
   discoverFreeModels,
   discoverFreeModelsWithStatus,
@@ -188,6 +189,27 @@ describe("stored model conversion", () => {
   });
 });
 
+describe("persisted catalog metadata", () => {
+  it("restores a complete validated metadata body and its validator", () => {
+    const models = configsFromStoredModels([storedModel], "opencode-free");
+    const stored = { models: [storedModel], catalog: models, lastModified: 123, etag: '"v1"' };
+    expect(catalogFromStoredEntry(stored)).toEqual({ models, lastModified: 123, etag: '"v1"' });
+  });
+
+  it.each([
+    undefined,
+    { models: [], lastModified: 0 },
+    { models: [], catalog: [], lastModified: Number.NaN },
+    { models: [], catalog: [], lastModified: -1 },
+    { models: [], catalog: [] },
+    { models: [], catalog: "invalid", lastModified: 0 },
+    { models: [], catalog: [null], lastModified: 0 },
+    { models: [], catalog: [{ id: "bad" }], lastModified: 0 },
+  ])("rejects unusable metadata bodies: %j", (stored) => {
+    expect(catalogFromStoredEntry(stored)).toBeUndefined();
+  });
+});
+
 describe("free model discovery", () => {
   it("intersects live models with Pi's native free chat catalog", async () => {
     const { fetcher, calls } = createFetcher((url) => {
@@ -336,6 +358,52 @@ describe("free model discovery", () => {
     );
 
     expect(models).toEqual(bundledModels);
+  });
+
+  it("does not send a validator for an empty cached body or accept unsolicited 304", async () => {
+    const { fetcher, calls } = createFetcher((url) =>
+      url === MODEL_CATALOG_URL
+        ? new Response(null, { status: 304 })
+        : Response.json({ data: [{ id: "big-pickle" }] }),
+    );
+
+    const outcome = await discoverFreeModelsWithStatus({
+      baseUrl: DEFAULT_BASE_URL,
+      headers: {},
+      signal: new AbortController().signal,
+      fetcher,
+      allowNetwork: true,
+      catalog: { models: [], lastModified: 0, etag: '"empty"' },
+    });
+
+    expect(outcome).toMatchObject({ status: "catalog-request-failed", httpStatus: 304 });
+    expect(
+      calls.find((call) => call.url === MODEL_CATALOG_URL)?.headers.get("if-none-match"),
+    ).toBeNull();
+  });
+
+  it("replaces validators on 200 and stores invalid Last-Modified as zero", async () => {
+    const { fetcher, calls } = createFetcher((url) =>
+      url === MODEL_CATALOG_URL
+        ? Response.json(remoteCatalog, { headers: { "last-modified": "invalid" } })
+        : Response.json({ data: [{ id: "big-pickle" }] }),
+    );
+
+    const outcome = await discoverFreeModelsWithStatus({
+      baseUrl: DEFAULT_BASE_URL,
+      headers: {},
+      signal: new AbortController().signal,
+      fetcher,
+      allowNetwork: true,
+      catalog: { models: initialFreeModels(), lastModified: 0, etag: '"old"' },
+    });
+
+    expect(outcome.status).toBe("ok");
+    expect(outcome.catalog?.lastModified).toBe(0);
+    expect(outcome.catalog?.etag).toBeUndefined();
+    expect(calls.find((call) => call.url === MODEL_CATALOG_URL)?.headers.get("if-none-match")).toBe(
+      '"old"',
+    );
   });
 
   it("returns undefined when the native catalog is unavailable", async () => {
@@ -587,7 +655,9 @@ describe("free model discovery", () => {
     ])("classifies %s", async (status, live, catalog) => {
       const { fetcher } = createFetcher((url) => (url === MODEL_CATALOG_URL ? catalog() : live()));
 
-      expect(await discoverFreeModelsWithStatus(options(fetcher))).toEqual({ status });
+      const outcome = await discoverFreeModelsWithStatus(options(fetcher));
+      expect(outcome.status).toBe(status);
+      expect(outcome.httpStatus).toBe(status.endsWith("request-failed") ? 503 : undefined);
     });
 
     it("classifies an empty live catalog and an unknown free intersection", async () => {

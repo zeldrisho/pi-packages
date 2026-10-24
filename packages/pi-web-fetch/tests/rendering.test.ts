@@ -38,7 +38,11 @@ describe("web_fetch rendering", () => {
     // SAFETY: the captured value is the web_fetch SearchTool registered above; we assert
     // the render-call/result shape the extension exposes.
     const tool = registered as {
-      renderCall(args: { url: string }, theme: RenderTheme): RenderedComponent;
+      annotations: object;
+      renderCall(
+        args: { url: string; query?: string; offset?: number },
+        theme: RenderTheme,
+      ): RenderedComponent;
       renderResult(
         result: {
           content: Array<{ type: "text"; text: string }>;
@@ -47,6 +51,10 @@ describe("web_fetch rendering", () => {
             cached: boolean;
             truncated: boolean;
             characterCount: number;
+            cacheStatus?: string;
+            nextOffset?: number;
+            focus?: { matchedSections: number; totalSections: number };
+            extractionDiagnostics?: { botWall: boolean };
           };
         },
         options: { expanded: boolean; isPartial: boolean },
@@ -76,6 +84,12 @@ describe("web_fetch rendering", () => {
       .render(200)
       .join("\n");
 
+    expect(tool.annotations).toEqual({
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true,
+    });
+    expect(collapsed).toContain(`${output.length} characters · miss`);
     expect(collapsed).toContain("Fetched line 1");
     expect(collapsed).toContain("2 more lines, 12 total, Ctrl+O to expand");
     expect(collapsed).not.toContain("Fetched line 11");
@@ -84,6 +98,52 @@ describe("web_fetch rendering", () => {
     expect(
       tool.renderCall({ url: "https://example.com" }, renderTheme).render(200).join("\n"),
     ).toContain("web_fetch https://example.com");
+
+    expect(
+      tool
+        .renderCall({ url: "https://example.com", query: "cache\npolicy", offset: 0 }, renderTheme)
+        .render(200)
+        .join("\n"),
+    ).toContain('query="cache\\npolicy" offset=0');
+
+    const focusedResult = tool
+      .renderResult(
+        {
+          ...result,
+          details: {
+            ...result.details,
+            cacheStatus: "hit",
+            nextOffset: 6000,
+            focus: { matchedSections: 2, totalSections: 5 },
+          },
+        },
+        { expanded: false, isPartial: false },
+        renderTheme,
+      )
+      .render(200)
+      .join("\n");
+
+    expect(focusedResult).toContain("hit · 2/5 sections · next offset=6000");
+    expect(
+      tool
+        .renderResult(
+          { ...result, details: { ...result.details, extractionDiagnostics: { botWall: true } } },
+          { expanded: false, isPartial: false },
+          renderTheme,
+        )
+        .render(200)
+        .join("\n"),
+    ).toContain("Blocked");
+    expect(
+      tool
+        .renderResult(
+          { ...result, content: [{ type: "text", text: "Revalidating cached content…" }] },
+          { expanded: false, isPartial: true },
+          renderTheme,
+        )
+        .render(200)
+        .join("\n"),
+    ).toContain("Revalidating cached content…");
 
     const credentialedCall = tool
       .renderCall(
@@ -102,7 +162,7 @@ describe("web_fetch rendering", () => {
         .renderResult(result, { expanded: false, isPartial: true }, renderTheme)
         .render(200)
         .join("\n"),
-    ).toContain("Fetching…");
+    ).toContain("Fetched line 1");
     expect(
       tool
         .renderResult(

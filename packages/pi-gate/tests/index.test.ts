@@ -52,7 +52,7 @@ interface FakeUi {
   select: (
     prompt: string,
     options: readonly string[],
-    settings?: { timeout?: number },
+    settings?: { timeout?: number; signal?: AbortSignal },
   ) => Promise<string | undefined>;
 }
 
@@ -77,6 +77,7 @@ type ToolCallHandler = (
 
 interface RecordedHandlers {
   sessionStart: SessionStartHandler | undefined;
+  sessionShutdown: (() => void) | undefined;
   toolCall: ToolCallHandler | undefined;
 }
 
@@ -141,7 +142,12 @@ function createExtensionContext(
 }
 
 function makeExtension(): ExtensionFactory {
-  const handlers: RecordedHandlers = { sessionStart: undefined, toolCall: undefined };
+  const handlers: RecordedHandlers = {
+    sessionStart: undefined,
+    sessionShutdown: undefined,
+    toolCall: undefined,
+  };
+
   const herdrEvents: HerdrBlockedEvent[] = [];
 
   // SAFETY: the test only exercises the `on` method; the rest of ExtensionAPI is unused.
@@ -155,6 +161,8 @@ function makeExtension(): ExtensionFactory {
       if (name === "session_start") {
         // SAFETY: the extension registers a SessionStartHandler for `session_start`.
         handlers.sessionStart = handler as SessionStartHandler;
+      } else if (name === "session_shutdown") {
+        handlers.sessionShutdown = () => handler({}, undefined);
       } else if (name === "tool_call") {
         // SAFETY: the extension registers a ToolCallHandler for `tool_call`.
         handlers.toolCall = handler as ToolCallHandler;
@@ -292,15 +300,23 @@ describe("legacy configuration fallback", () => {
 });
 
 describe("piGate extension", () => {
-  it("registers exactly session_start and tool_call", () => {
+  it("registers session lifecycle and tool_call handlers", () => {
     const ext = makeExtension();
     const { handlers } = ext.install();
     // SAFETY: the captured handlers list is keyed by the names the extension registered.
     expect(handlers.sessionStart).toBeDefined();
+    expect(handlers.sessionShutdown).toBeDefined();
     expect(handlers.toolCall).toBeDefined();
   });
 
   describe("session_start notification", () => {
+    it("does not create configuration until a session starts", async () => {
+      const { ctx, handlers } = makeExtension().install();
+      expect(existsSync(join(workDir, "gate.json"))).toBe(false);
+      await handlers.sessionStart!({ reason: "startup" }, ctx);
+      expect(existsSync(join(workDir, "gate.json"))).toBe(true);
+    });
+
     it("allows commands when no config has ever existed and creation fails", async () => {
       const blockedAgentDir = join(workDir, "not-a-directory");
       writeFileSync(blockedAgentDir, "not a directory", "utf-8");
@@ -534,7 +550,7 @@ describe("piGate extension", () => {
           prompt:
             'pi-gate: allow this command?\n\n  »rm -rf« node_modules\n\nMatched rule: "rm -rf": "prompt"\nMatched command text is wrapped in »…«',
           options: ["Allow", "Deny"],
-          settings: { timeout: DEFAULT_PROMPT_TIMEOUT_MS },
+          settings: { timeout: DEFAULT_PROMPT_TIMEOUT_MS, signal: expect.any(AbortSignal) },
         },
       ]);
     });
@@ -678,6 +694,51 @@ describe("piGate extension", () => {
       },
     );
 
+    it.each(["shutdown", "replacement"])(
+      "cancels active and queued approvals on %s",
+      async (kind) => {
+        setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
+        const { ctx, uiState, handlers } = makeExtension().install();
+        let opened!: () => void;
+
+        const opening = new Promise<void>((resolve) => {
+          opened = resolve;
+        });
+
+        ctx.ui.select = async (_prompt, _options, settings) => {
+          opened();
+          const signal = settings?.signal;
+
+          if (!signal) throw new Error("Expected a cancellation signal");
+          await new Promise<void>((resolve) =>
+            signal.addEventListener("abort", () => resolve(), { once: true }),
+          );
+
+          return "Allow";
+        };
+
+        const first = handlers.toolCall!(bashEvent("sudo echo first"), ctx);
+        const second = handlers.toolCall!(bashEvent("sudo echo second"), ctx);
+        await opening;
+        handlers.sessionShutdown!();
+        handlers.sessionShutdown!(); // Cleanup is idempotent.
+
+        if (kind === "replacement") await handlers.sessionStart!({ reason: "switch" }, ctx);
+        expect(await first).toMatchObject({ block: true, terminate: true });
+        expect(await second).toMatchObject({ block: true, terminate: true });
+        ctx.ui = createUi(uiState, true);
+        uiState.selectResponse = "Allow";
+
+        if (kind === "replacement")
+          expect(await handlers.toolCall!(bashEvent("sudo echo fresh"), ctx)).toBeUndefined();
+        else
+          expect(await handlers.toolCall!(bashEvent("sudo echo stale"), ctx)).toMatchObject({
+            block: true,
+          });
+        expect(uiState.selectCalls).toHaveLength(kind === "replacement" ? 1 : 0);
+      },
+    );
+
     it("does not poison queued approvals when a UI request fails", async () => {
       setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
       const { ctx, uiState, handlers } = makeExtension().install();
@@ -721,7 +782,10 @@ describe("piGate extension", () => {
       const { ctx, uiState, handlers } = makeExtension().install();
       uiState.selectDelayMs = 30;
       const result = await handlers.toolCall!(bashEvent("rm -rf node_modules"), ctx);
-      expect(uiState.selectCalls[0]?.settings).toEqual({ timeout: 20 });
+      expect(uiState.selectCalls[0]?.settings).toEqual({
+        timeout: 20,
+        signal: expect.any(AbortSignal),
+      });
       expect(result).toEqual({
         block: true,
         reason:

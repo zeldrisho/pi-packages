@@ -1,4 +1,5 @@
 import {
+  isRetryableAssistantError,
   normalizeContext,
   type Model,
   type SimpleStreamOptions,
@@ -187,12 +188,13 @@ describe("OpenCode provider stream boundary", () => {
 
         const reset =
           retryAfter === "3600" || retryAfter?.startsWith("Fri")
-            ? `Reported reset: ${formatResetTime(Date.parse("2026-10-23T13:00:00Z"))}.`
+            ? `Reset time: ${formatResetTime(Date.parse("2026-10-23T13:00:00Z"))}.`
             : "Reset time unavailable.";
 
-        expect(result.errorMessage).toBe(`429: OpenCode Free usage limit reached.\n${reset}`);
+        expect(result.errorMessage).toBe(`OpenCode Free quota exceeded.\n${reset}`);
+        expect(isRetryableAssistantError(result)).toBe(false);
         expect(fetcher).toHaveBeenCalledTimes(1);
-        expect(result.errorMessage).not.toMatch(/FreeUsageLimitError|Retry-After|https:\/\//u);
+        expect(result.errorMessage).not.toMatch(/Retry-After|https:\/\//u);
       } finally {
         clock.mockRestore();
       }
@@ -209,7 +211,20 @@ describe("OpenCode provider stream boundary", () => {
     const result = await native(model, summary, options).result();
     expect(result.stopReason).toBe("error");
     expect(result.errorMessage).toContain(type);
-    expect(result.errorMessage).not.toContain("Reported reset:");
+    expect(result.errorMessage).not.toContain("Reset time:");
+  });
+
+  it("keeps ordinary rate limits retryable", async () => {
+    const native = createFreeStream(
+      async () => refusal(429, "RateLimitError", "3600"),
+      fingerprint,
+    );
+
+    const result = await native(model, summary, options).result();
+    expect(result.stopReason).toBe("error");
+    expect(isRetryableAssistantError(result)).toBe(true);
+    expect(result.errorMessage).toContain("RateLimitError");
+    expect(result.errorMessage).not.toContain("Reset time:");
   });
 
   it("keeps quota timing scoped to each concurrent request", async () => {
@@ -228,7 +243,7 @@ describe("OpenCode provider stream boundary", () => {
       native(model, summary, options).result(),
     ]);
 
-    expect(first.errorMessage).toContain("Reported reset:");
+    expect(first.errorMessage).toContain("Reset time:");
     expect(second.errorMessage).toContain("Reset time unavailable.");
   });
 
@@ -364,23 +379,34 @@ describe("quota reset formatting", () => {
 
   it("uses the Pi process's locale and timezone by default", () => {
     expect(formatResetTime(resetAt)).toBe(
-      new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "long" }).format(
-        resetAt,
-      ),
+      new Intl.DateTimeFormat(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        hourCycle: "h23",
+        minute: "2-digit",
+        timeZoneName: "short",
+      }).format(resetAt),
     );
+    expect(formatResetTime(resetAt + 37_000)).toBe(formatResetTime(resetAt));
   });
 
   it.each([
-    ["de_DE.UTF-8", "de-DE", "Europe/Berlin"],
-    ["en_US.UTF-8", "en-US", "America/New_York"],
+    ["de_DE.UTF-8", "de-DE", "Europe/Berlin", "02:00"],
+    ["en_US.UTF-8", "en-US", "America/New_York", "20:00"],
+    ["en_US.UTF-8", "en-US", "UTC", "00:00"],
   ])(
     "inherits %s (%s) and timezone %s from a fresh Pi host process",
-    (language, locale, timeZone) => {
+    (language, locale, timeZone, clock) => {
       const source = new URL("../src/quota.ts", import.meta.url).href;
 
       const code = `
       import { formatResetTime } from ${JSON.stringify(source)};
-      const formatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "long" });
+      const formatter = new Intl.DateTimeFormat(undefined, {
+        year: "numeric", month: "short", day: "numeric",
+        hour: "2-digit", hourCycle: "h23", minute: "2-digit", timeZoneName: "short",
+      });
       console.log(formatResetTime(${resetAt}));
       console.log(formatter.format(${resetAt}));
       console.log(formatter.resolvedOptions().locale);
@@ -395,6 +421,8 @@ describe("quota reset formatting", () => {
         .split("\n");
 
       expect(lines[0]).toBe(lines[1]);
+      expect(lines[0]).toContain(clock);
+      expect(lines[0]).not.toMatch(/AM|PM|\d{2}:\d{2}:\d{2}/u);
       expect(lines[2]).toBe(locale);
       expect(lines[3]).toBe(timeZone);
     },
@@ -461,7 +489,7 @@ describe("quota timing", () => {
     expect(quotaResetAt(new Headers({ "retry-after": "0" }), now)).toBe(now);
     expect(quotaResetAt(new Headers({ "retry-after": "0.5" }), now)).toBe(now + 500);
     expect(usageLimitMessage(new Headers(), now)).toBe(
-      "429: OpenCode Free usage limit reached.\nReset time unavailable.",
+      "OpenCode Free quota exceeded.\nReset time unavailable.",
     );
   });
 });

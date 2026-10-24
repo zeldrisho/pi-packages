@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-25
+
+### Changed
+
+- Show cache progress, focus queries, offsets, and a compact fetch summary in Pi's tool preview without adding model-facing output.
+- Declare read-only network access hints for permission integrations and validate existing input limits in the tool schema.
+
 ## [0.13.0] - 2026-10-24
 
 ### Added
@@ -256,7 +263,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.13.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.14.0...HEAD
+[0.14.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.13.0...pi-web-fetch-v0.14.0
 [0.13.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.12.0...pi-web-fetch-v0.13.0
 [0.12.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.11.1...pi-web-fetch-v0.12.0
 [0.11.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.11.0...pi-web-fetch-v0.11.1

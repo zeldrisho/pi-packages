@@ -21,7 +21,7 @@ Restart Pi after installing. Use `pi config` to enable or disable the extension,
 
 No configuration or `/login` is required. Your prompts are sent directly to OpenCode using its public token. Endpoint and API-key environment overrides are not supported.
 
-The model list updates automatically as OpenCode's free catalog changes. If discovery is unavailable, the extension uses the last synced catalog or Pi's bundled free models.
+The model list refreshes automatically when you open `/model`, following Pi's native four-hour catalog refresh policy. Unchanged metadata is revalidated without downloading it again. If discovery is unavailable, the last synced catalog for the current endpoint or Pi's bundled free models remain available.
 
 The provider automatically resolves the current CLI version from OpenCode's official update service, with npm metadata as a fallback, when needed for an online model refresh or inference request. Successful lookups are cached in memory for 24 hours. No OpenCode installation or version configuration is needed. If neither source can provide a valid version and no unexpired cached value exists, inference stops with a retryable connection error rather than using an invented version.
 

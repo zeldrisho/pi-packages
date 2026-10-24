@@ -54,19 +54,29 @@ export function quotaResetAt(headers: Headers, now: number): number | undefined 
 
 /**
  * Formats an epoch-millisecond reset time using the supplied formatter.
- * Defaults to the Pi process's locale and timezone, including its standard TZ override.
+ * Defaults to 24-hour, minute-precision time in the Pi process's locale and timezone,
+ * including TZ.
  *
  * @throws {RangeError} If resetAt is invalid or outside the supported date range
  */
 export function formatResetTime(
   resetAt: number,
-  formatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "long" }),
+  formatter = new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    hourCycle: "h23",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }),
 ): string {
   return formatter.format(resetAt);
 }
 
 /**
  * Formats a quota error with the reported reset time, or an unavailable-time notice.
+ * Uses "quota exceeded" so Pi recognizes exhausted usage as non-retryable.
  *
  * @param now - Current time in milliseconds since the Unix epoch
  */
@@ -74,9 +84,7 @@ export function usageLimitMessage(headers: Headers, now: number): string {
   const resetAt = quotaResetAt(headers, now);
 
   const reset =
-    resetAt === undefined
-      ? "Reset time unavailable."
-      : `Reported reset: ${formatResetTime(resetAt)}.`;
+    resetAt === undefined ? "Reset time unavailable." : `Reset time: ${formatResetTime(resetAt)}.`;
 
-  return `429: OpenCode Free usage limit reached.\n${reset}`;
+  return `OpenCode Free quota exceeded.\n${reset}`;
 }
