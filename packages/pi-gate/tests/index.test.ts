@@ -43,6 +43,7 @@ interface UiState {
   }>;
   selectResponse: string | undefined;
   selectDelayMs: number | undefined;
+  onSelect?: () => void;
 }
 
 interface FakeUi {
@@ -59,6 +60,7 @@ interface FakeContext {
   ui: FakeUi;
   hasUI: boolean;
   mode: "tui" | "rpc" | "json" | "print";
+  signal?: AbortSignal;
 }
 
 // SAFETY: pi.on accepts variably-typed handlers across many event overloads; the
@@ -107,6 +109,7 @@ function createUi(state: UiState, hasUI: boolean): FakeUi {
     },
     select: async (prompt, options, settings) => {
       state.selectCalls.push({ prompt, options, settings });
+      state.onSelect?.();
 
       if (state.selectDelayMs !== undefined) {
         await new Promise<void>((resolve) => setTimeout(resolve, state.selectDelayMs));
@@ -128,7 +131,11 @@ function createExtensionContext(
     selectDelayMs: undefined,
   };
 
-  const ctx: FakeContext = { ui: createUi(uiState, hasUI), hasUI, mode };
+  const ctx: FakeContext = {
+    ui: createUi(uiState, hasUI),
+    hasUI,
+    mode,
+  };
 
   return { ctx, uiState };
 }
@@ -455,6 +462,28 @@ describe("piGate extension", () => {
       expect(result).toBeUndefined();
     });
 
+    it.each(["echo sudo", "printf '%s' sudo", "git checkout-index --help"])(
+      "does not prompt for literal output or partial command names: %s",
+      async (command) => {
+        setConfig(JSON.stringify({ operations: { sudo: "prompt", "git checkout": "prompt" } }));
+        const { ctx, uiState, handlers } = makeExtension().install();
+
+        expect(await handlers.toolCall!(bashEvent(command), ctx)).toBeUndefined();
+        expect(uiState.selectCalls).toHaveLength(0);
+      },
+    );
+
+    it.each(["echo sudo; sudo true", "echo sudo | sh", "echo $(sudo true)"])(
+      "retains approval for real calls and uncertain shell syntax: %s",
+      async (command) => {
+        setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
+        const { ctx, uiState, handlers } = makeExtension().install();
+
+        expect(await handlers.toolCall!(bashEvent(command), ctx)).toMatchObject({ block: true });
+        expect(uiState.selectCalls).toHaveLength(1);
+      },
+    );
+
     it("returns undefined when all rules are empty", async () => {
       setConfig('{"operations":{}}');
       const { ctx, handlers } = makeExtension().install();
@@ -575,6 +604,103 @@ describe("piGate extension", () => {
       expect(uiState.selectCalls[0]?.prompt).toContain("»dangerous« \\u{001b}[31m");
       expect(uiState.selectCalls[0]?.prompt).toMatch(/\[\d+ more characters hidden\]/u);
       expect(uiState.selectCalls[0]?.prompt).not.toContain("\x1b");
+    });
+
+    it("asks again for a repeated command unless gate.json allows it", async () => {
+      setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
+      const { ctx, uiState, handlers } = makeExtension().install();
+      uiState.selectResponse = "Allow";
+      await handlers.toolCall!(bashEvent("sudo echo hi"), ctx);
+      await handlers.toolCall!(bashEvent("sudo echo hi"), ctx);
+      expect(uiState.selectCalls).toHaveLength(2);
+      setConfig(JSON.stringify({ operations: { sudo: "allow" } }));
+      expect(await handlers.toolCall!(bashEvent("sudo echo hi"), ctx)).toBeUndefined();
+      expect(uiState.selectCalls).toHaveLength(2);
+    });
+
+    it("reloads policy before each gated call", async () => {
+      setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
+      const { ctx, uiState, handlers } = makeExtension().install();
+      uiState.selectResponse = "Allow";
+      await handlers.toolCall!(bashEvent("sudo echo hi"), ctx);
+      setConfig(JSON.stringify({ operations: { sudo: "block" } }));
+      expect(await handlers.toolCall!(bashEvent("sudo echo hi"), ctx)).toMatchObject({
+        block: true,
+      });
+      setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
+      await handlers.toolCall!(bashEvent("sudo echo hi"), ctx);
+      expect(uiState.selectCalls).toHaveLength(2);
+    });
+
+    it("serializes sibling prompts without remembering approvals", async () => {
+      setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
+      const { ctx, uiState, handlers } = makeExtension().install();
+      let active = 0;
+      let maximumActive = 0;
+      ctx.ui.select = async () => {
+        active += 1;
+        maximumActive = Math.max(maximumActive, active);
+        await new Promise<void>((resolve) => setTimeout(resolve, 10));
+        active -= 1;
+
+        return "Allow";
+      };
+
+      const results = await Promise.all([
+        handlers.toolCall!(bashEvent("sudo echo hi"), ctx),
+        handlers.toolCall!(bashEvent("sudo echo hi"), ctx),
+      ]);
+
+      expect(results).toEqual([undefined, undefined]);
+      expect(maximumActive).toBe(1);
+      expect(uiState.selectCalls).toHaveLength(0);
+    });
+
+    it.each(["abort", "session-change", "policy-change"])(
+      "denies a stale prompt after %s",
+      async (kind) => {
+        setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
+        const { ctx, uiState, handlers } = makeExtension().install();
+        const controller = new AbortController();
+        ctx.signal = controller.signal;
+        uiState.selectResponse = "Allow";
+        uiState.onSelect = () => {
+          if (kind === "abort") controller.abort();
+          else if (kind === "session-change")
+            void handlers.sessionStart!({ reason: "switch" }, ctx);
+          else setConfig(JSON.stringify({ operations: { sudo: "block" } }));
+        };
+
+        expect(await handlers.toolCall!(bashEvent("sudo echo hi"), ctx)).toMatchObject({
+          block: true,
+          reason: expect.stringContaining("cancelled or policy changed"),
+        });
+      },
+    );
+
+    it("does not poison queued approvals when a UI request fails", async () => {
+      setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
+      const { ctx, uiState, handlers } = makeExtension().install();
+      uiState.onSelect = () => {
+        throw new Error("UI unavailable");
+      };
+
+      await expect(handlers.toolCall!(bashEvent("sudo echo hi"), ctx)).rejects.toThrow(
+        "UI unavailable",
+      );
+      uiState.onSelect = undefined;
+      uiState.selectResponse = "Allow";
+      expect(await handlers.toolCall!(bashEvent("sudo echo hi"), ctx)).toBeUndefined();
+    });
+
+    it("does not show an approval for an already-aborted turn", async () => {
+      setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
+      const { ctx, uiState, handlers } = makeExtension().install();
+      ctx.signal = AbortSignal.abort();
+      expect(await handlers.toolCall!(bashEvent("sudo echo hi"), ctx)).toMatchObject({
+        block: true,
+      });
+      expect(uiState.selectCalls).toHaveLength(0);
     });
 
     it("prompts with the user and blocks on Deny", async () => {

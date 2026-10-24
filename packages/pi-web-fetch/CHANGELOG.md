@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add structured page content and continuation offsets for codemode callers.
+
+### Security
+
+- Reject HTML nested beyond 512 elements to prevent freezes caused by deeply nested pages.
+
 ## [0.12.0] - 2026-10-23
 
 ### Changed

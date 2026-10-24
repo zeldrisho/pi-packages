@@ -105,6 +105,19 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
       response.end("<html><head></head><body></body></html>");
 
       return;
+    case "/escaped-text":
+      response.setHeader("content-type", "text/plain; charset=utf-8");
+      response.end("\u0001".repeat(40_000));
+
+      return;
+    case "/deep-html":
+    case "/deep-anubis":
+      response.setHeader("content-type", "text/html; charset=utf-8");
+      response.end(
+        `${request.url === "/deep-anubis" ? '<script id="anubis_challenge">{}</script>' : ""}${"<div>".repeat(20_000)}Deep leaf${"</div>".repeat(20_000)}`,
+      );
+
+      return;
     case "/html":
       response.setHeader("content-type", "text/html; charset=utf-8");
       response.end(

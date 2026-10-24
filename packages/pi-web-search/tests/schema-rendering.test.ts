@@ -1,6 +1,6 @@
 import { Check } from "typebox/value";
 import { describe, expect, it, vi } from "vite-plus/test";
-import { webSearchParameters } from "../src/index";
+import { webSearchOutputSchema, webSearchParameters } from "../src/index";
 import { SEARCH_WEB_MAX_QUERY_CHARACTERS } from "../src/limits";
 import { createSearchTool, jsonResponse, renderTheme } from "./harness";
 
@@ -114,6 +114,23 @@ describe("web_search schema rendering", () => {
       quality: "medium",
     });
     expect(result.content[0].text).toContain("untrusted external data");
+    expect(Check(webSearchOutputSchema, result.structuredContent)).toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      resultType: "search-results",
+      query: "pi extensions",
+      provider: "brave",
+      cached: false,
+      truncated: false,
+      results: [
+        {
+          title: "Result",
+          url: "https://example.com/path",
+          snippet: "A useful snippet",
+          quality: "medium",
+        },
+      ],
+      evidence: { requestedCount: 2, returnedCount: 1, uniqueDomains: 1 },
+    });
     expect(result.details.truncation).toMatchObject({
       truncated: false,
       strategy: "none",

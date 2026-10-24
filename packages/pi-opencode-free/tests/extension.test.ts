@@ -6,6 +6,7 @@ import type {
   RefreshModelsContext,
 } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ProviderConfig } from "@earendil-works/pi-coding-agent";
+import { normalizeContext } from "@earendil-works/pi-ai/compat";
 import { describe, expect, it } from "vite-plus/test";
 
 import piOpencodeFree, {
@@ -29,7 +30,7 @@ interface FakeContext {
   };
 }
 
-type FakeHandler = (event: FakeEvent, context: FakeContext) => ProviderRequestPayload | void;
+type FakeHandler = (event: FakeEvent, context: FakeContext) => void | Promise<void>;
 
 interface FakePiState {
   provider?: {
@@ -37,6 +38,7 @@ interface FakePiState {
     config: ProviderConfig;
   };
   handlers: Map<string, FakeHandler>;
+  commands: Set<string>;
 }
 
 interface FakePi {
@@ -45,7 +47,7 @@ interface FakePi {
 }
 
 function createFakePi(): FakePi {
-  const state: FakePiState = { handlers: new Map() };
+  const state: FakePiState = { handlers: new Map(), commands: new Set() };
 
   const proxy = new Proxy(
     {},
@@ -67,12 +69,18 @@ function createFakePi(): FakePi {
           };
         }
 
+        if (property === "registerCommand") {
+          return (name: string): void => {
+            state.commands.add(name);
+          };
+        }
+
         return undefined;
       },
     },
   );
 
-  // SAFETY: the proxy supplies the two ExtensionAPI members this extension uses.
+  // SAFETY: the proxy supplies the ExtensionAPI members this extension uses.
   return { pi: proxy as ExtensionAPI, state };
 }
 
@@ -245,6 +253,7 @@ describe("opencode-free extension", () => {
     );
 
     expect(state.provider?.name).toBe(PROVIDER_ID);
+    expect(state.commands.size).toBe(0);
 
     const config = state.provider?.config;
     expect(config?.name).toBe("OpenCode Free");
@@ -262,8 +271,9 @@ describe("opencode-free extension", () => {
     expect(ids).not.toContain("jev-1.13-free");
 
     expect(state.handlers.has("session_start")).toBe(true);
-    expect(state.handlers.has("before_provider_headers")).toBe(true);
-    expect(state.handlers.has("before_provider_request")).toBe(true);
+    expect(config?.streamSimple).toBeDefined();
+    expect(state.handlers.has("before_provider_headers")).toBe(false);
+    expect(state.handlers.has("before_provider_request")).toBe(false);
   });
 
   it("honors proxy, credential, and client version overrides", () => {
@@ -288,9 +298,7 @@ describe("opencode-free extension", () => {
     expect(config?.apiKey).toBe("secret");
     expect(config?.headers?.["User-Agent"]).toBe("opencode/latest/2.1.3/cli");
 
-    const headers: ProviderHeaders = { ...config?.headers };
-    handlerFor(state, "before_provider_headers")({ type: "before_provider_headers", headers }, {});
-    expect(headers["User-Agent"]).toBe("opencode/latest/2.1.3/cli");
+    expect(config?.streamSimple).toBeDefined();
   });
 
   it("refreshes models through the injected fetcher and persists the catalog", async () => {
@@ -401,79 +409,42 @@ describe("opencode-free extension", () => {
     expect(publications).toHaveLength(0);
   });
 
-  it("rotates the canonical session id when a session starts", () => {
+  it("rotates session identity for inference, including requests without extension hooks", async () => {
     const { pi, state } = createFakePi();
-
+    const sessions: Array<string | null> = [];
     registerOpencodeFree(
       pi,
-      dependencies({}, () => {
-        throw new Error("unexpected network access");
+      dependencies({}, async (_input, init) => {
+        sessions.push(new Headers(init?.headers).get("x-opencode-session"));
+
+        return new Response(
+          JSON.stringify({
+            type: "error",
+            error: { type: "FreeUsageLimitError", message: "Free usage limit reached" },
+          }),
+          {
+            status: 429,
+            headers: { "content-type": "application/json", "retry-after": "3600" },
+          },
+        );
       }),
     );
-
     const config = state.provider?.config;
-    const initial = config?.headers?.["x-opencode-session"];
+    const native = config?.streamSimple;
 
-    expect(initial).toBeDefined();
+    if (!config || !native) throw new Error("missing provider stream");
 
-    const headers: ProviderHeaders = { ...config?.headers };
-    const before = handlerFor(state, "before_provider_headers");
-
-    before({ type: "before_provider_headers", headers }, {});
-    expect(headers["x-opencode-session"]).toBe(initial);
-
-    handlerFor(state, "session_start")({ type: "session_start" }, {});
-    before({ type: "before_provider_headers", headers }, {});
-
-    expect(headers["x-opencode-session"]).not.toBe(initial);
-    expect(headers["x-opencode-session"]).toMatch(/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/u);
-  });
-
-  it("normalizes only requests for its own provider", () => {
-    const { pi, state } = createFakePi();
-
-    registerOpencodeFree(
-      pi,
-      dependencies({}, () => {
-        throw new Error("unexpected network access");
-      }),
-    );
-
-    const request = handlerFor(state, "before_provider_request");
-
-    const payload: ProviderRequestPayload = {
-      model: "big-pickle",
-      stream: false,
-      tools: [],
-      tool_choice: "none",
-      temperature: 0.1,
-    };
-
-    const otherProvider = request(
-      { type: "before_provider_request", payload },
-      { model: { provider: "opencode" } },
-    );
-
-    expect(otherProvider).toBeUndefined();
-
-    const invalid = request(
-      { type: "before_provider_request", payload: null },
-      { model: { provider: PROVIDER_ID } },
-    );
-
-    expect(invalid).toBeUndefined();
-
-    const result = request(
-      { type: "before_provider_request", payload },
-      { model: { provider: PROVIDER_ID } },
-    );
-
-    expect(result).toMatchObject({
-      stream: true,
-      temperature: 0.1,
-      tools: [{ function: { name: "read" } }],
+    const context = normalizeContext({
+      messages: [{ role: "user", content: "Summarize", timestamp: 0 }],
     });
-    expect(JSON.stringify(result)).not.toContain("tool_choice");
+
+    await native(storedModel, context, { apiKey: "public", maxRetries: 0 }).result();
+    expect(sessions[0]).toBe(config.headers?.["x-opencode-session"]);
+    await handlerFor(state, "session_start")({ type: "session_start" }, {});
+    await native(storedModel, context, { apiKey: "public", maxRetries: 0 }).result();
+    expect(sessions[1]).not.toBe(sessions[0]);
+    expect(sessions[1]).toMatch(/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/u);
+    expect(sessions).toHaveLength(2);
   });
 
   it("provides a default export for Pi", () => {

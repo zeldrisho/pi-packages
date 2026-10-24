@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add structured search results for codemode callers, distinguishing retrieved sources from generated answers.
+
+### Fixed
+
+- Clarify that shell environment changes require restarting Pi, while `.env` changes apply on the next search.
+
 ## [0.12.1] - 2026-10-23
 
 ### Security

@@ -36,6 +36,8 @@ The tag name and manifest version must match. Publishing is automatic: the `publ
 
 Each package owns its `CHANGELOG.md`. Use [Keep a Changelog 2.0.0](https://keepachangelog.com/en/2.0.0/): `# Changelog`, an `Unreleased` section, dated version headings, one comparison link per version, and the standard `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security` sections. Do not repeat the package name as a bullet scope.
 
+Record only user-visible features, fixes, security changes, and usage or compatibility changes. Omit internal refactors, tests, tooling updates, and maintenance-only work. Describe the effect on users rather than the implementation.
+
 ## Recovery and bootstrap
 
 If a tagged release fails, first check `npm view <package>@<version>`. Published versions are permanent: reconcile the existing GitHub release and provenance instead of republishing. If npm does not contain the version, delete the partial GitHub release and remote tag, correct the commit, and recreate the tag.

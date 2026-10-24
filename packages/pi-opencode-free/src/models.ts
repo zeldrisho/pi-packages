@@ -47,6 +47,27 @@ interface LiveModelsResponse {
   data?: readonly LiveModel[];
 }
 
+/** Machine-readable outcome of one live model discovery attempt. */
+export type DiscoveryStatus =
+  | "ok"
+  | "offline"
+  | "aborted"
+  | "timeout"
+  | "live-request-failed"
+  | "live-response-invalid"
+  | "live-empty"
+  | "catalog-request-failed"
+  | "catalog-response-invalid"
+  | "no-known-free-models";
+
+/** Discovery result with a failure reason that callers can report without exposing payloads. */
+export interface DiscoveryOutcome {
+  status: DiscoveryStatus;
+  models?: FreeChatModelConfig[];
+  /** Number of ids reported by the live endpoint, when it responded successfully. */
+  liveModelCount?: number;
+}
+
 /** Inputs for live free-model discovery. */
 export interface DiscoverFreeModelsOptions {
   baseUrl: string;
@@ -179,35 +200,56 @@ export function storedModelsFromConfigs(
 }
 
 /**
- * Discovers free chat models from the live endpoint and Pi's native catalog.
+ * Discovers free chat models and reports why discovery failed.
  *
  * The live endpoint decides which models currently exist. Pi's OpenCode
- * catalog supplies their capabilities and compatibility flags, so this
- * extension does not maintain a second metadata translation.
- * A newer remote catalog overlays bundled metadata; otherwise bundled metadata
- * is used. Both endpoints must respond successfully. Fetch, HTTP, JSON parsing,
- * and response-shape failures return `undefined`, as do disabled networking,
- * an already-aborted signal, and an empty intersection.
+ * catalog supplies their capabilities and compatibility flags. A newer remote
+ * catalog overlays bundled metadata; otherwise bundled metadata is used. Both
+ * endpoints must respond successfully. Failures are classified without
+ * exposing response bodies, headers, or credentials.
  *
  * @param options - Endpoint, headers, abort signal, and fetcher
- * @returns Free chat model configurations, or `undefined` when discovery cannot verify them
- * @throws If model metadata conversion fails, such as for a non-string catalog name
+ * @returns Discovered models or a bounded failure status
  */
-export async function discoverFreeModels(
+export async function discoverFreeModelsWithStatus(
   options: DiscoverFreeModelsOptions,
-): Promise<FreeChatModelConfig[] | undefined> {
-  if (!options.allowNetwork || options.signal.aborted) return undefined;
+): Promise<DiscoveryOutcome> {
+  if (!options.allowNetwork) return { status: "offline" };
 
-  const [liveIds, catalog] = await Promise.all([
+  if (options.signal.aborted) return { status: "aborted" };
+
+  const [live, catalog] = await Promise.all([
     fetchLiveModelIds(options),
     fetchModelCatalog(options),
   ]);
 
-  if (!liveIds || liveIds.length === 0 || !catalog) return undefined;
+  if (options.signal.aborted) {
+    return { status: options.signal.reason?.name === "TimeoutError" ? "timeout" : "aborted" };
+  }
 
-  const models = selectFreeModels(liveIds, freeCatalogModels(catalog));
+  if (!live.ok) return { status: live.failure };
 
-  return models.length > 0 ? models : undefined;
+  if (!catalog.ok) return { status: catalog.failure };
+
+  if (live.ids.length === 0) return { status: "live-empty", liveModelCount: 0 };
+
+  const models = selectFreeModels(live.ids, freeCatalogModels(catalog.entries));
+
+  return models.length > 0
+    ? { status: "ok", models, liveModelCount: live.ids.length }
+    : { status: "no-known-free-models", liveModelCount: live.ids.length };
+}
+
+/**
+ * Discovers free chat models from the live endpoint and Pi's native catalog.
+ *
+ * @param options - Endpoint, headers, abort signal, and fetcher
+ * @returns Free chat model configurations, or `undefined` when discovery cannot verify them
+ */
+export async function discoverFreeModels(
+  options: DiscoverFreeModelsOptions,
+): Promise<FreeChatModelConfig[] | undefined> {
+  return (await discoverFreeModelsWithStatus(options)).models;
 }
 
 /** Indexes bundled OpenAI-completions models with zero input and output costs by model id. */
@@ -267,8 +309,7 @@ function fromModel(model: Model<Api>): FreeChatModelConfig {
  * Converts a zero-input/output-cost OpenAI-completions chat entry with positive
  * finite limits, reasoning, and input metadata, or returns `undefined` when those checks fail.
  * Positive fractional token limits are rounded down; cache costs are preserved.
- *
- * @throws If an otherwise qualifying entry has a non-null name that is not a string
+ * A malformed optional name rejects only that entry.
  */
 function configFromRemote(entry: RemoteCatalogEntry): FreeChatModelConfig | undefined {
   if (entry.type !== undefined && entry.type !== "chat") return undefined;
@@ -281,13 +322,21 @@ function configFromRemote(entry: RemoteCatalogEntry): FreeChatModelConfig | unde
 
   if (!isPositiveInteger(entry.maxTokens)) return undefined;
 
+  if (entry.cost.cacheRead !== undefined && !isNonNegativeNumber(entry.cost.cacheRead))
+    return undefined;
+
+  if (entry.cost.cacheWrite !== undefined && !isNonNegativeNumber(entry.cost.cacheWrite))
+    return undefined;
+
   if (entry.reasoning !== true && entry.reasoning !== false) return undefined;
 
   if (!entry.input || !isStringArray(entry.input)) return undefined;
 
+  const name = entry.name?.trim() || entry.id;
+
   const config: FreeChatModelConfig = {
     id: entry.id,
-    name: entry.name?.trim() || entry.id,
+    name,
     input: entry.input.includes("image") ? ["text", "image"] : ["text"],
     cost: {
       input: 0,
@@ -331,23 +380,23 @@ function selectFreeModels(
 
 /**
  * Fetches `/models` with the supplied headers and signal, omitting empty ids.
- * Returns `undefined` on HTTP, fetch, JSON parsing, or response-shape failure,
- * including an aborted fetch; a valid empty list returns an empty array.
+ * Returns a classified failure on HTTP, fetch, JSON parsing, or response-shape
+ * failure, including an aborted fetch; a valid empty list succeeds.
  */
 async function fetchLiveModelIds(
   options: DiscoverFreeModelsOptions,
-): Promise<readonly string[] | undefined> {
+): Promise<{ ok: true; ids: readonly string[] } | { ok: false; failure: DiscoveryStatus }> {
   try {
     const response = await options.fetcher(`${options.baseUrl}/models`, {
       headers: { ...options.headers, Accept: "application/json" },
       signal: options.signal,
     });
 
-    if (!response.ok) return undefined;
+    if (!response.ok) return { ok: false, failure: "live-request-failed" };
 
-    const body: unknown = await response.json();
+    const body: unknown = await response.json().catch(() => undefined);
 
-    if (!isLiveModelsResponse(body)) return undefined;
+    if (!isLiveModelsResponse(body)) return { ok: false, failure: "live-response-invalid" };
 
     const ids: string[] = [];
 
@@ -355,35 +404,45 @@ async function fetchLiveModelIds(
       if (model.id) ids.push(model.id);
     }
 
-    return ids;
+    return { ok: true, ids };
   } catch {
-    return undefined;
+    return { ok: false, failure: "live-request-failed" };
   }
 }
 
 /**
  * Fetches Pi's OpenCode catalog with the supplied signal and without provider headers.
- * Returns an empty array when the bundled catalog is at least as recent, or
- * `undefined` on HTTP, fetch, JSON parsing, or response-shape failure, including abort.
+ * Returns an empty entry list when the bundled catalog is at least as recent, or a
+ * classified failure on HTTP, fetch, JSON parsing, or response-shape failure.
  */
 async function fetchModelCatalog(
   options: DiscoverFreeModelsOptions,
-): Promise<readonly RemoteCatalogEntry[] | undefined> {
+): Promise<
+  { ok: true; entries: readonly RemoteCatalogEntry[] } | { ok: false; failure: DiscoveryStatus }
+> {
   try {
     const response = await options.fetcher(MODEL_CATALOG_URL, {
       headers: { Accept: "application/json" },
       signal: options.signal,
     });
 
-    if (!response.ok) return undefined;
+    if (!response.ok) return { ok: false, failure: "catalog-request-failed" };
 
-    const body: unknown = await response.json();
+    const body: unknown = await response.json().catch(() => undefined);
 
-    if (!isRemoteCatalog(body)) return undefined;
+    if (!Array.isArray(body)) return { ok: false, failure: "catalog-response-invalid" };
 
-    return isCatalogNewer(response.headers.get("last-modified")) ? body : [];
+    const entries = body.filter(isRemoteCatalogEntry);
+
+    if (body.length > 0 && entries.length === 0)
+      return { ok: false, failure: "catalog-response-invalid" };
+
+    return {
+      ok: true,
+      entries: isCatalogNewer(response.headers.get("last-modified")) ? entries : [],
+    };
   } catch {
-    return undefined;
+    return { ok: false, failure: "catalog-request-failed" };
   }
 }
 
@@ -422,22 +481,13 @@ function isLiveModel(value: unknown): value is LiveModel {
   return typeof value.id === "string";
 }
 
-/** Accepts an empty catalog or entries with string ids; capability fields are not validated here. */
-function isRemoteCatalog(value: unknown): value is readonly RemoteCatalogEntry[] {
-  if (!Array.isArray(value)) return false;
-
-  for (const model of value) {
-    if (!isRemoteCatalogEntry(model)) return false;
-  }
-
-  return true;
-}
-
-/** Checks only for a string id, leaving optional catalog metadata unchecked. */
+/** Validates identity and display name before an entry enters capability conversion. */
 function isRemoteCatalogEntry(value: unknown): value is RemoteCatalogEntry {
-  return (
-    value !== null && typeof value === "object" && "id" in value && typeof value.id === "string"
-  );
+  if (value === null || typeof value !== "object" || !("id" in value)) return false;
+
+  if (typeof value.id !== "string" || !value.id.trim()) return false;
+
+  return !("name" in value) || value.name == null || typeof value.name === "string";
 }
 
 /** Accepts arrays containing only strings, including empty arrays. */
@@ -456,7 +506,12 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-/** Accepts finite values greater than zero, including fractions that callers round down. */
+/** Cache pricing must be finite and non-negative. */
+function isNonNegativeNumber(value: unknown): value is number {
+  return isFiniteNumber(value) && value >= 0;
+}
+
+/** Accepts finite limits that remain positive after rounding down. */
 function isPositiveInteger(value: unknown): value is number {
-  return isFiniteNumber(value) && value > 0;
+  return isFiniteNumber(value) && value >= 1;
 }

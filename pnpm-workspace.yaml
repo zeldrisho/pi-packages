@@ -69,6 +69,10 @@ overrides:
   # GHSA-m8rv-5g2x-5cg5) was forced to 8.9.0 because pi-coding-agent pinned
   # undici@8.5.0; pi-coding-agent@0.84.0 repins undici@8.9.0, so the override
   # became a no-op. brace-expansion was dropped earlier with the 0.83.0 bump.
+  # Undici security fixes: GHSA-xjj6-f33q-929c, GHSA-4qv8-2p9j-2685,
+  # GHSA-f72v-6w45-q472. Pi 1.3.0 and 1.4.0 still pin 8.10.2.
+  # Remove when Pi resolves >=8.12.2 without this override.
+  undici: 8.12.2
   vite@*: "catalog:"
   vitest@*: "catalog:"
 

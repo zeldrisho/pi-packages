@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { describe, it } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 const root = resolve(import.meta.dirname, "./..");
 
@@ -119,6 +119,14 @@ function parseOverrides(yaml: string): Map<string, string> {
   }
 
   return overrides;
+}
+
+/** Reads package versions without swallowing pnpm peer suffixes or YAML quotes. */
+function resolvedVersions(lockfile: string, name: string): string[] {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const occurrences = lockfile.match(new RegExp(`${escapedName}@[^\\s:()'"]+`, "g")) ?? [];
+
+  return occurrences.map((occurrence) => occurrence.slice(name.length + 1));
 }
 
 /**
@@ -361,11 +369,21 @@ describe("repository contracts", () => {
     }
   });
 
+  it("reads exact versions from package keys and peer references", () => {
+    const fixture = `undici@8.12.2:
+  'openai@7.19.0(undici@8.12.2)(ws@8.21.3)':
+  'openai@7.19.0(undici@8.10.2)(ws@8.21.3)':
+  '@scope/client@1.2.3(undici@8.12.2)':`;
+
+    expect(resolvedVersions(fixture, "undici")).toEqual(["8.12.2", "8.12.2", "8.10.2", "8.12.2"]);
+    expect(resolvedVersions(fixture, "@scope/client")).toEqual(["1.2.3"]);
+    expect(resolvedVersions(fixture, "absent")).toEqual([]);
+  });
+
   it("workspace overrides match the lockfile", () => {
     for (const [name, version] of parseOverrides(workspace)) {
       if (version === "catalog:") continue;
-      const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const resolved = lockfile.match(new RegExp(`${escapedName}@[^\\s:]+`, "g")) ?? [];
+      const resolved = resolvedVersions(lockfile, name);
 
       if (resolved.length === 0) {
         fail(
@@ -373,9 +391,7 @@ describe("repository contracts", () => {
         );
       }
 
-      for (const occurrence of resolved) {
-        const resolvedVersion = occurrence.slice(name.length + 1);
-
+      for (const resolvedVersion of resolved) {
         if (resolvedVersion !== version) {
           fail(
             `${name} is overridden to ${version} but the lockfile resolves ${resolvedVersion}; update the lockfile or remove the override`,

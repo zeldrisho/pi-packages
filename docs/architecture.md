@@ -26,6 +26,8 @@ The cache stores the complete extracted document; focused selection derives a se
 
 Retryable `429` and `503` responses honor capped `Retry-After` values or capped jittered backoff with a fixed attempt limit. Origin coordination bounds concurrent request starts.
 
+A linear preflight rejects HTML nested beyond 512 open elements before challenge parsing and extraction. The basic extraction fallback applies the same check; it must not reparse rejected markup. This limits pathological nesting, not every possible source of synchronous extraction cost.
+
 HTML evidence distinguishes JavaScript-required pages, bot walls, consent interstitials, and sparse extraction. Links are bounded metadata only; unsafe schemes and credentials are rejected, and links are never traversed implicitly.
 
 In-process Anubis proof-of-work interstitials are solved inside the same boundary: challenge and pass requests reuse the pinned transport, a server-provided WebAssembly module runs in a worker thread terminated on cancellation with allowlisted imports and a byte/time budget, and cookies live in memory for one acquisition. Methods or extensions outside the in-process set report the standard block.
@@ -47,7 +49,15 @@ flowchart LR
   I -- no --> J[Private temporary file]
 ```
 
-The API key is read at request time and excluded from cache keys, output, and errors. Web search runs first; when it returns no usable results, the extension optionally tries Brave Answers using its separate key. Answers uses Brave's chat-completions endpoint through the same bounded, timeout- and cancellation-aware transport, parsing SSE citation and usage tags into generated-answer metadata rather than search-result evidence. The two request types are separately cached; Answers failures do not conceal cancellation. Neither mode fetches result URLs. Generated answers remain untrusted and do not imply correctness. Large formatted results use a package-owned temporary directory and are removed after write failure or session shutdown.
+The API key is read at request time and excluded from cache keys, output, and errors. Web search runs first; when it returns no usable results, the extension optionally tries Brave Answers using its separate key. Answers uses Brave's chat-completions endpoint through the same bounded, timeout- and cancellation-aware transport, parsing SSE citation and usage tags into generated-answer metadata rather than search-result evidence. The two request types are separately cached; Answers failures do not conceal cancellation. Neither mode fetches result URLs. Generated answers remain untrusted and do not imply correctness. Answers fallback is controlled solely by availability of its separate API key. Large formatted results use a package-owned temporary directory and are removed after write failure or session shutdown.
+
+Both web tools declare output schemas for programmatic callers. Structured fetch output contains a bounded content chunk with its own continuation offset; JSON escaping may shorten that chunk relative to the text view. Structured search output distinguishes retrieved sources from generated answers and reports omitted payloads with a private full-text file path. Structured output must not bypass byte limits or leak content suppressed from blocked pages.
+
+## Provider requests and approvals
+
+`pi-opencode-free` delegates streaming to Pi's native OpenAI completions implementation. Its provider-scoped adapter applies the free-tier request contract after any caller payload hook, including tool-free compaction and branch-summary requests. It preserves caller instrumentation, cancellation, and native usage accounting. Only a confirmed free-usage 429 receives a human-readable quota notice; reset times come from `Retry-After`, never an assumed daily schedule. Quota errors format the server-reported reset time in the Pi process's locale and timezone. Quota evidence remains request-local; there is no status command, cached countdown, or inference probe.
+
+`pi-gate` reads command-text rules from `gate.json` and never remembers dialog approvals. A bounded, non-executing recognizer applies word boundaries to simple literal commands and excludes inert `echo`/`printf` argument text and comments. Restrictive flag and numeric suffixes retain prefix coverage; allow exceptions require complete words and cannot suppress another simple command. Pipelines, redirects, expansions, opaque script arguments, malformed quoting, oversized inputs, and rules containing shell syntax retain conservative substring matching. This recognizer is not a Bash parser or sandbox. Persistent exceptions are explicit `allow` rules. Approval dialogs are serialized, cancellation-aware, and revalidate policy after the user responds; policy changes and session starts invalidate pending dialogs.
 
 ## Data flow invariants
 

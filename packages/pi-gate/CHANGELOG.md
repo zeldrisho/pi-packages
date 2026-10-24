@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Apply `gate.json` edits to the next gated call without reloading Pi.
+- Show one approval dialog at a time. Approvals apply only to the current call; persistent exceptions remain in `gate.json`.
+
+### Fixed
+
+- Avoid unnecessary approvals for literal `echo`/`printf` output, comments, and partial command names such as `git checkout-index`, while retaining conservative checks for complex shell syntax.
+- Reject pending approvals if the call is canceled, the session changes, or the rules change.
+- Correct rule-precedence guidance shown by editors for `gate.json`.
+
 ## [0.6.1] - 2026-10-21
 
 ### Changed

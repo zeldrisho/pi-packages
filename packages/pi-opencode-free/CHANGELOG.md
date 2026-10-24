@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Show shorter usage-limit errors with server-reported reset times in your local date, time, and timezone.
+
+### Fixed
+
+- Keep valid free models available when individual catalog entries are malformed.
+- Fix request-format errors during automatic compaction, branch summaries, and nested model calls.
+
 ## [0.1.0] - 2026-10-23
 
 ### Added

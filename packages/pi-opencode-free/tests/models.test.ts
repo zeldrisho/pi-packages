@@ -6,6 +6,7 @@ import {
   MODEL_CATALOG_URL,
   configsFromStoredModels,
   discoverFreeModels,
+  discoverFreeModelsWithStatus,
   initialFreeModels,
   resolveApiKey,
   resolveBaseUrl,
@@ -475,6 +476,200 @@ describe("free model discovery", () => {
     });
 
     expect(models).toBeUndefined();
+  });
+
+  it.each([
+    { contextWindow: 0.5 },
+    { maxTokens: 0.5 },
+    { cost: { input: 0, output: 0, cacheRead: -1 } },
+    { cost: { input: 0, output: 0, cacheWrite: "invalid" } },
+  ])("rejects invalid limits or cache pricing: %j", async (invalid) => {
+    const { fetcher } = createFetcher((url) =>
+      url === MODEL_CATALOG_URL
+        ? jsonResponse(
+            JSON.stringify([{ ...remoteBeam, id: "invalid-test-free", ...invalid }]),
+            200,
+            {
+              "last-modified": FUTURE_LAST_MODIFIED,
+            },
+          )
+        : jsonResponse(JSON.stringify({ data: [{ id: "invalid-test-free" }] })),
+    );
+
+    expect(
+      await discoverFreeModels({
+        baseUrl: DEFAULT_BASE_URL,
+        headers: {},
+        signal: new AbortController().signal,
+        fetcher,
+        allowNetwork: true,
+      }),
+    ).toBeUndefined();
+  });
+
+  it("skips a malformed catalog entry without discarding its valid siblings", async () => {
+    const { fetcher } = createFetcher((url) =>
+      url === MODEL_CATALOG_URL
+        ? jsonResponse(
+            JSON.stringify([
+              { ...remoteBeam, name: 42 },
+              {
+                ...remoteBeam,
+                id: "second-free",
+                name: "Second Free",
+              },
+            ]),
+            200,
+            { "last-modified": FUTURE_LAST_MODIFIED },
+          )
+        : jsonResponse(JSON.stringify({ data: [{ id: "beam-free" }, { id: "second-free" }] })),
+    );
+
+    const models = requireModels(
+      await discoverFreeModels({
+        baseUrl: DEFAULT_BASE_URL,
+        headers: {},
+        signal: new AbortController().signal,
+        fetcher,
+        allowNetwork: true,
+      }),
+    );
+
+    expect(models.map((model) => model.id)).toEqual(["second-free"]);
+    expect(models[0]?.name).toBe("Second Free");
+  });
+
+  describe("discovery status", () => {
+    const options = (fetcher: typeof fetch, signal = new AbortController().signal) => ({
+      baseUrl: DEFAULT_BASE_URL,
+      headers: {},
+      signal,
+      fetcher,
+      allowNetwork: true,
+    });
+
+    const catalogResponse = (value: typeof remoteCatalog) =>
+      jsonResponse(JSON.stringify(value), 200, { "last-modified": FUTURE_LAST_MODIFIED });
+
+    it("reports offline and aborted attempts without touching the network", async () => {
+      const { fetcher, calls } = createFetcher(() => {
+        throw new Error("fetch should not run");
+      });
+
+      const controller = new AbortController();
+      controller.abort();
+
+      expect(
+        await discoverFreeModelsWithStatus({ ...options(fetcher), allowNetwork: false }),
+      ).toEqual({ status: "offline" });
+      expect(await discoverFreeModelsWithStatus(options(fetcher, controller.signal))).toEqual({
+        status: "aborted",
+      });
+      expect(calls).toHaveLength(0);
+    });
+
+    it.each([
+      [
+        "live-request-failed",
+        () => jsonResponse("unavailable", 503),
+        () => catalogResponse(remoteCatalog),
+      ],
+      [
+        "live-response-invalid",
+        () => jsonResponse(JSON.stringify({ data: "nope" })),
+        () => catalogResponse(remoteCatalog),
+      ],
+      [
+        "catalog-request-failed",
+        () => jsonResponse(JSON.stringify({ data: [{ id: "beam-free" }] })),
+        () => jsonResponse("unavailable", 503),
+      ],
+      [
+        "catalog-response-invalid",
+        () => jsonResponse(JSON.stringify({ data: [{ id: "beam-free" }] })),
+        () => jsonResponse(JSON.stringify({ opencode: null })),
+      ],
+    ])("classifies %s", async (status, live, catalog) => {
+      const { fetcher } = createFetcher((url) => (url === MODEL_CATALOG_URL ? catalog() : live()));
+
+      expect(await discoverFreeModelsWithStatus(options(fetcher))).toEqual({ status });
+    });
+
+    it("classifies an empty live catalog and an unknown free intersection", async () => {
+      const empty = createFetcher((url) =>
+        url === MODEL_CATALOG_URL
+          ? catalogResponse(remoteCatalog)
+          : jsonResponse(JSON.stringify({ data: [] })),
+      );
+
+      const unknown = createFetcher((url) =>
+        url === MODEL_CATALOG_URL
+          ? catalogResponse(remoteCatalog)
+          : jsonResponse(JSON.stringify({ data: [{ id: "unknown" }] })),
+      );
+
+      expect(await discoverFreeModelsWithStatus(options(empty.fetcher))).toEqual({
+        status: "live-empty",
+        liveModelCount: 0,
+      });
+      expect(await discoverFreeModelsWithStatus(options(unknown.fetcher))).toEqual({
+        status: "no-known-free-models",
+        liveModelCount: 1,
+      });
+    });
+
+    it.each(["abort", "timeout"])("classifies %s during discovery", async (kind) => {
+      const controller = new AbortController();
+
+      const fetcher: typeof fetch = async () => {
+        controller.abort(
+          new DOMException(
+            "private failure details",
+            kind === "timeout" ? "TimeoutError" : "AbortError",
+          ),
+        );
+        throw controller.signal.reason;
+      };
+
+      expect(await discoverFreeModelsWithStatus(options(fetcher, controller.signal))).toEqual({
+        status: kind === "timeout" ? "timeout" : "aborted",
+      });
+    });
+
+    it.each([
+      ["live-response-invalid", "live"],
+      ["catalog-response-invalid", "catalog"],
+    ])("classifies malformed JSON as %s", async (status, endpoint) => {
+      const { fetcher } = createFetcher((url) => {
+        if (url === MODEL_CATALOG_URL)
+          return endpoint === "catalog" ? jsonResponse("{") : catalogResponse(remoteCatalog);
+
+        return endpoint === "live"
+          ? jsonResponse("{")
+          : jsonResponse(JSON.stringify({ data: [{ id: "beam-free" }] }));
+      });
+
+      expect(await discoverFreeModelsWithStatus(options(fetcher))).toEqual({ status });
+    });
+
+    it("reports the live catalog size on success", async () => {
+      const { fetcher } = createFetcher((url) =>
+        url === MODEL_CATALOG_URL
+          ? catalogResponse(remoteCatalog)
+          : jsonResponse(
+              JSON.stringify({ data: [{ id: "beam-free" }, { id: "deepseek-v4.1-flash-free" }] }),
+            ),
+      );
+
+      const outcome = await discoverFreeModelsWithStatus(options(fetcher));
+
+      expect(outcome.status).toBe("ok");
+      expect(outcome.liveModelCount).toBe(2);
+      expect(outcome.models?.map((model) => model.id)).toEqual([
+        "beam-free",
+        "deepseek-v4.1-flash-free",
+      ]);
+    });
   });
 
   it("does not touch the network when disabled or already aborted", async () => {

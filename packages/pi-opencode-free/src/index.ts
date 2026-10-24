@@ -2,7 +2,6 @@ import type { RefreshModelsContext } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ProviderConfig } from "@earendil-works/pi-coding-agent";
 
 import {
-  applyFingerprintHeaders,
   buildFingerprintHeaders,
   createCanonicalSessionId,
   createSessionSeed,
@@ -10,7 +9,7 @@ import {
 } from "./fingerprint.ts";
 import {
   configsFromStoredModels,
-  discoverFreeModels,
+  discoverFreeModelsWithStatus,
   initialFreeModels,
   resolveApiKey,
   resolveBaseUrl,
@@ -18,9 +17,9 @@ import {
   stripTrailingSlashes,
   type FreeChatModelConfig,
 } from "./models.ts";
-import { isProviderRequestPayload, normalizeFreeRequestPayload } from "./request.ts";
+import { createFreeStream } from "./stream.ts";
 
-/** Provider id used by `/model` and provider-scoped request handlers. */
+/** Provider id used by `/model` and the provider-scoped request adapter. */
 export const PROVIDER_ID = "opencode-free";
 
 const DISCOVERY_TIMEOUT_MS = 8_000;
@@ -33,7 +32,7 @@ export interface OpencodeFreeDependencies {
 }
 
 /**
- * Registers the OpenCode free provider and its request hooks.
+ * Registers the OpenCode free provider and its request adapter.
  *
  * Seeds the catalog from bundled models, rotates session identity on session
  * start, and normalizes requests for this provider. Discovery runs when Pi
@@ -52,21 +51,10 @@ export function registerOpencodeFree(
   const baseUrl = resolveBaseUrl(dependencies.environment);
   const apiKey = resolveApiKey(dependencies.environment);
   const cliVersion = resolveCliVersion(dependencies.environment);
+  const initialModels = initialFreeModels();
 
   pi.on("session_start", () => {
     sessionId = createCanonicalSessionId(dependencies.randomSeed());
-  });
-
-  pi.on("before_provider_headers", (event) => {
-    applyFingerprintHeaders(event.headers, sessionId, cliVersion);
-  });
-
-  pi.on("before_provider_request", (event, ctx) => {
-    if (ctx.model?.provider !== PROVIDER_ID) return undefined;
-
-    if (!isProviderRequestPayload(event.payload)) return undefined;
-
-    return normalizeFreeRequestPayload(event.payload);
   });
 
   const config: ProviderConfig = {
@@ -76,7 +64,8 @@ export function registerOpencodeFree(
     api: "openai-completions",
     authHeader: true,
     headers: buildFingerprintHeaders(sessionId, cliVersion),
-    models: initialFreeModels(),
+    models: initialModels,
+    streamSimple: createFreeStream(dependencies.fetcher, () => ({ sessionId, cliVersion })),
     refreshModels: async (context) =>
       refreshModels(context, dependencies, baseUrl, sessionId, cliVersion),
   };
@@ -91,7 +80,6 @@ export function registerOpencodeFree(
  * publication failures are ignored and the discovered models are still returned.
  *
  * @param fallbackBaseUrl - Endpoint used when the refresh context has no override
- * @throws Propagates model metadata conversion errors from discovery
  */
 async function refreshModels(
   context: RefreshModelsContext,
@@ -108,7 +96,7 @@ async function refreshModels(
 
   const signal = AbortSignal.any([context.signal, AbortSignal.timeout(DISCOVERY_TIMEOUT_MS)]);
 
-  const models = await discoverFreeModels({
+  const outcome = await discoverFreeModelsWithStatus({
     baseUrl,
     headers: buildFingerprintHeaders(sessionId, cliVersion),
     signal,
@@ -116,7 +104,9 @@ async function refreshModels(
     allowNetwork: context.allowNetwork,
   });
 
-  if (!models || context.signal.aborted) return fallbackModels;
+  if (!outcome.models || context.signal.aborted) return fallbackModels;
+
+  const models = outcome.models;
 
   try {
     await context.publish({

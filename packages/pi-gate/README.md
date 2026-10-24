@@ -15,9 +15,7 @@ Use `pi config` to enable or disable this extension interactively. Run `pi list`
 
 ## Configure
 
-The extension reads `~/.pi/agent/gate.json`, falling back to legacy `~/.pi/agent/pi-gate.json` only when `gate.json` is absent. Set `PI_CODING_AGENT_DIR` to use a different configuration directory. If both files exist, only `gate.json` is used—even if it is invalid. To migrate, rename `pi-gate.json` to `gate.json` and run `/reload`; existing files are never automatically renamed, merged, or overwritten.
-
-On first load, if neither file exists, the extension creates `gate.json` with starter rules and a 30-second prompt timeout. If no configuration can be created yet, pi-gate warns at session start and allows commands until the file is created. If an existing configuration cannot be read or parsed, pi-gate warns and prompts for every command until it is fixed. The published package includes [`config.schema.json`](config.schema.json); use this schema URL for editor completion:
+Edit `~/.pi/agent/gate.json` to choose which commands need approval. The extension creates this file with starter rules on first load. Changes apply before the next gated call, without restarting Pi. Add the optional `$schema` below for editor completion and validation:
 
 ```json
 {
@@ -32,23 +30,34 @@ On first load, if neither file exists, the extension creates `gate.json` with st
 }
 ```
 
-Rules use substring matching and have one of three actions:
+Rules match command text and have one of three actions:
 
 - `prompt`: ask the user to allow or deny;
 - `block`: deny without asking;
 - `allow`: explicitly permit matches fully contained within its matching text.
 
-Empty or over-1,024-character patterns are ignored, at most 1,000 valid rules are loaded, and commands with no match are allowed. Matching is case-insensitive and collapses whitespace runs. An `allow` suppresses only prompt/block matches fully inside its matching span; otherwise any surviving `block` wins over `prompt`. `promptTimeoutMs` defaults to 30 s (maximum one day); a timeout counts as a denial and ends the turn, so raise it for attended sessions. Run `/reload` after editing.
+For simple commands, matching is case-insensitive, treats runs of whitespace as a single space, and matches complete words: `git checkout` does not match `git checkout-index`. Restrictive flag and numeric patterns retain prefix coverage, so `rm -rf` still gates `rm -rfv` and `chmod 777` still gates `chmod 7777`.
 
-pi-gate is a guard rail, not a sandbox. Substring matching cannot see flag-order variants, `$(…)`, or commands run through other tools; keep `allow` patterns specific. Bash path checks are textual, so a separate earlier `cd ~/.pi/agent` followed by `echo x > gate.json` may not be recognized.
+Literal arguments to `echo` and `printf`, and shell comments, do not trigger unrelated rules: `echo sudo` does not match `sudo`. Explicit output rules such as `echo sudo` still work. An `allow` suppresses only prompt/block matches fully inside its matching text in the same simple command; otherwise any remaining `block` wins over `prompt`. Commands with no match are allowed. Patterns must contain 1–1,024 characters; at most 1,000 valid rules are loaded.
 
-## Behavior
+pi-gate is a guard rail, not a sandbox. Complex shell syntax, pipelines, redirects, substitutions, script arguments, or rules containing shell syntax use conservative substring matching and can still prompt on literal text. Generated commands, flag-order variants, and commands run through other tools are not fully understood; keep `allow` patterns specific. Bash path checks remain textual, so a separate earlier `cd ~/.pi/agent` followed by `echo x > gate.json` may not be recognized.
 
-The built-in `bash` tool is gated, and `write`/`edit` calls targeting the gate config require approval. Prompt dialogs offer `Allow` and `Deny`, escape terminal controls, and show at most 2,000 command characters and 20 lines; an allowed command executes in full and unchanged. Blocked, denied, dismissed, and timed-out calls request early termination. A parallel batch continues when it contains allowed calls. In non-interactive modes (`-p`, JSON), prompts and blocks deny and request termination.
+## Usage
 
-The agent receives normal bash output after approval, or a bounded error naming the matched rule after denial or blocking. Dialogs and choices are not sent directly to the agent. RPC hosts use their native selection dialog.
+The built-in `bash` tool is gated, and `write`/`edit` calls targeting the gate config require approval. Prompt dialogs offer `Allow` and `Deny`; approvals are never remembered. To stop repeated prompts, add a specific `allow` rule to `gate.json`.
 
-When running in a Herdr-managed TUI pane, pi-gate can report an active approval prompt as `blocked` in Herdr. This is optional: pi-gate works normally without Herdr, and reporting requires Herdr's Pi integration (`herdr integration install pi`). If Herdr or that integration is unavailable, the report is simply ignored.
+Approval dialogs are serialized for concurrent tool calls; cancellation, session replacement, or a policy change while a dialog is open denies the pending call.
+
+Long commands are truncated in approval dialogs, but an approved command executes in full. Denied, dismissed, blocked, and timed-out calls stop the turn; other allowed calls in a parallel batch may still run. In non-interactive modes (`-p`, JSON), commands requiring approval are denied.
+
+In Herdr-managed panes, install Herdr's Pi integration with `herdr integration install pi` to report pending approvals as `blocked`. Herdr is optional.
+
+## Configuration notes
+
+- `promptTimeoutMs` defaults to 30 seconds and accepts up to one day. Increase it if you need more time to approve calls.
+- Set `PI_CODING_AGENT_DIR` if your Pi configuration lives outside `~/.pi/agent`.
+- Legacy `pi-gate.json` is used only when `gate.json` is absent. To migrate, rename it to `gate.json`; existing files are never overwritten automatically.
+- An unreadable or invalid configuration causes every command to require approval until fixed. If no file exists and one cannot be created, pi-gate warns and allows commands until you create it.
 
 ## Uninstall
 

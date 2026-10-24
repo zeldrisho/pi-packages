@@ -9,6 +9,7 @@ import {
   formatSize,
   truncateHead,
   withFileMutationQueue,
+  type AgentToolResult,
 } from "@earendil-works/pi-coding-agent";
 import {
   searchBraveWeb,
@@ -193,6 +194,59 @@ function formatResults(query: string, results: SearchResult[], requestedCount: n
   return `${notice}${guidanceBlock}\n\n<untrusted_web_content>\n${safeBody}\n</untrusted_web_content>`;
 }
 
+/** Discriminates retrieved search results from a generated answer. */
+export type SearchResultType = "search-results" | "generated-answer";
+
+/** Machine-readable result declared by `web_search`'s `outputSchema`. */
+export interface WebSearchStructuredOutput {
+  resultType: SearchResultType;
+  query: string;
+  provider: Provider;
+  results: SearchResult[];
+  answer?: BraveAnswer;
+  evidence: SearchEvidence;
+  cached: boolean;
+  truncated: boolean;
+  /** Payload omitted from structured output to preserve the byte budget; read fullOutputPath. */
+  payloadOmitted: boolean;
+  fullOutputPath?: string;
+}
+
+/** JSON Schema of the machine-readable `web_search` result. */
+export const webSearchOutputSchema = Type.Object({
+  resultType: Type.Union([Type.Literal("search-results"), Type.Literal("generated-answer")]),
+  query: Type.String(),
+  provider: Type.String(),
+  results: Type.Array(
+    Type.Object({
+      title: Type.String(),
+      url: Type.String(),
+      snippet: Type.String(),
+      quality: Type.Union([Type.Literal("high"), Type.Literal("medium"), Type.Literal("low")]),
+    }),
+  ),
+  answer: Type.Optional(answerSchema),
+  evidence: Type.Object({
+    requestedCount: Type.Integer(),
+    returnedCount: Type.Integer(),
+    dropped: Type.Integer(),
+    truncated: Type.Boolean(),
+    uniqueDomains: Type.Integer(),
+    topDomainShare: Type.Number(),
+    alteredQuery: Type.Optional(Type.String()),
+    spellcheckOff: Type.Optional(Type.Boolean()),
+    showStrictWarning: Type.Optional(Type.Boolean()),
+    moreResultsAvailable: Type.Optional(Type.Boolean()),
+    operatorsApplied: Type.Optional(Type.Boolean()),
+    operatorSites: Type.Optional(Type.Array(Type.String())),
+    offset: Type.Optional(Type.Integer()),
+  }),
+  cached: Type.Boolean(),
+  truncated: Type.Boolean(),
+  payloadOmitted: Type.Boolean(),
+  fullOutputPath: Type.Optional(Type.String()),
+});
+
 /** Generated answers are untrusted claims, not verified facts. */
 function formatAnswer(query: string, answer: BraveAnswer): string {
   const numbersByUrl = new Map<string, Set<number>>();
@@ -368,7 +422,8 @@ export class SearchRuntime {
 
     const cachedPayload = searchCache.get(cacheKey);
     const cachedEntry = cachedPayload?.results;
-    const cached = cachedEntry !== undefined;
+    let cached = cachedEntry !== undefined;
+    let apiKeySource = credentials.source;
     onUpdate?.({
       content: [
         {
@@ -460,6 +515,8 @@ export class SearchRuntime {
               signal,
               "Web search was cancelled.",
             ));
+          cached = cachedAnswer !== undefined;
+          apiKeySource = answerCredentials.source;
         } catch (error) {
           if (signal?.aborted) throw error;
         }
@@ -500,10 +557,44 @@ export class SearchRuntime {
     if (meta.operatorSites !== undefined) evidence.operatorSites = meta.operatorSites;
 
     if (mode === "web" && params.offset !== undefined) evidence.offset = params.offset;
+
+    const structured: WebSearchStructuredOutput = {
+      resultType: payload.answer ? "generated-answer" : "search-results",
+      query,
+      provider,
+      results,
+      answer: payload.answer,
+      evidence: {
+        requestedCount: evidence.requestedCount,
+        returnedCount: evidence.returnedCount,
+        dropped: evidence.dropped,
+        truncated: evidence.truncated,
+        uniqueDomains: evidence.uniqueDomains,
+        topDomainShare: evidence.topDomainShare,
+      },
+      cached,
+      truncated: truncation.truncated,
+      payloadOmitted: false,
+    };
+
+    // JSON escaping can make the structured representation larger than the text.
+    // Never use it to bypass the tool's output limits or private overflow storage.
+    if (
+      truncation.truncated ||
+      encoder.encode(JSON.stringify(structured)).byteLength > DEFAULT_MAX_BYTES - 2_048
+    ) {
+      structured.results = [];
+      delete structured.answer;
+      structured.payloadOmitted = true;
+      structured.truncated = true;
+      structured.evidence.truncated = true;
+      evidence.truncated = true;
+    }
+
     let text = truncation.content;
     let fullOutputPath: string | undefined;
 
-    if (truncation.truncated) {
+    if (structured.truncated) {
       const tempDirectory = await mkdtemp(join(tmpdir(), "pi-web-search-"));
       this.#tempDirectories.add(tempDirectory);
       fullOutputPath = join(tempDirectory, "results.txt");
@@ -518,11 +609,22 @@ export class SearchRuntime {
         throw error;
       }
 
-      text += `\n\n[Output truncated to ${truncation.outputLines} of ${truncation.totalLines} lines (${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}). Full output saved to: ${fullOutputPath}]`;
+      text += truncation.truncated
+        ? `\n\n[Output truncated to ${truncation.outputLines} of ${truncation.totalLines} lines (${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}). Full output saved to: ${fullOutputPath}]`
+        : `\n\n[Structured payload omitted to fit output limits. Full output saved to: ${fullOutputPath}]`;
     }
+
+    structured.fullOutputPath = fullOutputPath;
+
+    // SAFETY: the bounded result DTO contains JSON data only; serialization removes
+    // optional undefined properties before exposing it to programmatic callers.
+    const structuredContent = JSON.parse(JSON.stringify(structured)) as NonNullable<
+      AgentToolResult["structuredContent"]
+    >;
 
     return {
       content: [{ type: "text" as const, text }],
+      structuredContent,
       details: {
         query,
         provider,
@@ -532,12 +634,12 @@ export class SearchRuntime {
         evidence,
         answer: payload.answer,
         cached,
-        apiKeySource: credentials.source,
-        truncated: truncation.truncated,
+        apiKeySource,
+        truncated: structured.truncated,
         fullOutputPath,
         truncation: {
-          truncated: truncation.truncated,
-          strategy: truncation.truncated ? "temporary-file" : "none",
+          truncated: structured.truncated,
+          strategy: structured.truncated ? "temporary-file" : "none",
           fullOutputPath,
           outputBytes: truncation.outputBytes,
           totalBytes: truncation.totalBytes,

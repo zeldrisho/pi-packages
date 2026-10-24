@@ -26,6 +26,7 @@ import {
   hasExtractionWarning,
 } from "../document/evidence.ts";
 import { extractHtmlToMarkdown } from "../document/extract.ts";
+import { assertConversionDepth } from "../document/complexity.ts";
 import {
   requestFollowingRedirects,
   type RedirectDependencies,
@@ -195,6 +196,8 @@ async function decodeResponseBody(
     decompressResponse(rawBytes, responseHeader(response, "content-encoding")),
     contentTypeHeader,
   );
+
+  if (isHtmlContentType(contentType)) assertConversionDepth(raw);
 
   return { raw, contentTypeHeader, contentType };
 }
