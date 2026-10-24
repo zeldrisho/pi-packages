@@ -1,6 +1,6 @@
 {
   "name": "@zeldrisho/pi-gate",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Pi extension that gates bash commands and protects its configuration from tool edits",
   "keywords": [
     "command-blocking",

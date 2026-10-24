@@ -1,6 +1,6 @@
 {
   "name": "@zeldrisho/pi-opencode-free",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Pi provider extension for OpenCode's free-tier models",
   "keywords": [
     "opencode",
