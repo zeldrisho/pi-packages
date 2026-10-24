@@ -81,6 +81,9 @@ describe("web_search code-search options", () => {
       operatorsApplied: true,
       operatorSites: ["github.com"],
     });
+    expect(result.structuredContent).toMatchObject({
+      evidence: result.details.evidence,
+    });
   });
 
   it("validates advanced inputs", () => {

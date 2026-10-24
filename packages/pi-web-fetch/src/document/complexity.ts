@@ -54,7 +54,8 @@ function findRawTextEnd(html: string, name: string, from: number): number {
  * Quoted attributes, comments, and raw-text bodies cannot hide nested markup.
  */
 export function exceedsConversionDepth(html: string): boolean {
-  const lower = html.toLowerCase();
+  // Preserve code-unit positions when normalizing ASCII tag names.
+  const lower = html.replace(/[A-Z]+/g, (match) => match.toLowerCase());
   const stack: string[] = [];
   let offset = 0;
 
@@ -87,14 +88,31 @@ export function exceedsConversionDepth(html: string): boolean {
 
     const name = lower.slice(nameStart, cursor);
     let quote: '"' | "'" | undefined;
+    let expectingValue = false;
+    let unquotedValue = false;
 
     while (cursor < html.length) {
       const character = html[cursor++];
 
       if (quote !== undefined) {
         if (character === quote) quote = undefined;
-      } else if (character === '"' || character === "'") {
-        quote = character;
+      } else if (unquotedValue) {
+        if (character === ">") break;
+
+        if (/[\t\n\f\r ]/u.test(character)) unquotedValue = false;
+      } else if (expectingValue) {
+        if (/[\t\n\f\r ]/u.test(character)) continue;
+        expectingValue = false;
+
+        if (character === '"' || character === "'") {
+          quote = character;
+        } else if (character === ">") {
+          break;
+        } else {
+          unquotedValue = true;
+        }
+      } else if (character === "=") {
+        expectingValue = true;
       } else if (character === ">") {
         break;
       }

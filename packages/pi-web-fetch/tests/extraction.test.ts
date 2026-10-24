@@ -284,6 +284,15 @@ describe("conversion depth bounds", () => {
     expect(exceedsConversionDepth(nestedHtml(513))).toBe(true);
   });
 
+  it("preserves scanner indices after Unicode text", () => {
+    const shallow = `İ${nestedHtml(10)}`.repeat(MAX_CONVERSION_DEPTH + 1);
+    const deep = `İİİ${"br<ab>".repeat(MAX_CONVERSION_DEPTH + 1)}`;
+
+    expect(exceedsConversionDepth(shallow)).toBe(false);
+    expect(exceedsConversionDepth(deep)).toBe(true);
+    expect(exceedsConversionDepth("İ<DIV>leaf</DIV>".repeat(600))).toBe(false);
+  });
+
   it("ignores comments, void elements, and raw-text bodies", () => {
     const comment = `<!-- ${"<div>".repeat(600)} --><p>Visible</p>`;
     const voids = `${"<br>".repeat(600)}<img src="x"><p>Visible</p>`;
@@ -292,6 +301,20 @@ describe("conversion depth bounds", () => {
     expect(exceedsConversionDepth(comment)).toBe(false);
     expect(exceedsConversionDepth(voids)).toBe(false);
     expect(exceedsConversionDepth(script)).toBe(false);
+  });
+
+  it.each(['<div x=a">', "<div x=a'>", '<div x=a=" >', "<div x=a=' >"])(
+    "does not let quotes inside unquoted attributes hide nesting: %s",
+    (tag) => {
+      expect(exceedsConversionDepth(tag.repeat(MAX_CONVERSION_DEPTH + 1))).toBe(true);
+    },
+  );
+
+  it.each(['"', "'"])("preserves properly quoted attribute values: %s", (quote) => {
+    const value = `> ${"<div>".repeat(MAX_CONVERSION_DEPTH + 1)}`;
+    const html = `<div x= \t\n\f\r${quote}${value}${quote} y=unquoted z=${quote}${value}${quote}>leaf</div>`;
+
+    expect(exceedsConversionDepth(html)).toBe(false);
   });
 
   it("accepts the exact ceiling and refuses the next opening element", () => {

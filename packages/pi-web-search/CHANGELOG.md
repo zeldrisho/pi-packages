@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Clarify that shell environment changes require restarting Pi, while `.env` changes apply on the next search.
+- Clarify that shell environment changes require restarting Pi, while `.env` changes apply on the next search only when the key is not supplied by the process environment.
 
 ## [0.12.1] - 2026-10-23
 
