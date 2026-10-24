@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-24
+
 ### Added
 
 - Show shorter usage-limit errors with server-reported reset times in your local date, time, and timezone.
 
 ### Fixed
 
+- Resolve the current OpenCode CLI version automatically at runtime from the official update service, with npm metadata as a fallback, instead of advertising a synthetic compatibility version.
 - Keep valid free models available when individual catalog entries are malformed.
 - Fix request-format errors during automatic compaction, branch summaries, and nested model calls.
 
@@ -26,5 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Discover free models through Pi's native OpenCode catalog from pi.dev instead of models.dev, preserving Pi's capabilities and compatibility metadata.
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.1.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.2.0...HEAD
+[0.2.0]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.1.0...pi-opencode-free-v0.2.0
 [0.1.0]: https://github.com/zeldrisho/pi-packages/releases/tag/pi-opencode-free-v0.1.0

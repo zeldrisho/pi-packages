@@ -11,18 +11,24 @@ import { isProviderRequestPayload, normalizeFreeRequestPayload } from "./request
 /** Delegates protocol handling and retries to Pi while normalizing every provider call. */
 export function createFreeStream(
   fetcher: typeof fetch,
-  fingerprint: () => { sessionId: string; cliVersion: string },
+  fingerprint: (
+    signal?: AbortSignal,
+  ) =>
+    | { sessionId: string; cliVersion: string }
+    | Promise<{ sessionId: string; cliVersion: string }>,
 ): NonNullable<ProviderConfig["streamSimple"]> {
   const native = openAICompletionsApi();
 
   return (model, context, options) => {
     const stream = createAssistantMessageEventStream();
-    const { sessionId, cliVersion } = fingerprint();
-    const headers = { ...options?.headers, ...buildFingerprintHeaders(sessionId, cliVersion) };
-    applyFingerprintHeaders(headers, sessionId, cliVersion);
 
     const run = async () => {
       try {
+        options?.signal?.throwIfAborted();
+        const { sessionId, cliVersion } = await fingerprint(options?.signal);
+        options?.signal?.throwIfAborted();
+        const headers = { ...options?.headers, ...buildFingerprintHeaders(sessionId, cliVersion) };
+        applyFingerprintHeaders(headers, sessionId, cliVersion);
         let quotaMessage: string | undefined;
         // SAFETY: this adapter is registered only for the openai-completions API.
         const nativeModel = model as Model<"openai-completions">;

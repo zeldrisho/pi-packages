@@ -8,8 +8,6 @@ import {
   discoverFreeModels,
   discoverFreeModelsWithStatus,
   initialFreeModels,
-  resolveApiKey,
-  resolveBaseUrl,
   storedModelsFromConfigs,
   type FreeChatModelConfig,
 } from "../src/models";
@@ -120,26 +118,6 @@ const storedModel: Model<"openai-completions"> = {
   maxTokens: 8_000,
   reasoning: false,
 };
-
-describe("environment resolution", () => {
-  it("uses the OpenCode endpoint and public token by default", () => {
-    expect(resolveBaseUrl({})).toBe(DEFAULT_BASE_URL);
-    expect(resolveApiKey({})).toBe("public");
-  });
-
-  it("trims a proxy base URL and removes trailing slashes", () => {
-    expect(resolveBaseUrl({ OPENCODE_FREE_BASE_URL: "  http://localhost:8080/v1/// " })).toBe(
-      "http://localhost:8080/v1",
-    );
-  });
-
-  it("prefers the free key and falls back to the standard OpenCode key", () => {
-    expect(resolveApiKey({ OPENCODE_FREE_API_KEY: " free ", OPENCODE_API_KEY: "paid" })).toBe(
-      "free",
-    );
-    expect(resolveApiKey({ OPENCODE_API_KEY: " paid " })).toBe("paid");
-  });
-});
 
 describe("initial free models", () => {
   it("seeds the catalog from Pi's built-in OpenCode models", () => {
@@ -323,12 +301,28 @@ describe("free model discovery", () => {
   });
 
   it("uses bundled native metadata when pi.dev has no newer catalog", async () => {
+    const bundledModels = initialFreeModels();
+    const remoteOnlyId = "test-remote-only-free";
+
+    const staleCatalog = [
+      ...bundledModels.map((model) => ({
+        ...remoteBeam,
+        id: model.id,
+        name: "Stale remote metadata",
+      })),
+      { ...remoteBeam, id: remoteOnlyId },
+    ];
+
     const { fetcher } = createFetcher((url) =>
       url === MODEL_CATALOG_URL
-        ? jsonResponse(JSON.stringify(remoteCatalog), 200, {
+        ? jsonResponse(JSON.stringify(staleCatalog), 200, {
             "last-modified": "Thu, 01 Jan 1970 00:00:00 GMT",
           })
-        : jsonResponse(JSON.stringify({ data: [{ id: "big-pickle" }, { id: "beam-free" }] })),
+        : jsonResponse(
+            JSON.stringify({
+              data: [...bundledModels.map((model) => ({ id: model.id })), { id: remoteOnlyId }],
+            }),
+          ),
     );
 
     const models = requireModels(
@@ -341,8 +335,7 @@ describe("free model discovery", () => {
       }),
     );
 
-    expect(models.map((model) => model.id)).toEqual(["big-pickle"]);
-    expect(models[0]?.name).not.toBe("Big Pickle Native");
+    expect(models).toEqual(bundledModels);
   });
 
   it("returns undefined when the native catalog is unavailable", async () => {
@@ -512,7 +505,7 @@ describe("free model discovery", () => {
       url === MODEL_CATALOG_URL
         ? jsonResponse(
             JSON.stringify([
-              { ...remoteBeam, name: 42 },
+              { ...remoteBeam, id: "test-malformed-free", name: 42 },
               {
                 ...remoteBeam,
                 id: "second-free",
@@ -522,7 +515,9 @@ describe("free model discovery", () => {
             200,
             { "last-modified": FUTURE_LAST_MODIFIED },
           )
-        : jsonResponse(JSON.stringify({ data: [{ id: "beam-free" }, { id: "second-free" }] })),
+        : jsonResponse(
+            JSON.stringify({ data: [{ id: "test-malformed-free" }, { id: "second-free" }] }),
+          ),
     );
 
     const models = requireModels(

@@ -11,8 +11,6 @@ export const DEFAULT_BASE_URL = "https://opencode.ai/inference/v1";
 /** Pi's native OpenCode catalog overlay, as served by pi.dev. */
 export const MODEL_CATALOG_URL = "https://pi.dev/api/models/providers/opencode?types=chat";
 
-const DEFAULT_PUBLIC_API_KEY = "public";
-
 /** Chat model configuration accepted by `ProviderConfig.models`. */
 export type FreeChatModelConfig = Extract<ProviderModelConfig, { reasoning: boolean }>;
 
@@ -89,36 +87,6 @@ export function stripTrailingSlashes(value: string): string {
   while (end > 0 && value.charCodeAt(end - 1) === 0x2f) end -= 1;
 
   return value.slice(0, end);
-}
-
-/**
- * Resolves the provider base URL, allowing a local proxy or alternate gateway.
- *
- * @param environment - Environment variables visible to the extension
- * @returns The configured URL without trailing slashes, or the OpenCode default
- */
-export function resolveBaseUrl(environment: Record<string, string | undefined>): string {
-  const configured = environment.OPENCODE_FREE_BASE_URL?.trim();
-
-  if (!configured) return DEFAULT_BASE_URL;
-
-  return stripTrailingSlashes(configured);
-}
-
-/**
- * Resolves the bearer token used for inference requests.
- *
- * @param environment - Environment variables visible to the extension
- * @returns `OPENCODE_FREE_API_KEY`, then `OPENCODE_API_KEY`, then `public`
- */
-export function resolveApiKey(environment: Record<string, string | undefined>): string {
-  const freeKey = environment.OPENCODE_FREE_API_KEY?.trim();
-
-  if (freeKey) return freeKey;
-
-  const openCodeKey = environment.OPENCODE_API_KEY?.trim();
-
-  return openCodeKey || DEFAULT_PUBLIC_API_KEY;
 }
 
 /**

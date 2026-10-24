@@ -9,13 +9,10 @@ import type { ExtensionAPI, ProviderConfig } from "@earendil-works/pi-coding-age
 import { normalizeContext } from "@earendil-works/pi-ai/compat";
 import { describe, expect, it } from "vite-plus/test";
 
-import piOpencodeFree, {
-  PROVIDER_ID,
-  registerOpencodeFree,
-  type OpencodeFreeDependencies,
-} from "../src/index";
-import { DEFAULT_CLI_VERSION, FINGERPRINT_MARKER_HEADER, buildUserAgent } from "../src/fingerprint";
-import { MODEL_CATALOG_URL, initialFreeModels } from "../src/models";
+import piOpencodeFree, { PROVIDER_ID, registerOpencodeFree } from "../src/index";
+import { CLI_NPM_URL, CLI_UPDATE_URL } from "../src/cli-version";
+import { FINGERPRINT_MARKER_HEADER } from "../src/fingerprint";
+import { DEFAULT_BASE_URL, MODEL_CATALOG_URL, initialFreeModels } from "../src/models";
 import type { ProviderRequestPayload } from "../src/request";
 
 interface FakeEvent {
@@ -96,10 +93,7 @@ function deterministicSeed(value: number): Uint8Array {
   return Uint8Array.from({ length: 20 }, (_, index) => (index + value) % 256);
 }
 
-function dependencies(
-  environment: Record<string, string | undefined>,
-  fetcher: typeof fetch,
-): OpencodeFreeDependencies {
+function dependencies(environment: Record<string, string | undefined>, fetcher: typeof fetch) {
   let seedValue = 0;
 
   return {
@@ -213,11 +207,24 @@ const discoveryCatalog = [
   },
 ];
 
+function versionResponse(): Response {
+  return Response.json({
+    channel: "latest",
+    name: "cli",
+    distribution: "npm",
+    active: true,
+    version: "2.1.4",
+    metadata: { package: "@opencode/cli" },
+  });
+}
+
 function discoveryFetcher(calls: string[]): typeof fetch {
   return async (input) => {
     const url = input instanceof Request ? input.url : input.toString();
 
     calls.push(url);
+
+    if (url === CLI_UPDATE_URL) return versionResponse();
 
     if (url === MODEL_CATALOG_URL) {
       return new Response(JSON.stringify(discoveryCatalog), {
@@ -261,9 +268,7 @@ describe("opencode-free extension", () => {
     expect(config?.apiKey).toBe("public");
     expect(config?.authHeader).toBe(true);
     expect(config?.baseUrl).toBe("https://opencode.ai/inference/v1");
-    expect(config?.headers?.[FINGERPRINT_MARKER_HEADER]).toBe("1");
-    expect(config?.headers?.["User-Agent"]).toBe(buildUserAgent(DEFAULT_CLI_VERSION));
-    expect(config?.headers?.["x-opencode-session"]).toMatch(/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/u);
+    expect(config?.headers).toBeUndefined();
 
     const ids = config?.models?.map((model) => model.id) ?? [];
     expect(ids.length).toBeGreaterThan(0);
@@ -276,29 +281,33 @@ describe("opencode-free extension", () => {
     expect(state.handlers.has("before_provider_request")).toBe(false);
   });
 
-  it("honors proxy, credential, and client version overrides", () => {
+  it.each([
+    { OPENCODE_FREE_BASE_URL: " http://localhost:8080/v1/ " },
+    { OPENCODE_FREE_API_KEY: " secret " },
+    { OPENCODE_API_KEY: " paid " },
+    { OPENCODE_FREE_CLI_VERSION: "2.999.0" },
+    {
+      OPENCODE_FREE_BASE_URL: " http://localhost:8080/v1/ ",
+      OPENCODE_FREE_API_KEY: " secret ",
+      OPENCODE_API_KEY: " paid ",
+    },
+  ])("ignores removed environment overrides: %j", async (environment) => {
     const { pi, state } = createFakePi();
+    const calls: string[] = [];
 
-    registerOpencodeFree(
-      pi,
-      dependencies(
-        {
-          OPENCODE_FREE_BASE_URL: " http://localhost:8080/v1/ ",
-          OPENCODE_FREE_API_KEY: " secret ",
-          OPENCODE_FREE_CLI_VERSION: " 2.1.3 ",
-        },
-        () => {
-          throw new Error("unexpected network access");
-        },
-      ),
-    );
+    registerOpencodeFree(pi, dependencies(environment, discoveryFetcher(calls)));
 
     const config = state.provider?.config;
-    expect(config?.baseUrl).toBe("http://localhost:8080/v1");
-    expect(config?.apiKey).toBe("secret");
-    expect(config?.headers?.["User-Agent"]).toBe("opencode/latest/2.1.3/cli");
 
-    expect(config?.streamSimple).toBeDefined();
+    if (!config) throw new Error("missing provider");
+
+    expect(config.baseUrl).toBe(DEFAULT_BASE_URL);
+    expect(config.apiKey).toBe("public");
+    expect(config.authHeader).toBe(true);
+
+    const { context } = refreshContext({ allowNetwork: true });
+    await refreshModels(config, context);
+    expect(calls).toEqual([CLI_UPDATE_URL, `${DEFAULT_BASE_URL}/models`, MODEL_CATALOG_URL]);
   });
 
   it("refreshes models through the injected fetcher and persists the catalog", async () => {
@@ -319,7 +328,7 @@ describe("opencode-free extension", () => {
     const models = await refreshModels(config, context);
 
     expect(models.map((model) => model.id)).toEqual(["beam-free", "deepseek-v4.1-flash-free"]);
-    expect(calls).toEqual(["http://proxy.test/v1/models", MODEL_CATALOG_URL]);
+    expect(calls).toEqual([CLI_UPDATE_URL, "http://proxy.test/v1/models", MODEL_CATALOG_URL]);
 
     expect(publications).toHaveLength(1);
 
@@ -412,10 +421,21 @@ describe("opencode-free extension", () => {
   it("rotates session identity for inference, including requests without extension hooks", async () => {
     const { pi, state } = createFakePi();
     const sessions: Array<string | null> = [];
+    let versionLookups = 0;
     registerOpencodeFree(
       pi,
-      dependencies({}, async (_input, init) => {
-        sessions.push(new Headers(init?.headers).get("x-opencode-session"));
+      dependencies({}, async (input, init) => {
+        if (input === CLI_UPDATE_URL) {
+          versionLookups += 1;
+
+          return versionResponse();
+        }
+
+        const headers = new Headers(init?.headers);
+        sessions.push(headers.get("x-opencode-session"));
+        expect(headers.get("User-Agent")).toBe("opencode/latest/2.1.4/cli");
+        expect(headers.get("Authorization")).toBe("Bearer public");
+        expect(headers.get(FINGERPRINT_MARKER_HEADER)).toBe("1");
 
         return new Response(
           JSON.stringify({
@@ -439,12 +459,35 @@ describe("opencode-free extension", () => {
     });
 
     await native(storedModel, context, { apiKey: "public", maxRetries: 0 }).result();
-    expect(sessions[0]).toBe(config.headers?.["x-opencode-session"]);
+    expect(sessions[0]).toMatch(/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/u);
     await handlerFor(state, "session_start")({ type: "session_start" }, {});
     await native(storedModel, context, { apiKey: "public", maxRetries: 0 }).result();
     expect(sessions[1]).not.toBe(sessions[0]);
     expect(sessions[1]).toMatch(/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/u);
     expect(sessions).toHaveLength(2);
+    expect(versionLookups).toBe(1);
+  });
+
+  it("reports a version lookup failure without sending an inference request", async () => {
+    const { pi, state } = createFakePi();
+    const calls: string[] = [];
+    registerOpencodeFree(
+      pi,
+      dependencies({}, async (input) => {
+        calls.push(new Request(input).url);
+
+        return new Response("unavailable", { status: 503 });
+      }),
+    );
+    const native = state.provider?.config.streamSimple;
+
+    if (!native) throw new Error("missing provider stream");
+
+    const context = normalizeContext({ messages: [{ role: "user", content: "Hi", timestamp: 0 }] });
+    const result = await native(storedModel, context, { apiKey: "public", maxRetries: 0 }).result();
+    expect(result.stopReason).toBe("error");
+    expect(result.errorMessage).toContain("Cannot resolve the current OpenCode CLI version");
+    expect(calls).toEqual([CLI_UPDATE_URL, CLI_NPM_URL]);
   });
 
   it("provides a default export for Pi", () => {

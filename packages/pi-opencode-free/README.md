@@ -19,9 +19,11 @@ Restart Pi after installing. Use `pi config` to enable or disable the extension,
 2. Type `opencode-free` to filter the list.
 3. Select a model tagged `[opencode-free]`.
 
-No configuration or `/login` is required. By default, your prompts are sent directly to OpenCode.
+No configuration or `/login` is required. Your prompts are sent directly to OpenCode using its public token. Endpoint and API-key environment overrides are not supported.
 
 The model list updates automatically as OpenCode's free catalog changes. If discovery is unavailable, the extension uses the last synced catalog or Pi's bundled free models.
+
+The provider automatically resolves the current CLI version from OpenCode's official update service, with npm metadata as a fallback, when needed for an online model refresh or inference request. Successful lookups are cached in memory for 24 hours. No OpenCode installation or version configuration is needed. If neither source can provide a valid version and no unexpired cached value exists, inference stops with a retryable connection error rather than using an invented version.
 
 ## Usage limits
 

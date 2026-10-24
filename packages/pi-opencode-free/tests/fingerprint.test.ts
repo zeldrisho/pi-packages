@@ -7,12 +7,12 @@ import {
   buildUserAgent,
   createCanonicalSessionId,
   createSessionSeed,
-  DEFAULT_CLI_VERSION,
   FINGERPRINT_MARKER_HEADER,
   READ_TOOL,
-  resolveCliVersion,
   SESSION_HEADER_NAMES,
 } from "../src/fingerprint";
+
+const CLI_VERSION = "2.1.4";
 
 const SESSION_PATTERN = /^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/u;
 
@@ -59,9 +59,9 @@ describe("opencode session identity", () => {
   it("builds headers for the full v2 fingerprint", () => {
     const sessionId = createCanonicalSessionId(deterministicSeed());
 
-    const headers = buildFingerprintHeaders(sessionId, DEFAULT_CLI_VERSION);
+    const headers = buildFingerprintHeaders(sessionId, CLI_VERSION);
 
-    expect(headers["User-Agent"]).toBe(buildUserAgent(DEFAULT_CLI_VERSION));
+    expect(headers["User-Agent"]).toBe(buildUserAgent(CLI_VERSION));
     expect(headers["x-opencode-client"]).toBe("cli");
     expect(headers["x-opencode-project"]).toBe("global");
     expect(headers[FINGERPRINT_MARKER_HEADER]).toBe("1");
@@ -86,8 +86,8 @@ describe("opencode session identity", () => {
       "x-other": "keep",
     } satisfies ProviderHeaders;
 
-    expect(applyFingerprintHeaders(headers, sessionId, DEFAULT_CLI_VERSION)).toBe(true);
-    expect(headers["User-Agent"]).toBe(buildUserAgent(DEFAULT_CLI_VERSION));
+    expect(applyFingerprintHeaders(headers, sessionId, CLI_VERSION)).toBe(true);
+    expect(headers["User-Agent"]).toBe(buildUserAgent(CLI_VERSION));
     expect(headers["user-agent"]).toBeUndefined();
     expect(headers["X-Opencode-Request"]).toBeUndefined();
     expect(headers["x-other"]).toBe("keep");
@@ -103,30 +103,15 @@ describe("opencode session identity", () => {
       "x-opencode-session": "ses_other",
     } satisfies ProviderHeaders;
 
-    expect(applyFingerprintHeaders(headers, createCanonicalSessionId(), DEFAULT_CLI_VERSION)).toBe(
-      false,
-    );
+    expect(applyFingerprintHeaders(headers, createCanonicalSessionId(), CLI_VERSION)).toBe(false);
     expect(headers).toEqual({
       Authorization: "Bearer secret",
       "x-opencode-session": "ses_other",
     });
   });
 
-  it("uses a major-2 compatibility version by default", () => {
-    expect(resolveCliVersion({})).toBe(DEFAULT_CLI_VERSION);
-    expect(DEFAULT_CLI_VERSION.startsWith("2.")).toBe(true);
-    expect(buildUserAgent(DEFAULT_CLI_VERSION)).toBe(`opencode/latest/${DEFAULT_CLI_VERSION}/cli`);
-  });
-
-  it("accepts a valid client version override", () => {
-    expect(resolveCliVersion({ OPENCODE_FREE_CLI_VERSION: " 2.1.3 " })).toBe("2.1.3");
-    expect(resolveCliVersion({ OPENCODE_FREE_CLI_VERSION: "2.1" })).toBe("2.1");
-  });
-
-  it("ignores malformed client version overrides", () => {
-    for (const value of ["latest", "2", "2.1.3-beta", "v2.1.3", ""]) {
-      expect(resolveCliVersion({ OPENCODE_FREE_CLI_VERSION: value })).toBe(DEFAULT_CLI_VERSION);
-    }
+  it("builds the user agent from a resolved client version", () => {
+    expect(buildUserAgent(CLI_VERSION)).toBe(`opencode/latest/${CLI_VERSION}/cli`);
   });
 
   it("declares the read tool with the v2 CLI schema", () => {

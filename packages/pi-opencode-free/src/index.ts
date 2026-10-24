@@ -1,18 +1,17 @@
 import type { RefreshModelsContext } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ProviderConfig } from "@earendil-works/pi-coding-agent";
 
+import { createCliVersionResolver } from "./cli-version.ts";
 import {
   buildFingerprintHeaders,
   createCanonicalSessionId,
   createSessionSeed,
-  resolveCliVersion,
 } from "./fingerprint.ts";
 import {
+  DEFAULT_BASE_URL,
   configsFromStoredModels,
   discoverFreeModelsWithStatus,
   initialFreeModels,
-  resolveApiKey,
-  resolveBaseUrl,
   storedModelsFromConfigs,
   stripTrailingSlashes,
   type FreeChatModelConfig,
@@ -28,7 +27,6 @@ const DISCOVERY_TIMEOUT_MS = 8_000;
 export interface OpencodeFreeDependencies {
   randomSeed: () => Uint8Array;
   fetcher: typeof fetch;
-  environment: Record<string, string | undefined>;
 }
 
 /**
@@ -48,9 +46,7 @@ export function registerOpencodeFree(
 ): void {
   let sessionId = createCanonicalSessionId(dependencies.randomSeed());
 
-  const baseUrl = resolveBaseUrl(dependencies.environment);
-  const apiKey = resolveApiKey(dependencies.environment);
-  const cliVersion = resolveCliVersion(dependencies.environment);
+  const resolveVersion = createCliVersionResolver(dependencies.fetcher);
   const initialModels = initialFreeModels();
 
   pi.on("session_start", () => {
@@ -59,15 +55,18 @@ export function registerOpencodeFree(
 
   const config: ProviderConfig = {
     name: "OpenCode Free",
-    baseUrl,
-    apiKey,
+    baseUrl: DEFAULT_BASE_URL,
+    apiKey: "public",
     api: "openai-completions",
     authHeader: true,
-    headers: buildFingerprintHeaders(sessionId, cliVersion),
     models: initialModels,
-    streamSimple: createFreeStream(dependencies.fetcher, () => ({ sessionId, cliVersion })),
+    streamSimple: createFreeStream(dependencies.fetcher, async (signal) => {
+      const cliVersion = await resolveVersion(signal);
+
+      return { sessionId, cliVersion };
+    }),
     refreshModels: async (context) =>
-      refreshModels(context, dependencies, baseUrl, sessionId, cliVersion),
+      refreshModels(context, dependencies, sessionId, resolveVersion),
   };
 
   pi.registerProvider(PROVIDER_ID, config);
@@ -78,23 +77,27 @@ export function registerOpencodeFree(
  * offline, canceled, or discovery returns no usable models. Discovery has an
  * eight-second abort deadline. Successful results are published for persistence;
  * publication failures are ignored and the discovered models are still returned.
- *
- * @param fallbackBaseUrl - Endpoint used when the refresh context has no override
  */
 async function refreshModels(
   context: RefreshModelsContext,
   dependencies: OpencodeFreeDependencies,
-  fallbackBaseUrl: string,
   sessionId: string,
-  cliVersion: string,
+  resolveVersion: (signal?: AbortSignal) => Promise<string>,
 ): Promise<FreeChatModelConfig[]> {
-  const baseUrl = stripTrailingSlashes(context.baseUrl ?? fallbackBaseUrl);
+  const baseUrl = stripTrailingSlashes(context.baseUrl ?? DEFAULT_BASE_URL);
   const cachedModels = configsFromStoredModels(context.stored?.models ?? [], PROVIDER_ID);
   const fallbackModels = cachedModels.length > 0 ? cachedModels : initialFreeModels();
 
   if (!context.allowNetwork || context.signal.aborted) return fallbackModels;
 
   const signal = AbortSignal.any([context.signal, AbortSignal.timeout(DISCOVERY_TIMEOUT_MS)]);
+  let cliVersion: string;
+
+  try {
+    cliVersion = await resolveVersion(signal);
+  } catch {
+    return fallbackModels;
+  }
 
   const outcome = await discoverFreeModelsWithStatus({
     baseUrl,
@@ -125,7 +128,6 @@ async function refreshModels(
 const defaultDependencies: OpencodeFreeDependencies = {
   randomSeed: createSessionSeed,
   fetcher: globalThis.fetch,
-  environment: process.env,
 };
 
 /**

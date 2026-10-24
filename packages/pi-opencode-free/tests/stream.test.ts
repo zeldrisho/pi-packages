@@ -28,7 +28,7 @@ const model: Model<"openai-completions"> = {
   compat: { supportsStore: false, supportsDeveloperRole: false, maxTokensField: "max_tokens" },
 };
 
-const fingerprint = () => ({ sessionId: "ses_ffffffffeffe0123456789ABCD", cliVersion: "2.999.0" });
+const fingerprint = () => ({ sessionId: "ses_ffffffffeffe0123456789ABCD", cliVersion: "2.1.4" });
 
 const options = { apiKey: "public", maxRetries: 0 };
 
@@ -281,6 +281,42 @@ describe("OpenCode provider stream boundary", () => {
 
     const result = await native(model, summary, { ...options, signal: controller.signal }).result();
     expect(result.stopReason).toBe("aborted");
+  });
+
+  it("closes the stream before inference if asynchronous version resolution fails", async () => {
+    const fetcher = vi.fn(async () => completion());
+
+    const native = createFreeStream(fetcher, async () => {
+      throw new Error("version lookup failed");
+    });
+
+    const stream = native(model, summary, options);
+    expect(await stream.result()).toMatchObject({
+      stopReason: "error",
+      errorMessage: "version lookup failed",
+    });
+    expect(fetcher).not.toHaveBeenCalled();
+    const events = [];
+
+    for await (const event of stream) events.push(event);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.type).toBe("error");
+  });
+
+  it("preserves cancellation during asynchronous version resolution", async () => {
+    const controller = new AbortController();
+    const fetcher = vi.fn(async () => completion());
+
+    const native = createFreeStream(fetcher, async (signal) => {
+      expect(signal).toBe(controller.signal);
+      controller.abort();
+
+      return fingerprint();
+    });
+
+    const result = await native(model, summary, { ...options, signal: controller.signal }).result();
+    expect(result.stopReason).toBe("aborted");
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it("closes the forwarding stream if request setup fails", async () => {

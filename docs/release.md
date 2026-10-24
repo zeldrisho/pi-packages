@@ -4,6 +4,12 @@ Packages are versioned independently. The agent updates the manifest and changel
 
 ## Normal release
 
+For an existing package with trusted publishing already configured, release
+preparation and CI publishing do not require a local npm login. Do not run
+`vp pm login`, `npm trust github`, or `npm trust list` as routine release
+prerequisites; those are first-package bootstrap steps described below. The
+release workflow authenticates to npm through GitHub Actions OIDC.
+
 A release starts by confirming the package and version, then updating
 `packages/<name>/package.json` and that package's `CHANGELOG.md`. The changelog
 entry uses the heading `## [version] - YYYY-MM-DD`; run `vp run format:changelog`
@@ -64,13 +70,13 @@ npm trust list <package>
 
 `vp pm login` opens a browser; if it cannot, set `BROWSER`. An unauthenticated publish of a new package returns `404`, so log in before treating that response as fatal. Because `vp pm pkg set` leaves the manifest dirty, pnpm refuses to publish unless `--no-git-checks` is passed. Do not pass `--no-git-checks` to npm, which warns that it is unknown and ignores it.
 
-The trust command needs the package to exist, so run it after the bootstrap publish. It requires 2FA and reports the configured permissions, which may include stage publishing. Confirm the configuration with `npm trust list` before tagging.
+The trust command needs the package to exist, so run it after the bootstrap publish. It requires 2FA and reports the configured permissions, which may include stage publishing. Confirm the configuration with `npm trust list` before pushing the new package's first release tag; do not repeat this check for routine releases.
 
 npm can create a `<version>-stage` stub while deferring 2FA for the first publish. The stub has `"stub": true`, no dist-tag, and is an internal staged-publishing placeholder, not a release; it does not replace the manual bootstrap.
 
 Confirm the publish output names the expected package at `0.0.0` and shows the `bootstrap` tag. If published with the default `latest` tag by mistake, add the `bootstrap` tag with `npm dist-tag add <package>@0.0.0 bootstrap`. Do not try to remove `latest` while it points to the only published version; the registry may reject that operation. The first normal release will move `latest` to its published version. Restore the intended release version in the manifest without committing `0.0.0`. Stop if the package name, version, access, tarball, or publisher settings are unexpected or publishing fails. Normal releases continue to publish through the automated trusted-publishing workflow.
 
-Pause and notify the owner if any manifest, tag, package path, changelog, authentication, OIDC, provenance, or publication detail disagrees or fails.
+Pause and notify the owner if any manifest, tag, package path, changelog, provenance, or publication detail disagrees or fails, or if authentication or OIDC fails during a required bootstrap or CI publishing step. Missing local npm authentication is not a blocker for an existing package's normal release preparation.
 
 ## Invariants
 

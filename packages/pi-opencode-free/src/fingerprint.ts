@@ -1,19 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { ProviderHeaders } from "@earendil-works/pi-ai";
 
-/**
- * Synthetic major-2 client version used when no override is configured.
- *
- * The free-tier gate checks the major version, not a specific release, so a
- * high compatibility version avoids pinning the extension to one OpenCode
- * release.
- */
-export const DEFAULT_CLI_VERSION = "2.999.0";
-
 /** Marks requests assembled for the extension's own provider. */
 export const FINGERPRINT_MARKER_HEADER = "x-pi-opencode-free";
-
-const CLI_VERSION_PATTERN = /^\d+\.\d+(?:\.\d+)?$/u;
 
 /** Canonical OpenCode session headers mirrored by the v2 CLI. */
 export const SESSION_HEADER_NAMES = [
@@ -76,20 +65,6 @@ function createSessionSuffix(seed: Uint8Array): string {
   }
 
   return digits.join("");
-}
-
-/**
- * Resolves the client version carried by the request fingerprint.
- *
- * @param environment - Environment variables visible to the extension
- * @returns `OPENCODE_FREE_CLI_VERSION` when valid, else the compatibility version
- */
-export function resolveCliVersion(environment: Record<string, string | undefined>): string {
-  const configured = environment.OPENCODE_FREE_CLI_VERSION?.trim();
-
-  if (configured && CLI_VERSION_PATTERN.test(configured)) return configured;
-
-  return DEFAULT_CLI_VERSION;
 }
 
 /**
