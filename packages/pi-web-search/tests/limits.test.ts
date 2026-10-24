@@ -19,6 +19,7 @@ describe("web_search limit contracts", () => {
     const schema = JSON.parse(JSON.stringify(webSearchParameters));
     expect(Object.keys(schema.properties)).toEqual(["query"]);
     expect(schema.properties.query.description).toBeUndefined();
+    expect(schema.properties.count).toBeUndefined();
     expect(schema.properties.freshness).toBeUndefined();
     expect(schema.properties.spellcheck).toBeUndefined();
   });

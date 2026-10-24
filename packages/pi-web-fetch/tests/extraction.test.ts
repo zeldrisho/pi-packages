@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import type { DefuddleResponse } from "defuddle/node";
-import { extractHtmlToMarkdown, stripExtractedCssCruft } from "../src/document/extract.ts";
+import {
+  extractHtmlToMarkdown,
+  htmlToMarkdownFallback,
+  stripExtractedCssCruft,
+} from "../src/document/extract.ts";
+import { exceedsConversionDepth, MAX_CONVERSION_DEPTH } from "../src/document/complexity.ts";
 
 // Mock defuddle/node so we can induce failures. The factory keeps the real
 // implementation by default (the other tests exercise the real extractor) and
@@ -267,5 +272,74 @@ schema"}</script></head><body><main><article><h1>Fixture</h1><p>${articleText}</
     } finally {
       process.off("unhandledRejection", swallow);
     }
+  });
+});
+
+describe("conversion depth bounds", () => {
+  const nestedHtml = (depth: number): string =>
+    `<div>${"<div>".repeat(depth)}Readable leaf${"</div>".repeat(depth)}</div>`;
+
+  it("detects markup beyond the conversion depth ceiling", () => {
+    expect(exceedsConversionDepth(nestedHtml(10))).toBe(false);
+    expect(exceedsConversionDepth(nestedHtml(513))).toBe(true);
+  });
+
+  it("preserves scanner indices after Unicode text", () => {
+    const shallow = `İ${nestedHtml(10)}`.repeat(MAX_CONVERSION_DEPTH + 1);
+    const deep = `İİİ${"br<ab>".repeat(MAX_CONVERSION_DEPTH + 1)}`;
+
+    expect(exceedsConversionDepth(shallow)).toBe(false);
+    expect(exceedsConversionDepth(deep)).toBe(true);
+    expect(exceedsConversionDepth("İ<DIV>leaf</DIV>".repeat(600))).toBe(false);
+  });
+
+  it("ignores comments, void elements, and raw-text bodies", () => {
+    const comment = `<!-- ${"<div>".repeat(600)} --><p>Visible</p>`;
+    const voids = `${"<br>".repeat(600)}<img src="x"><p>Visible</p>`;
+    const script = `<script>${"<div>".repeat(600)}</script><p>Visible</p>`;
+
+    expect(exceedsConversionDepth(comment)).toBe(false);
+    expect(exceedsConversionDepth(voids)).toBe(false);
+    expect(exceedsConversionDepth(script)).toBe(false);
+  });
+
+  it.each(['<div x=a">', "<div x=a'>", '<div x=a=" >', "<div x=a=' >"])(
+    "does not let quotes inside unquoted attributes hide nesting: %s",
+    (tag) => {
+      expect(exceedsConversionDepth(tag.repeat(MAX_CONVERSION_DEPTH + 1))).toBe(true);
+    },
+  );
+
+  it.each(['"', "'"])("preserves properly quoted attribute values: %s", (quote) => {
+    const value = `> ${"<div>".repeat(MAX_CONVERSION_DEPTH + 1)}`;
+    const html = `<div x= \t\n\f\r${quote}${value}${quote} y=unquoted z=${quote}${value}${quote}>leaf</div>`;
+
+    expect(exceedsConversionDepth(html)).toBe(false);
+  });
+
+  it("accepts the exact ceiling and refuses the next opening element", () => {
+    expect(exceedsConversionDepth("<div>".repeat(MAX_CONVERSION_DEPTH))).toBe(false);
+    expect(exceedsConversionDepth("<div>".repeat(MAX_CONVERSION_DEPTH + 1))).toBe(true);
+  });
+
+  it.each([
+    "<div/>".repeat(600),
+    `<noscript>${nestedHtml(600)}</noscript>`,
+    `<div data-value="quoted > text">${nestedHtml(600)}</div>`,
+    "<div><span></div>".repeat(600),
+  ])("does not let malformed or self-closing markup hide nesting", (html) => {
+    expect(exceedsConversionDepth(html)).toBe(true);
+  });
+
+  it("refuses hostile nesting before either DOM extractor is called", async () => {
+    const html = nestedHtml(20_000);
+    const { Defuddle } = await import("defuddle/node");
+    const previousCalls = vi.mocked(Defuddle).mock.calls.length;
+
+    await expect(
+      extractHtmlToMarkdown(html, new URL("https://example.com/hostile")),
+    ).rejects.toThrow("HTML nesting exceeds the safe extraction depth (512)");
+    expect(() => htmlToMarkdownFallback(html)).toThrow("safe extraction depth");
+    expect(vi.mocked(Defuddle).mock.calls).toHaveLength(previousCalls);
   });
 });

@@ -3,18 +3,21 @@ import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { SEARCH_WEB_MAX_QUERY_CHARACTERS } from "./limits";
 import { formatCollapsibleOutput } from "./render";
-import { SearchRuntime } from "./search";
+import { SearchRuntime, webSearchOutputSchema } from "./search";
 
 export { ExpiringLruCache } from "./cache";
 
 export {
   SearchRuntime,
   summarizeDomainDiversity,
+  webSearchOutputSchema,
   type DomainDiversity,
   type SearchDetails,
   type SearchEvidence,
   type SearchParameters,
+  type SearchResultType,
   type SearchTruncationDetails,
+  type WebSearchStructuredOutput,
 } from "./search";
 
 export type { BraveQueryMeta, SearchMode, SearchResponse } from "./brave";
@@ -45,6 +48,7 @@ export default function (pi: ExtensionAPI) {
     label: "Web Search",
     description: "Search the web. Use web_fetch to read sources.",
     parameters: webSearchParameters,
+    outputSchema: webSearchOutputSchema,
 
     renderCall(args, theme) {
       return new Text(

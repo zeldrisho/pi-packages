@@ -3,7 +3,7 @@ import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { redactUrlForDisplay } from "./redact";
 import { formatCollapsibleOutput } from "./render";
-import { executeWebFetch } from "./service";
+import { executeWebFetch, webFetchOutputSchema } from "./service";
 
 export { ExpiringLruCache } from "./cache";
 
@@ -45,9 +45,11 @@ export { redactUrlForDisplay } from "./redact";
 
 export {
   executeWebFetch,
+  webFetchOutputSchema,
   type CacheStatus,
   type WebFetchDetails,
   type WebFetchParameters,
+  type WebFetchStructuredOutput,
   type WebFetchTruncationDetails,
 } from "./service";
 
@@ -76,6 +78,7 @@ export default function (pi: ExtensionAPI) {
     label: "Web Fetch",
     description: "Read a public webpage as Markdown.",
     parameters: webFetchParameters,
+    outputSchema: webFetchOutputSchema,
 
     renderCall(args, theme) {
       return new Text(

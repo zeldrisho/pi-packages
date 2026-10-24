@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-24
+
+### Added
+
+- Add structured search results for codemode callers, distinguishing retrieved sources from generated answers.
+
+### Fixed
+
+- Clarify that shell environment changes require restarting Pi, while `.env` changes apply on the next search only when the key is not supplied by the process environment.
+
 ## [0.12.1] - 2026-10-23
 
 ### Security
@@ -152,7 +162,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded Brave web search ([cbc9491](https://github.com/zeldrisho/pi-packages/commit/cbc9491dce36555ab91b6bef203ec8b380596a89))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.12.1...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.13.0...HEAD
+[0.13.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.12.1...pi-web-search-v0.13.0
 [0.12.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.12.0...pi-web-search-v0.12.1
 [0.12.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.11.0...pi-web-search-v0.12.0
 [0.11.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.10.0...pi-web-search-v0.11.0

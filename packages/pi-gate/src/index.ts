@@ -7,16 +7,17 @@
  *
  * Configuration file: `~/.pi/agent/gate.json` (legacy fallback: `pi-gate.json`)
  *
- * The configuration has an `operations` section, which maps a substring
+ * The configuration has an `operations` section, which maps a command-text
  * pattern to one of three actions, and an optional `promptTimeoutMs` setting:
  *
  * - `prompt` - ask the user to allow or deny the command
  * - `block`  - deny the command without asking
  * - `allow`  - explicitly allow (use to carve out an exception)
  *
- * Matching is case-insensitive and whitespace-normalized. An allow occurrence
- * suppresses only restrictive occurrences fully contained within its span;
- * surviving blocks take priority over prompts.
+ * Simple commands match whole words without treating literal echo/printf data
+ * as commands; uncertain syntax retains conservative substring matching.
+ * Matching is case-insensitive and whitespace-normalized. Allow occurrences
+ * suppress contained restrictions in the same command; surviving blocks win.
  *
  * On first run, a configuration with the default prompt timeout and starter
  * operation rules is written to `~/.pi/agent/gate.json` when neither file exists.
@@ -27,7 +28,11 @@
  * indefinitely.
  */
 
-import { isToolCallEventType, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import {
+  isToolCallEventType,
+  type ExtensionAPI,
+  type ToolCallEventResult,
+} from "@earendil-works/pi-coding-agent";
 import { configPath, ensureConfig, loadConfigResult } from "./config";
 import {
   bashTouchesConfig,
@@ -105,15 +110,36 @@ export {
   highlightRuleForDisplay,
 } from "./display";
 
-/** Gate the built-in `bash` tool against the user-provided rules. */
+/**
+ * Gates `bash` calls against user rules and requires approval for protected
+ * configuration writes and edits. Attempts to create a starter configuration if absent.
+ * Reloads rules before gating and after each prompt; approvals apply per call.
+ * Dialogs are serialized, and cancellation, session starts, or policy changes
+ * invalidate an active approval. UI failures reject the affected tool call.
+ */
 export default function piGate(pi: ExtensionAPI): void {
   ensureConfig();
   let loadResult = loadConfigResult();
-  const { config } = loadResult;
+  let policy = JSON.stringify(loadResult);
+  let revision = 0;
+  let pending = Promise.resolve();
+
+  /** Reloads policy and invalidates active approvals when its parsed value or load status changes. */
+  const refreshConfig = () => {
+    loadResult = loadConfigResult();
+    const current = JSON.stringify(loadResult);
+
+    if (current !== policy) {
+      revision += 1;
+      policy = current;
+    }
+  };
 
   pi.on("session_start", (_event, ctx) => {
+    revision += 1;
+    refreshConfig();
     const path = configPath();
-    const ruleCount = Object.keys(config.operations).length;
+    const ruleCount = Object.keys(loadResult.config.operations).length;
 
     if (loadResult.status === "loaded" && ruleCount === 0) {
       ctx.ui.notify(
@@ -133,89 +159,121 @@ export default function piGate(pi: ExtensionAPI): void {
     }
   });
 
-  pi.on("tool_call", async (event, ctx) => {
-    let command: string;
-    let configChange = false;
+  pi.on("tool_call", (event, ctx) => {
+    // Pi can dispatch sibling tools concurrently; never overlap approval dialogs.
+    const run = async (): Promise<ToolCallEventResult | undefined> => {
+      let command: string;
+      let configChange = false;
 
-    if (event.toolName === "bash") {
-      if (!isToolCallEventType("bash", event)) return undefined;
-      command = event.input.command;
-      configChange = bashTouchesConfig(command);
-    } else if (isToolCallEventType("write", event)) {
-      if (!isProtectedConfigPath(event.input.path)) return undefined;
-      command = event.input.path;
-      configChange = true;
-    } else if (isToolCallEventType("edit", event)) {
-      if (!isProtectedConfigPath(event.input.path)) return undefined;
-      command = event.input.path;
-      configChange = true;
-    } else {
-      return undefined;
-    }
+      if (event.toolName === "bash") {
+        if (!isToolCallEventType("bash", event)) return undefined;
+        command = event.input.command;
+        configChange = bashTouchesConfig(command);
+      } else if (isToolCallEventType("write", event)) {
+        if (!isProtectedConfigPath(event.input.path)) return undefined;
+        command = event.input.path;
+        configChange = true;
+      } else if (isToolCallEventType("edit", event)) {
+        if (!isProtectedConfigPath(event.input.path)) return undefined;
+        command = event.input.path;
+        configChange = true;
+      } else {
+        return undefined;
+      }
 
-    if (loadResult.status === "failed") loadResult = loadConfigResult();
+      refreshConfig();
 
-    const match = configChange
-      ? { pattern: "gate config change requires approval", action: "prompt" as const }
-      : loadResult.status === "failed"
-        ? { pattern: "configuration unavailable", action: "prompt" as const }
-        : resolveRule(command, loadResult.config.operations);
+      const match = configChange
+        ? { pattern: "gate config change requires approval", action: "prompt" as const }
+        : loadResult.status === "failed"
+          ? { pattern: "configuration unavailable", action: "prompt" as const }
+          : resolveRule(command, loadResult.config.operations);
 
-    if (match === null || match.action === "allow") return undefined;
-    const rule = configChange ? CONFIG_CHANGE_REASON : formatRule(match);
+      if (match === null || match.action === "allow") return undefined;
+      const rule = configChange ? CONFIG_CHANGE_REASON : formatRule(match);
 
-    if (match.action === "block") {
-      const reason = `pi-gate: blocked by rule "${reasonRuleName(match.pattern)}". Do not retry or use equivalent commands; ask the user.`;
+      if (match.action === "block") {
+        const reason = `pi-gate: blocked by rule "${reasonRuleName(match.pattern)}". Do not retry or use equivalent commands; ask the user.`;
 
-      if (ctx.hasUI) ctx.ui.notify(reason, "warning");
+        if (ctx.hasUI) ctx.ui.notify(reason, "warning");
 
-      return { block: true, reason, terminate: true };
-    }
+        return { block: true, reason, terminate: true };
+      }
 
-    if (!ctx.hasUI) {
-      return {
-        block: true,
-        reason: configChange
-          ? CONFIG_CHANGE_REASON
-          : `pi-gate: rule "${reasonRuleName(match.pattern)}" needs approval but no UI is available. Do not retry; ask the user.`,
-        terminate: true,
-      };
-    }
-
-    reportHerdrBlocked(pi, ctx, true);
-    let choice: string | undefined;
-    let timedOut = false;
-    const timeoutMs = loadResult.config.promptTimeoutMs;
-
-    const promptCommand = configChange
-      ? `  ${formatCommandForDisplay(command)}`
-      : formatPromptCommand(command, match.pattern);
-
-    try {
-      const promptStartedAt = Date.now();
-      choice = await ctx.ui.select(
-        `pi-gate: allow this command?\n\n${promptCommand}\n\nMatched rule: ${rule}${configChange ? "" : "\nMatched command text is wrapped in »…«"}`,
-        ["Allow", "Deny"],
-        { timeout: timeoutMs },
-      );
-      // Pi returns undefined for both dismissal and timeout; elapsed time separates the timeout case.
-      timedOut = choice === undefined && Date.now() - promptStartedAt >= timeoutMs;
-    } finally {
-      reportHerdrBlocked(pi, ctx, false);
-    }
-
-    if (choice !== "Allow") {
-      return {
-        block: true,
-        reason: timedOut
-          ? timeoutReason(match.pattern, timeoutMs)
-          : configChange
+      if (!ctx.hasUI) {
+        return {
+          block: true,
+          reason: configChange
             ? CONFIG_CHANGE_REASON
-            : `pi-gate: denied by rule "${reasonRuleName(match.pattern)}". Do not retry or use equivalent commands; ask the user.`,
-        terminate: true,
-      };
-    }
+            : `pi-gate: rule "${reasonRuleName(match.pattern)}" needs approval but no UI is available. Do not retry; ask the user.`,
+          terminate: true,
+        };
+      }
 
-    return undefined;
+      if (ctx.signal?.aborted) {
+        return {
+          block: true,
+          reason: "pi-gate: approval cancelled; command not run.",
+          terminate: true,
+        };
+      }
+
+      const promptRevision = revision;
+
+      reportHerdrBlocked(pi, ctx, true);
+      let choice: string | undefined;
+      let timedOut = false;
+      const timeoutMs = loadResult.config.promptTimeoutMs;
+
+      const promptCommand = configChange
+        ? `  ${formatCommandForDisplay(command)}`
+        : formatPromptCommand(command, match.pattern);
+
+      try {
+        const promptStartedAt = Date.now();
+        choice = await ctx.ui.select(
+          `pi-gate: allow this command?\n\n${promptCommand}\n\nMatched rule: ${rule}${configChange ? "" : "\nMatched command text is wrapped in »…«"}`,
+          ["Allow", "Deny"],
+          { timeout: timeoutMs, signal: ctx.signal },
+        );
+        // Pi returns undefined for both dismissal and timeout; elapsed time separates the timeout case.
+        timedOut = choice === undefined && Date.now() - promptStartedAt >= timeoutMs;
+      } finally {
+        reportHerdrBlocked(pi, ctx, false);
+      }
+
+      refreshConfig();
+
+      if (ctx.signal?.aborted || revision !== promptRevision) {
+        return {
+          block: true,
+          reason:
+            "pi-gate: approval cancelled or policy changed; command not run. Ask the user whether to retry.",
+          terminate: true,
+        };
+      }
+
+      if (choice !== "Allow") {
+        return {
+          block: true,
+          reason: timedOut
+            ? timeoutReason(match.pattern, timeoutMs)
+            : configChange
+              ? CONFIG_CHANGE_REASON
+              : `pi-gate: denied by rule "${reasonRuleName(match.pattern)}". Do not retry or use equivalent commands; ask the user.`,
+          terminate: true,
+        };
+      }
+
+      return undefined;
+    };
+
+    const result = pending.then(run);
+    pending = result.then(
+      () => undefined,
+      () => undefined,
+    );
+
+    return result;
   });
 }

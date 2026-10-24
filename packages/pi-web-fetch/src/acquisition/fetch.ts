@@ -26,6 +26,7 @@ import {
   hasExtractionWarning,
 } from "../document/evidence.ts";
 import { extractHtmlToMarkdown } from "../document/extract.ts";
+import { assertConversionDepth } from "../document/complexity.ts";
 import {
   requestFollowingRedirects,
   type RedirectDependencies,
@@ -182,7 +183,13 @@ function assertSuccessfulResponse(response: IncomingMessage): void {
   throw new Error(`web_fetch returned HTTP ${status}.${authenticationHint}`);
 }
 
-/** Reads, decompresses, and decodes a response body once. */
+/**
+ * Reads, decompresses, and decodes a response body once.
+ * Unsupported charsets fall back to UTF-8.
+ *
+ * @throws For HTML nesting beyond MAX_CONVERSION_DEPTH; read, cancellation,
+ *   and decompression errors propagate
+ */
 async function decodeResponseBody(
   response: IncomingMessage,
   signal: AbortSignal,
@@ -195,6 +202,8 @@ async function decodeResponseBody(
     decompressResponse(rawBytes, responseHeader(response, "content-encoding")),
     contentTypeHeader,
   );
+
+  if (isHtmlContentType(contentType)) assertConversionDepth(raw);
 
   return { raw, contentTypeHeader, contentType };
 }

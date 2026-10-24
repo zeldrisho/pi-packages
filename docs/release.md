@@ -4,6 +4,12 @@ Packages are versioned independently. The agent updates the manifest and changel
 
 ## Normal release
 
+For an existing package with trusted publishing already configured, release
+preparation and CI publishing do not require a local npm login. Do not run
+`vp pm login`, `npm trust github`, or `npm trust list` as routine release
+prerequisites; those are first-package bootstrap steps described below. The
+release workflow authenticates to npm through GitHub Actions OIDC.
+
 A release starts by confirming the package and version, then updating
 `packages/<name>/package.json` and that package's `CHANGELOG.md`. The changelog
 entry uses the heading `## [version] - YYYY-MM-DD`; run `vp run format:changelog`
@@ -36,21 +42,41 @@ The tag name and manifest version must match. Publishing is automatic: the `publ
 
 Each package owns its `CHANGELOG.md`. Use [Keep a Changelog 2.0.0](https://keepachangelog.com/en/2.0.0/): `# Changelog`, an `Unreleased` section, dated version headings, one comparison link per version, and the standard `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security` sections. Do not repeat the package name as a bullet scope.
 
+Record only user-visible features, fixes, security changes, and usage or compatibility changes. Omit internal refactors, tests, tooling updates, and maintenance-only work. Describe the effect on users rather than the implementation.
+
 ## Recovery and bootstrap
 
 If a tagged release fails, first check `npm view <package>@<version>`. Published versions are permanent: reconcile the existing GitHub release and provenance instead of republishing. If npm does not contain the version, delete the partial GitHub release and remote tag, correct the commit, and recreate the tag.
 
-Trusted publishing cannot publish a package's first registry version ([npm limitation](https://github.com/npm/cli/issues/8544)). Before merging a new package, publish an inspected one-off `0.0.0` with `--tag bootstrap` (do not commit that version), configure the npm trusted publisher for `zeldrisho/pi-packages`, workflow `release.yml`, environment `publish`, then use the normal process.
+Trusted publishing cannot publish a package's first registry version ([npm limitation](https://github.com/npm/cli/issues/8544)). Before pushing a new package's first release tag, publish an inspected one-off `0.0.0`, conventionally with `--tag bootstrap`, then configure the npm trusted publisher for `zeldrisho/pi-packages`, workflow `release.yml`, environment `publish`. The published version is what makes trust configuration possible; the `bootstrap` tag only labels the placeholder. Do not commit the `0.0.0` version. Do not push the first release tag before the bootstrap and trust configuration succeed: the workflow creates the GitHub release before publishing, so a failed first publish leaves a partial release.
 
-For the one-off manual bootstrap only, use npm directly: set the package manifest to `0.0.0` temporarily, inspect the tarball, then publish from the package directory. Run npm commands from inside that package; the repository root pins pnpm through `packageManager`, while an individual package directory may resolve to npm. Do not use `vp pm` for this bootstrap publish, since its package-manager selection depends on the current directory.
+Run the bootstrap from inside the package directory. `vp pm` is the fallback for package-manager commands that Vite+ does not provide; it delegates to the repository's pinned pnpm. Use `vp pm` for the package operations and `npm` only for trusted-publisher configuration, which has no `vp pm` equivalent:
 
 ```bash
-npm publish --access public --tag bootstrap
+vp pm pkg set version=0.0.0
+vp pm pack -- --dry-run
+vp pm login
+vp pm publish --access public --tag bootstrap --no-git-checks
+git restore package.json
+npm trust github <package> \
+  --file release.yml \
+  --repo zeldrisho/pi-packages \
+  --env publish \
+  --allow-publish -y
+npm trust list <package>
 ```
 
-Do not pass pnpm's `--no-git-checks` option to npm; npm warns that it is an unknown configuration option and ignores it. Confirm the publish output names the expected package at `0.0.0` and shows the `bootstrap` tag. If published with the default `latest` tag by mistake, add the `bootstrap` tag with `npm dist-tag add <package>@0.0.0 bootstrap`. Do not try to remove `latest` while it points to the only published version; the registry may reject that operation. The first normal release will move `latest` to its published version. Restore the intended release version in the manifest without committing `0.0.0`. Stop if the package name, version, access, tarball, or publisher settings are unexpected or publishing fails. Normal releases continue to publish through the automated trusted-publishing workflow.
+`vp` is not an npm wrapper: `vp pkg`, `vp pm trust`, and `vp pm pack --dry-run` without `--` do not work, and `vp pack` is the Vite+ build command, not an npm tarball pack. Pass `--` when forwarding pack options through `vp pm`.
 
-Pause and notify the owner if any manifest, tag, package path, changelog, authentication, OIDC, provenance, or publication detail disagrees or fails.
+`vp pm login` opens a browser; if it cannot, set `BROWSER`. An unauthenticated publish of a new package returns `404`, so log in before treating that response as fatal. Because `vp pm pkg set` leaves the manifest dirty, pnpm refuses to publish unless `--no-git-checks` is passed. Do not pass `--no-git-checks` to npm, which warns that it is unknown and ignores it.
+
+The trust command needs the package to exist, so run it after the bootstrap publish. It requires 2FA and reports the configured permissions, which may include stage publishing. Confirm the configuration with `npm trust list` before pushing the new package's first release tag; do not repeat this check for routine releases.
+
+npm can create a `<version>-stage` stub while deferring 2FA for the first publish. The stub has `"stub": true`, no dist-tag, and is an internal staged-publishing placeholder, not a release; it does not replace the manual bootstrap.
+
+Confirm the publish output names the expected package at `0.0.0` and shows the `bootstrap` tag. If published with the default `latest` tag by mistake, add the `bootstrap` tag with `npm dist-tag add <package>@0.0.0 bootstrap`. Do not try to remove `latest` while it points to the only published version; the registry may reject that operation. The first normal release will move `latest` to its published version. Restore the intended release version in the manifest without committing `0.0.0`. Stop if the package name, version, access, tarball, or publisher settings are unexpected or publishing fails. Normal releases continue to publish through the automated trusted-publishing workflow.
+
+Pause and notify the owner if any manifest, tag, package path, changelog, provenance, or publication detail disagrees or fails, or if authentication or OIDC fails during a required bootstrap or CI publishing step. Missing local npm authentication is not a blocker for an existing package's normal release preparation.
 
 ## Invariants
 

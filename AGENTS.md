@@ -4,6 +4,7 @@
 
 - Use **Vite+** (`vp install`) with the pnpm workspace and lockfile.
 - Use `vp run <name>` for project scripts; `vp <name>` invokes a built-in command.
+- Use `vp pm <command>` for package-manager commands Vite+ does not provide; it delegates to pnpm (for example, `vp pm publish`).
 - Use `fd` for file discovery.
 
 ## Commands
@@ -20,12 +21,12 @@
 ## Key Conventions
 
 - Use Conventional Commits.
-
+- Keep READMEs user-guide-only; put implementation and maintenance details in `docs/`.
+- Record only user-facing changes under `Unreleased` in package changelogs, then run `vp run format:changelog`; omit internal refactors, tests, tooling, and maintenance-only changes.
 - Edit shared `cache.ts`, `inflight.ts`, and `render.ts` in `packages/pi-web-fetch/src/`, then run `vp run sync:web-modules` to update `pi-web-search`.
 - Read `docs/development.md` before runtime or dependency changes, especially its security and regression requirements.
 - Read `docs/architecture.md` before changing package boundaries, network acquisition, caching, or derived views.
 - Follow `docs/release.md` before version bumps, changelog edits, tags, or publishing.
-- After each Pi package change, update its `CHANGELOG.md` under `Unreleased` if the change is notable to users, then run `vp run format:changelog`.
 - Update work branches from their target before review.
 
 ## External References

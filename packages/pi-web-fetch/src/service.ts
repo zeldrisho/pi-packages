@@ -6,6 +6,7 @@ import {
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
   truncateHead,
+  type AgentToolResult,
 } from "@earendil-works/pi-coding-agent";
 import { ExpiringLruCache, stableKeyHash, type CachePersistence } from "./cache";
 import { sliceCompleteDocument, type CompleteDocument } from "./document/content.ts";
@@ -198,6 +199,84 @@ interface WebFetchUpdate {
   details: Record<string, never>;
 }
 
+/** Machine-readable result declared by `web_fetch`'s `outputSchema`. */
+export interface WebFetchStructuredOutput {
+  requestedUrl: string;
+  finalUrl: string;
+  title?: string;
+  contentType: string;
+  extractor: CompleteDocument["extractor"];
+  contentKind: ContentKind;
+  confidence: FetchConfidence;
+  cacheStatus: CacheStatus;
+  blocked: boolean;
+  markdown: string;
+  truncated: boolean;
+  offset: number;
+  nextOffset?: number;
+  totalCharacters: number;
+  characterCount: number;
+  llmsTxtFallback: boolean;
+  markdownAlternateFallback: boolean;
+  extraction?: CompleteDocument["extractionDiagnostics"];
+  focus?: FocusDetails;
+  outline: { totalWords: number; totalHeadings: number; omittedHeadings: number };
+  fragment?: { requested: string; matched: boolean; offset?: number };
+}
+
+/** JSON Schema of the machine-readable `web_fetch` result. */
+export const webFetchOutputSchema = Type.Object({
+  requestedUrl: Type.String(),
+  finalUrl: Type.String(),
+  title: Type.Optional(Type.String()),
+  contentType: Type.String(),
+  extractor: Type.Union([Type.Literal("raw"), Type.Literal("basic"), Type.Literal("defuddle")]),
+  contentKind: Type.String(),
+  confidence: Type.Union([Type.Literal("high"), Type.Literal("medium"), Type.Literal("low")]),
+  cacheStatus: Type.Union([Type.Literal("hit"), Type.Literal("revalidated"), Type.Literal("miss")]),
+  blocked: Type.Boolean(),
+  markdown: Type.String(),
+  truncated: Type.Boolean(),
+  offset: Type.Integer(),
+  nextOffset: Type.Optional(Type.Integer()),
+  totalCharacters: Type.Integer(),
+  characterCount: Type.Integer(),
+  llmsTxtFallback: Type.Boolean(),
+  markdownAlternateFallback: Type.Boolean(),
+  extraction: Type.Optional(
+    Type.Object({
+      javascriptRequired: Type.Boolean(),
+      botWall: Type.Boolean(),
+      consentInterstitial: Type.Boolean(),
+      sparseExtraction: Type.Boolean(),
+      rawCharacters: Type.Integer(),
+      extractedCharacters: Type.Integer(),
+    }),
+  ),
+  focus: Type.Optional(
+    Type.Object({
+      query: Type.String(),
+      matchedSections: Type.Integer(),
+      totalSections: Type.Integer(),
+      omittedSections: Type.Integer(),
+      originalCharacters: Type.Integer(),
+      focusedCharacters: Type.Integer(),
+    }),
+  ),
+  outline: Type.Object({
+    totalWords: Type.Integer(),
+    totalHeadings: Type.Integer(),
+    omittedHeadings: Type.Integer(),
+  }),
+  fragment: Type.Optional(
+    Type.Object({
+      requested: Type.String(),
+      matched: Type.Boolean(),
+      offset: Type.Optional(Type.Integer()),
+    }),
+  ),
+});
+
 const completeDocumentCacheSchema = Type.Object(
   {
     url: Type.String(),
@@ -294,7 +373,8 @@ const inflightFetches = new InflightCoalescer<string, FetchAcquisition>(MAX_INFL
  * @param params.maxCharacters - Integer from 1,000 to 30,000; defaults to 6,000 before line/byte limits
  * @param signal - Cancels acquisition; fresh cache hits do not consult this signal
  * @param onUpdate - Receives cache or acquisition progress before content is returned
- * @returns Bounded text output and metadata, including cache, fragment, and continuation details
+ * @returns Bounded text, structured content, and metadata. Structured Markdown may
+ *   be shorter to fit JSON byte limits; use its own nextOffset for continuation.
  * @throws For invalid parameter limits; acquisition, cancellation, and progress callback errors propagate
  */
 export async function executeWebFetch(
@@ -550,9 +630,70 @@ export async function executeWebFetch(
   });
 
   const truncated = result.truncated || outputTruncation.truncated;
+  const outline = createDocumentOutline(document.markdown);
+
+  const structured: WebFetchStructuredOutput = {
+    requestedUrl,
+    finalUrl,
+    title: result.title?.slice(0, 500),
+    contentType: result.contentType,
+    extractor: result.extractor,
+    contentKind,
+    confidence,
+    cacheStatus,
+    blocked,
+    markdown: outputDocument.markdown.slice(result.offset, result.nextOffset),
+    truncated: result.truncated,
+    offset: result.offset,
+    nextOffset: result.nextOffset,
+    totalCharacters: result.totalCharacters,
+    characterCount: 0,
+    llmsTxtFallback: Boolean(result.llmsTxtFallback),
+    markdownAlternateFallback: Boolean(result.markdownAlternateFallback),
+    extraction: result.extractionDiagnostics,
+    focus: focused?.details,
+    outline: {
+      totalWords: outline.totalWords,
+      totalHeadings: outline.totalHeadings,
+      omittedHeadings: outline.omittedHeadings,
+    },
+    fragment:
+      resolvedFragment.fragment === undefined
+        ? undefined
+        : {
+            requested: resolvedFragment.fragment,
+            matched: fragmentMatched,
+            offset: fragmentOffset,
+          },
+  };
+
+  structured.characterCount = structured.markdown.length;
+
+  // JSON escaping consumes a separate byte budget. If it needs a shorter chunk,
+  // advance only by the content actually returned to programmatic callers.
+  while (
+    encoder.encode(JSON.stringify(structured)).byteLength > DEFAULT_MAX_BYTES &&
+    structured.markdown.length > 0
+  ) {
+    let end = Math.floor(structured.markdown.length / 2);
+
+    if (end > 0 && /[\uD800-\uDBFF]/u.test(structured.markdown[end - 1])) end -= 1;
+
+    structured.markdown = structured.markdown.slice(0, end);
+    structured.characterCount = end;
+    structured.nextOffset = result.offset + end;
+    structured.truncated = true;
+  }
+
+  // SAFETY: this DTO contains only bounded JSON data; serialization omits optional
+  // undefined properties so the emitted value matches the declared output schema.
+  const structuredContent = JSON.parse(JSON.stringify(structured)) as NonNullable<
+    AgentToolResult["structuredContent"]
+  >;
 
   return {
     content: [{ type: "text" as const, text: outputTruncation.content }],
+    structuredContent,
     details: {
       url: finalUrl,
       requestedUrl,
@@ -565,7 +706,7 @@ export async function executeWebFetch(
       extractionDiagnostics: result.extractionDiagnostics,
       links: displayLinks,
       confidence,
-      outline: createDocumentOutline(document.markdown),
+      outline,
       focus: focused?.details,
       llmsTxtFallback: Boolean(result.llmsTxtFallback),
       markdownAlternateFallback: Boolean(result.markdownAlternateFallback),

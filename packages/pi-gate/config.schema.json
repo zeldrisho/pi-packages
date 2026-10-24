@@ -21,7 +21,7 @@
     },
     "operations": {
       "type": "object",
-      "description": "Command substring patterns mapped to actions. When multiple patterns match, the longest wins.",
+      "description": "Case-insensitive command patterns. Simple commands use word matching and ignore literal echo/printf arguments; complex syntax uses substring matching. Contained allow matches suppress restrictions; remaining blocks win.",
       "maxProperties": 1000,
       "propertyNames": {
         "minLength": 1,

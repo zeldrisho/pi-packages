@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { describe, it } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 const root = resolve(import.meta.dirname, "./..");
 
@@ -21,9 +21,22 @@ const workspace = await readFile(join(root, "pnpm-workspace.yaml"), "utf8");
 
 const lockfile = await readFile(join(root, "pnpm-lock.yaml"), "utf8");
 
+const rootManifest: RepositoryManifest = JSON.parse(
+  await readFile(join(root, "package.json"), "utf8"),
+);
+
 const releaseWorkflow = await readFile(join(root, ".github/workflows/release.yml"), "utf8");
 
 const expectedFiles = ["src", "CHANGELOG.md"];
+
+interface RepositoryManifest {
+  packageManager?: string;
+  devEngines?: { packageManager?: { name?: string; version?: string } };
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+  optionalDependencies?: Record<string, string>;
+}
 
 const packageSpecificFiles = new Map([
   ["pi-gate", ["config.schema.json"]],
@@ -70,6 +83,25 @@ const synchronizedInfrastructurePairs = [
  * next top-level key. Catalog aliases (`vite` and `vitest`) are returned as
  * `catalog:` values so callers can skip them.
  */
+function parseCatalog(yaml: string): Map<string, string> {
+  const catalog = new Map<string, string>();
+  let inCatalog = false;
+
+  for (const line of yaml.split(/\r?\n/)) {
+    if (!inCatalog) {
+      if (/^catalog:\s*$/.test(line)) inCatalog = true;
+      continue;
+    }
+
+    if (/^\S/.test(line)) break;
+    const match = line.match(/^ {2}"?([A-Za-z0-9@._/-]+)"?:\s*(?:"([^"]*)"|(\S+))?/);
+
+    if (match) catalog.set(match[1], match[2] ?? match[3] ?? "");
+  }
+
+  return catalog;
+}
+
 function parseOverrides(yaml: string): Map<string, string> {
   const overrides = new Map<string, string>();
   let inOverrides = false;
@@ -87,6 +119,14 @@ function parseOverrides(yaml: string): Map<string, string> {
   }
 
   return overrides;
+}
+
+/** Reads package versions without swallowing pnpm peer suffixes or YAML quotes. */
+function resolvedVersions(lockfile: string, name: string): string[] {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const occurrences = lockfile.match(new RegExp(`${escapedName}@[^\\s:()'"]+`, "g")) ?? [];
+
+  return occurrences.map((occurrence) => occurrence.slice(name.length + 1));
 }
 
 /**
@@ -329,11 +369,21 @@ describe("repository contracts", () => {
     }
   });
 
+  it("reads exact versions from package keys and peer references", () => {
+    const fixture = `undici@8.12.2:
+  'openai@7.19.0(undici@8.12.2)(ws@8.21.3)':
+  'openai@7.19.0(undici@8.10.2)(ws@8.21.3)':
+  '@scope/client@1.2.3(undici@8.12.2)':`;
+
+    expect(resolvedVersions(fixture, "undici")).toEqual(["8.12.2", "8.12.2", "8.10.2", "8.12.2"]);
+    expect(resolvedVersions(fixture, "@scope/client")).toEqual(["1.2.3"]);
+    expect(resolvedVersions(fixture, "absent")).toEqual([]);
+  });
+
   it("workspace overrides match the lockfile", () => {
     for (const [name, version] of parseOverrides(workspace)) {
       if (version === "catalog:") continue;
-      const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const resolved = lockfile.match(new RegExp(`${escapedName}@[^\\s:]+`, "g")) ?? [];
+      const resolved = resolvedVersions(lockfile, name);
 
       if (resolved.length === 0) {
         fail(
@@ -341,14 +391,76 @@ describe("repository contracts", () => {
         );
       }
 
-      for (const occurrence of resolved) {
-        const resolvedVersion = occurrence.slice(name.length + 1);
-
+      for (const resolvedVersion of resolved) {
         if (resolvedVersion !== version) {
           fail(
             `${name} is overridden to ${version} but the lockfile resolves ${resolvedVersion}; update the lockfile or remove the override`,
           );
         }
+      }
+    }
+  });
+
+  it("declares a single package-manager pin", () => {
+    const pin = rootManifest.packageManager?.match(/^pnpm@(.+)$/)?.[1];
+    const devEngine = rootManifest.devEngines?.packageManager;
+
+    if (!pin) fail("root packageManager must pin a pnpm version as pnpm@<version>");
+
+    if (devEngine?.name !== "pnpm" || devEngine?.version !== pin) {
+      fail(`devEngines.packageManager must repeat the packageManager pin pnpm@${pin}`);
+    }
+  });
+
+  it("workspace catalog covers every catalog reference", async () => {
+    const catalog = parseCatalog(workspace);
+    const referenced = new Map<string, string[]>();
+
+    const manifests = [
+      { directory: ".", manifest: rootManifest },
+      ...(await Promise.all(
+        packageDirectories.map(async (directory) => ({
+          directory,
+          manifest: JSON.parse(
+            await readFile(join(packagesDirectory, directory, "package.json"), "utf8"),
+          ),
+        })),
+      )),
+    ];
+
+    for (const { directory, manifest } of manifests) {
+      const sections = [
+        "dependencies",
+        "devDependencies",
+        "peerDependencies",
+        "optionalDependencies",
+      ] as const;
+
+      for (const section of sections) {
+        for (const [name, value] of Object.entries(manifest[section] ?? {})) {
+          if (value !== "catalog:") continue;
+          referenced.set(name, [...(referenced.get(name) ?? []), `${directory}:${section}`]);
+        }
+      }
+    }
+
+    for (const [selector, version] of parseOverrides(workspace)) {
+      if (version !== "catalog:") continue;
+      const name = selector.split("@")[0];
+      referenced.set(name, [...(referenced.get(name) ?? []), "workspace override"]);
+    }
+
+    for (const [name, sources] of referenced) {
+      if (!catalog.has(name)) {
+        fail(
+          `${name} is referenced as catalog: by ${sources.join(", ")} but missing from the catalog`,
+        );
+      }
+    }
+
+    for (const name of catalog.keys()) {
+      if (!referenced.has(name)) {
+        fail(`${name} is defined in the workspace catalog but nothing references catalog:`);
       }
     }
   });

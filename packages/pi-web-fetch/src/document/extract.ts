@@ -2,6 +2,7 @@ import { parseHTML } from "linkedom";
 import type { DefuddleResponse } from "defuddle/node";
 import { stripExtractedCssCruft } from "./markdown-cleanup.ts";
 import { buildFragmentOffsets } from "./fragment-index.ts";
+import { assertConversionDepth } from "./complexity.ts";
 
 export { stripExtractedCssCruft } from "./markdown-cleanup.ts";
 
@@ -133,8 +134,10 @@ function normalizeFragmentDocument(document: Document): void {
  *
  * @param html - The HTML content to convert
  * @returns The trimmed text content with excluded elements and excessive whitespace removed
+ * @throws When markup exceeds the safe conversion depth; DOM parsing errors propagate
  */
 export function htmlToMarkdownFallback(html: string): string {
+  assertConversionDepth(html);
   const { document } = parseHTML(html);
   normalizeFragmentDocument(document);
 
@@ -393,8 +396,8 @@ function readAdvertisedLinks(
  *
  * @param html - The HTML document to convert
  * @param baseUrl - The absolute base URL used to resolve document-relative links
- * @returns The extracted Markdown, optional title, extractor used, and any advertised
- *   discovery links resolved against the base URL
+ * @returns The extracted Markdown, optional title, extractor used, and advertised discovery links
+ * @throws When markup exceeds the safe conversion depth
  */
 export async function extractHtmlToMarkdown(
   html: string,
@@ -407,6 +410,8 @@ export async function extractHtmlToMarkdown(
   describedByLink?: string;
   markdownAlternateLink?: string;
 }> {
+  // Keep refusal outside the catch: the fallback also constructs a DOM.
+  assertConversionDepth(html);
   let advertised: AdvertisedLinks = {};
 
   try {
