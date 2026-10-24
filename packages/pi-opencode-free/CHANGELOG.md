@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Show usage-limit reset times in 24-hour format without seconds while retaining your local date and timezone.
+
+### Fixed
+
+- Stop Pi from automatically retrying exhausted free-tier usage limits while preserving server-reported reset times.
+
 ## [0.2.0] - 2026-10-24
 
 ### Added
