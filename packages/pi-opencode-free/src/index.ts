@@ -88,12 +88,17 @@ export function registerOpencodeFree(
  * Refreshes the catalog, falling back to stored models or bundled models when
  * offline, canceled, version resolution fails, or discovery returns no usable
  * models. Version resolution and discovery share an eight-second abort deadline.
- * Like native Pi, catalogs with Last-Modified metadata stay fresh for four hours;
- * force bypasses freshness, never offline mode or cancellation. HTTP failures
+ * Like native Pi, catalogs with lastModified (including zero) and a valid checkedAt
+ * stay fresh for four hours after checkedAt. Force bypasses freshness, never
+ * offline mode or cancellation. HTTP failures
  * retain the body and validators while advancing checkedAt; first failures without
  * Last-Modified remain immediately retryable. Transport, parsing, version lookup,
  * and cancellation failures do not advance freshness. Snapshots are endpoint-scoped.
- * Publication failures still leave a valid in-memory catalog.
+ * Publication errors are ignored and the snapshot is retained in memory unless
+ * the caller canceled; a refused publication does not update the in-memory cache.
+ *
+ * @throws {Error} If discovery reports an HTTP failure, after attempting to publish the
+ *   updated checkedAt with any existing body and validators
  */
 async function refreshModels(
   context: RefreshModelsContext,
@@ -132,6 +137,7 @@ async function refreshModels(
     return fallbackModels;
   }
 
+  /** Publishes a snapshot and caches it unless refused or canceled; publication errors are ignored. */
   const publish = async (entry: FreeModelsStoreEntry): Promise<void> => {
     let accepted = true;
 
@@ -184,7 +190,10 @@ async function refreshModels(
   return outcome.models;
 }
 
-/** Rejects missing, invalid, or future timestamps instead of extending cache lifetimes. */
+/**
+ * Accepts nonnegative epoch-millisecond timestamps no later than now and less
+ * than ttl milliseconds old; missing, nonfinite, and future timestamps fail.
+ */
 function isRecent(timestamp: number | undefined, now: number, ttl: number): boolean {
   return (
     timestamp !== undefined &&

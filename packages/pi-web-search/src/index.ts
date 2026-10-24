@@ -63,6 +63,10 @@ export default function (pi: ExtensionAPI) {
       return runtime.execute(params, signal, onUpdate, ctx?.cwd);
     },
 
+    /**
+     * Renders partial text or "Searching…" while pending. Completed text gets a
+     * result and cache summary when available and a collapsible body; absent text shows "No results".
+     */
     renderResult(result, { expanded, isPartial }, theme) {
       const content = result.content.find((item) => item.type === "text");
 

@@ -98,6 +98,7 @@ export default function (pi: ExtensionAPI) {
     outputSchema: webFetchOutputSchema,
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
 
+    /** Renders the redacted URL, optional focus query, and character offset in the call preview. */
     renderCall(args, theme) {
       return new Text(
         `${theme.fg("toolTitle", theme.bold("web_fetch"))} ${theme.fg("accent", redactUrlForDisplay(args.url))}${args.query === undefined ? "" : ` query=${JSON.stringify(args.query)}`}${args.offset === undefined ? "" : ` offset=${args.offset}`}`,
@@ -110,6 +111,10 @@ export default function (pi: ExtensionAPI) {
       return executeWebFetch(params, signal, onUpdate);
     },
 
+    /**
+     * Renders partial text or "Fetching…" while pending. Completed text gets a
+     * detail summary when available and a collapsible body; absent text shows "No content".
+     */
     renderResult(result, { expanded, isPartial }, theme) {
       const content = result.content.find((item) => item.type === "text");
 

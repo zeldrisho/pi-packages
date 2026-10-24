@@ -112,10 +112,12 @@ export {
 
 /**
  * Gates `bash` calls against user rules and requires approval for protected
- * configuration writes and edits. Creates a starter configuration at session start if absent.
+ * configuration writes and edits. Attempts to create a starter configuration
+ * at session start if absent.
  * Reloads rules before gating and after each prompt; approvals apply per call.
- * Dialogs are serialized, and cancellation, session starts, or policy changes
- * invalidate an active approval. UI failures reject the affected tool call.
+ * Dialogs are serialized. Cancellation, shutdown, and session replacement deny
+ * active and queued gated calls; policy changes invalidate an active approval.
+ * UI failures reject the affected tool call.
  */
 export default function piGate(pi: ExtensionAPI): void {
   let loadResult = loadConfigResult();
@@ -172,6 +174,10 @@ export default function piGate(pi: ExtensionAPI): void {
     const signal = ctx.signal ? AbortSignal.any([ctx.signal, session.signal]) : session.signal;
 
     // Pi can dispatch sibling tools concurrently; never overlap approval dialogs.
+    /**
+     * Returns a terminating block result for denied calls, or undefined to allow;
+     * UI errors propagate.
+     */
     const run = async (): Promise<ToolCallEventResult | undefined> => {
       let command: string;
       let configChange = false;

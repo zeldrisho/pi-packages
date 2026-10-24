@@ -150,7 +150,10 @@ export function configsFromStoredModels(
   return configs;
 }
 
-/** Restores validated metadata only when a complete body backs the persisted validator. */
+/**
+ * Restores cached free-model metadata, accepting an empty catalog and lastModified of zero.
+ * Returns undefined if the catalog or timestamp is missing or invalid, or any entry is unusable.
+ */
 export function catalogFromStoredEntry(
   stored: Readonly<ModelsStoreEntry> | undefined,
 ): ModelCatalogSnapshot | undefined {
@@ -230,12 +233,15 @@ export function storedModelsFromConfigs(
  *
  * The live endpoint decides which models currently exist. Pi's OpenCode
  * catalog supplies their capabilities and compatibility flags. A newer remote
- * catalog overlays bundled metadata; otherwise bundled metadata is used. Both
- * endpoints must respond successfully. Failures are classified without
- * exposing response bodies, headers, or credentials.
+ * catalog overlays bundled metadata; otherwise bundled metadata is used.
+ * A catalog 304 reuses a nonempty cached body with an ETag; 404/501 uses bundled metadata.
+ * HTTP, transport, parsing, and cancellation failures are returned as statuses
+ * without exposing response bodies, headers, or credentials.
  *
- * @param options - Endpoint, headers, abort signal, and fetcher
- * @returns Discovered models or a bounded failure status
+ * @param options - Endpoint, headers, abort signal, fetcher, network permission,
+ *   and optional cached metadata for revalidation
+ * @returns Discovered models and the complete metadata snapshot, or a bounded
+ *   failure status with an HTTP status when an HTTP request failed
  */
 export async function discoverFreeModelsWithStatus(
   options: DiscoverFreeModelsOptions,
@@ -294,7 +300,7 @@ function freeBuiltinModels(): Map<string, FreeChatModelConfig> {
   return models;
 }
 
-/** Overlays qualifying remote entries on bundled models; rejected or absent entries leave them intact. */
+/** Overlays already validated free metadata on bundled models, replacing matching ids. */
 function freeCatalogModels(
   catalog: readonly FreeChatModelConfig[],
 ): Map<string, FreeChatModelConfig> {
@@ -405,6 +411,7 @@ function selectFreeModels(
  * Fetches `/models` with the supplied headers and signal, omitting empty ids.
  * Returns a classified failure on HTTP, fetch, JSON parsing, or response-shape
  * failure, including an aborted fetch; a valid empty list succeeds.
+ * HTTP failures include the response status; caught errors do not propagate.
  */
 async function fetchLiveModelIds(
   options: DiscoverFreeModelsOptions,
@@ -439,11 +446,13 @@ async function fetchLiveModelIds(
 
 /**
  * Fetches Pi's OpenCode catalog with the supplied signal and without provider headers.
- * Revalidates a complete cached metadata body with ETag, retaining it on 304.
+ * Revalidates nonempty cached metadata with ETag, retaining it on 304.
  * Missing catalogs (404/501) produce the native empty overlay marker. Other HTTP,
  * fetch, JSON parsing, or response-shape failures are classified.
  * Invalid ids or names discard individual entries; a nonempty response with no
  * valid entries is a response-shape failure.
+ * Successful snapshots contain free-model metadata, an optional ETag, and a
+ * Last-Modified time in epoch milliseconds (zero when missing or invalid).
  */
 async function fetchModelCatalog(
   options: DiscoverFreeModelsOptions,
@@ -504,8 +513,8 @@ async function fetchModelCatalog(
 }
 
 /**
- * Compares the remote Last-Modified date with the bundled catalog timestamp.
- * A missing or invalid remote date is stored as zero, matching native Pi.
+ * Returns whether the remote Last-Modified time in epoch milliseconds is strictly
+ * newer than the bundled timestamp; any value qualifies if no bundled timestamp exists.
  */
 function isCatalogNewer(lastModified: number): boolean {
   const localGeneratedAt = getBuiltinModelDataGeneratedAt();
