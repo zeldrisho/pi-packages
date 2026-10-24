@@ -9,12 +9,14 @@ import {
 } from "./fingerprint.ts";
 import {
   DEFAULT_BASE_URL,
+  catalogFromStoredEntry,
   configsFromStoredModels,
   discoverFreeModelsWithStatus,
   initialFreeModels,
   storedModelsFromConfigs,
   stripTrailingSlashes,
   type FreeChatModelConfig,
+  type FreeModelsStoreEntry,
 } from "./models.ts";
 import { createFreeStream } from "./stream.ts";
 
@@ -22,6 +24,15 @@ import { createFreeStream } from "./stream.ts";
 export const PROVIDER_ID = "opencode-free";
 
 const DISCOVERY_TIMEOUT_MS = 8_000;
+
+const CATALOG_TTL_MS = 4 * 60 * 60 * 1000;
+
+interface CatalogRefreshState {
+  cached?: {
+    baseUrl: string;
+    entry: FreeModelsStoreEntry;
+  };
+}
 
 /** Injectable runtime dependencies used by tests and the default extension export. */
 export interface OpencodeFreeDependencies {
@@ -48,6 +59,7 @@ export function registerOpencodeFree(
 
   const resolveVersion = createCliVersionResolver(dependencies.fetcher);
   const initialModels = initialFreeModels();
+  const refreshState: CatalogRefreshState = {};
 
   pi.on("session_start", () => {
     sessionId = createCanonicalSessionId(dependencies.randomSeed());
@@ -66,7 +78,7 @@ export function registerOpencodeFree(
       return { sessionId, cliVersion };
     }),
     refreshModels: async (context) =>
-      refreshModels(context, dependencies, sessionId, resolveVersion),
+      refreshModels(context, dependencies, sessionId, resolveVersion, refreshState),
   };
 
   pi.registerProvider(PROVIDER_ID, config);
@@ -76,20 +88,61 @@ export function registerOpencodeFree(
  * Refreshes the catalog, falling back to stored models or bundled models when
  * offline, canceled, version resolution fails, or discovery returns no usable
  * models. Version resolution and discovery share an eight-second abort deadline.
- * Successful results are published for persistence; publication failures are ignored
- * and the discovered models are still returned.
+ * Like native Pi, catalogs with Last-Modified metadata stay fresh for four hours;
+ * force bypasses freshness, never offline mode or cancellation. HTTP failures
+ * retain the body and validators while advancing checkedAt; first failures without
+ * Last-Modified remain immediately retryable. Transport, parsing, version lookup,
+ * and cancellation failures do not advance freshness. Snapshots are endpoint-scoped.
+ * Publication failures still leave a valid in-memory catalog.
  */
 async function refreshModels(
   context: RefreshModelsContext,
   dependencies: OpencodeFreeDependencies,
   sessionId: string,
   resolveVersion: (signal?: AbortSignal) => Promise<string>,
+  state: CatalogRefreshState,
 ): Promise<FreeChatModelConfig[]> {
   const baseUrl = stripTrailingSlashes(context.baseUrl ?? DEFAULT_BASE_URL);
-  const cachedModels = configsFromStoredModels(context.stored?.models ?? [], PROVIDER_ID);
+  const memory = state.cached?.baseUrl === baseUrl ? state.cached : undefined;
+
+  const storedModels = configsFromStoredModels(
+    (context.stored?.models ?? []).filter(
+      (model) => stripTrailingSlashes(model.baseUrl) === baseUrl,
+    ),
+    PROVIDER_ID,
+  );
+
+  const stored = memory?.entry ?? (storedModels.length > 0 ? context.stored : undefined);
+
+  const cachedModels = memory
+    ? configsFromStoredModels(memory.entry.models, PROVIDER_ID)
+    : storedModels;
+
   const fallbackModels = cachedModels.length > 0 ? cachedModels : initialFreeModels();
 
   if (!context.allowNetwork || context.signal.aborted) return fallbackModels;
+
+  const now = Date.now();
+
+  if (
+    !context.force &&
+    stored?.lastModified !== undefined &&
+    isRecent(stored.checkedAt, now, CATALOG_TTL_MS)
+  ) {
+    return fallbackModels;
+  }
+
+  const publish = async (entry: FreeModelsStoreEntry): Promise<void> => {
+    let accepted = true;
+
+    try {
+      accepted = await context.publish({ persist: entry });
+    } catch {
+      // Keep a valid in-memory catalog even when persistent storage is unavailable.
+    }
+
+    if (accepted && !context.signal.aborted) state.cached = { baseUrl, entry };
+  };
 
   const signal = AbortSignal.any([context.signal, AbortSignal.timeout(DISCOVERY_TIMEOUT_MS)]);
   let cliVersion: string;
@@ -106,24 +159,40 @@ async function refreshModels(
     signal,
     fetcher: dependencies.fetcher,
     allowNetwork: context.allowNetwork,
+    catalog: catalogFromStoredEntry(stored),
   });
 
-  if (!outcome.models || context.signal.aborted) return fallbackModels;
+  if (signal.aborted) return fallbackModels;
 
-  const models = outcome.models;
-
-  try {
-    await context.publish({
-      persist: {
-        models: storedModelsFromConfigs(models, PROVIDER_ID, baseUrl),
-        checkedAt: Date.now(),
-      },
-    });
-  } catch {
-    // Keep a valid in-memory catalog even when persistent storage is unavailable.
+  if (outcome.httpStatus !== undefined) {
+    await publish({ ...(stored ?? { models: [] }), checkedAt: Date.now() });
+    throw new Error(
+      `OpenCode Free model discovery failed (${outcome.status}): HTTP ${outcome.httpStatus}`,
+    );
   }
 
-  return models;
+  if (!outcome.models || !outcome.catalog) return fallbackModels;
+
+  await publish({
+    models: storedModelsFromConfigs(outcome.models, PROVIDER_ID, baseUrl),
+    catalog: outcome.catalog.models,
+    checkedAt: Date.now(),
+    lastModified: outcome.catalog.lastModified,
+    etag: outcome.catalog.etag,
+  });
+
+  return outcome.models;
+}
+
+/** Rejects missing, invalid, or future timestamps instead of extending cache lifetimes. */
+function isRecent(timestamp: number | undefined, now: number, ttl: number): boolean {
+  return (
+    timestamp !== undefined &&
+    Number.isFinite(timestamp) &&
+    timestamp >= 0 &&
+    timestamp <= now &&
+    now - timestamp < ttl
+  );
 }
 
 const defaultDependencies: OpencodeFreeDependencies = {

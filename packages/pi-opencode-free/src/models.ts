@@ -1,4 +1,10 @@
-import { isModelType, type AnyModel, type Api, type Model } from "@earendil-works/pi-ai";
+import {
+  isModelType,
+  type AnyModel,
+  type Api,
+  type Model,
+  type ModelsStoreEntry,
+} from "@earendil-works/pi-ai";
 import {
   getBuiltinModelDataGeneratedAt,
   getBuiltinModels,
@@ -13,6 +19,18 @@ export const MODEL_CATALOG_URL = "https://pi.dev/api/models/providers/opencode?t
 
 /** Chat model configuration accepted by `ProviderConfig.models`. */
 export type FreeChatModelConfig = Extract<ProviderModelConfig, { reasoning: boolean }>;
+
+/** Complete free metadata projection backing a pi.dev catalog validator. */
+export interface ModelCatalogSnapshot {
+  models: FreeChatModelConfig[];
+  lastModified: number;
+  etag?: string;
+}
+
+/** The visible live selection and the complete metadata backing conditional requests. */
+export interface FreeModelsStoreEntry extends ModelsStoreEntry {
+  catalog?: readonly FreeChatModelConfig[];
+}
 
 interface RemoteCost {
   input?: number;
@@ -62,6 +80,9 @@ export type DiscoveryStatus =
 export interface DiscoveryOutcome {
   status: DiscoveryStatus;
   models?: FreeChatModelConfig[];
+  catalog?: ModelCatalogSnapshot;
+  /** Present only for HTTP failures, not transport or response-shape failures. */
+  httpStatus?: number;
   /** Number of ids reported by the live endpoint, when it responded successfully. */
   liveModelCount?: number;
 }
@@ -73,6 +94,7 @@ export interface DiscoverFreeModelsOptions {
   signal: AbortSignal;
   fetcher: typeof fetch;
   allowNetwork: boolean;
+  catalog?: ModelCatalogSnapshot;
 }
 
 /**
@@ -126,6 +148,42 @@ export function configsFromStoredModels(
   }
 
   return configs;
+}
+
+/** Restores validated metadata only when a complete body backs the persisted validator. */
+export function catalogFromStoredEntry(
+  stored: Readonly<ModelsStoreEntry> | undefined,
+): ModelCatalogSnapshot | undefined {
+  const lastModified = stored?.lastModified;
+
+  if (
+    !stored ||
+    lastModified === undefined ||
+    !Number.isFinite(lastModified) ||
+    lastModified < 0 ||
+    !("catalog" in stored) ||
+    !Array.isArray(stored.catalog)
+  ) {
+    return undefined;
+  }
+
+  const models: FreeChatModelConfig[] = [];
+
+  for (const entry of stored.catalog) {
+    if (!isRemoteCatalogEntry(entry)) return undefined;
+
+    const config = configFromRemote({ ...entry, api: "openai-completions" });
+
+    if (!config) return undefined;
+
+    models.push(config);
+  }
+
+  return {
+    models,
+    lastModified,
+    etag: stored.etag,
+  };
 }
 
 /**
@@ -195,16 +253,17 @@ export async function discoverFreeModelsWithStatus(
     return { status: options.signal.reason?.name === "TimeoutError" ? "timeout" : "aborted" };
   }
 
-  if (!live.ok) return { status: live.failure };
+  if (!live.ok) return { status: live.failure, httpStatus: live.httpStatus };
 
-  if (!catalog.ok) return { status: catalog.failure };
+  if (!catalog.ok) return { status: catalog.failure, httpStatus: catalog.httpStatus };
 
   if (live.ids.length === 0) return { status: "live-empty", liveModelCount: 0 };
 
-  const models = selectFreeModels(live.ids, freeCatalogModels(catalog.entries));
+  const metadata = isCatalogNewer(catalog.snapshot.lastModified) ? catalog.snapshot.models : [];
+  const models = selectFreeModels(live.ids, freeCatalogModels(metadata));
 
   return models.length > 0
-    ? { status: "ok", models, liveModelCount: live.ids.length }
+    ? { status: "ok", models, catalog: catalog.snapshot, liveModelCount: live.ids.length }
     : { status: "no-known-free-models", liveModelCount: live.ids.length };
 }
 
@@ -237,15 +296,11 @@ function freeBuiltinModels(): Map<string, FreeChatModelConfig> {
 
 /** Overlays qualifying remote entries on bundled models; rejected or absent entries leave them intact. */
 function freeCatalogModels(
-  catalog: readonly RemoteCatalogEntry[],
+  catalog: readonly FreeChatModelConfig[],
 ): Map<string, FreeChatModelConfig> {
   const models = freeBuiltinModels();
 
-  for (const entry of catalog) {
-    const config = configFromRemote(entry);
-
-    if (config) models.set(config.id, config);
-  }
+  for (const config of catalog) models.set(config.id, config);
 
   return models;
 }
@@ -353,14 +408,18 @@ function selectFreeModels(
  */
 async function fetchLiveModelIds(
   options: DiscoverFreeModelsOptions,
-): Promise<{ ok: true; ids: readonly string[] } | { ok: false; failure: DiscoveryStatus }> {
+): Promise<
+  | { ok: true; ids: readonly string[] }
+  | { ok: false; failure: DiscoveryStatus; httpStatus?: number }
+> {
   try {
     const response = await options.fetcher(`${options.baseUrl}/models`, {
       headers: { ...options.headers, Accept: "application/json" },
       signal: options.signal,
     });
 
-    if (!response.ok) return { ok: false, failure: "live-request-failed" };
+    if (!response.ok)
+      return { ok: false, failure: "live-request-failed", httpStatus: response.status };
 
     const body: unknown = await response.json().catch(() => undefined);
 
@@ -380,23 +439,37 @@ async function fetchLiveModelIds(
 
 /**
  * Fetches Pi's OpenCode catalog with the supplied signal and without provider headers.
- * Returns an empty entry list when the bundled catalog is at least as recent, or a
- * classified failure on HTTP, fetch, JSON parsing, or response-shape failure.
+ * Revalidates a complete cached metadata body with ETag, retaining it on 304.
+ * Missing catalogs (404/501) produce the native empty overlay marker. Other HTTP,
+ * fetch, JSON parsing, or response-shape failures are classified.
  * Invalid ids or names discard individual entries; a nonempty response with no
  * valid entries is a response-shape failure.
  */
 async function fetchModelCatalog(
   options: DiscoverFreeModelsOptions,
 ): Promise<
-  { ok: true; entries: readonly RemoteCatalogEntry[] } | { ok: false; failure: DiscoveryStatus }
+  | { ok: true; snapshot: ModelCatalogSnapshot }
+  | { ok: false; failure: DiscoveryStatus; httpStatus?: number }
 > {
   try {
+    const cached = options.catalog;
+    const validator = cached && cached.models.length > 0 ? cached.etag : undefined;
+    const headers = new Headers({ Accept: "application/json" });
+
+    if (validator) headers.set("If-None-Match", validator);
+
     const response = await options.fetcher(MODEL_CATALOG_URL, {
-      headers: { Accept: "application/json" },
+      headers,
       signal: options.signal,
     });
 
-    if (!response.ok) return { ok: false, failure: "catalog-request-failed" };
+    if (response.status === 304 && validator && cached) return { ok: true, snapshot: cached };
+
+    if (response.status === 404 || response.status === 501)
+      return { ok: true, snapshot: { models: [], lastModified: 0 } };
+
+    if (!response.ok)
+      return { ok: false, failure: "catalog-request-failed", httpStatus: response.status };
 
     const body: unknown = await response.json().catch(() => undefined);
 
@@ -407,9 +480,23 @@ async function fetchModelCatalog(
     if (body.length > 0 && entries.length === 0)
       return { ok: false, failure: "catalog-response-invalid" };
 
+    const models: FreeChatModelConfig[] = [];
+
+    for (const entry of entries) {
+      const config = configFromRemote(entry);
+
+      if (config) models.push(config);
+    }
+
+    const lastModified = Date.parse(response.headers.get("last-modified") ?? "");
+
     return {
       ok: true,
-      entries: isCatalogNewer(response.headers.get("last-modified")) ? entries : [],
+      snapshot: {
+        models,
+        lastModified: Number.isNaN(lastModified) ? 0 : lastModified,
+        etag: response.headers.get("etag") ?? undefined,
+      },
     };
   } catch {
     return { ok: false, failure: "catalog-request-failed" };
@@ -418,15 +505,12 @@ async function fetchModelCatalog(
 
 /**
  * Compares the remote Last-Modified date with the bundled catalog timestamp.
- * A missing or invalid remote date qualifies only when no bundled timestamp exists.
+ * A missing or invalid remote date is stored as zero, matching native Pi.
  */
-function isCatalogNewer(lastModified: string | null): boolean {
-  const remoteGeneratedAt = Date.parse(lastModified ?? "");
+function isCatalogNewer(lastModified: number): boolean {
   const localGeneratedAt = getBuiltinModelDataGeneratedAt();
 
-  if (Number.isNaN(remoteGeneratedAt)) return localGeneratedAt === undefined;
-
-  return localGeneratedAt === undefined || remoteGeneratedAt > localGeneratedAt;
+  return localGeneratedAt === undefined || lastModified > localGeneratedAt;
 }
 
 /** Requires a `data` array whose entries all have string ids; an empty array is valid. */

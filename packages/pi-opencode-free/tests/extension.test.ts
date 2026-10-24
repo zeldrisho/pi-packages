@@ -7,7 +7,7 @@ import type {
 } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ProviderConfig } from "@earendil-works/pi-coding-agent";
 import { normalizeContext } from "@earendil-works/pi-ai/compat";
-import { describe, expect, it } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import piOpencodeFree, { PROVIDER_ID, registerOpencodeFree } from "../src/index";
 import { CLI_NPM_URL, CLI_UPDATE_URL } from "../src/cli-version";
@@ -124,6 +124,7 @@ function refreshContext(options: {
   stored?: ModelsStoreEntry;
   baseUrl?: string;
   signal?: AbortSignal;
+  force?: boolean;
 }): RefreshHarness {
   const publications: ModelsPublication[] = [];
 
@@ -140,6 +141,8 @@ function refreshContext(options: {
   if (options.stored) context.stored = options.stored;
 
   if (options.baseUrl) context.baseUrl = options.baseUrl;
+
+  if (options.force !== undefined) context.force = options.force;
 
   return { publications, context };
 }
@@ -232,6 +235,7 @@ function discoveryFetcher(calls: string[]): typeof fetch {
         headers: {
           "content-type": "application/json",
           "last-modified": "Wed, 21 Oct 2099 07:28:00 GMT",
+          etag: '"catalog-v1"',
         },
       });
     }
@@ -488,6 +492,495 @@ describe("opencode-free extension", () => {
     expect(result.stopReason).toBe("error");
     expect(result.errorMessage).toContain("Cannot resolve the current OpenCode CLI version");
     expect(calls).toEqual([CLI_UPDATE_URL, CLI_NPM_URL]);
+  });
+
+  describe("catalog refresh caching", () => {
+    const start = Date.UTC(2026, 9, 24);
+    const ttl = 4 * 60 * 60 * 1000;
+    let now: number;
+
+    beforeEach(() => {
+      now = start;
+      vi.spyOn(Date, "now").mockImplementation(() => now);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    function provider(fetcher: typeof fetch): ProviderConfig {
+      const { pi, state } = createFakePi();
+      registerOpencodeFree(pi, dependencies({}, fetcher));
+
+      if (!state.provider) throw new Error("missing provider");
+
+      return state.provider.config;
+    }
+
+    it("uses fresh persisted models without network or publication, then refreshes at expiry", async () => {
+      const calls: string[] = [];
+      const config = provider(discoveryFetcher(calls));
+
+      const { context, publications } = refreshContext({
+        allowNetwork: true,
+        baseUrl: `${DEFAULT_BASE_URL}/`,
+        stored: { models: [storedModel], checkedAt: start, lastModified: 0 },
+      });
+
+      now += ttl - 1;
+      expect((await refreshModels(config, context)).map((model) => model.id)).toEqual([
+        "cached-free",
+      ]);
+      expect(calls).toEqual([]);
+      expect(publications).toEqual([]);
+
+      now += 1;
+      expect((await refreshModels(config, context)).map((model) => model.id)).toEqual([
+        "beam-free",
+        "deepseek-v4.1-flash-free",
+      ]);
+      expect(calls).toEqual([CLI_UPDATE_URL, `${DEFAULT_BASE_URL}/models`, MODEL_CATALOG_URL]);
+      expect(publications[0]?.persist?.checkedAt).toBe(now);
+    });
+
+    it.each([undefined, Number.NaN, Number.POSITIVE_INFINITY, -1, start + 1, start - ttl])(
+      "refreshes stored models with an absent, invalid, future, or expired timestamp: %s",
+      async (checkedAt) => {
+        const calls: string[] = [];
+        const config = provider(discoveryFetcher(calls));
+
+        const { context } = refreshContext({
+          allowNetwork: true,
+          stored: { models: [storedModel], checkedAt, lastModified: 0 },
+        });
+
+        await refreshModels(config, context);
+        expect(calls).toHaveLength(3);
+      },
+    );
+
+    it.each([{ models: [] }, { models: [{ ...storedModel, provider: "other" }] }])(
+      "does not treat a timestamp without usable models as a fresh catalog: %j",
+      async ({ models }) => {
+        const calls: string[] = [];
+        const config = provider(discoveryFetcher(calls));
+
+        const { context } = refreshContext({
+          allowNetwork: true,
+          stored: { models, checkedAt: now, lastModified: 0 },
+        });
+
+        await refreshModels(config, context);
+        expect(calls).toHaveLength(3);
+      },
+    );
+
+    it.each([false, true])(
+      "caches successful discovery in memory even when persistence throws: %s",
+      async (publicationFails) => {
+        const calls: string[] = [];
+        const config = provider(discoveryFetcher(calls));
+        const { context, publications } = refreshContext({ allowNetwork: true });
+
+        if (publicationFails) {
+          context.publish = async () => {
+            throw new Error("storage unavailable");
+          };
+        }
+
+        const models = await refreshModels(config, context);
+        now += ttl - 1;
+        expect(await refreshModels(config, context)).toEqual(models);
+        expect(calls).toHaveLength(3);
+        expect(publications).toHaveLength(publicationFails ? 0 : 1);
+
+        const offline = refreshContext({ allowNetwork: false });
+        expect(await refreshModels(config, offline.context)).toEqual(models);
+
+        now += 1;
+        await refreshModels(config, context);
+        expect(calls).toHaveLength(5);
+      },
+    );
+
+    it("does not cache a refused publication", async () => {
+      const calls: string[] = [];
+      const config = provider(discoveryFetcher(calls));
+      const { context } = refreshContext({ allowNetwork: true });
+      context.publish = async () => false;
+
+      await refreshModels(config, context);
+      await refreshModels(config, context);
+      expect(calls).toHaveLength(5);
+    });
+
+    it("scopes stored and in-memory catalogs to the normalized endpoint", async () => {
+      const calls: string[] = [];
+      const config = provider(discoveryFetcher(calls));
+      const stored = { models: [storedModel], checkedAt: now };
+
+      const { context } = refreshContext({
+        allowNetwork: true,
+        baseUrl: "https://proxy.test/v1",
+        stored,
+      });
+
+      await refreshModels(config, context);
+      expect(calls).toContain("https://proxy.test/v1/models");
+
+      const sameEndpoint = refreshContext({
+        allowNetwork: true,
+        baseUrl: "https://proxy.test/v1///",
+      });
+
+      await refreshModels(config, sameEndpoint.context);
+      expect(calls).toHaveLength(3);
+
+      const otherEndpoint = refreshContext({
+        allowNetwork: true,
+        baseUrl: "https://other.test/v1",
+      });
+
+      await refreshModels(config, otherEndpoint.context);
+      expect(calls).toHaveLength(5);
+      expect(calls).toContain("https://other.test/v1/models");
+    });
+
+    it("does not use another endpoint's stored catalog as a fallback", async () => {
+      const config = provider(async () => new Response(null, { status: 503 }));
+
+      const { context } = refreshContext({
+        allowNetwork: true,
+        baseUrl: "https://proxy.test/v1",
+        stored: { models: [storedModel], checkedAt: now },
+      });
+
+      expect(await refreshModels(config, context)).toEqual(initialFreeModels());
+    });
+
+    it("retains a known catalog and validators on HTTP failure, advancing the four-hour check time", async () => {
+      const calls: string[] = [];
+      const successfulFetch = discoveryFetcher(calls);
+      let failed = false;
+
+      const config = provider(async (input, init) => {
+        const response = await successfulFetch(input, init);
+
+        return failed && input !== CLI_UPDATE_URL ? new Response(null, { status: 503 }) : response;
+      });
+
+      const { context, publications } = refreshContext({ allowNetwork: true });
+      const models = await refreshModels(config, context);
+      const previous = publications[0]?.persist;
+      now += ttl;
+      failed = true;
+      await expect(refreshModels(config, context)).rejects.toThrow("HTTP 503");
+      expect(publications[1]?.persist).toEqual({ ...previous, checkedAt: now });
+      expect(calls).toHaveLength(5);
+      now += ttl - 1;
+      expect(await refreshModels(config, context)).toEqual(models);
+      expect(calls).toHaveLength(5);
+
+      failed = false;
+      now += 1;
+      await refreshModels(config, context);
+      expect(calls).toHaveLength(7);
+    });
+
+    it("does not throttle an initial HTTP failure without Last-Modified metadata", async () => {
+      const calls: string[] = [];
+      const successfulFetch = discoveryFetcher(calls);
+
+      const config = provider(async (input, init) => {
+        const response = await successfulFetch(input, init);
+
+        return input === MODEL_CATALOG_URL ? new Response(null, { status: 503 }) : response;
+      });
+
+      const { context, publications } = refreshContext({ allowNetwork: true });
+
+      await expect(refreshModels(config, context)).rejects.toThrow("HTTP 503");
+      expect(publications[0]?.persist).toEqual({ models: [], checkedAt: now });
+      await expect(refreshModels(config, context)).rejects.toThrow("HTTP 503");
+      expect(calls).toHaveLength(5);
+    });
+
+    it("revalidates persisted metadata after restart and applies live changes on 304", async () => {
+      const calls: string[] = [];
+      const successfulFetch = discoveryFetcher(calls);
+      const catalogHeaders: Headers[] = [];
+      const lastModified = "Wed, 21 Oct 2099 07:28:00 GMT";
+      let unchanged = false;
+
+      const fetcher: typeof fetch = async (input, init) => {
+        const response = await successfulFetch(input, init);
+
+        if (input === MODEL_CATALOG_URL) {
+          catalogHeaders.push(new Headers(init?.headers));
+
+          return unchanged
+            ? new Response(null, { status: 304 })
+            : Response.json(
+                [...discoveryCatalog, { ...discoveryCatalog[0], id: "newly-live-free" }],
+                { headers: { "last-modified": lastModified, etag: '"catalog-v1"' } },
+              );
+        }
+
+        return unchanged && input === `${DEFAULT_BASE_URL}/models`
+          ? Response.json({ data: [{ id: "newly-live-free" }] })
+          : response;
+      };
+
+      const initial = refreshContext({ allowNetwork: true });
+      const models = await refreshModels(provider(fetcher), initial.context);
+      expect(models.map((model) => model.id)).not.toContain("newly-live-free");
+      const stored = initial.publications[0]?.persist;
+
+      if (!stored) throw new Error("missing persisted catalog");
+
+      unchanged = true;
+      now += ttl;
+      const restarted = refreshContext({ allowNetwork: true, stored });
+      const refreshed = await refreshModels(provider(fetcher), restarted.context);
+      expect(refreshed.map((model) => model.id)).toEqual(["newly-live-free"]);
+      expect(catalogHeaders[0]?.get("if-none-match")).toBeNull();
+      expect(catalogHeaders[1]?.get("if-none-match")).toBe('"catalog-v1"');
+      expect(catalogHeaders[1]?.get("authorization")).toBeNull();
+      expect(catalogHeaders[1]?.get("x-opencode-session")).toBeNull();
+      expect(restarted.publications[0]?.persist).toMatchObject({
+        checkedAt: now,
+        lastModified: Date.parse(lastModified),
+        etag: '"catalog-v1"',
+      });
+    });
+
+    it("does not send an ETag without a complete cached metadata body", async () => {
+      const calls: string[] = [];
+      const successfulFetch = discoveryFetcher(calls);
+
+      const config = provider(async (input, init) => {
+        if (input === MODEL_CATALOG_URL) {
+          expect(new Headers(init?.headers).get("if-none-match")).toBeNull();
+        }
+
+        return successfulFetch(input, init);
+      });
+
+      const { context } = refreshContext({
+        allowNetwork: true,
+        stored: {
+          models: [storedModel],
+          checkedAt: start - ttl,
+          lastModified: 0,
+          etag: '"orphaned"',
+        },
+      });
+
+      await refreshModels(config, context);
+      expect(calls).toHaveLength(3);
+    });
+
+    it.each([404, 501])("persists native missing-catalog markers for HTTP %s", async (status) => {
+      const calls: string[] = [];
+      const successfulFetch = discoveryFetcher(calls);
+      const builtin = initialFreeModels()[0];
+
+      if (!builtin) throw new Error("missing bundled model");
+
+      const config = provider(async (input, init) => {
+        const response = await successfulFetch(input, init);
+
+        if (input === MODEL_CATALOG_URL) return new Response(null, { status });
+
+        return input === `${DEFAULT_BASE_URL}/models`
+          ? Response.json({ data: [{ id: builtin.id }] })
+          : response;
+      });
+
+      const { context, publications } = refreshContext({ allowNetwork: true });
+      expect(await refreshModels(config, context)).toEqual([builtin]);
+      expect(publications[0]?.persist).toMatchObject({ lastModified: 0, checkedAt: now });
+      expect(publications[0]?.persist?.etag).toBeUndefined();
+      now += ttl - 1;
+      await refreshModels(config, context);
+      expect(calls).toHaveLength(3);
+    });
+
+    it.each(["transport", "invalid-json"])(
+      "does not advance freshness on catalog %s failures",
+      async (failure) => {
+        const calls: string[] = [];
+        const successfulFetch = discoveryFetcher(calls);
+
+        const config = provider(async (input, init) => {
+          const response = await successfulFetch(input, init);
+
+          if (input === MODEL_CATALOG_URL) {
+            if (failure === "transport") throw new Error("private details");
+
+            return new Response("{");
+          }
+
+          return response;
+        });
+
+        const { context, publications } = refreshContext({
+          allowNetwork: true,
+          stored: { models: [storedModel], checkedAt: start - ttl, lastModified: 0 },
+        });
+
+        expect((await refreshModels(config, context))[0]?.id).toBe("cached-free");
+        await refreshModels(config, context);
+        expect(calls).toHaveLength(5);
+        expect(publications).toEqual([]);
+      },
+    );
+
+    it("rechecks legacy snapshots without Last-Modified instead of trusting checkedAt alone", async () => {
+      const calls: string[] = [];
+      const config = provider(discoveryFetcher(calls));
+
+      const { context } = refreshContext({
+        allowNetwork: true,
+        stored: { models: [storedModel], checkedAt: now },
+      });
+
+      await refreshModels(config, context);
+      expect(calls).toHaveLength(3);
+    });
+
+    it("does not cache CLI-version lookup failures or advance freshness", async () => {
+      const calls: string[] = [];
+
+      const config = provider(async (input) => {
+        calls.push(new Request(input).url);
+
+        return new Response(null, { status: 503 });
+      });
+
+      const { context, publications } = refreshContext({ allowNetwork: true });
+
+      await refreshModels(config, context);
+      await refreshModels(config, context);
+      expect(calls).toEqual([CLI_UPDATE_URL, CLI_NPM_URL, CLI_UPDATE_URL, CLI_NPM_URL]);
+      expect(publications).toEqual([]);
+    });
+
+    it("allows force to bypass successful and failed HTTP freshness checks", async () => {
+      const calls: string[] = [];
+      const successfulFetch = discoveryFetcher(calls);
+      let failed = false;
+
+      const config = provider(async (input, init) => {
+        const response = await successfulFetch(input, init);
+
+        return failed && input !== CLI_UPDATE_URL ? new Response(null, { status: 503 }) : response;
+      });
+
+      const { context } = refreshContext({ allowNetwork: true, force: true });
+
+      await refreshModels(config, context);
+      failed = true;
+      await expect(refreshModels(config, context)).rejects.toThrow("HTTP 503");
+      expect(calls).toHaveLength(5);
+      failed = false;
+      await refreshModels(config, context);
+      expect(calls).toHaveLength(7);
+    });
+
+    it.each(["offline", "aborted"])("never lets force override %s mode", async (mode) => {
+      const calls: string[] = [];
+      const config = provider(discoveryFetcher(calls));
+
+      const { context } = refreshContext({
+        allowNetwork: mode !== "offline",
+        force: true,
+        signal: mode === "aborted" ? AbortSignal.abort() : undefined,
+      });
+
+      expect(await refreshModels(config, context)).toEqual(initialFreeModels());
+      expect(calls).toEqual([]);
+    });
+
+    it("does not advance freshness after caller cancellation during discovery", async () => {
+      const calls: string[] = [];
+      const successfulFetch = discoveryFetcher(calls);
+      const controller = new AbortController();
+
+      const config = provider(async (input, init) => {
+        if (input === `${DEFAULT_BASE_URL}/models`) controller.abort();
+
+        return successfulFetch(input, init);
+      });
+
+      const canceled = refreshContext({ allowNetwork: true, signal: controller.signal });
+
+      expect(await refreshModels(config, canceled.context)).toEqual(initialFreeModels());
+      expect(canceled.publications).toEqual([]);
+      const retry = refreshContext({ allowNetwork: true });
+      await refreshModels(config, retry.context);
+      expect(calls).toHaveLength(5);
+      expect(retry.publications).toHaveLength(1);
+    });
+
+    it("does not advance freshness after caller cancellation during version resolution", async () => {
+      const calls: string[] = [];
+      const successfulFetch = discoveryFetcher(calls);
+      const controller = new AbortController();
+
+      const config = provider(async (input, init) => {
+        if (input === CLI_UPDATE_URL) controller.abort();
+
+        return successfulFetch(input, init);
+      });
+
+      const canceled = refreshContext({ allowNetwork: true, signal: controller.signal });
+
+      expect(await refreshModels(config, canceled.context)).toEqual(initialFreeModels());
+      expect(calls).toEqual([CLI_UPDATE_URL]);
+      const retry = refreshContext({ allowNetwork: true });
+      await refreshModels(config, retry.context);
+      expect(calls).toEqual([
+        CLI_UPDATE_URL,
+        CLI_UPDATE_URL,
+        `${DEFAULT_BASE_URL}/models`,
+        MODEL_CATALOG_URL,
+      ]);
+      expect(retry.publications).toHaveLength(1);
+    });
+
+    it("does not advance freshness after deadline failures", async () => {
+      const calls: string[] = [];
+      const successfulFetch = discoveryFetcher(calls);
+      const deadline = new AbortController();
+      const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(deadline.signal);
+
+      const config = provider(async (input, init) => {
+        if (input === `${DEFAULT_BASE_URL}/models`) {
+          deadline.abort(new DOMException("deadline", "TimeoutError"));
+        }
+
+        return successfulFetch(input, init);
+      });
+
+      const { context, publications } = refreshContext({ allowNetwork: true });
+
+      expect(await refreshModels(config, context)).toEqual(initialFreeModels());
+      expect(publications).toEqual([]);
+      timeout.mockRestore();
+      await refreshModels(config, context);
+      expect(calls).toHaveLength(5);
+      expect(publications).toHaveLength(1);
+
+      const otherEndpoint = refreshContext({
+        allowNetwork: true,
+        baseUrl: "https://proxy.test/v1",
+      });
+
+      await refreshModels(config, otherEndpoint.context);
+      expect(calls).toHaveLength(7);
+      expect(otherEndpoint.publications).toHaveLength(1);
+    });
   });
 
   it("provides a default export for Pi", () => {

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Avoid repeated catalog requests when reopening the model picker by following Pi's native four-hour refresh policy and revalidating unchanged metadata.
 - Stop Pi from automatically retrying exhausted free-tier usage limits while preserving server-reported reset times.
 
 ## [0.2.0] - 2026-10-24
