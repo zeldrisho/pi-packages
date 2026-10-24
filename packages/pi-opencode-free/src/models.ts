@@ -274,10 +274,10 @@ function fromModel(model: Model<Api>): FreeChatModelConfig {
 }
 
 /**
- * Converts a zero-input/output-cost OpenAI-completions chat entry with positive
- * finite limits, reasoning, and input metadata, or returns `undefined` when those checks fail.
- * Positive fractional token limits are rounded down; cache costs are preserved.
- * A malformed optional name rejects only that entry.
+ * Converts a zero-input/output-cost OpenAI-completions chat entry with finite
+ * token limits of at least one, reasoning, and input metadata, or returns
+ * `undefined` when those checks fail. Fractional token limits are rounded down;
+ * supplied cache costs must be finite and nonnegative and are preserved.
  */
 function configFromRemote(entry: RemoteCatalogEntry): FreeChatModelConfig | undefined {
   if (entry.type !== undefined && entry.type !== "chat") return undefined;
@@ -382,6 +382,8 @@ async function fetchLiveModelIds(
  * Fetches Pi's OpenCode catalog with the supplied signal and without provider headers.
  * Returns an empty entry list when the bundled catalog is at least as recent, or a
  * classified failure on HTTP, fetch, JSON parsing, or response-shape failure.
+ * Invalid ids or names discard individual entries; a nonempty response with no
+ * valid entries is a response-shape failure.
  */
 async function fetchModelCatalog(
   options: DiscoverFreeModelsOptions,

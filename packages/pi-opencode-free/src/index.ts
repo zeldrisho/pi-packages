@@ -74,9 +74,10 @@ export function registerOpencodeFree(
 
 /**
  * Refreshes the catalog, falling back to stored models or bundled models when
- * offline, canceled, or discovery returns no usable models. Discovery has an
- * eight-second abort deadline. Successful results are published for persistence;
- * publication failures are ignored and the discovered models are still returned.
+ * offline, canceled, version resolution fails, or discovery returns no usable
+ * models. Version resolution and discovery share an eight-second abort deadline.
+ * Successful results are published for persistence; publication failures are ignored
+ * and the discovered models are still returned.
  */
 async function refreshModels(
   context: RefreshModelsContext,

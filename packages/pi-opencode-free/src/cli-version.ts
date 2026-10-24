@@ -116,7 +116,12 @@ async function fetchVersion(
   throw new Error("OpenCode CLI version metadata is invalid");
 }
 
-/** Falls back to npm only on a source failure, never after caller cancellation. */
+/**
+ * Falls back to npm only on a source failure, never after caller cancellation.
+ * Each source has a five-second abort deadline.
+ *
+ * @throws The caller's abort reason, or an Error when neither source resolves a version
+ */
 async function lookupVersion(fetcher: typeof fetch, signal: AbortSignal): Promise<string> {
   try {
     return await fetchVersion(
@@ -172,6 +177,10 @@ function waitForVersion(promise: Promise<string>, signal?: AbortSignal): Promise
  * Creates a lazy runtime resolver with a 24-hour in-memory cache and shared lookup.
  * No network request occurs until called. The last canceled waiter aborts the
  * lookup; failures are not cached and no fabricated or bundled version is used.
+ *
+ * @param now - Clock returning milliseconds since the Unix epoch for cache expiry
+ * @returns A resolver that rejects with the caller's abort reason, or an Error
+ *   if both metadata sources fail; expired cached versions are not returned
  */
 export function createCliVersionResolver(fetcher: typeof fetch, now = Date.now) {
   let cached: CachedVersion | undefined;

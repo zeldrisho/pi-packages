@@ -1,6 +1,7 @@
 /** Bounds parsing of provider-generated error text. */
 const MAX_QUOTA_ERROR_MESSAGE_CHARS = 16_384;
 
+/** Recognizes a quota error by its top-level type tag. */
 function isQuotaError(value: unknown): value is { type: "FreeUsageLimitError" } {
   return (
     typeof value === "object" &&
@@ -10,6 +11,7 @@ function isQuotaError(value: unknown): value is { type: "FreeUsageLimitError" } 
   );
 }
 
+/** Recognizes a quota error wrapped in the provider's error field. */
 function isQuotaEnvelope(value: unknown): value is { error: { type: "FreeUsageLimitError" } } {
   return (
     typeof value === "object" && value !== null && "error" in value && isQuotaError(value.error)
@@ -32,7 +34,14 @@ export function isFreeUsageLimitMessage(message: string | undefined): boolean {
   }
 }
 
-/** Parses Retry-After without assuming a daily quota or inventing a reset time. */
+/**
+ * Parses Retry-After without assuming a daily quota or inventing a reset time.
+ * Accepts a delay in seconds (including zero and fractions) or a date.
+ *
+ * @param now - Current time in milliseconds since the Unix epoch
+ * @returns Reset time in epoch milliseconds, or undefined for a missing, invalid,
+ *   past, or out-of-range value
+ */
 export function quotaResetAt(headers: Headers, now: number): number | undefined {
   const value = headers.get("retry-after")?.trim();
 
@@ -43,7 +52,12 @@ export function quotaResetAt(headers: Headers, now: number): number | undefined 
   return Number.isFinite(resetAt) && resetAt >= now && resetAt <= 8.64e15 ? resetAt : undefined;
 }
 
-/** Uses the Pi process's locale and timezone, including its standard TZ override. */
+/**
+ * Formats an epoch-millisecond reset time using the supplied formatter.
+ * Defaults to the Pi process's locale and timezone, including its standard TZ override.
+ *
+ * @throws {RangeError} If resetAt is invalid or outside the supported date range
+ */
 export function formatResetTime(
   resetAt: number,
   formatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "long" }),
@@ -51,7 +65,11 @@ export function formatResetTime(
   return formatter.format(resetAt);
 }
 
-/** Formats a quota error; an absent header must not become a guessed reset. */
+/**
+ * Formats a quota error with the reported reset time, or an unavailable-time notice.
+ *
+ * @param now - Current time in milliseconds since the Unix epoch
+ */
 export function usageLimitMessage(headers: Headers, now: number): string {
   const resetAt = quotaResetAt(headers, now);
 

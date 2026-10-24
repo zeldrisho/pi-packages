@@ -8,7 +8,16 @@ import { applyFingerprintHeaders, buildFingerprintHeaders } from "./fingerprint.
 import { isFreeUsageLimitMessage, usageLimitMessage } from "./quota.ts";
 import { isProviderRequestPayload, normalizeFreeRequestPayload } from "./request.ts";
 
-/** Delegates protocol handling and retries to Pi while normalizing every provider call. */
+/**
+ * Delegates protocol handling and retries to Pi while normalizing every provider call.
+ * Resolves the fingerprint for each call and normalizes recognized payloads after
+ * the caller's payload hook. Caller fetch overrides and instrumentation are preserved.
+ * Confirmed free-usage 429 errors receive a notice using the response's Retry-After.
+ *
+ * @returns A streaming callback that forwards native events and converts setup,
+ *   fingerprint, or forwarding failures into error events before closing the stream;
+ *   an aborted caller signal marks those failures as aborted
+ */
 export function createFreeStream(
   fetcher: typeof fetch,
   fingerprint: (

@@ -27,7 +27,10 @@ const VOID_ELEMENTS = new Set([
 // in particular, linkedom parses nested elements inside <noscript>.
 const RAW_TEXT_ELEMENTS = new Set(["script", "style", "textarea"]);
 
-/** Finds a raw-text end tag without interpreting its body as markup. */
+/**
+ * Finds a raw-text end tag in lowercased HTML, starting at the supplied code-unit
+ * offset, without interpreting its body as markup. Returns -1 when none is found.
+ */
 function findRawTextEnd(html: string, name: string, from: number): number {
   const prefix = `</${name}`;
   let candidate = html.indexOf(prefix, from);
@@ -122,7 +125,11 @@ export function exceedsConversionDepth(html: string): boolean {
   return false;
 }
 
-/** Refuses excessive nesting rather than parsing it again in a fallback or diagnostic path. */
+/**
+ * Refuses excessive nesting before fallback or diagnostic DOM parsing.
+ *
+ * @throws {Error} When lexical depth exceeds MAX_CONVERSION_DEPTH (512 open elements)
+ */
 export function assertConversionDepth(html: string): void {
   if (exceedsConversionDepth(html)) {
     throw new Error(

@@ -373,7 +373,8 @@ const inflightFetches = new InflightCoalescer<string, FetchAcquisition>(MAX_INFL
  * @param params.maxCharacters - Integer from 1,000 to 30,000; defaults to 6,000 before line/byte limits
  * @param signal - Cancels acquisition; fresh cache hits do not consult this signal
  * @param onUpdate - Receives cache or acquisition progress before content is returned
- * @returns Bounded text output and metadata, including cache, fragment, and continuation details
+ * @returns Bounded text, structured content, and metadata. Structured Markdown may
+ *   be shorter to fit JSON byte limits; use its own nextOffset for continuation.
  * @throws For invalid parameter limits; acquisition, cancellation, and progress callback errors propagate
  */
 export async function executeWebFetch(

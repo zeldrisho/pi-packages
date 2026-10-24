@@ -25,6 +25,10 @@ export function normalizeMatchText(text: string): string {
   return text.toLowerCase().replace(/\s+/gu, " ");
 }
 
+/**
+ * Finds overlapping spans of a nonempty, normalized pattern in normalized text,
+ * applying the context's boundaries for words and literal output and retaining its scope.
+ */
 function findOccurrences(context: RuleText, pattern: string, rule: RuleMatch): RuleOccurrence[] {
   const occurrences: RuleOccurrence[] = [];
   const { text } = context;
@@ -66,9 +70,12 @@ function findOccurrences(context: RuleText, pattern: string, rule: RuleMatch): R
 
 /**
  * Matches whole words in recognized literal commands, excluding data arguments
- * to echo/printf. Complex syntax or patterns retain conservative text matching.
+ * to echo/printf. Restrictive final flag or numeric words also match prefixes.
+ * Complex syntax or patterns retain conservative text matching.
  * Allows suppress only contained restrictions in the same command; surviving
  * blocks take priority, with the longest pattern reported for the winning action.
+ * Returns null when no rule matches. Considers at most 1,000 rules, skipping
+ * empty patterns and patterns longer than 1,024 UTF-16 code units.
  */
 export function resolveRule(command: string, rules: Record<string, Action>): RuleMatch | null {
   const acceptedRules: RuleMatch[] = [];

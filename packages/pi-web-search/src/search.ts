@@ -360,13 +360,19 @@ export class SearchRuntime {
 
   /**
    * Executes a web search with caching, truncation, and progress updates.
+   * Empty web results may fall back to generated answers when an Answers key is
+   * available. Fallback request failures retain the empty results, except on cancellation.
+   * Oversized text or structured payloads save full formatted output to a private
+   * temporary file tracked for shutdown cleanup; structured payloads are then omitted.
    *
    * @param params - Search parameters including query, count, and filters
    * @param signal - Optional abort signal for cancellation
    * @param onUpdate - Optional callback for search progress updates
    * @param cwd - Working directory for credential resolution
-   * @returns Promise resolving to search details with results and metadata
-   * @throws {Error} When query is empty or API key is missing
+   * @returns Text, structured results or a generated answer, and metadata including
+   *   a fullOutputPath when output limits require a temporary file
+   * @throws For invalid parameters or missing credentials; primary provider,
+   *   cancellation, progress callback, and temporary-file creation or write errors propagate
    */
   async execute(
     params: SearchParameters,

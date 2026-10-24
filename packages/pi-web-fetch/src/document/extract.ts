@@ -134,6 +134,7 @@ function normalizeFragmentDocument(document: Document): void {
  *
  * @param html - The HTML content to convert
  * @returns The trimmed text content with excluded elements and excessive whitespace removed
+ * @throws When markup exceeds the safe conversion depth; DOM parsing errors propagate
  */
 export function htmlToMarkdownFallback(html: string): string {
   assertConversionDepth(html);

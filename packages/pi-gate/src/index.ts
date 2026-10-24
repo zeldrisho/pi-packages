@@ -110,7 +110,13 @@ export {
   highlightRuleForDisplay,
 } from "./display";
 
-/** Gate the built-in `bash` tool against the user-provided rules. */
+/**
+ * Gates `bash` calls against user rules and requires approval for protected
+ * configuration writes and edits. Attempts to create a starter configuration if absent.
+ * Reloads rules before gating and after each prompt; approvals apply per call.
+ * Dialogs are serialized, and cancellation, session starts, or policy changes
+ * invalidate an active approval. UI failures reject the affected tool call.
+ */
 export default function piGate(pi: ExtensionAPI): void {
   ensureConfig();
   let loadResult = loadConfigResult();
@@ -118,6 +124,7 @@ export default function piGate(pi: ExtensionAPI): void {
   let revision = 0;
   let pending = Promise.resolve();
 
+  /** Reloads policy and invalidates active approvals when its parsed value or load status changes. */
   const refreshConfig = () => {
     loadResult = loadConfigResult();
     const current = JSON.stringify(loadResult);

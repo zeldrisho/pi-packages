@@ -11,6 +11,9 @@ const MAX_LITERAL_COMMAND_CHARACTERS = 65_536;
  * Unsupported syntax returns undefined for the entire input: callers must use
  * conservative text matching, not treat an unrecognized command as safe.
  * This does not expand variables, execute commands, or attempt full Bash parsing.
+ * Returned text joins recognized words with spaces after quote and escape
+ * handling; comments and separators are omitted. Empty or comment-only input returns an empty list.
+ * Inputs longer than 65,536 UTF-16 code units also return undefined.
  */
 export function literalCommands(command: string): LiteralCommand[] | undefined {
   if (command.length > MAX_LITERAL_COMMAND_CHARACTERS) return undefined;
