@@ -19,7 +19,7 @@
  * Matching is case-insensitive and whitespace-normalized. Allow occurrences
  * suppress contained restrictions in the same command; surviving blocks win.
  *
- * On first run, a configuration with the default prompt timeout and starter
+ * On first session start, a configuration with the default prompt timeout and starter
  * operation rules is written to `~/.pi/agent/gate.json` when neither file exists.
  *
  * Non-UI modes (print, JSON) never auto-approve. A `prompt` or `block` rule
@@ -112,14 +112,14 @@ export {
 
 /**
  * Gates `bash` calls against user rules and requires approval for protected
- * configuration writes and edits. Attempts to create a starter configuration if absent.
+ * configuration writes and edits. Creates a starter configuration at session start if absent.
  * Reloads rules before gating and after each prompt; approvals apply per call.
  * Dialogs are serialized, and cancellation, session starts, or policy changes
  * invalidate an active approval. UI failures reject the affected tool call.
  */
 export default function piGate(pi: ExtensionAPI): void {
-  ensureConfig();
   let loadResult = loadConfigResult();
+  let session = new AbortController();
   let policy = JSON.stringify(loadResult);
   let revision = 0;
   let pending = Promise.resolve();
@@ -135,8 +135,16 @@ export default function piGate(pi: ExtensionAPI): void {
     }
   };
 
-  pi.on("session_start", (_event, ctx) => {
+  pi.on("session_shutdown", () => {
+    session.abort();
     revision += 1;
+  });
+
+  pi.on("session_start", (_event, ctx) => {
+    session.abort();
+    session = new AbortController();
+    revision += 1;
+    ensureConfig();
     refreshConfig();
     const path = configPath();
     const ruleCount = Object.keys(loadResult.config.operations).length;
@@ -160,6 +168,9 @@ export default function piGate(pi: ExtensionAPI): void {
   });
 
   pi.on("tool_call", (event, ctx) => {
+    // Capture ownership before queueing so old calls cannot enter a replacement session.
+    const signal = ctx.signal ? AbortSignal.any([ctx.signal, session.signal]) : session.signal;
+
     // Pi can dispatch sibling tools concurrently; never overlap approval dialogs.
     const run = async (): Promise<ToolCallEventResult | undefined> => {
       let command: string;
@@ -179,6 +190,14 @@ export default function piGate(pi: ExtensionAPI): void {
         configChange = true;
       } else {
         return undefined;
+      }
+
+      if (signal.aborted) {
+        return {
+          block: true,
+          reason: "pi-gate: approval cancelled; command not run.",
+          terminate: true,
+        };
       }
 
       refreshConfig();
@@ -210,14 +229,6 @@ export default function piGate(pi: ExtensionAPI): void {
         };
       }
 
-      if (ctx.signal?.aborted) {
-        return {
-          block: true,
-          reason: "pi-gate: approval cancelled; command not run.",
-          terminate: true,
-        };
-      }
-
       const promptRevision = revision;
 
       reportHerdrBlocked(pi, ctx, true);
@@ -234,7 +245,7 @@ export default function piGate(pi: ExtensionAPI): void {
         choice = await ctx.ui.select(
           `pi-gate: allow this command?\n\n${promptCommand}\n\nMatched rule: ${rule}${configChange ? "" : "\nMatched command text is wrapped in »…«"}`,
           ["Allow", "Deny"],
-          { timeout: timeoutMs, signal: ctx.signal },
+          { timeout: timeoutMs, signal },
         );
         // Pi returns undefined for both dismissal and timeout; elapsed time separates the timeout case.
         timedOut = choice === undefined && Date.now() - promptStartedAt >= timeoutMs;
@@ -244,7 +255,7 @@ export default function piGate(pi: ExtensionAPI): void {
 
       refreshConfig();
 
-      if (ctx.signal?.aborted || revision !== promptRevision) {
+      if (signal.aborted || revision !== promptRevision) {
         return {
           block: true,
           reason:

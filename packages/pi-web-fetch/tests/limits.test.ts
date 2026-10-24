@@ -4,11 +4,12 @@ import { executeWebFetch, webFetchParameters } from "../src/index";
 import {
   FETCH_MAX_CHARACTERS,
   FETCH_MAX_OFFSET_CHARACTERS,
+  FETCH_MAX_QUERY_CHARACTERS,
   FETCH_MAX_URL_CHARACTERS,
 } from "../src/limits";
 
 describe("web_fetch limit contracts", () => {
-  it("exposes only URL, focus query, and character offset without bounds", () => {
+  it("exposes only URL, focus query, and character offset with runtime bounds", () => {
     const schema = JSON.parse(JSON.stringify(webFetchParameters));
     expect(Object.keys(schema.properties)).toEqual(["url", "query", "offset"]);
     expect(schema.properties.url.description).toBeUndefined();
@@ -17,10 +18,22 @@ describe("web_fetch limit contracts", () => {
     expect(JSON.stringify(schema)).not.toContain("maxCharacters");
     expect(
       Check(webFetchParameters, {
-        url: "https://example.com",
-        offset: FETCH_MAX_OFFSET_CHARACTERS + 1,
+        url: "x".repeat(FETCH_MAX_URL_CHARACTERS),
+        query: "x".repeat(FETCH_MAX_QUERY_CHARACTERS),
+        offset: FETCH_MAX_OFFSET_CHARACTERS,
       }),
     ).toBe(true);
+
+    for (const params of [
+      { url: "" },
+      { url: "x".repeat(FETCH_MAX_URL_CHARACTERS + 1) },
+      { url: "https://example.com", query: "" },
+      { url: "https://example.com", query: "x".repeat(FETCH_MAX_QUERY_CHARACTERS + 1) },
+      { url: "https://example.com", offset: -1 },
+      { url: "https://example.com", offset: 0.5 },
+      { url: "https://example.com", offset: FETCH_MAX_OFFSET_CHARACTERS + 1 },
+    ])
+      expect(Check(webFetchParameters, params)).toBe(false);
   });
 
   it.each([

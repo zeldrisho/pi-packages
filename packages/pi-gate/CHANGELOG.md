@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Create starter configuration when a session starts rather than when the extension is loaded.
+
+### Fixed
+
+- Cancel active approval dialogs and reject queued calls during shutdown, reload, and session replacement.
+
 ## [0.7.0] - 2026-10-24
 
 ### Changed

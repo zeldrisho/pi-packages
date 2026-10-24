@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Show cache progress, focus queries, offsets, and a compact fetch summary in Pi's tool preview without adding model-facing output.
+- Declare read-only network access hints for permission integrations and validate existing input limits in the tool schema.
+
 ## [0.13.0] - 2026-10-24
 
 ### Added

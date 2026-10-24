@@ -23,6 +23,7 @@ export interface RenderTheme {
 }
 
 export interface SearchTool {
+  annotations: object;
   renderCall(args: { query: string }, theme: RenderTheme): RenderedComponent;
   execute(
     toolCallId: string,

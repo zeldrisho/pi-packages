@@ -15,7 +15,7 @@ Use `pi config` to enable or disable this extension interactively. Run `pi list`
 
 ## Configure
 
-Edit `~/.pi/agent/gate.json` to choose which commands need approval. The extension creates this file with starter rules on first load. Changes apply before the next gated call, without restarting Pi. Add the optional `$schema` below for editor completion and validation:
+Edit `~/.pi/agent/gate.json` to choose which commands need approval. The extension creates this file with starter rules when the first session starts. Changes apply before the next gated call, without restarting Pi. Add the optional `$schema` below for editor completion and validation:
 
 ```json
 {
@@ -46,7 +46,7 @@ pi-gate is a guard rail, not a sandbox. Complex shell syntax, pipelines, redirec
 
 The built-in `bash` tool is gated, and `write`/`edit` calls targeting the gate config require approval. Prompt dialogs offer `Allow` and `Deny`; approvals are never remembered. To stop repeated prompts, add a specific `allow` rule to `gate.json`.
 
-Approval dialogs are serialized for concurrent tool calls; cancellation, session replacement, or a policy change while a dialog is open denies the pending call.
+Approval dialogs are serialized for concurrent tool calls; cancellation, shutdown, reload, session replacement, or a policy change while a dialog is open denies the pending call. Calls queued before shutdown or session replacement are also denied.
 
 Long commands are truncated in approval dialogs, but an approved command executes in full. Denied, dismissed, blocked, and timed-out calls stop the turn; other allowed calls in a parallel batch may still run. In non-interactive modes (`-p`, JSON), commands requiring approval are denied.
 
