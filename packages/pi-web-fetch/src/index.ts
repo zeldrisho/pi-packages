@@ -1,5 +1,5 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
+import { getMarkdownTheme, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Markdown, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
   FETCH_MAX_OFFSET_CHARACTERS,
@@ -101,7 +101,7 @@ export default function (pi: ExtensionAPI) {
     /** Renders the redacted URL, optional focus query, and character offset in the call preview. */
     renderCall(args, theme) {
       return new Text(
-        `${theme.fg("toolTitle", theme.bold("web_fetch"))} ${theme.fg("accent", redactUrlForDisplay(args.url))}${args.query === undefined ? "" : ` query=${JSON.stringify(args.query)}`}${args.offset === undefined ? "" : ` offset=${args.offset}`}`,
+        `${theme.fg("toolTitle", theme.bold("web_fetch"))} ${theme.fg("accent", redactUrlForDisplay(args.url))}`,
         0,
         0,
       );
@@ -120,29 +120,11 @@ export default function (pi: ExtensionAPI) {
 
       if (isPartial) return new Text(theme.fg("warning", content?.text || "Fetching…"), 0, 0);
 
-      const details = result.details;
-
-      const summary =
-        details?.characterCount !== undefined
-          ? [
-              details.extractionDiagnostics?.botWall
-                ? "Blocked"
-                : `${details.characterCount} characters`,
-              details.cacheStatus ?? (details.cached ? "cached" : "miss"),
-              ...(details.focus
-                ? [`${details.focus.matchedSections}/${details.focus.totalSections} sections`]
-                : []),
-              ...(details.nextOffset === undefined ? [] : [`next offset=${details.nextOffset}`]),
-            ].join(" · ")
-          : "";
-
-      return new Text(
-        content?.type === "text"
-          ? `${theme.fg("dim", summary)}${formatCollapsibleOutput(content.text, expanded, theme)}`
-          : theme.fg("dim", "No content"),
-        0,
-        0,
-      );
+      return content?.type === "text"
+        ? new Markdown(formatCollapsibleOutput(content.text, expanded), 0, 0, getMarkdownTheme(), {
+            color: (text) => theme.fg("toolOutput", text),
+          })
+        : new Text(theme.fg("dim", "No content"), 0, 0);
     },
   });
 }

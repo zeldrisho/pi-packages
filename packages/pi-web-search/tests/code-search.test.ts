@@ -143,7 +143,7 @@ describe("web_search recovery guidance", () => {
     } else if (count < 5) {
       expect(text).toContain(`Returned ${count} of 5 requested results.`);
       expect(text.match(/If evidence is insufficient/g)).toHaveLength(1);
-      expect(text.indexOf("Returned")).toBeLessThan(text.indexOf("<untrusted_web_content>"));
+      expect(text.indexOf("Returned")).toBeLessThan(text.indexOf("1. ["));
     } else expect(text).not.toContain("If evidence is insufficient");
     const cached = await tool.execute("cached", params, undefined, undefined);
     expect(cached.content).toEqual(result.content);

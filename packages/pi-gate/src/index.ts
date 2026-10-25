@@ -129,7 +129,7 @@ function reasonRuleName(pattern: string): string {
 
 /** Formats an approval timeout with the matched rule, elapsed limit in seconds, and retry guidance. */
 function timeoutReason(pattern: string, timeoutMs: number): string {
-  return `pi-gate: no response to rule "${reasonRuleName(pattern)}" within ${timeoutMs / 1_000}s; command not run. Ask the user whether to retry.`;
+  return `pi-gate: no response to rule "${reasonRuleName(pattern)}" within ${timeoutMs / 1_000}s; command not run. Ask the user whether to retry approval.`;
 }
 
 function reportHerdrBlocked(pi: ExtensionAPI, ctx: { mode?: string }, active: boolean): void {
@@ -290,7 +290,7 @@ export default function piGate(pi: ExtensionAPI): void {
       const rule = configChange ? CONFIG_CHANGE_REASON : formatRule(match);
 
       if (match.action === "block") {
-        const reason = `pi-gate: blocked by rule "${reasonRuleName(match.pattern)}". Do not retry or use equivalent commands; ask the user.`;
+        const reason = `pi-gate: command blocked by rule "${reasonRuleName(match.pattern)}". Ask the user before proceeding.`;
 
         if (ctx.hasUI) ctx.ui.notify(reason, "warning");
 
@@ -302,7 +302,7 @@ export default function piGate(pi: ExtensionAPI): void {
           block: true,
           reason: configChange
             ? CONFIG_CHANGE_REASON
-            : `pi-gate: rule "${reasonRuleName(match.pattern)}" needs approval but no UI is available. Do not retry; ask the user.`,
+            : `pi-gate: rule "${reasonRuleName(match.pattern)}" needs approval but no UI is available. Ask the user before proceeding.`,
           terminate: true,
         };
       }
@@ -345,7 +345,7 @@ export default function piGate(pi: ExtensionAPI): void {
             ? timeoutReason(match.pattern, timeoutMs)
             : configChange
               ? CONFIG_CHANGE_REASON
-              : `pi-gate: denied by rule "${reasonRuleName(match.pattern)}". Do not retry or use equivalent commands; ask the user.`,
+              : `pi-gate: command not run because approval was denied. Ask the user before retrying (rule "${reasonRuleName(match.pattern)}").`,
           terminate: true,
         };
       }

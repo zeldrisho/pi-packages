@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Render fetched results as themed Markdown, omit focus queries and offsets from the call preview, and show discovered documentation-index links in result text.
+- Remove cache/count summaries and the separate caution notice from rendered output.
+
 ## [0.14.0] - 2026-10-25
 
 ### Changed

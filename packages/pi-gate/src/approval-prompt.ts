@@ -62,7 +62,35 @@ export function createApprovalPrompt(
         panelLine(theme.bold("pi-gate: allow this command?"), width, "accent"),
         panelLine("Review the requested command or file change:", width, "muted"),
         panelLine("", width),
-        ...command.split("\n").map((line) => panelLine(line, width, "toolOutput")),
+        ...command.split("\n").map((line) => {
+          const contentWidth = innerWidth(width);
+          const parts = line.split(/([»«])/u);
+          let matched = false;
+
+          const rendered = parts
+            .map((part) => {
+              if (part === "»") {
+                matched = true;
+
+                return "";
+              }
+
+              if (part === "«") {
+                matched = false;
+
+                return "";
+              }
+
+              return theme.style(part, { fg: matched ? "accent" : "toolOutput", bold: matched });
+            })
+            .join("");
+
+          const visible = line.replace(/[»«]/gu, "");
+          const content = truncateToWidth(visible, contentWidth, "…");
+          const padding = " ".repeat(Math.max(0, contentWidth - visibleWidth(content)));
+
+          return `  ${rendered}${theme.style(padding, { fg: "toolOutput" })}  `;
+        }),
         panelLine("", width),
         panelLine(`Matched rule: ${rule}`, width, "muted"),
         panelLine("", width),

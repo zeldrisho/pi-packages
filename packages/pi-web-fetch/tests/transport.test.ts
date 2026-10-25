@@ -382,7 +382,7 @@ describe("web_fetch transport", () => {
     },
   );
 
-  it("escapes untrusted-content closing tags", async () => {
+  it("preserves page text without adding wrapper-specific escaping", async () => {
     const result = await fetchRemoteContent(
       `${origin}/untrusted`,
       0,
@@ -391,7 +391,6 @@ describe("web_fetch transport", () => {
       dependencies,
     );
 
-    expect(result.markdown).toContain("&lt;/untrusted_web_content&gt;");
-    expect(result.markdown).not.toContain("</untrusted_web_content>");
+    expect(result.markdown).toContain("</untrusted_web_content>");
   });
 });

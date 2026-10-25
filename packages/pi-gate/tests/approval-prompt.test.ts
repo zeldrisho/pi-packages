@@ -35,7 +35,9 @@ describe("approval prompt", () => {
     const output = component.render(84).join("\n");
 
     expect(output).toContain("pi-gate: allow this command?");
-    expect(output).toContain("sudo »rm« -rf /tmp/example");
+    expect(output).toContain("sudo rm -rf /tmp/example");
+    expect(output).not.toContain("»");
+    expect(styled).toContainEqual(expect.objectContaining({ text: "rm", fg: "accent" }));
     expect(output).toContain('Matched rule: "sudo": "prompt"');
     expect(styled).toContainEqual(expect.objectContaining({ fg: "accent" }));
   });

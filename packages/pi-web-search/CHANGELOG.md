@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Render search results as themed Markdown and remove cache/count summaries and caution notices from rendered output.
+- Remove the redundant web-results heading from search output.
+
 ## [0.14.0] - 2026-10-25
 
 ### Changed

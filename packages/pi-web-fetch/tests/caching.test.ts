@@ -271,8 +271,8 @@ describe("web_fetch caching", () => {
 
     expect(first.details.cached).toBe(false);
     expect(second.details.cached).toBe(true);
-    expect(first.content[0].text).toContain("<untrusted_web_content");
-    expect(first.content[0].text).toContain("</untrusted_web_content>");
+    expect(first.content[0].text).not.toContain("Caution:");
+    expect(first.content[0].text).not.toContain("<untrusted_web_content");
     expect(first.details.truncation).toEqual({
       truncated: false,
       strategy: "none",

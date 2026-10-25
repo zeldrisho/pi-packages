@@ -295,7 +295,7 @@ async function documentFromDecoded(
   return {
     url: target.url.toString(),
     contentType,
-    markdown: markdown.replace(/<\/untrusted_web_content>/gi, "&lt;/untrusted_web_content&gt;"),
+    markdown,
     fragmentOffsets,
     title,
     extractor,

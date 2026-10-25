@@ -264,7 +264,8 @@ describe("web_fetch honest-evidence details", () => {
     expect(result.details.url).toBe(redacted);
     expect(result.details.requestedUrl).toBe(redacted);
     expect(result.details.finalUrl).toBe(redacted);
-    expect(result.content[0]?.text).toContain(`source=${JSON.stringify(redacted)}`);
+    expect(result.content[0]?.text).not.toContain("Caution:");
+    expect(result.content[0]?.text).not.toContain("secret-token");
     expect(JSON.stringify(result)).not.toContain("secret-token");
   });
 
