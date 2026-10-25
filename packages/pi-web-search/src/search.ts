@@ -522,7 +522,7 @@ export class SearchRuntime {
     const results = payload.results.filter((result) => result.url).slice(0, count);
 
     const output = payload.answer
-      ? `No web results were found. Showing an AI-generated answer instead.\n\n${formatAnswer(query, payload.answer)}`
+      ? `${mode === "web" ? "No web results were found. Showing an AI-generated answer instead.\n\n" : ""}${formatAnswer(query, payload.answer)}`
       : formatResults(query, results, count);
 
     const truncation = truncateHead(output, {

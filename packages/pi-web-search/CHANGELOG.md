@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Render search results as themed Markdown and remove cache/count summaries and caution notices from rendered output.
 - Remove the redundant web-results heading from search output.
+- Show the empty-web-results notice only when a web search falls back to a generated answer, not in direct Answers mode.
 
 ## [0.14.0] - 2026-10-25
 
