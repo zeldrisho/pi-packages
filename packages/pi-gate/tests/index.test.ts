@@ -2,7 +2,13 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
-import { isToolCallEventType, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import {
+  isToolCallEventType,
+  type ExtensionAPI,
+  type KeybindingsManager,
+  type Theme,
+} from "@earendil-works/pi-coding-agent";
+import type { Component, TUI } from "@earendil-works/pi-tui";
 import piGate, {
   ensureConfig,
   loadConfig,
@@ -48,6 +54,14 @@ interface UiState {
 
 interface FakeUi {
   hasUI: boolean;
+  custom?: <T>(
+    factory: (
+      tui: TUI,
+      theme: Theme,
+      keybindings: KeybindingsManager,
+      done: (result: T) => void,
+    ) => Component | Promise<Component>,
+  ) => Promise<T>;
   notify: (text: string, level: NotifyLevel) => void;
   select: (
     prompt: string,
@@ -469,6 +483,45 @@ describe("piGate extension", () => {
         reason: "pi-gate: gate config change requires approval",
         terminate: true,
       });
+    });
+
+    it("uses the themed custom approval UI in TUI mode", async () => {
+      setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
+      const { ctx, handlers } = makeExtension().install();
+
+      ctx.ui.custom = <T>(
+        factory: (
+          tui: TUI,
+          theme: Theme,
+          keybindings: KeybindingsManager,
+          done: (result: T) => void,
+        ) => Component | Promise<Component>,
+      ) =>
+        new Promise<T>((resolve) => {
+          // SAFETY: The custom approval only calls requestRender() on the TUI.
+          const tui = Object.assign(Object.create(null), { requestRender() {} }) as TUI;
+
+          // SAFETY: The approval component uses only these theme helpers.
+          const theme = Object.assign(Object.create(null), {
+            style: (text: string) => text,
+            bg: (_color: string, text: string) => text,
+            bold: (text: string) => text,
+          }) as Theme;
+
+          // SAFETY: The test drives the approval component using only keybinding matches().
+          const keybindings = Object.assign(Object.create(null), {
+            matches: (input: string, action: string) =>
+              input === "ENTER" && action === "tui.select.confirm",
+          }) as KeybindingsManager;
+
+          const component = factory(tui, theme, keybindings, resolve);
+          void Promise.resolve(component).then(
+            (resolved) => resolved.handleInput?.("ENTER"),
+            () => undefined,
+          );
+        });
+
+      expect(await handlers.toolCall!(bashEvent("sudo true"), ctx)).toBeUndefined();
     });
 
     it("returns undefined when no rule matches", async () => {

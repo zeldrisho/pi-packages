@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Show approval prompts in Pi’s normal dialog area, using the terminal background and Pi theme accents.
+
 ## [0.7.1] - 2026-10-25
 
 ### Changed
