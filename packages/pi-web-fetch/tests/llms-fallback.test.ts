@@ -122,6 +122,23 @@ describe("parseLinkHeaderForAgentHints", () => {
 });
 
 describe("executeWebFetch llms.txt support", () => {
+  it("does not advertise the index when the requested URL is already llms.txt", async () => {
+    const { dependencies } = recordingDependencies(() =>
+      fakeResponse(200, "text/markdown", LLMS_TXT),
+    );
+
+    const result = await executeWebFetch(
+      { url: "https://direct.example.com/llms.txt" },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.content[0]?.text).not.toContain("Caution:");
+    expect(result.content[0]?.text).not.toContain("Documentation index available:");
+    expect(result.content[0]?.text).not.toContain("<untrusted_web_content");
+  });
+
   it("serves /llms.txt instead of an app-shell page", async () => {
     const { dependencies, requests } = recordingDependencies((href) => {
       if (href === "https://shell.example.com/llms.txt") {
@@ -144,7 +161,7 @@ describe("executeWebFetch llms.txt support", () => {
     expect(result.details.contentKind).toBe("llms-index");
     expect(result.details.extractor).toBe("raw");
     expect(result.details.confidence).toBe("high");
-    expect(result.content[0]?.text).toContain("/llms.txt index instead");
+    expect(result.content[0]?.text).toContain("Showing the site's documentation index instead");
     expect(result.content[0]?.text).not.toContain("also publishes");
     expect(result.content[0]?.text).toContain("# Example site");
   });
@@ -196,10 +213,8 @@ describe("executeWebFetch llms.txt support", () => {
     expect(requests).toHaveLength(2);
     expect(result.details.llmsTxtFallback).toBe(false);
     expect(result.details.llmsTxtUrl).toBe("https://indexed.example.com/llms.txt");
-    expect(result.content[0]?.text).toContain("https://indexed.example.com/llms.txt");
-    expect(result.content[0]?.text).toContain(
-      "llms.txt index: https://indexed.example.com/llms.txt",
-    );
+    expect(result.content[0]?.text).toContain("Documentation index available:");
+    expect(result.content[0]?.text).toContain("A perfectly readable plain-text page.");
 
     const second = await executeWebFetch(
       { url: `https://indexed.example.com/second-${process.pid}` },
@@ -208,9 +223,7 @@ describe("executeWebFetch llms.txt support", () => {
       dependencies,
     );
 
-    expect(second.content[0]?.text).toContain(
-      "llms.txt index: https://indexed.example.com/llms.txt",
-    );
+    expect(second.content[0]?.text).toContain("Documentation index available:");
   });
 
   it("prefers a deeper section index over the site-wide one", async () => {

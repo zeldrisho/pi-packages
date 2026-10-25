@@ -1,4 +1,5 @@
 import { Check } from "typebox/value";
+import { initTheme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { webSearchOutputSchema, webSearchParameters } from "../src/index";
 import { SEARCH_WEB_MAX_QUERY_CHARACTERS } from "../src/limits";
@@ -11,6 +12,7 @@ vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
 });
 
 describe("web_search schema rendering", () => {
+  initTheme();
   it("exposes a provider-compatible object schema without allOf or anyOf", () => {
     expect(webSearchParameters.type).toBe("object");
     const schema = JSON.stringify(webSearchParameters);
@@ -113,7 +115,7 @@ describe("web_search schema rendering", () => {
       snippet: "A useful snippet",
       quality: "medium",
     });
-    expect(result.content[0].text).toContain("untrusted external data");
+    expect(result.content[0].text).not.toContain("Caution:");
     expect(Check(webSearchOutputSchema, result.structuredContent)).toBe(true);
     expect(result.structuredContent).toMatchObject({
       resultType: "search-results",
@@ -177,10 +179,10 @@ describe("web_search schema rendering", () => {
       destructiveHint: false,
       openWorldHint: true,
     });
-    expect(collapsed).toContain("3 results · miss");
+    expect(collapsed).not.toContain("results ·");
     expect(collapsed).toContain("First title");
     expect(collapsed).toContain("more lines");
-    expect(collapsed).not.toContain("Third title");
+    expect(collapsed).toContain("Third title");
     expect(expanded).toContain("Third title");
     expect(expanded).not.toContain("more lines");
     expect(
@@ -205,7 +207,7 @@ describe("web_search schema rendering", () => {
         )
         .render(200)
         .join("\n"),
-    ).toContain("3 results · cached · truncated");
+    ).not.toContain("results ·");
     expect(
       tool
         .renderResult(

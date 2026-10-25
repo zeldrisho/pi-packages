@@ -1,5 +1,5 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
+import { getMarkdownTheme, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Markdown, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { SEARCH_WEB_MAX_QUERY_CHARACTERS } from "./limits";
 import { formatCollapsibleOutput } from "./render";
@@ -72,20 +72,11 @@ export default function (pi: ExtensionAPI) {
 
       if (isPartial) return new Text(theme.fg("warning", content?.text || "Searching…"), 0, 0);
 
-      const details = result.details;
-
-      const summary =
-        details?.resultCount !== undefined
-          ? `${details.answer ? "Generated answer" : `${details.resultCount} results`} · ${details.cached ? "cached" : "miss"}${details.truncated ? " · truncated" : ""}`
-          : "";
-
-      return new Text(
-        content?.type === "text"
-          ? `${theme.fg("dim", summary)}${formatCollapsibleOutput(content.text, expanded, theme)}`
-          : theme.fg("dim", "No results"),
-        0,
-        0,
-      );
+      return content?.type === "text"
+        ? new Markdown(formatCollapsibleOutput(content.text, expanded), 0, 0, getMarkdownTheme(), {
+            color: (text) => theme.fg("toolOutput", text),
+          })
+        : new Text(theme.fg("dim", "No results"), 0, 0);
     },
   });
 }

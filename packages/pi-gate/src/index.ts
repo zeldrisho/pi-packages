@@ -31,8 +31,10 @@
 import {
   isToolCallEventType,
   type ExtensionAPI,
+  type ExtensionContext,
   type ToolCallEventResult,
 } from "@earendil-works/pi-coding-agent";
+import { createApprovalPrompt, type ApprovalAction } from "./approval-prompt";
 import { configPath, ensureConfig, loadConfigResult } from "./config";
 import {
   bashTouchesConfig,
@@ -43,6 +45,76 @@ import { resolveRule } from "./rules";
 import { formatCommandForDisplay, formatPromptCommand, formatRule } from "./display";
 
 const HERDR_BLOCKED_LABEL = "pi-gate: approval required";
+
+/** Uses a themed terminal component in TUI mode and Pi's standard selector elsewhere. */
+async function selectApproval(
+  ctx: ExtensionContext,
+  timeoutMs: number,
+  signal: AbortSignal,
+  command: string,
+  rule: string,
+  showMatchHint: boolean,
+): Promise<string | undefined> {
+  if (ctx.mode !== "tui" || !ctx.ui.custom) {
+    return ctx.ui.select(
+      `pi-gate: allow this command?\n\n${command}\n\nMatched rule: ${rule}${showMatchHint ? "\nMatched command text is wrapped in »…«" : ""}`,
+      ["Allow", "Deny"],
+      { timeout: timeoutMs, signal },
+    );
+  }
+
+  let uiDone: ((value: ApprovalAction | undefined) => void) | undefined;
+  let settled = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let removeAbortListener: (() => void) | undefined;
+
+  return new Promise<ApprovalAction | undefined>((resolve, reject) => {
+    const finish = (value: ApprovalAction | undefined) => {
+      if (settled) return;
+      settled = true;
+
+      if (timer !== undefined) clearTimeout(timer);
+      removeAbortListener?.();
+      resolve(value);
+      uiDone?.(value);
+    };
+
+    const onAbort = () => finish(undefined);
+
+    try {
+      timer = setTimeout(() => finish(undefined), timeoutMs);
+
+      const uiPromise = ctx.ui.custom<ApprovalAction | undefined>(
+        (tui, theme, keybindings, done) => {
+          uiDone = done;
+
+          return createApprovalPrompt(tui, theme, keybindings, done, command, rule);
+        },
+      );
+
+      uiPromise
+        .then(finish)
+        .catch(reject)
+        .finally(() => {
+          if (timer !== undefined) clearTimeout(timer);
+          removeAbortListener?.();
+        });
+
+      if (signal) {
+        signal.addEventListener("abort", onAbort, { once: true });
+        removeAbortListener = () => signal.removeEventListener("abort", onAbort);
+
+        if (signal.aborted) onAbort();
+      }
+    } catch (error) {
+      settled = true;
+
+      if (timer !== undefined) clearTimeout(timer);
+      removeAbortListener?.();
+      reject(error);
+    }
+  });
+}
 
 const MAX_REASON_RULE_NAME_LENGTH = 27;
 
@@ -57,7 +129,7 @@ function reasonRuleName(pattern: string): string {
 
 /** Formats an approval timeout with the matched rule, elapsed limit in seconds, and retry guidance. */
 function timeoutReason(pattern: string, timeoutMs: number): string {
-  return `pi-gate: no response to rule "${reasonRuleName(pattern)}" within ${timeoutMs / 1_000}s; command not run. Ask the user whether to retry.`;
+  return `pi-gate: no response to rule "${reasonRuleName(pattern)}" within ${timeoutMs / 1_000}s; command not run. Ask the user whether to retry approval.`;
 }
 
 function reportHerdrBlocked(pi: ExtensionAPI, ctx: { mode?: string }, active: boolean): void {
@@ -218,7 +290,7 @@ export default function piGate(pi: ExtensionAPI): void {
       const rule = configChange ? CONFIG_CHANGE_REASON : formatRule(match);
 
       if (match.action === "block") {
-        const reason = `pi-gate: blocked by rule "${reasonRuleName(match.pattern)}". Do not retry or use equivalent commands; ask the user.`;
+        const reason = `pi-gate: command blocked by rule "${reasonRuleName(match.pattern)}". Ask the user before proceeding.`;
 
         if (ctx.hasUI) ctx.ui.notify(reason, "warning");
 
@@ -230,7 +302,7 @@ export default function piGate(pi: ExtensionAPI): void {
           block: true,
           reason: configChange
             ? CONFIG_CHANGE_REASON
-            : `pi-gate: rule "${reasonRuleName(match.pattern)}" needs approval but no UI is available. Do not retry; ask the user.`,
+            : `pi-gate: rule "${reasonRuleName(match.pattern)}" needs approval but no UI is available. Ask the user before proceeding.`,
           terminate: true,
         };
       }
@@ -248,11 +320,7 @@ export default function piGate(pi: ExtensionAPI): void {
 
       try {
         const promptStartedAt = Date.now();
-        choice = await ctx.ui.select(
-          `pi-gate: allow this command?\n\n${promptCommand}\n\nMatched rule: ${rule}${configChange ? "" : "\nMatched command text is wrapped in »…«"}`,
-          ["Allow", "Deny"],
-          { timeout: timeoutMs, signal },
-        );
+        choice = await selectApproval(ctx, timeoutMs, signal, promptCommand, rule, !configChange);
         // Pi returns undefined for both dismissal and timeout; elapsed time separates the timeout case.
         timedOut = choice === undefined && Date.now() - promptStartedAt >= timeoutMs;
       } finally {
@@ -277,7 +345,7 @@ export default function piGate(pi: ExtensionAPI): void {
             ? timeoutReason(match.pattern, timeoutMs)
             : configChange
               ? CONFIG_CHANGE_REASON
-              : `pi-gate: denied by rule "${reasonRuleName(match.pattern)}". Do not retry or use equivalent commands; ask the user.`,
+              : `pi-gate: command not run because approval was denied. Ask the user before retrying (rule "${reasonRuleName(match.pattern)}").`,
           terminate: true,
         };
       }

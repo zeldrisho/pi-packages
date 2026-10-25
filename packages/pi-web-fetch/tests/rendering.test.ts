@@ -89,7 +89,7 @@ describe("web_fetch rendering", () => {
       destructiveHint: false,
       openWorldHint: true,
     });
-    expect(collapsed).toContain(`${output.length} characters · miss`);
+    expect(collapsed).not.toContain("characters ·");
     expect(collapsed).toContain("Fetched line 1");
     expect(collapsed).toContain("2 more lines, 12 total, Ctrl+O to expand");
     expect(collapsed).not.toContain("Fetched line 11");
@@ -99,12 +99,14 @@ describe("web_fetch rendering", () => {
       tool.renderCall({ url: "https://example.com" }, renderTheme).render(200).join("\n"),
     ).toContain("web_fetch https://example.com");
 
-    expect(
-      tool
-        .renderCall({ url: "https://example.com", query: "cache\npolicy", offset: 0 }, renderTheme)
-        .render(200)
-        .join("\n"),
-    ).toContain('query="cache\\npolicy" offset=0');
+    const focusedCall = tool
+      .renderCall({ url: "https://example.com", query: "cache\npolicy", offset: 3000 }, renderTheme)
+      .render(200)
+      .join("\n");
+
+    expect(focusedCall).toContain("web_fetch https://example.com");
+    expect(focusedCall).not.toContain("query=");
+    expect(focusedCall).not.toContain("offset=");
 
     const focusedResult = tool
       .renderResult(
@@ -123,17 +125,22 @@ describe("web_fetch rendering", () => {
       .render(200)
       .join("\n");
 
-    expect(focusedResult).toContain("hit · 2/5 sections · next offset=6000");
+    expect(focusedResult).not.toContain("hit ·");
+    expect(focusedResult).not.toContain("next offset=");
     expect(
       tool
         .renderResult(
-          { ...result, details: { ...result.details, extractionDiagnostics: { botWall: true } } },
+          {
+            ...result,
+            content: [{ type: "text", text: "Blocked by an anti-bot challenge." }],
+            details: { ...result.details, extractionDiagnostics: { botWall: true } },
+          },
           { expanded: false, isPartial: false },
           renderTheme,
         )
         .render(200)
         .join("\n"),
-    ).toContain("Blocked");
+    ).toContain("Blocked by an anti-bot challenge.");
     expect(
       tool
         .renderResult(

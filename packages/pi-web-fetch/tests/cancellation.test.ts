@@ -63,17 +63,19 @@ describe("web_fetch cancellation", () => {
 
   it("times out while HTML extraction is stalled", async () => {
     let extractionCount = 0;
-    await expect(
-      fetchRemoteContent(`${origin}/html`, 0, 6_000, undefined, {
-        ...dependencies,
-        extractHtml: () => {
-          extractionCount += 1;
 
-          return new Promise<never>(() => {});
-        },
-        timeoutMs: 20,
-      }),
-    ).rejects.toThrow("web_fetch timed out after 0.02 seconds.");
+    const pending = fetchRemoteContent(`${origin}/html`, 0, 6_000, undefined, {
+      ...dependencies,
+      extractHtml: () => {
+        extractionCount += 1;
+
+        return new Promise<never>(() => {});
+      },
+      timeoutMs: 1_000,
+    });
+
+    await vi.waitFor(() => expect(extractionCount).toBe(1));
+    await expect(pending).rejects.toThrow("web_fetch timed out after 1 seconds.");
     expect(extractionCount).toBe(1);
   });
 
