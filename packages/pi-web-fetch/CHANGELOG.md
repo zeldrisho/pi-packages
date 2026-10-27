@@ -7,13 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Return minified JavaScript, JSON, and YAML responses as indented, fenced code blocks.
+
 ### Changed
 
 - Shorten documentation index notices.
+- Probe one more ancestor directory for `/llms.txt`, so locale-prefixed documentation sites resolve to their section index.
 
 ### Fixed
 
 - Report AWS WAF challenge responses as blocks instead of empty pages.
+- Fetch Markdown documentation that static hosts serve as `application/octet-stream`.
+- Fall back to a discovered documentation index when a bot challenge withholds the requested page.
 
 ## [0.14.1] - 2026-10-25
 

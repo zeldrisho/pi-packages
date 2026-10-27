@@ -1,6 +1,10 @@
 import { ExpiringLruCache } from "../cache";
 import type { CompleteDocument } from "../document/content.ts";
-import { fetchCompleteDocument, type FetchRemoteDependencies } from "./fetch.ts";
+import {
+  ChallengeBlockedError,
+  fetchCompleteDocument,
+  type FetchRemoteDependencies,
+} from "./fetch.ts";
 import { InflightCoalescer } from "../inflight";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
@@ -97,8 +101,13 @@ interface LlmsTxtProbe {
 
 const MAX_LLMS_TXT_PROBE_ENTRIES = 512;
 
-/** Deepest ancestor-directory `/llms.txt` probed, e.g. `/r2/x/y` probes `/r2/llms.txt`. */
-const MAX_LLMS_TXT_DIRECTORY_DEPTH = 1;
+/**
+ * Deepest ancestor-directory `/llms.txt` probed, e.g. `/a/b/c` also probes
+ * `/a/b/llms.txt`. Locale-prefixed documentation sites publish their section index
+ * one level below the locale root, so two levels are needed to reach
+ * `/en/docs/llms.txt` from `/en/docs/catalog/...`.
+ */
+const MAX_LLMS_TXT_DIRECTORY_DEPTH = 2;
 
 const llmsTxtProbes = new ExpiringLruCache<string, LlmsTxtProbe>(
   MAX_LLMS_TXT_PROBE_ENTRIES,
@@ -179,10 +188,16 @@ async function probeUsableRawText(
       if (existing) return existing;
 
       try {
-        const document = await fetchCompleteDocument(candidate.toString(), sharedSignal, {
-          ...dependencies,
-          solveAnubisChallenges: false,
-        });
+        const document = await fetchCompleteDocument(
+          candidate.toString(),
+          sharedSignal,
+          { ...dependencies, solveAnubisChallenges: false },
+          // An index probe never accepts an empty body.
+          false,
+          // A probe wants exactly this representation; retrying as HTML only burns
+          // a request on a URL that is already known to be missing.
+          false,
+        );
 
         const available = isUsableLlmsTxtIndex(document) ? document : undefined;
         const result = { document: available, expires: Date.now() + CACHE_TTL_MS };
@@ -226,8 +241,8 @@ function isSafeToProbe(candidate: URL | undefined, primaryUrl: string): boolean 
  *
  * - Probes the site's `/llms.txt` index once per origin per TTL window, in parallel with
  *   the primary fetch, so later calls can advertise it.
- * - Serves the index instead of the page when the page looks like an app shell or carries
- *   too little readable text.
+ * - Serves the index instead of the page when the page looks like an app shell, carries
+ *   too little readable text, or was withheld by a bot-protection challenge.
  * - Otherwise annotates the page with the index URL so agents can discover sibling pages.
  *
  * A missing or useless index can never degrade the primary fetch.
@@ -247,16 +262,32 @@ export async function fetchDocumentWithLlmsTxtSupport(
 
   const candidates = buildLlmsTxtCandidateUrls(rawUrl);
 
-  const [primary, blindIndex] = await Promise.all([
+  // A withheld page must not discard an index that is still usable, so the pair is
+  // settled instead of rejected together.
+  const [primarySettled, indexSettled] = await Promise.allSettled([
     fetchCompleteDocument(rawUrl, signal, dependencies, true),
     candidates.length > 0
       ? ensureLlmsTxtIndex(candidates, signal, dependencies)
       : Promise.resolve(undefined),
   ]);
 
+  // An index probe only rejects when the caller cancels, which must still surface.
+  if (indexSettled.status === "rejected") throw indexSettled.reason;
+
+  if (primarySettled.status === "rejected") {
+    // A bot-protection layer replaced the page with a challenge that carries no
+    // content; the discovered index is the only remaining pointer to that content.
+    if (indexSettled.value && primarySettled.reason instanceof ChallengeBlockedError)
+      return { ...indexSettled.value.document, llmsTxtFallback: true };
+
+    throw primarySettled.reason;
+  }
+
+  const primary = primarySettled.value;
+
   // A `describedby` advertisement names the covering index authoritatively per
   // llmstxt.org v2, so it outranks the blind root/section probes whenever usable.
-  let index = blindIndex;
+  let index = indexSettled.value;
 
   if (primary.llmsTxtDescribedBy) {
     const describedBy = toAbsoluteUrl(primary.llmsTxtDescribedBy);

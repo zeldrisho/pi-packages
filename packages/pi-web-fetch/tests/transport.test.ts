@@ -310,6 +310,48 @@ describe("web_fetch transport", () => {
     expect(result.totalCharacters).toBe(1_500_000);
   });
 
+  it("structures minified source responses instead of returning one long line", async () => {
+    const result = await fetchRemoteContent(
+      `${origin}/minified-js`,
+      0,
+      6_000,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.extractor).toBe("raw");
+    expect(result.markdown.startsWith("```js\n")).toBe(true);
+    expect(result.markdown).toContain('\n  openapi:"3.1.1",');
+    expect(result.markdown).toContain('"/sapi/v1/capital/deposit/hisrec":{');
+    expect(result.markdown.split("\n").length).toBeGreaterThan(10);
+  });
+
+  it("structures JSON-like minified bodies that strict parsing rejects", async () => {
+    const result = await fetchRemoteContent(
+      `${origin}/minified-json-like`,
+      0,
+      6_000,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.markdown.startsWith("```json\n")).toBe(true);
+    expect(result.markdown).toContain('\n  openapi:"3.1.1",');
+  });
+
+  it("leaves long single-line prose untouched", async () => {
+    const result = await fetchRemoteContent(
+      `${origin}/single-line-plain-text`,
+      0,
+      6_000,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.markdown.startsWith("plain prose without structure")).toBe(true);
+    expect(result.markdown).not.toContain("```");
+  });
+
   it.each([
     ["/binary", "does not support application/octet-stream"],
     ["/status", "HTTP 418"],

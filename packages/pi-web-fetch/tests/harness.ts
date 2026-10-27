@@ -162,6 +162,25 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
       response.end("x".repeat(1_500_000));
 
       return;
+    case "/minified-js":
+      response.setHeader("content-type", "text/javascript");
+      response.end(
+        `import{a,b}from"./chunk.js";const e={openapi:"3.1.1",info:{title:"Wallet REST API",description:"${"Provides wallet endpoints. ".repeat(90)}"},paths:{"/sapi/v1/capital/deposit/hisrec":{get:{summary:"Deposit History",parameters:[{name:"coin",in:"query",required:false}]}}}};export{e as default};`,
+      );
+
+      return;
+    case "/minified-json-like":
+      response.setHeader("content-type", "application/json");
+      response.end(
+        `{openapi:"3.1.1",paths:{"/sapi/v1/capital/deposit/hisrec":{get:{summary:"Deposit History"}}},note:"${"unquoted keys are not strict JSON. ".repeat(60)}"}`,
+      );
+
+      return;
+    case "/single-line-plain-text":
+      response.setHeader("content-type", "text/plain");
+      response.end(`${"plain prose without structure ".repeat(120)}`);
+
+      return;
     case "/declared-large":
       response.setHeader("content-type", "text/plain");
       response.setHeader("content-length", String(FETCH_MAX_BYTES + 1));

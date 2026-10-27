@@ -15,7 +15,7 @@ Use `pi config` to enable or disable the extension, and `pi list` to see configu
 
 ## Usage
 
-The `web_fetch` tool accepts public HTTP and HTTPS URLs and supports HTML, Markdown, plain text, JSON, and XML. HTML is converted to Markdown; images are omitted. URLs with credentials, local or private network targets, unsafe redirects, downloads over 5 MiB, and unsupported content types are rejected.
+The `web_fetch` tool accepts public HTTP and HTTPS URLs and supports HTML, Markdown, plain text, JSON, and XML. HTML is converted to Markdown; images are omitted. Minified JavaScript, JSON, and YAML are returned as indented code blocks so long single-line payloads stay readable. URLs with credentials, local or private network targets, unsafe redirects, downloads over 5 MiB, and unsupported content types are rejected.
 
 | Parameter | Description                                                                                               |
 | --------- | --------------------------------------------------------------------------------------------------------- |
@@ -29,7 +29,7 @@ For example, a URL such as `https://github.com/shadcn-ui/lint#get-started` start
 
 ### Page alternatives and bot challenges
 
-The tool can discover advertised Markdown versions and `/llms.txt` indexes. When an index is discovered, its URL is shown in the result so you can follow it if the fetched page is insufficient; when the index replaces the requested page, the result explains that fallback. Anubis proof-of-work challenges are supported; unsupported challenges and JavaScript CAPTCHAs return a blocked result. There is no browser fallback. Challenge cookies are not reused between fetches.
+The tool can discover advertised Markdown versions and `/llms.txt` indexes. When an index is discovered, its URL is shown in the result so you can follow it if the fetched page is insufficient; when the index replaces the requested page, the result explains that fallback. Markdown files served with a generic binary content type are read as text. Anubis proof-of-work challenges are supported, and a page withheld by an AWS WAF or Cloudflare bot challenge falls back to the site's documentation index when one exists. Other unsupported challenges and JavaScript CAPTCHAs return a blocked result. There is no browser fallback. Challenge cookies are not reused between fetches.
 
 Pages with HTML nested beyond 512 elements are rejected.
 
