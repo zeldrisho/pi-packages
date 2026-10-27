@@ -28,6 +28,15 @@ const SESSION_SUFFIX_LENGTH = 14;
 
 const SESSION_SEED_LENGTH = 20;
 
+/** Milliseconds representable by the identifier's 36-bit timestamp field. */
+const SESSION_TS_MODULUS = 2 ** 36;
+
+/** Half the timestamp range; larger differences are read as the nearer side. */
+const SESSION_TS_HALF = SESSION_TS_MODULUS / 2;
+
+/** Canonical identifier shape: hex timestamp half plus a fourteen-character suffix. */
+export const SESSION_ID_PATTERN = /^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/u;
+
 /** Largest multiple of the base62 alphabet size that fits in a byte. */
 const BASE62_UNBIASED_LIMIT = BASE62.length * 4;
 
@@ -124,30 +133,70 @@ export function createSessionSeed(): Uint8Array {
  * Renders OpenCode CLI's canonical session identifier shape.
  *
  * The 48-bit hex half reproduces `Identifier.descending()` with the counter
- * pinned to one, so the low twelve bits always read `ffe`. The high 36 bits are
- * derived from the seed, matching the reference implementation, while the
- * fourteen-character suffix is derived from the seed.
+ * pinned to one, so the low twelve bits always read `ffe`. Its high 36 bits
+ * carry the creation time, which the inference gateway checks for recency
+ * before honouring the free tier. The fourteen-character suffix is derived
+ * from the seed.
  *
  * @param seed - At least twenty bytes; defaults to fresh cryptographic randomness
+ * @param now - Creation time in epoch milliseconds, defaulting to the wall clock
  * @returns A `ses_` identifier accepted by the free-tier gate
  * @throws If the seed contains fewer than twenty bytes or default seed generation fails
  */
-export function createCanonicalSessionId(seed: Uint8Array = createSessionSeed()): string {
+export function createCanonicalSessionId(
+  seed: Uint8Array = createSessionSeed(),
+  now: number = Date.now(),
+): string {
   if (seed.length < SESSION_SEED_LENGTH) {
     throw new Error(`Session seed must contain at least ${SESSION_SEED_LENGTH} bytes`);
   }
 
-  const timestampBits =
-    ((BigInt(seed[0] ?? 0) << 28n) |
-      (BigInt(seed[1] ?? 0) << 20n) |
-      (BigInt(seed[2] ?? 0) << 12n) |
-      (BigInt(seed[3] ?? 0) << 4n) |
-      (BigInt(seed[4] ?? 0) >> 4n)) &
-    SESSION_TS_MASK_36;
+  const timestampBits = BigInt(now) & SESSION_TS_MASK_36;
 
   const encoded = ~((timestampBits << 12n) | SESSION_COUNTER) & SESSION_MASK_48;
 
   return `${SESSION_PREFIX}${encoded.toString(16).padStart(SESSION_HEX_LENGTH, "0")}${createSessionSuffix(seed)}`;
+}
+
+/**
+ * Reads the creation time a canonical identifier carries.
+ *
+ * The timestamp wraps every {@link SESSION_TS_MODULUS} milliseconds, so callers
+ * must compare it with a nearby reference time rather than treating it as an
+ * absolute date.
+ *
+ * @param id - Candidate identifier
+ * @returns Creation time in epoch milliseconds, or undefined for a malformed id
+ */
+export function sessionIdCreatedAt(id: string): number | undefined {
+  const match = /^ses_([0-9a-f]{12})/u.exec(id);
+
+  if (!match?.[1]) return undefined;
+
+  const encoded = BigInt(`0x${match[1]}`);
+
+  return Number((~encoded & SESSION_MASK_48) >> 12n);
+}
+
+/**
+ * Measures how long ago a canonical identifier was created.
+ *
+ * The result is signed and wrapped into half the timestamp range, so identifiers
+ * created in the future read as small negative ages and stale identifiers read
+ * as large positive ages.
+ *
+ * @param id - Candidate identifier
+ * @param now - Reference time in epoch milliseconds
+ * @returns Age in milliseconds, or undefined for a malformed id
+ */
+export function sessionIdAgeMs(id: string, now: number): number | undefined {
+  const createdAt = sessionIdCreatedAt(id);
+
+  if (createdAt === undefined) return undefined;
+
+  const age = (now - createdAt) % SESSION_TS_MODULUS;
+
+  return age > SESSION_TS_HALF ? age - SESSION_TS_MODULUS : age;
 }
 
 /**

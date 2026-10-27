@@ -1,6 +1,7 @@
 import type { RefreshModelsContext } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ProviderConfig } from "@earendil-works/pi-coding-agent";
 
+import { createBunTransport } from "./bun-transport.ts";
 import { createCliVersionResolver } from "./cli-version.ts";
 import {
   buildFingerprintHeaders,
@@ -19,6 +20,7 @@ import {
   type FreeModelsStoreEntry,
 } from "./models.ts";
 import { createFreeStream } from "./stream.ts";
+import { createSessionStore, resolveSessionId, type SessionStore } from "./session-store.ts";
 
 /** Provider id used by `/model` and the provider-scoped request adapter. */
 export const PROVIDER_ID = "opencode-free";
@@ -38,13 +40,19 @@ interface CatalogRefreshState {
 export interface OpencodeFreeDependencies {
   randomSeed: () => Uint8Array;
   fetcher: typeof fetch;
+  /** Identity store; defaults to a JSON file in the Pi agent directory. */
+  sessionStore?: SessionStore;
+  /** Clock used to date and validate identities; defaults to `Date.now`. */
+  now?: () => number;
+  /** Explicit identity override, for example from an environment variable. */
+  sessionIdOverride?: () => string | undefined;
 }
 
 /**
  * Registers the OpenCode free provider and its request adapter.
  *
- * Seeds the catalog from bundled models, rotates session identity on session
- * start, and normalizes requests for this provider. Discovery runs when Pi
+ * Seeds the catalog from bundled models, keeps one persisted session identity
+ * across runs, and normalizes requests for this provider. Discovery runs when Pi
  * invokes the registered model refresh hook.
  *
  * @param pi - Extension API supplied by Pi
@@ -55,14 +63,27 @@ export function registerOpencodeFree(
   pi: ExtensionAPI,
   dependencies: OpencodeFreeDependencies,
 ): void {
-  let sessionId = createCanonicalSessionId(dependencies.randomSeed());
+  const now = dependencies.now ?? Date.now;
+  const store = dependencies.sessionStore ?? createSessionStore();
+  const override = dependencies.sessionIdOverride ?? readSessionOverride;
+
+  /** Reuses a persisted identity so each launch does not consume a new free-tier session. */
+  const resolveCurrentSessionId = (): string =>
+    resolveSessionId({
+      now: now(),
+      create: (timestamp) => createCanonicalSessionId(dependencies.randomSeed(), timestamp),
+      store,
+      override: override(),
+    });
+
+  let sessionId = resolveCurrentSessionId();
 
   const resolveVersion = createCliVersionResolver(dependencies.fetcher);
   const initialModels = initialFreeModels();
   const refreshState: CatalogRefreshState = {};
 
   pi.on("session_start", () => {
-    sessionId = createCanonicalSessionId(dependencies.randomSeed());
+    sessionId = resolveCurrentSessionId();
   });
 
   const config: ProviderConfig = {
@@ -204,9 +225,19 @@ function isRecent(timestamp: number | undefined, now: number, ttl: number): bool
   );
 }
 
+/** Environment variable that pins this provider to a specific session identity. */
+export const SESSION_ID_ENV = "PI_OPENCODE_FREE_SESSION_ID";
+
+/** Reads the optional identity override, treating blanks as absent. */
+function readSessionOverride(): string | undefined {
+  return process.env[SESSION_ID_ENV]?.trim() || undefined;
+}
+
 const defaultDependencies: OpencodeFreeDependencies = {
   randomSeed: createSessionSeed,
-  fetcher: globalThis.fetch,
+  // Free-tier inference only accepts the OpenCode CLI's TLS stack, so gateway
+  // requests run through Bun while catalog and version lookups stay direct.
+  fetcher: createBunTransport(),
 };
 
 /**

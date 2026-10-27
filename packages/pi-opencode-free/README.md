@@ -27,9 +27,11 @@ The provider automatically resolves the current CLI version from OpenCode's offi
 
 ## Usage limits
 
-Free-tier availability and limits are controlled by OpenCode. When a usage limit is reached, the error includes the server-reported reset time in your local date, time, and timezone when available; otherwise it says `Reset time unavailable.`
+Free-tier availability and limits are controlled by OpenCode. OpenCode rations _new_ free sessions from a network, while requests from a session that already served a completion keep working. The provider therefore stores one session identity in `<agent-dir>/opencode-free/session.json` and reuses it across Pi runs instead of opening a new session on every launch; it refreshes that identity after 30 days. Delete the file to force a fresh identity.
 
-Wait for the reported reset or select another provider with `/model`. A reported reset does not guarantee that access has been restored. The extension cannot reset or bypass upstream limits.
+To pin a specific canonical `ses_…` identity instead, set `PI_OPENCODE_FREE_SESSION_ID`. Any value that is malformed or outside the 30-day reuse window is ignored.
+
+When a usage limit is reached, the error includes the server-reported reset time in your local date, time, and timezone when available; otherwise it says `Reset time unavailable.` Wait for the reported reset or select another provider with `/model`. A reported reset does not guarantee that access has been restored. The extension cannot reset or bypass upstream limits.
 
 ## Uninstall
 

@@ -10,6 +10,8 @@ import {
   FINGERPRINT_MARKER_HEADER,
   READ_TOOL,
   SESSION_HEADER_NAMES,
+  sessionIdAgeMs,
+  sessionIdCreatedAt,
 } from "../src/fingerprint";
 
 const CLI_VERSION = "2.1.4";
@@ -18,6 +20,15 @@ const SESSION_PATTERN = /^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/u;
 
 function deterministicSeed(offset = 0): Uint8Array {
   return Uint8Array.from({ length: 20 }, (_, index) => (index + offset) % 256);
+}
+
+const SESSION_TS_MODULUS = 2 ** 36;
+
+/** Recovers the creation time the CLI encodes in the identifier's hex half. */
+function decodeSessionTimestamp(id: string): number {
+  const encoded = BigInt(`0x${id.slice(4, 16)}`);
+
+  return Number((~encoded & 0xffffffffffffn) >> 12n);
 }
 
 describe("opencode session identity", () => {
@@ -30,16 +41,62 @@ describe("opencode session identity", () => {
   });
 
   it("is deterministic for a fixed seed and changes with different bytes", () => {
-    expect(createCanonicalSessionId(deterministicSeed())).toBe(
-      createCanonicalSessionId(deterministicSeed()),
+    const now = 1_793_000_000_000;
+
+    expect(createCanonicalSessionId(deterministicSeed(), now)).toBe(
+      createCanonicalSessionId(deterministicSeed(), now),
     );
-    expect(createCanonicalSessionId(deterministicSeed(1))).not.toBe(
-      createCanonicalSessionId(deterministicSeed()),
+    expect(createCanonicalSessionId(deterministicSeed(1), now)).not.toBe(
+      createCanonicalSessionId(deterministicSeed(), now),
     );
+  });
+
+  it("encodes the creation time in the identifier", () => {
+    const now = 1_793_000_000_000;
+    const id = createCanonicalSessionId(deterministicSeed(), now);
+
+    expect(decodeSessionTimestamp(id)).toBe(now % SESSION_TS_MODULUS);
+  });
+
+  it("tracks the wall clock instead of the seed", () => {
+    const first = createCanonicalSessionId(deterministicSeed(), 1_700_000_000_000);
+    const second = createCanonicalSessionId(deterministicSeed(), 1_700_000_060_000);
+
+    expect(decodeSessionTimestamp(second) - decodeSessionTimestamp(first)).toBe(60_000);
+  });
+
+  it("defaults the creation time to now", () => {
+    const before = Date.now() % SESSION_TS_MODULUS;
+    const id = createCanonicalSessionId(deterministicSeed());
+    const stamp = decodeSessionTimestamp(id);
+    const elapsed = (stamp - before + SESSION_TS_MODULUS) % SESSION_TS_MODULUS;
+
+    expect(elapsed).toBeLessThan(5_000);
   });
 
   it("rejects a seed that is too short", () => {
     expect(() => createCanonicalSessionId(new Uint8Array(19))).toThrow(/at least 20 bytes/u);
+  });
+
+  it("recovers the creation time and age of an identifier", () => {
+    const now = 1_793_000_000_000;
+    const id = createCanonicalSessionId(deterministicSeed(), now - 90_000);
+
+    expect(sessionIdCreatedAt(id)).toBe((now - 90_000) % SESSION_TS_MODULUS);
+    expect(sessionIdAgeMs(id, now)).toBe(90_000);
+    expect(sessionIdAgeMs(id, now - 60_000)).toBe(30_000);
+  });
+
+  it("reads future-dated identifiers as negative ages across the wrap", () => {
+    const now = 1_793_000_000_000;
+    const id = createCanonicalSessionId(deterministicSeed(), now + 45_000);
+
+    expect(sessionIdAgeMs(id, now)).toBe(-45_000);
+  });
+
+  it("returns no age for malformed identifiers", () => {
+    expect(sessionIdCreatedAt("ses_xyz")).toBeUndefined();
+    expect(sessionIdAgeMs("not-a-session", Date.now())).toBeUndefined();
   });
 
   it("keeps the suffix well formed when seed bytes are rejected", () => {

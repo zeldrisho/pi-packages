@@ -93,8 +93,12 @@ function deterministicSeed(value: number): Uint8Array {
   return Uint8Array.from({ length: 20 }, (_, index) => (index + value) % 256);
 }
 
+/** Fixed clock so generated identities are deterministic across a test. */
+const SESSION_NOW = 1_793_000_000_000;
+
 function dependencies(environment: Record<string, string | undefined>, fetcher: typeof fetch) {
   let seedValue = 0;
+  let storedSessionId: string | undefined;
 
   return {
     randomSeed: () => {
@@ -104,6 +108,14 @@ function dependencies(environment: Record<string, string | undefined>, fetcher: 
     },
     fetcher,
     environment,
+    now: () => SESSION_NOW,
+    sessionIdOverride: () => undefined,
+    sessionStore: {
+      load: () => storedSessionId,
+      save: (id: string) => {
+        storedSessionId = id;
+      },
+    },
   };
 }
 
@@ -422,7 +434,7 @@ describe("opencode-free extension", () => {
     expect(publications).toHaveLength(0);
   });
 
-  it("rotates session identity for inference, including requests without extension hooks", async () => {
+  it("reuses the persisted session identity for inference across session starts", async () => {
     const { pi, state } = createFakePi();
     const sessions: Array<string | null> = [];
     let versionLookups = 0;
@@ -466,8 +478,7 @@ describe("opencode-free extension", () => {
     expect(sessions[0]).toMatch(/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/u);
     await handlerFor(state, "session_start")({ type: "session_start" }, {});
     await native(storedModel, context, { apiKey: "public", maxRetries: 0 }).result();
-    expect(sessions[1]).not.toBe(sessions[0]);
-    expect(sessions[1]).toMatch(/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/u);
+    expect(sessions[1]).toBe(sessions[0]);
     expect(sessions).toHaveLength(2);
     expect(versionLookups).toBe(1);
   });

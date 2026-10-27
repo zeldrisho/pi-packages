@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Keep one session identity across Pi runs instead of opening a new free-tier session on every launch, and allow pinning an identity with `PI_OPENCODE_FREE_SESSION_ID`.
+
+### Fixed
+
+- Stop every request being rejected as a free usage limit by dating the session identifier from the system clock, matching the OpenCode CLI.
+
 ## [0.2.1] - 2026-10-25
 
 ### Changed
