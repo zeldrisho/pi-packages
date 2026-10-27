@@ -65,6 +65,11 @@ describe("query-focused Markdown", () => {
     expect(focusMarkdown(`\`\`\`json\n${lines.join("\n")}\n\`\`\``, "absent").markdown).toBe("");
   });
 
+  it("handles long whitespace after a closing fence followed by non-whitespace", () => {
+    const markdown = `\`\`\`json\nneedle\n\`\`\`${"\t".repeat(100_000)}x`;
+    expect(focusMarkdown(markdown, "needle").markdown).toContain("needle");
+  });
+
   it("does not treat code inside fences as headings", () => {
     const result = focusMarkdown(
       "# Real\n\n```yaml\n# fake\nvalue: needle\n```\n# Other\nother",
