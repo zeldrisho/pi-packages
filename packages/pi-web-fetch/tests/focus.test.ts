@@ -70,6 +70,15 @@ describe("query-focused Markdown", () => {
     expect(focusMarkdown(markdown, "needle").markdown).toContain("needle");
   });
 
+  it("recognizes headings between separate fenced blocks", () => {
+    const markdown = "```js\nfirst\n```\n# Heading\nneedle\n```\nsecond\n```";
+    const result = focusMarkdown(markdown, "needle");
+
+    expect(result.details.totalSections).toBe(2);
+    expect(result.markdown).toContain("# Heading");
+    expect(result.markdown).not.toContain("first");
+  });
+
   it("does not treat code inside fences as headings", () => {
     const result = focusMarkdown(
       "# Real\n\n```yaml\n# fake\nvalue: needle\n```\n# Other\nother",

@@ -94,6 +94,9 @@ describe("free-tier request normalization", () => {
       false,
     );
     expect(isProviderRequestPayload({ model: "x", tool_choice: 1 })).toBe(false);
+    expect(isProviderRequestPayload({ model: "x", messages: "invalid" })).toBe(false);
+    expect(isProviderRequestPayload({ model: "x", messages: {} })).toBe(false);
+    expect(isProviderRequestPayload({ model: "x", messages: [] })).toBe(true);
   });
 });
 

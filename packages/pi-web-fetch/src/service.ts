@@ -435,6 +435,7 @@ export async function executeWebFetch(
 
   const fresh = Boolean(
     document &&
+    !document.llmsTxtFallback &&
     !document.extractionDiagnostics?.botWall &&
     (document.cachedAt === undefined || now - document.cachedAt < CACHE_TTL_MS),
   );

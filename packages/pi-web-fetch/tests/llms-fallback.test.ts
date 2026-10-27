@@ -313,6 +313,28 @@ describe("executeWebFetch llms.txt support", () => {
     expect(result.content[0]?.text).toContain("# Example site");
   });
 
+  it("refetches a recovered page instead of serving a fresh cached index fallback", async () => {
+    let blocked = true;
+
+    const { dependencies, requests } = recordingDependencies((href) => {
+      if (href.endsWith("/llms.txt")) return fakeResponse(200, "text/markdown", LLMS_TXT);
+
+      if (blocked) return fakeResponse(202, "text/html", "", { "x-amzn-waf-action": "challenge" });
+
+      return fakeResponse(200, "text/plain", "Recovered documentation page ".repeat(20));
+    });
+
+    const url = `https://recover-index.example.com/page-${process.pid}`;
+    const first = await executeWebFetch({ url }, undefined, undefined, dependencies);
+    expect(first.details.llmsTxtFallback).toBe(true);
+
+    blocked = false;
+    const second = await executeWebFetch({ url }, undefined, undefined, dependencies);
+    expect(second.details.llmsTxtFallback).toBe(false);
+    expect(second.content[0]?.text).toContain("Recovered documentation page");
+    expect(requests.filter((href) => href === url)).toHaveLength(2);
+  });
+
   it("reports the challenge when a withheld page has no usable index", async () => {
     const { dependencies } = recordingDependencies((href) =>
       href.endsWith("/llms.txt")

@@ -62,6 +62,10 @@ export function isProviderRequestPayload(value: unknown): value is ProviderReque
     }
   }
 
+  if ("messages" in value && value.messages !== undefined && !Array.isArray(value.messages)) {
+    return false;
+  }
+
   if ("tool_choice" in value && value.tool_choice !== undefined) {
     if (!isToolChoice(value.tool_choice)) return false;
   }

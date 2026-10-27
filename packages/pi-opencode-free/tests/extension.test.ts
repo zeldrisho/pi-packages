@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type {
   Model,
   ModelsPublication,
@@ -994,13 +997,19 @@ describe("opencode-free extension", () => {
   });
 
   it("provides a default export for Pi", () => {
-    const { pi, state } = createFakePi();
+    const directory = mkdtempSync(join(tmpdir(), "opencode-free-test-"));
+    vi.stubEnv("PI_CODING_AGENT_DIR", directory);
 
-    piOpencodeFree(pi);
+    try {
+      const { pi, state } = createFakePi();
+      piOpencodeFree(pi);
+      expect(state.provider?.name).toBe(PROVIDER_ID);
 
-    expect(state.provider?.name).toBe(PROVIDER_ID);
-
-    const ids = state.provider?.config.models?.map((model) => model.id) ?? [];
-    expect(ids.length).toBeGreaterThan(0);
+      const ids = state.provider?.config.models?.map((model) => model.id) ?? [];
+      expect(ids.length).toBeGreaterThan(0);
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

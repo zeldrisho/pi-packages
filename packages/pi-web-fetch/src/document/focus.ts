@@ -85,7 +85,13 @@ function splitSections(markdown: string): SplitSections {
   // Window a standalone fenced source body without leaving partial Markdown fences.
   const fenced = /^( {0,3})(`{3,}|~{3,})([^\n\r]*)\r?\n([\s\S]*?)\r?\n\1\2\s*$/.exec(markdown);
 
-  if (fenced) {
+  const hasInteriorClose = fenced?.[4].split(/\r?\n/).some((line) => {
+    const close = /^[ \t]{0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
+
+    return close && close[1][0] === fenced[2][0] && close[1].length >= fenced[2].length;
+  });
+
+  if (fenced && !hasInteriorClose) {
     const windows = splitIntoWindows(fenced[4]);
 
     if (windows.length > 1) {
