@@ -30,7 +30,7 @@ const model: Model<"openai-completions"> = {
   compat: { supportsStore: false, supportsDeveloperRole: false, maxTokensField: "max_tokens" },
 };
 
-const fingerprint = () => ({ sessionId: "ses_ffffffffeffe0123456789ABCD", cliVersion: "2.1.4" });
+const identity = () => ({ sessionId: "ses_ffffffffeffe0123456789ABCD", cliVersion: "2.1.4" });
 
 const options = { apiKey: "public", maxRetries: 0 };
 
@@ -84,7 +84,7 @@ describe("OpenCode provider stream boundary", () => {
 
     const native = createFreeStream(async () => {
       throw new BunTransportError(message);
-    }, fingerprint);
+    }, identity);
 
     expect((await native(model, summary, options).result()).errorMessage).toBe(message);
   });
@@ -94,12 +94,12 @@ describe("OpenCode provider stream boundary", () => {
       expect(payload.stream).toBe(true);
       expect(payload.tools.map((tool) => tool.function.name)).toEqual(["read"]);
       expect(payload).not.toHaveProperty("tool_choice");
-      expect(new Headers(init?.headers).get("x-opencode-session")).toBe(fingerprint().sessionId);
+      expect(new Headers(init?.headers).get("x-opencode-session")).toBe(identity().sessionId);
 
       return completion();
     });
 
-    const stream = createFreeStream(fetcher, fingerprint)(model, summary, options);
+    const stream = createFreeStream(fetcher, identity)(model, summary, options);
     const events = [];
 
     for await (const event of stream) events.push(event);
@@ -164,7 +164,7 @@ describe("OpenCode provider stream boundary", () => {
 
     const native = createFreeStream(async () => {
       throw new Error("must use caller fetch");
-    }, fingerprint);
+    }, identity);
 
     const result = await native(model, context, {
       ...options,
@@ -192,7 +192,7 @@ describe("OpenCode provider stream boundary", () => {
 
       try {
         const fetcher = vi.fn(async () => refusal(429, "FreeUsageLimitError", retryAfter));
-        const native = createFreeStream(fetcher, fingerprint);
+        const native = createFreeStream(fetcher, identity);
 
         const result = await native(model, summary, options).result();
         expect(result.stopReason).toBe("error");
@@ -217,7 +217,7 @@ describe("OpenCode provider stream boundary", () => {
     [429, "RateLimitError"],
     [500, "FreeUsageLimitError"],
   ])("preserves unrelated failures: %s %s", async (status, type) => {
-    const native = createFreeStream(async () => refusal(status, type, "3600"), fingerprint);
+    const native = createFreeStream(async () => refusal(status, type, "3600"), identity);
 
     const result = await native(model, summary, options).result();
     expect(result.stopReason).toBe("error");
@@ -226,10 +226,7 @@ describe("OpenCode provider stream boundary", () => {
   });
 
   it("keeps ordinary rate limits retryable", async () => {
-    const native = createFreeStream(
-      async () => refusal(429, "RateLimitError", "3600"),
-      fingerprint,
-    );
+    const native = createFreeStream(async () => refusal(429, "RateLimitError", "3600"), identity);
 
     const result = await native(model, summary, options).result();
     expect(result.stopReason).toBe("error");
@@ -247,7 +244,7 @@ describe("OpenCode provider stream boundary", () => {
       return calls === 1
         ? refusal(429, "FreeUsageLimitError", "3600")
         : refusal(429, "FreeUsageLimitError");
-    }, fingerprint);
+    }, identity);
 
     const [first, second] = await Promise.all([
       native(model, summary, options).result(),
@@ -287,7 +284,7 @@ describe("OpenCode provider stream boundary", () => {
           })}\n\ndata: [DONE]\n\n`,
           { headers: { "content-type": "text/event-stream" } },
         ),
-      fingerprint,
+      identity,
     );
 
     const result = await native(model, summary, options).result();
@@ -303,7 +300,7 @@ describe("OpenCode provider stream boundary", () => {
 
     const native = createFreeStream(async () => {
       throw new DOMException("Aborted", "AbortError");
-    }, fingerprint);
+    }, identity);
 
     const result = await native(model, summary, { ...options, signal: controller.signal }).result();
     expect(result.stopReason).toBe("aborted");
@@ -337,7 +334,7 @@ describe("OpenCode provider stream boundary", () => {
       expect(signal).toBe(controller.signal);
       controller.abort();
 
-      return fingerprint();
+      return identity();
     });
 
     const result = await native(model, summary, { ...options, signal: controller.signal }).result();
@@ -347,7 +344,7 @@ describe("OpenCode provider stream boundary", () => {
 
   it("closes the forwarding stream if request setup fails", async () => {
     const fetcher = vi.fn(async () => completion());
-    const native = createFreeStream(fetcher, fingerprint);
+    const native = createFreeStream(fetcher, identity);
 
     const settings: SimpleStreamOptions = {
       ...options,
@@ -379,7 +376,7 @@ describe("OpenCode provider stream boundary", () => {
       expect(await requestPayload(input, init)).toMatchObject({ tools: "invalid" });
 
       return refusal(400, "BadRequestError");
-    }, fingerprint);
+    }, identity);
 
     expect((await native(model, summary, settings).result()).stopReason).toBe("error");
   });

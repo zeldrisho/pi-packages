@@ -5,27 +5,31 @@ import {
 } from "@earendil-works/pi-ai/compat";
 import type { ProviderConfig } from "@earendil-works/pi-coding-agent";
 import { BunTransportError } from "./bun-transport.ts";
-import { applyFingerprintHeaders, buildFingerprintHeaders } from "./fingerprint.ts";
+import { applyClientHeaders, buildClientHeaders } from "./client-headers.ts";
 import { isFreeUsageLimitMessage, usageLimitMessage } from "./quota.ts";
 import { isProviderRequestPayload, normalizeFreeRequestPayload } from "./request.ts";
 
 /**
  * Delegates protocol handling and retries to Pi while normalizing every provider call.
- * Resolves the fingerprint for each call and normalizes recognized payloads after
+ * Resolves the client identity for each call and normalizes recognized payloads after
  * the caller's payload hook. Caller fetch overrides and instrumentation are preserved.
  * Confirmed free-usage 429 errors receive a notice using the response's Retry-After.
  *
+ * @param fetcher - Transport used when the caller supplies none
+ * @param identity - Resolves the session identity and client version per call
+ * @param resolveWorkingDirectory - Declares the request's working directory to the gateway
  * @returns A streaming callback that forwards native events and converts setup,
- *   fingerprint, or forwarding failures into error events before closing the stream;
+ *   identity resolution, or forwarding failures into error events before closing the stream;
  *   an aborted caller signal marks those failures as aborted
  */
 export function createFreeStream(
   fetcher: typeof fetch,
-  fingerprint: (
+  identity: (
     signal?: AbortSignal,
   ) =>
     | { sessionId: string; cliVersion: string }
     | Promise<{ sessionId: string; cliVersion: string }>,
+  resolveWorkingDirectory: () => string = () => process.cwd(),
 ): NonNullable<ProviderConfig["streamSimple"]> {
   const native = openAICompletionsApi();
 
@@ -35,10 +39,10 @@ export function createFreeStream(
     const run = async () => {
       try {
         options?.signal?.throwIfAborted();
-        const { sessionId, cliVersion } = await fingerprint(options?.signal);
+        const { sessionId, cliVersion } = await identity(options?.signal);
         options?.signal?.throwIfAborted();
-        const headers = { ...options?.headers, ...buildFingerprintHeaders(sessionId, cliVersion) };
-        applyFingerprintHeaders(headers, sessionId, cliVersion);
+        const headers = { ...options?.headers, ...buildClientHeaders(sessionId, cliVersion) };
+        applyClientHeaders(headers, sessionId, cliVersion);
         let quotaMessage: string | undefined;
         let transportMessage: string | undefined;
         // SAFETY: this adapter is registered only for the openai-completions API.
@@ -52,7 +56,7 @@ export function createFreeStream(
             const request = replacement === undefined ? payload : replacement;
 
             return isProviderRequestPayload(request)
-              ? normalizeFreeRequestPayload(request)
+              ? normalizeFreeRequestPayload(request, resolveWorkingDirectory())
               : request;
           },
           fetch: async (input, init) => {

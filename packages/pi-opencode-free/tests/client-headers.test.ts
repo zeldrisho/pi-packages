@@ -2,17 +2,17 @@ import type { ProviderHeaders } from "@earendil-works/pi-ai";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
-  applyFingerprintHeaders,
-  buildFingerprintHeaders,
+  applyClientHeaders,
+  buildClientHeaders,
   buildUserAgent,
   createCanonicalSessionId,
   createSessionSeed,
-  FINGERPRINT_MARKER_HEADER,
+  PROVIDER_MARKER_HEADER,
   READ_TOOL,
   SESSION_HEADER_NAMES,
   sessionIdAgeMs,
   sessionIdCreatedAt,
-} from "../src/fingerprint";
+} from "../src/client-headers";
 
 const CLI_VERSION = "2.1.4";
 
@@ -122,15 +122,15 @@ describe("opencode session identity", () => {
     expect(seed).toHaveLength(20);
   });
 
-  it("builds headers for the full v2 fingerprint", () => {
+  it("builds the full client header set", () => {
     const sessionId = createCanonicalSessionId(deterministicSeed());
 
-    const headers = buildFingerprintHeaders(sessionId, CLI_VERSION);
+    const headers = buildClientHeaders(sessionId, CLI_VERSION);
 
     expect(headers["User-Agent"]).toBe(buildUserAgent(CLI_VERSION));
     expect(headers["x-opencode-client"]).toBe("cli");
     expect(headers["x-opencode-project"]).toBe("global");
-    expect(headers[FINGERPRINT_MARKER_HEADER]).toBe("1");
+    expect(headers[PROVIDER_MARKER_HEADER]).toBe("1");
 
     for (const name of SESSION_HEADER_NAMES) {
       expect(headers[name]).toBe(sessionId);
@@ -152,7 +152,7 @@ describe("opencode session identity", () => {
       "x-other": "keep",
     } satisfies ProviderHeaders;
 
-    expect(applyFingerprintHeaders(headers, sessionId, CLI_VERSION)).toBe(true);
+    expect(applyClientHeaders(headers, sessionId, CLI_VERSION)).toBe(true);
     expect(headers["User-Agent"]).toBe(buildUserAgent(CLI_VERSION));
     expect(headers["user-agent"]).toBeUndefined();
     expect(headers["X-Opencode-Request"]).toBeUndefined();
@@ -169,7 +169,7 @@ describe("opencode session identity", () => {
       "x-opencode-session": "ses_other",
     } satisfies ProviderHeaders;
 
-    expect(applyFingerprintHeaders(headers, createCanonicalSessionId(), CLI_VERSION)).toBe(false);
+    expect(applyClientHeaders(headers, createCanonicalSessionId(), CLI_VERSION)).toBe(false);
     expect(headers).toEqual({
       Authorization: "Bearer secret",
       "x-opencode-session": "ses_other",

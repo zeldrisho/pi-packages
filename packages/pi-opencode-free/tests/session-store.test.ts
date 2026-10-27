@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vite-plus/test";
 
-import { createCanonicalSessionId } from "../src/fingerprint";
+import { createCanonicalSessionId } from "../src/client-headers";
 import {
   createSessionStore,
   isReusableSessionId,
@@ -65,40 +65,6 @@ describe("session identity reuse", () => {
 
     expect(resolveSessionId({ now: NOW, create: () => identityAt(0), store })).toBe(stored);
     expect(store.state.saved).toEqual([]);
-  });
-
-  it("prefers a reusable override and persists it", () => {
-    const stored = identityAt(DAY_MS);
-    const override = identityAt(2 * DAY_MS, 1);
-    const store = memoryStore(stored);
-
-    expect(resolveSessionId({ now: NOW, create: () => identityAt(0), store, override })).toBe(
-      override,
-    );
-    expect(store.state.saved).toEqual([override]);
-  });
-
-  it("ignores an override older than the reuse window", () => {
-    const stored = identityAt(DAY_MS);
-    const store = memoryStore(stored);
-    const stale = identityAt(SESSION_REUSE_MS + DAY_MS);
-
-    expect(
-      resolveSessionId({ now: NOW, create: () => identityAt(0), store, override: stale }),
-    ).toBe(stored);
-    expect(store.state.saved).toEqual([]);
-  });
-
-  it("ignores malformed and far-future overrides", () => {
-    const stored = identityAt(DAY_MS);
-    const store = memoryStore(stored);
-    const future = identityAt(-(SESSION_FUTURE_TOLERANCE_MS + DAY_MS));
-
-    for (const override of ["not-a-session", "ses_", "", future]) {
-      expect(resolveSessionId({ now: NOW, create: () => identityAt(0), store, override })).toBe(
-        stored,
-      );
-    }
   });
 
   it("accepts a slightly future-dated identity for clock drift", () => {
@@ -161,7 +127,7 @@ describe("persisted session records", () => {
 
       expect(store.load(NOW)).toBe(id);
       expect(statSync(path).mode & 0o077).toBe(0);
-      expect(readdirSync(dirname(path))).toEqual(["session.json"]);
+      expect(readdirSync(dirname(path))).toEqual(["opencode-free.json"]);
       expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({
         version: 1,
         id,
@@ -202,12 +168,12 @@ describe("persisted session records", () => {
     try {
       mkdirSync(path, { recursive: true });
       expect(() => createSessionStore(path).save(identityAt(0), NOW)).not.toThrow();
-      expect(readdirSync(dirname(path))).toEqual(["session.json"]);
+      expect(readdirSync(dirname(path))).toEqual(["opencode-free.json"]);
       const blocked = join(directory, "blocked");
 
       writeFileSync(blocked, "not a directory");
       expect(() =>
-        createSessionStore(join(blocked, "session.json")).save(identityAt(0), NOW),
+        createSessionStore(join(blocked, "opencode-free.json")).save(identityAt(0), NOW),
       ).not.toThrow();
     } finally {
       rmSync(directory, { recursive: true, force: true });

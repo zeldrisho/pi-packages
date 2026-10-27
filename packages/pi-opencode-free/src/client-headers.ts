@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { ProviderHeaders } from "@earendil-works/pi-ai";
 
 /** Marks requests assembled for the extension's own provider. */
-export const FINGERPRINT_MARKER_HEADER = "x-pi-opencode-free";
+export const PROVIDER_MARKER_HEADER = "x-pi-opencode-free";
 
 /** Canonical OpenCode session headers mirrored by the v2 CLI. */
 export const SESSION_HEADER_NAMES = [
@@ -206,14 +206,14 @@ export function sessionIdAgeMs(id: string, now: number): number | undefined {
  *
  * @param sessionId - Canonical session identifier for the active Pi session
  * @param cliVersion - Client version carried by the user agent
- * @returns Provider headers carrying the v2 CLI fingerprint
+ * @returns Provider headers that declare the client identity
  */
-export function buildFingerprintHeaders(sessionId: string, cliVersion: string) {
+export function buildClientHeaders(sessionId: string, cliVersion: string) {
   return {
     "User-Agent": buildUserAgent(cliVersion),
     "x-opencode-client": "cli",
     "x-opencode-project": "global",
-    [FINGERPRINT_MARKER_HEADER]: "1",
+    [PROVIDER_MARKER_HEADER]: "1",
     "x-opencode-session": sessionId,
     "x-opencode-session-id": sessionId,
     "x-session-affinity": sessionId,
@@ -225,7 +225,7 @@ export function buildFingerprintHeaders(sessionId: string, cliVersion: string) {
  * Updates the active session id on requests assembled for this provider.
  *
  * The marker header keeps the mutation from leaking into built-in providers
- * that share the OpenCode endpoint but do not use the free-tier fingerprint.
+ * that share the OpenCode endpoint but do not use the free-tier client headers.
  * Matching header names are replaced case-insensitively, and the legacy
  * `x-opencode-request` header is removed. Unmarked requests are left unchanged.
  *
@@ -234,12 +234,12 @@ export function buildFingerprintHeaders(sessionId: string, cliVersion: string) {
  * @param cliVersion - Client version carried by the user agent
  * @returns Whether the request belonged to this extension
  */
-export function applyFingerprintHeaders(
+export function applyClientHeaders(
   headers: ProviderHeaders,
   sessionId: string,
   cliVersion: string,
 ): boolean {
-  if (!hasFingerprintMarker(headers)) return false;
+  if (!hasProviderMarker(headers)) return false;
 
   setHeader(headers, "User-Agent", buildUserAgent(cliVersion));
   setHeader(headers, "x-opencode-client", "cli");
@@ -257,9 +257,9 @@ export function applyFingerprintHeaders(
 }
 
 /** Checks for a case-insensitive marker header whose value is exactly `"1"`. */
-function hasFingerprintMarker(headers: ProviderHeaders): boolean {
+function hasProviderMarker(headers: ProviderHeaders): boolean {
   for (const [name, value] of Object.entries(headers)) {
-    if (name.toLowerCase() === FINGERPRINT_MARKER_HEADER && value === "1") return true;
+    if (name.toLowerCase() === PROVIDER_MARKER_HEADER && value === "1") return true;
   }
 
   return false;

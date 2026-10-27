@@ -4,10 +4,10 @@ import type { ExtensionAPI, ProviderConfig } from "@earendil-works/pi-coding-age
 import { createBunTransport } from "./bun-transport.ts";
 import { createCliVersionResolver } from "./cli-version.ts";
 import {
-  buildFingerprintHeaders,
+  buildClientHeaders,
   createCanonicalSessionId,
   createSessionSeed,
-} from "./fingerprint.ts";
+} from "./client-headers.ts";
 import {
   DEFAULT_BASE_URL,
   catalogFromStoredEntry,
@@ -44,8 +44,6 @@ export interface OpencodeFreeDependencies {
   sessionStore?: SessionStore;
   /** Clock used to date and validate identities; defaults to `Date.now`. */
   now?: () => number;
-  /** Explicit identity override, for example from an environment variable. */
-  sessionIdOverride?: () => string | undefined;
 }
 
 /**
@@ -65,7 +63,6 @@ export function registerOpencodeFree(
 ): void {
   const now = dependencies.now ?? Date.now;
   const store = dependencies.sessionStore ?? createSessionStore();
-  const override = dependencies.sessionIdOverride ?? readSessionOverride;
 
   /** Reuses a persisted identity so each launch does not consume a new free-tier session. */
   const resolveCurrentSessionId = (): string =>
@@ -73,7 +70,6 @@ export function registerOpencodeFree(
       now: now(),
       create: (timestamp) => createCanonicalSessionId(dependencies.randomSeed(), timestamp),
       store,
-      override: override(),
     });
 
   let sessionId = resolveCurrentSessionId();
@@ -110,7 +106,7 @@ export function registerOpencodeFree(
  * offline, canceled, version resolution fails, or discovery returns no usable
  * models. Version resolution and discovery share an eight-second abort deadline.
  * Like native Pi, catalogs with lastModified (including zero) and a valid checkedAt
- * stay fresh for four hours after checkedAt. Force bypasses freshness, never
+ * stay fresh for four hours after checkedAt. Force skips freshness checks, never
  * offline mode or cancellation. HTTP failures
  * retain the body and validators while advancing checkedAt; first failures without
  * Last-Modified remain immediately retryable. Transport, parsing, version lookup,
@@ -182,7 +178,7 @@ async function refreshModels(
 
   const outcome = await discoverFreeModelsWithStatus({
     baseUrl,
-    headers: buildFingerprintHeaders(sessionId, cliVersion),
+    headers: buildClientHeaders(sessionId, cliVersion),
     signal,
     fetcher: dependencies.fetcher,
     allowNetwork: context.allowNetwork,
@@ -223,14 +219,6 @@ function isRecent(timestamp: number | undefined, now: number, ttl: number): bool
     timestamp <= now &&
     now - timestamp < ttl
   );
-}
-
-/** Environment variable that pins this provider to a specific session identity. */
-export const SESSION_ID_ENV = "PI_OPENCODE_FREE_SESSION_ID";
-
-/** Reads the optional identity override, treating blanks as absent. */
-function readSessionOverride(): string | undefined {
-  return process.env[SESSION_ID_ENV]?.trim() || undefined;
 }
 
 /**

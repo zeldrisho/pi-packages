@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 
 import piOpencodeFree, { PROVIDER_ID, registerOpencodeFree } from "../src/index";
 import { CLI_NPM_URL, CLI_UPDATE_URL } from "../src/cli-version";
-import { FINGERPRINT_MARKER_HEADER } from "../src/fingerprint";
+import { PROVIDER_MARKER_HEADER } from "../src/client-headers";
 import { DEFAULT_BASE_URL, MODEL_CATALOG_URL, initialFreeModels } from "../src/models";
 import type { ProviderRequestPayload } from "../src/request";
 
@@ -109,7 +109,6 @@ function dependencies(environment: Record<string, string | undefined>, fetcher: 
     fetcher,
     environment,
     now: () => SESSION_NOW,
-    sessionIdOverride: () => undefined,
     sessionStore: {
       load: () => storedSessionId,
       save: (id: string) => {
@@ -451,7 +450,7 @@ describe("opencode-free extension", () => {
         sessions.push(headers.get("x-opencode-session"));
         expect(headers.get("User-Agent")).toBe("opencode/latest/2.1.4/cli");
         expect(headers.get("Authorization")).toBe("Bearer public");
-        expect(headers.get(FINGERPRINT_MARKER_HEADER)).toBe("1");
+        expect(headers.get(PROVIDER_MARKER_HEADER)).toBe("1");
 
         return new Response(
           JSON.stringify({
@@ -877,7 +876,7 @@ describe("opencode-free extension", () => {
       expect(publications).toEqual([]);
     });
 
-    it("allows force to bypass successful and failed HTTP freshness checks", async () => {
+    it("allows force to skip successful and failed HTTP freshness checks", async () => {
       const calls: string[] = [];
       const successfulFetch = discoveryFetcher(calls);
       let failed = false;

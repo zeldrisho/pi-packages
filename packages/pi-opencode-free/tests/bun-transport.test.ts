@@ -64,7 +64,7 @@ class FakeProcess extends EventEmitter {
   }
 }
 
-/** Builds a spawn double that replays one fake process per call. */
+/** Builds a spawn double that returns one fake process per call. */
 function spawnHarness(children: readonly FakeProcess[]) {
   const calls: SpawnCall[] = [];
   let index = 0;
@@ -160,7 +160,7 @@ describe("Bun gateway transport", () => {
         host: "opencode.ai",
         connection: "keep-alive",
         "content-length": String(payload.length),
-        "x-pi-proxy-token": "spoofed",
+        "x-pi-proxy-token": "wrong-token",
       },
       body: payload,
     });

@@ -11,13 +11,10 @@ import {
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { SESSION_ID_PATTERN, sessionIdAgeMs } from "./fingerprint.ts";
+import { SESSION_ID_PATTERN, sessionIdAgeMs } from "./client-headers.ts";
 
-/** Directory below the Pi agent directory that holds this provider's state. */
-const STORE_DIRECTORY = "opencode-free";
-
-/** State file name below {@link STORE_DIRECTORY}. */
-const STORE_FILE_NAME = "session.json";
+/** State file name below the Pi agent directory. */
+const STORE_FILE_NAME = "opencode-free.json";
 
 /** Current on-disk schema version. */
 const STORE_VERSION = 1;
@@ -63,7 +60,7 @@ export function agentDirectory(): string {
  * @returns Absolute path to the JSON state file
  */
 export function sessionStorePath(directory = agentDirectory()): string {
-  return join(directory, STORE_DIRECTORY, STORE_FILE_NAME);
+  return join(directory, STORE_FILE_NAME);
 }
 
 /**
@@ -183,25 +180,18 @@ export function createSessionStore(path = sessionStorePath()): SessionStore {
 /**
  * Chooses the identity to use for a run.
  *
- * Prefers an explicit override, then a reusable stored identity, and finally a
- * freshly created one. New identities are persisted so later runs reuse them.
+ * Reuses a stored identity when it is still reusable and otherwise creates and
+ * persists a fresh one.
  *
- * @param options - Clock reading, identity factory, store, and optional override
+ * @param options - Clock reading, identity factory, and store
  * @returns Canonical identifier for this run
  */
 export function resolveSessionId(options: {
   now: number;
   create: (now: number) => string;
   store?: SessionStore;
-  override?: string;
 }): string {
-  const { now, create, store, override } = options;
-
-  if (override && isReusableSessionId(override, now)) {
-    store?.save(override, now);
-
-    return override;
-  }
+  const { now, create, store } = options;
 
   const stored = store?.load(now);
 

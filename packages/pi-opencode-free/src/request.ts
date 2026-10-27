@@ -1,4 +1,4 @@
-import { READ_TOOL } from "./fingerprint.ts";
+import { READ_TOOL } from "./client-headers.ts";
 
 interface ToolFunctionReference {
   name?: string;
@@ -14,6 +14,12 @@ interface ToolChoiceObject {
   type?: string;
 }
 
+/** A chat message; only the role and the textual content are inspected. */
+interface ChatMessageReference {
+  role?: string;
+  content?: string | unknown[];
+}
+
 /** The subset of an OpenAI chat-completions payload the extension needs to inspect. */
 export interface ProviderRequestPayload {
   model?: string;
@@ -22,7 +28,14 @@ export interface ProviderRequestPayload {
   tool_choice?: string | ToolChoiceObject;
   temperature?: number;
   max_tokens?: number;
+  messages?: readonly ChatMessageReference[];
 }
+
+/** Roles that carry request-level instructions. */
+const SYSTEM_ROLES = new Set(["system", "developer"]);
+
+/** Recognizes a declared working directory, which the gateway requires inside an env block. */
+const WORKING_DIRECTORY_PATTERN = /<env>[\s\S]*?\bWorking directory:/u;
 
 /**
  * Validates the subset of a provider request payload used for normalization.
@@ -59,16 +72,23 @@ export function isProviderRequestPayload(value: unknown): value is ProviderReque
 /**
  * Applies the free-tier request contract to a provider payload.
  *
- * The request must stream and must declare a tool named exactly `read`.
- * Both `tool_choice: "none"` and `tool_choice: { type: "none" }` are removed
- * because the gate rejects them, while every other field and tool declaration
- * is preserved. The original payload is not mutated.
+ * The request must stream, must declare a tool named exactly `read`, and must
+ * carry an env block declaring a working directory. Both `tool_choice: "none"`
+ * and `tool_choice: { type: "none" }` are removed because the gateway rejects
+ * them, while every other field and tool declaration is preserved. The original
+ * payload is not mutated.
+ *
+ * The gateway requires a working directory declaration and accepts any path,
+ * while a prompt without the block is refused. Pi writes its own `<cwd>` element,
+ * so the block is appended instead of being copied from another client's prompt.
  *
  * @param payload - Validated provider request payload
+ * @param workingDirectory - Absolute path declared to the gateway, defaulting to the process directory
  * @returns A normalized copy suitable for the free-tier endpoint
  */
 export function normalizeFreeRequestPayload(
   payload: ProviderRequestPayload,
+  workingDirectory: string = process.cwd(),
 ): ProviderRequestPayload {
   const tools = appendReadTool(payload.tools);
 
@@ -81,7 +101,77 @@ export function normalizeFreeRequestPayload(
 
   if (isNoneToolChoice(payload.tool_choice)) delete normalized.tool_choice;
 
+  const messages = withWorkingDirectory(payload.messages, workingDirectory);
+
+  if (messages !== payload.messages) normalized.messages = messages;
+
   return normalized;
+}
+
+/**
+ * Ensures the request declares its working directory inside an env block.
+ *
+ * Reuses an existing block so repeated normalization stays idempotent, appends
+ * to the last instruction message when the payload has one, and otherwise
+ * prepends a message of its own.
+ *
+ * @param messages - Request messages, if the caller supplied any
+ * @param workingDirectory - Path to declare
+ * @returns The original array when no change is needed, otherwise a new array
+ */
+function withWorkingDirectory(
+  messages: readonly ChatMessageReference[] | undefined,
+  workingDirectory: string,
+): readonly ChatMessageReference[] | undefined {
+  if (!messages) return messages;
+
+  const block = `<env>\n  Working directory: ${sanitizePath(workingDirectory)}\n</env>\n`;
+  const index = lastInstructionIndex(messages);
+  const target = index >= 0 ? messages[index] : undefined;
+
+  if (target && WORKING_DIRECTORY_PATTERN.test(messageText(target.content))) return messages;
+
+  if (!target) return [{ role: "system", content: block }, ...messages];
+
+  const content = Array.isArray(target.content)
+    ? [...target.content, { type: "text", text: block }]
+    : `${target.content ?? ""}\n\n${block}`;
+
+  return messages.map((message, position) =>
+    position === index ? { ...message, content } : message,
+  );
+}
+
+/** Flattens the textual parts of a message so a multiline prompt can be inspected. */
+function messageText(content: ChatMessageReference["content"]): string {
+  if (Array.isArray(content)) {
+    return content.map((part) => (isTextPart(part) ? part.text : "")).join("");
+  }
+
+  return content ?? "";
+}
+
+/** Finds the final message carrying request-level instructions. */
+function lastInstructionIndex(messages: readonly ChatMessageReference[]): number {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const role = messages[index]?.role;
+
+    if (role !== undefined && SYSTEM_ROLES.has(role)) return index;
+  }
+
+  return -1;
+}
+
+/** Narrows a structured content part that carries text. */
+function isTextPart(value: unknown): value is { text: string } {
+  return (
+    typeof value === "object" && value !== null && "text" in value && typeof value.text === "string"
+  );
+}
+
+/** Keeps a declared path on one line and prevents it from closing the block early. */
+function sanitizePath(workingDirectory: string): string {
+  return workingDirectory.replaceAll(/[\r\n<>]+/gu, " ");
 }
 
 /** Reuses tools containing an exact `read` name, or returns a new list with the default appended. */
