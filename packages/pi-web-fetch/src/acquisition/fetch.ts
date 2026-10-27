@@ -28,6 +28,7 @@ import {
 import { extractHtmlToMarkdown } from "../document/extract.ts";
 import { assertConversionDepth } from "../document/complexity.ts";
 import { formatMinifiedSource } from "../document/source-format.ts";
+import { isOpenapiSource } from "../document/openapi.ts";
 import {
   requestFollowingRedirects,
   type RedirectDependencies,
@@ -276,6 +277,8 @@ async function documentFromDecoded(
   let extractor: CompleteDocument["extractor"] = "raw";
   let describedBy: string | undefined = linkHints.describedBy;
   let markdownAlternateUrl: string | undefined = linkHints.markdownAlternate;
+  let sourceLanguage: string | undefined;
+  const openapiSpec = isOpenapiSource(raw, contentType);
 
   if (isHtmlContentType(contentType)) {
     const extracted = await awaitWithAbort(extractHtml(raw, target.url), signal);
@@ -287,14 +290,23 @@ async function documentFromDecoded(
     markdownAlternateUrl = markdownAlternateUrl ?? extracted.markdownAlternateLink;
   } else if (contentType === "application/json") {
     try {
-      markdown = `\`\`\`json\n${JSON.stringify(JSON.parse(raw), null, 2)}\n\`\`\``;
+      const parsed: unknown = JSON.parse(raw);
+
+      markdown = `\`\`\`json\n${JSON.stringify(parsed, null, 2)}\n\`\`\``;
+      sourceLanguage = "json";
     } catch {
       // Minified or JSON-like bodies are still worth structuring even when they do
       // not parse as strict JSON.
-      markdown = formatMinifiedSource(raw, contentType)?.markdown ?? raw;
+      const formatted = formatMinifiedSource(raw, contentType);
+
+      markdown = formatted?.markdown ?? raw;
+      sourceLanguage = formatted?.language;
     }
   } else {
-    markdown = formatMinifiedSource(raw, contentType)?.markdown ?? raw;
+    const formatted = formatMinifiedSource(raw, contentType);
+
+    markdown = formatted?.markdown ?? raw;
+    sourceLanguage = formatted?.language;
 
     const markdownContent = /\bmarkdown\b|\.md(?:$|[?#])/i.test(
       contentTypeHeader + target.url.pathname,
@@ -341,6 +353,8 @@ async function documentFromDecoded(
     cachedAt: Date.now(),
     llmsTxtDescribedBy: describedBy,
     markdownAlternateUrl,
+    sourceLanguage,
+    openapiSpec,
   };
 }
 

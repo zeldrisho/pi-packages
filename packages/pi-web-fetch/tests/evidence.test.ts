@@ -302,6 +302,25 @@ describe("web_fetch honest-evidence details", () => {
     expect(JSON.stringify(result.details.links)).not.toContain("external-secret");
   });
 
+  it("classifies standalone and embedded OpenAPI specs", async () => {
+    const spec = await executeWebFetch(
+      { url: `${origin}/openapi-json` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    const bundle = await executeWebFetch(
+      { url: `${origin}/minified-js` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(spec.details.contentKind).toBe("openapi-spec");
+    expect(bundle.details.contentKind).toBe("openapi-spec");
+  });
+
   it("classifies plain text as raw-text with high confidence", async () => {
     const result = await executeWebFetch(
       { url: `${origin}/continuation` },

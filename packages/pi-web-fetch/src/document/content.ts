@@ -33,6 +33,10 @@ export interface CompleteDocument {
   cachedAt?: number;
   /** True when this document is the site's /llms.txt served instead of a low-quality page. */
   llmsTxtFallback?: boolean;
+  /** Code-fence language when the body was returned as reformatted source. */
+  sourceLanguage?: string;
+  /** Whether the response is a standalone OpenAPI or Swagger document. */
+  openapiSpec?: boolean;
   /** Set when the site publishes a usable /llms.txt index and this document is not that index. */
   llmsTxtIndexUrl?: string;
   /** Absolute URL advertised via `rel="describedby"` (header or HTML link) for this page. */

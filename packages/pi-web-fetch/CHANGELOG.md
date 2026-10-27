@@ -10,9 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Return minified JavaScript, JSON, and YAML responses as indented, fenced code blocks.
+- Identify OpenAPI and Swagger JSON and YAML documents and JavaScript bundles containing literal specs as `openapi-spec`.
 
 ### Changed
 
+- Focus large fenced source documents using line-aligned excerpts.
 - Shorten documentation index notices.
 - Probe one more ancestor directory for `/llms.txt`, so locale-prefixed documentation sites resolve to their section index.
 

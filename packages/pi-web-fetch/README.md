@@ -23,7 +23,7 @@ The `web_fetch` tool accepts public HTTP and HTTPS URLs and supports HTML, Markd
 | `query`   | Optional; selects matching sections from a long page. Sections remain in source order.                    |
 | `offset`  | Optional character offset for continuing through extracted content; takes precedence over a URL fragment. |
 
-Output is bounded to 6,000 characters by default. For long pages, use the returned `nextOffset` to continue. A query selects a focused view of the fetched page; omit it to read the complete document. Pi's preview renders Markdown with the active theme and is collapsed by default (`Ctrl+O` expands it). The call preview shows the URL; the focus query and character offset are not repeated there.
+Output is bounded to 6,000 characters by default. For long pages, use the returned `nextOffset` to continue. A query selects a focused view of the fetched page; omit it to read the complete document. Large fenced source files can be focused in line-aligned excerpts; excerpts are not necessarily valid standalone source. OpenAPI and Swagger JSON or YAML documents and JavaScript bundles containing literal specs can be reported as `openapi-spec`; detection is best-effort and limited to source bodies up to 512 KiB. Pi's preview renders Markdown with the active theme and is collapsed by default (`Ctrl+O` expands it). The call preview shows the URL; the focus query and character offset are not repeated there.
 
 For example, a URL such as `https://github.com/shadcn-ui/lint#get-started` starts at the matching heading. GitHub `blob` links and bare gists are converted to raw source URLs; repository roots use their README. GitHub directory listings are not supported.
 

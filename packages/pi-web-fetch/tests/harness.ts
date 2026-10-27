@@ -162,6 +162,13 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
       response.end("x".repeat(1_500_000));
 
       return;
+    case "/openapi-json":
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({ openapi: "3.1.0", info: { title: "API" }, paths: { "/pets": {} } }),
+      );
+
+      return;
     case "/minified-js":
       response.setHeader("content-type", "text/javascript");
       response.end(

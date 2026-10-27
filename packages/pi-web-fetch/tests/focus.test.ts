@@ -47,6 +47,47 @@ describe("query-focused Markdown", () => {
     expect(result.details.matchedSections).toBe(1);
   });
 
+  it("returns balanced fenced windows with indentation and source order", () => {
+    const lines = Array.from(
+      { length: 400 },
+      (_, i) => `  ${i === 150 ? "needle" : i === 350 ? "needle" : "entry"} ${i} ${"x".repeat(80)}`,
+    );
+
+    const result = focusMarkdown(`\`\`\`json\r\n${lines.join("\r\n")}\r\n\`\`\``, "needle");
+    expect(result.details.totalSections).toBeGreaterThan(2);
+    expect(result.details.matchedSections).toBe(2);
+    expect(result.markdown.match(/```json/g)).toHaveLength(2);
+    expect(result.markdown.match(/```/g)).toHaveLength(4);
+    expect(result.markdown).toContain("  needle 150");
+    expect(result.markdown.indexOf("needle 150")).toBeLessThan(
+      result.markdown.indexOf("needle 350"),
+    );
+    expect(focusMarkdown(`\`\`\`json\n${lines.join("\n")}\n\`\`\``, "absent").markdown).toBe("");
+  });
+
+  it("does not treat code inside fences as headings", () => {
+    const result = focusMarkdown(
+      "# Real\n\n```yaml\n# fake\nvalue: needle\n```\n# Other\nother",
+      "needle",
+    );
+
+    expect(result.details.totalSections).toBe(2);
+    expect(result.markdown).toContain("# Real");
+    expect(result.markdown).not.toContain("# Other");
+  });
+
+  it("windows long headingless paragraphs even when other paragraphs exist", () => {
+    const long = Array.from(
+      { length: 300 },
+      (_, i) => `  ${i === 150 ? "needle" : "entry"} ${i} ${"x".repeat(80)}`,
+    ).join("\n");
+
+    const result = focusMarkdown(`intro paragraph\n\n${long}\n\nclosing paragraph`, "needle");
+    expect(result.details.totalSections).toBeGreaterThan(3);
+    expect(result.markdown).toContain("  needle 150");
+    expect(result.markdown).not.toContain("closing paragraph");
+  });
+
   it("returns honest empty evidence when no section matches", () => {
     const result = focusMarkdown("# Alpha\n\nOnly alpha is discussed.", "unrelated");
 

@@ -13,6 +13,7 @@ import { sliceCompleteDocument, type CompleteDocument } from "./document/content
 import { revalidateCompleteDocument, type FetchRemoteDependencies } from "./acquisition/fetch.ts";
 import { fetchDocumentWithLlmsTxtSupport } from "./acquisition/llms.ts";
 import { focusMarkdown, type FocusDetails } from "./document/focus.ts";
+import { isCachedOpenapi } from "./document/openapi.ts";
 import { resolveFragmentOffset, urlWithoutFragment } from "./document/fragments.ts";
 import { InflightCoalescer } from "./inflight";
 import { createDocumentOutline, type DocumentOutline } from "./document/outline.ts";
@@ -43,6 +44,7 @@ const encoder = new TextEncoder();
 export type ContentKind =
   | "repository-readme"
   | "code-file"
+  | "openapi-spec"
   | "directory-listing"
   | "llms-index"
   | "article"
@@ -73,14 +75,24 @@ function safeUrl(value: string): URL | undefined {
  * @param url - The fetched URL
  * @param extractor - Extraction method used
  * @param shellSuspected - Whether the page appears to be an app shell
+ * @param sourceLanguage - Code-fence language when the body was reformatted as source
  * @returns Content classification
  */
 export function classifyContentKind(
   url: string,
   extractor: CompleteDocument["extractor"],
   shellSuspected: boolean,
+  sourceLanguage?: string,
+  openapiSpec = false,
 ): ContentKind {
   if (shellSuspected) return "markup-shell";
+
+  if (openapiSpec) return "openapi-spec";
+
+  // A reformatted body is code whatever host served it: the response was read as
+  // source, not as page prose.
+  if (sourceLanguage !== undefined) return "code-file";
+
   const parsed = safeUrl(url);
   const host = parsed?.hostname ?? "";
   const path = parsed?.pathname ?? "";
@@ -576,7 +588,15 @@ export async function executeWebFetch(
   const rawFinalUrl = result.url;
   const finalUrl = redactUrlForDisplay(rawFinalUrl);
   const shellSuspected = result.shellSuspected;
-  const contentKind = classifyContentKind(rawFinalUrl, result.extractor, shellSuspected);
+
+  const contentKind = classifyContentKind(
+    rawFinalUrl,
+    result.extractor,
+    shellSuspected,
+    result.sourceLanguage,
+    document.openapiSpec ?? isCachedOpenapi(document.markdown, document.contentType),
+  );
+
   const confidence = classifyConfidence(result.extractor, shellSuspected, result.markdown.length);
 
   const requestedPath = safeUrl(params.url)?.pathname.replace(/\/+$/u, "").toLowerCase();

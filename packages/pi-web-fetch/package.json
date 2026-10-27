@@ -39,8 +39,11 @@
     "typecheck": "vp check --no-fmt --no-lint"
   },
   "dependencies": {
+    "acorn": "^8.19.0",
+    "acorn-walk": "^8.3.5",
     "defuddle": "^0.19.5",
-    "linkedom": "^0.18.13"
+    "linkedom": "^0.18.13",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "catalog:",
