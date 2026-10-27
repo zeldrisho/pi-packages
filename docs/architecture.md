@@ -53,7 +53,7 @@ The API key is read at request time and excluded from cache keys, output, and er
 
 Both web tools declare output schemas for programmatic callers. Structured fetch output contains a bounded content chunk with its own continuation offset; JSON escaping may shorten that chunk relative to the text view. Structured search output distinguishes retrieved sources from generated answers and reports omitted payloads with a private full-text file path. Structured output must not exceed byte limits or leak content suppressed from blocked pages.
 
-## Provider requests and approvals
+## Provider requests
 
 `pi-opencode-free` delegates streaming to Pi's native OpenAI completions implementation. Its provider-scoped adapter applies the free-tier request contract after any caller payload hook, including tool-free compaction and branch-summary requests. It preserves caller instrumentation, cancellation, and native usage accounting. Only a confirmed free-usage 429 receives a human-readable quota notice; reset times come from `Retry-After`, never an assumed daily schedule. Quota errors format the server-reported reset time in the Pi process's locale and timezone. Quota evidence remains request-local; there is no status command, cached countdown, or inference probe.
 
@@ -79,6 +79,8 @@ Bun compatibility is empirical, not evidence of entitlement. Measured on 2026-10
 Everything else is free to differ: both `/inference/v1` and `/inference/openai/v1` work, and project id, bearer token, tool count, tool names, and prompt text made no difference. The identity headers are checked separately: the client user agent, `x-opencode-client`, and the four session headers are required, while `x-opencode-project` is not. Each session header must carry a `ses_` identifier — an arbitrary string is refused — although the four values need not agree. The identifier's encoded creation time must be recent: an 89-day-old identifier was served while a 91-day-old one was refused. This is why the provider persists one identity and replaces it after thirty days, well inside that window.
 
 The request contract declares the working directory in an env block, adds a `read` declaration when the caller declares no tool, and forces streaming, while keeping Pi's own system prompt and tools. These requirements are observed rather than published and can change without notice.
+
+## Command recognition and approvals
 
 `pi-gate` reads command-text rules from `gate.json` and never remembers dialog approvals. A bounded, non-executing recognizer applies word boundaries to simple literal commands and excludes inert `echo`/`printf` argument text and comments. Restrictive flag and numeric suffixes retain prefix coverage; allow exceptions require complete words and cannot suppress another simple command. Pipelines, redirects, expansions, opaque script arguments, malformed quoting, oversized inputs, and rules containing shell syntax retain conservative substring matching. This recognizer is not a Bash parser or sandbox. Persistent exceptions are explicit `allow` rules. Approval dialogs are serialized, cancellation-aware, and revalidate policy after the user responds; policy changes and session starts invalidate pending dialogs.
 
