@@ -165,6 +165,11 @@ function isAllowedContentType(value: string | undefined): value is string {
 function assertSuccessfulResponse(response: IncomingMessage): void {
   const status = response.statusCode ?? 0;
 
+  if (responseHeader(response, "x-amzn-waf-action")?.trim().toLowerCase() === "challenge") {
+    response.resume();
+    throw new Error(`web_fetch was blocked by an AWS WAF anti-bot challenge (HTTP ${status}).`);
+  }
+
   if (status >= 200 && status < 300) return;
 
   const cloudflareChallenge =
@@ -368,6 +373,7 @@ async function documentFromAcquisition(
   dependencies: FetchRemoteDependencies,
   allowSolve: boolean,
 ): Promise<CompleteDocument> {
+  assertSuccessfulResponse(response);
   const status = response.statusCode ?? 0;
   const contentTypeHeader = responseContentTypeHeader(response);
   const contentType = normalizeContentType(contentTypeHeader);

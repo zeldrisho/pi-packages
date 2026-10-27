@@ -367,6 +367,22 @@ describe("web_fetch transport", () => {
     ).rejects.toThrow(/blocked by Cloudflare's anti-bot challenge \(HTTP 403\)/);
   });
 
+  it.each([202, 403])("reports AWS WAF challenges with HTTP %s", async (status) => {
+    const challengeDependencies: FetchRemoteDependencies = {
+      ...dependencies,
+      request: async () =>
+        fixtureResponse(
+          status,
+          { "content-type": "text/html", "x-amzn-waf-action": "challenge" },
+          "",
+        ),
+    };
+
+    await expect(
+      fetchRemoteContent(`${origin}/aws-waf`, 0, 6_000, undefined, challengeDependencies),
+    ).rejects.toThrow(`blocked by an AWS WAF anti-bot challenge (HTTP ${status})`);
+  });
+
   it("explains that a missing page may be private or require authentication", async () => {
     await expect(
       fetchRemoteContent(`${origin}/missing`, 0, 6_000, undefined, dependencies),

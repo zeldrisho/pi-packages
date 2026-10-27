@@ -135,7 +135,7 @@ describe("executeWebFetch llms.txt support", () => {
     );
 
     expect(result.content[0]?.text).not.toContain("Caution:");
-    expect(result.content[0]?.text).not.toContain("Documentation index available:");
+    expect(result.content[0]?.text).not.toContain("Index:");
     expect(result.content[0]?.text).not.toContain("<untrusted_web_content");
   });
 
@@ -213,7 +213,7 @@ describe("executeWebFetch llms.txt support", () => {
     expect(requests).toHaveLength(2);
     expect(result.details.llmsTxtFallback).toBe(false);
     expect(result.details.llmsTxtUrl).toBe("https://indexed.example.com/llms.txt");
-    expect(result.content[0]?.text).toContain("Documentation index available:");
+    expect(result.content[0]?.text).toContain("Index: https://indexed.example.com/llms.txt");
     expect(result.content[0]?.text).toContain("A perfectly readable plain-text page.");
 
     const second = await executeWebFetch(
@@ -223,7 +223,7 @@ describe("executeWebFetch llms.txt support", () => {
       dependencies,
     );
 
-    expect(second.content[0]?.text).toContain("Documentation index available:");
+    expect(second.content[0]?.text).toContain("Index: https://indexed.example.com/llms.txt");
   });
 
   it("prefers a deeper section index over the site-wide one", async () => {

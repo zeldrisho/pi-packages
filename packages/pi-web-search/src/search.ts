@@ -243,7 +243,7 @@ export const webSearchOutputSchema = Type.Object({
 });
 
 /** Generated answers are untrusted claims, not verified facts. */
-function formatAnswer(query: string, answer: BraveAnswer): string {
+function formatAnswer(answer: BraveAnswer, fallback: boolean): string {
   const numbersByUrl = new Map<string, Set<number>>();
 
   for (const citation of answer.citations) {
@@ -261,7 +261,7 @@ function formatAnswer(query: string, answer: BraveAnswer): string {
     .map(([url, numbers]) => `[${[...numbers].join(", ")}] <${url}>`)
     .join("\n");
 
-  const body = `## Answer for ${JSON.stringify(query)}\n\n${answer.text}${sources ? `\n\n### Sources\n${sources}` : ""}`;
+  const body = `## ${fallback ? "No web results. AI-generated answer:" : "AI-generated answer:"}\n\n${answer.text}${sources ? `\n\n### Sources\n${sources}` : ""}`;
 
   return body;
 }
@@ -522,7 +522,7 @@ export class SearchRuntime {
     const results = payload.results.filter((result) => result.url).slice(0, count);
 
     const output = payload.answer
-      ? `${mode === "web" ? "No web results were found. Showing an AI-generated answer instead.\n\n" : ""}${formatAnswer(query, payload.answer)}`
+      ? formatAnswer(payload.answer, mode === "web")
       : formatResults(query, results, count);
 
     const truncation = truncateHead(output, {

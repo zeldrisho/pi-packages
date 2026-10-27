@@ -603,10 +603,7 @@ export async function executeWebFetch(
             ]
           : []),
         ...(showLlmsNotice && result.llmsTxtIndexUrl
-          ? [
-              `Documentation index available: ${redactUrlForDisplay(result.llmsTxtIndexUrl)}. Use it if this page does not cover the topic.`,
-              "",
-            ]
+          ? [`Index: ${redactUrlForDisplay(result.llmsTxtIndexUrl)}`, ""]
           : []),
         ...(resolvedFragment.fragment !== undefined && !fragmentMatched
           ? [
