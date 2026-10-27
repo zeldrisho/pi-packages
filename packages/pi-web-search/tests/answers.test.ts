@@ -59,7 +59,8 @@ describe("Answers mode", () => {
     expect(result.details.results).toEqual([]);
     expect(result.details.evidence.requestedCount).toBe(0);
     const text = result.content[0]!.text;
-    expect(text).not.toContain("No web results were found.");
+    expect(text).toContain("## AI-generated answer:");
+    expect(text).not.toContain("answer query");
     expect(text).toContain("### Sources");
     expect(text).not.toContain("_Provider:");
     expect(text).not.toContain("<usage>");
@@ -107,7 +108,9 @@ describe("Answers mode", () => {
     expect(second.details.cached).toBe(true);
     expect(second.content).toEqual(first.content);
     expect(second.details.answer).toEqual(first.details.answer);
-    await tool.execute("w", { query: params.query }, undefined, undefined);
+    const fallback = await tool.execute("w", { query: params.query }, undefined, undefined);
+    expect(fallback.content[0]!.text).toContain("## No web results. AI-generated answer:");
+    expect(fallback.content[0]!.text).not.toContain(params.query);
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 

@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { ProviderHeaders } from "@earendil-works/pi-ai";
 
 /** Marks requests assembled for the extension's own provider. */
-export const FINGERPRINT_MARKER_HEADER = "x-pi-opencode-free";
+export const PROVIDER_MARKER_HEADER = "x-pi-opencode-free";
 
 /** Canonical OpenCode session headers mirrored by the v2 CLI. */
 export const SESSION_HEADER_NAMES = [
@@ -27,6 +27,15 @@ const SESSION_HEX_LENGTH = 12;
 const SESSION_SUFFIX_LENGTH = 14;
 
 const SESSION_SEED_LENGTH = 20;
+
+/** Milliseconds representable by the identifier's 36-bit timestamp field. */
+const SESSION_TS_MODULUS = 2 ** 36;
+
+/** Half the timestamp range; larger differences are read as the nearer side. */
+const SESSION_TS_HALF = SESSION_TS_MODULUS / 2;
+
+/** Canonical identifier shape: hex timestamp half plus a fourteen-character suffix. */
+export const SESSION_ID_PATTERN = /^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/u;
 
 /** Largest multiple of the base62 alphabet size that fits in a byte. */
 const BASE62_UNBIASED_LIMIT = BASE62.length * 4;
@@ -124,26 +133,25 @@ export function createSessionSeed(): Uint8Array {
  * Renders OpenCode CLI's canonical session identifier shape.
  *
  * The 48-bit hex half reproduces `Identifier.descending()` with the counter
- * pinned to one, so the low twelve bits always read `ffe`. The high 36 bits are
- * derived from the seed, matching the reference implementation, while the
- * fourteen-character suffix is derived from the seed.
+ * pinned to one, so the low twelve bits always read `ffe`. Its high 36 bits
+ * carry the creation time, which the inference gateway checks for recency
+ * before honouring the free tier. The fourteen-character suffix is derived
+ * from the seed.
  *
  * @param seed - At least twenty bytes; defaults to fresh cryptographic randomness
- * @returns A `ses_` identifier accepted by the free-tier gate
+ * @param now - Creation time in epoch milliseconds, defaulting to the wall clock
+ * @returns A canonical `ses_` identifier; upstream acceptance is not guaranteed
  * @throws If the seed contains fewer than twenty bytes or default seed generation fails
  */
-export function createCanonicalSessionId(seed: Uint8Array = createSessionSeed()): string {
+export function createCanonicalSessionId(
+  seed: Uint8Array = createSessionSeed(),
+  now: number = Date.now(),
+): string {
   if (seed.length < SESSION_SEED_LENGTH) {
     throw new Error(`Session seed must contain at least ${SESSION_SEED_LENGTH} bytes`);
   }
 
-  const timestampBits =
-    ((BigInt(seed[0] ?? 0) << 28n) |
-      (BigInt(seed[1] ?? 0) << 20n) |
-      (BigInt(seed[2] ?? 0) << 12n) |
-      (BigInt(seed[3] ?? 0) << 4n) |
-      (BigInt(seed[4] ?? 0) >> 4n)) &
-    SESSION_TS_MASK_36;
+  const timestampBits = BigInt(now) & SESSION_TS_MASK_36;
 
   const encoded = ~((timestampBits << 12n) | SESSION_COUNTER) & SESSION_MASK_48;
 
@@ -151,18 +159,61 @@ export function createCanonicalSessionId(seed: Uint8Array = createSessionSeed())
 }
 
 /**
+ * Reads the creation time a canonical identifier carries.
+ *
+ * The timestamp wraps every {@link SESSION_TS_MODULUS} milliseconds, so callers
+ * must compare it with a nearby reference time rather than treating it as an
+ * absolute date.
+ *
+ * @param id - Candidate identifier
+ * @returns Creation time modulo the timestamp range, or undefined for a malformed id
+ */
+export function sessionIdCreatedAt(id: string): number | undefined {
+  if (!SESSION_ID_PATTERN.test(id)) return undefined;
+
+  const match = /^ses_([0-9a-f]{12})/u.exec(id);
+
+  if (!match?.[1]) return undefined;
+
+  const encoded = BigInt(`0x${match[1]}`);
+
+  return Number((~encoded & SESSION_MASK_48) >> 12n);
+}
+
+/**
+ * Measures how long ago a canonical identifier was created.
+ *
+ * The result is signed and wrapped into half the timestamp range, so identifiers
+ * created in the future read as small negative ages and stale identifiers read
+ * as large positive ages.
+ *
+ * @param id - Candidate identifier
+ * @param now - Reference time in epoch milliseconds
+ * @returns Age in milliseconds, or undefined for a malformed id
+ */
+export function sessionIdAgeMs(id: string, now: number): number | undefined {
+  const createdAt = sessionIdCreatedAt(id);
+
+  if (createdAt === undefined) return undefined;
+
+  const age = (((now - createdAt) % SESSION_TS_MODULUS) + SESSION_TS_MODULUS) % SESSION_TS_MODULUS;
+
+  return age > SESSION_TS_HALF ? age - SESSION_TS_MODULUS : age;
+}
+
+/**
  * Builds the static headers sent with every provider request.
  *
  * @param sessionId - Canonical session identifier for the active Pi session
  * @param cliVersion - Client version carried by the user agent
- * @returns Provider headers carrying the v2 CLI fingerprint
+ * @returns Provider headers that declare the client identity
  */
-export function buildFingerprintHeaders(sessionId: string, cliVersion: string) {
+export function buildClientHeaders(sessionId: string, cliVersion: string) {
   return {
     "User-Agent": buildUserAgent(cliVersion),
     "x-opencode-client": "cli",
     "x-opencode-project": "global",
-    [FINGERPRINT_MARKER_HEADER]: "1",
+    [PROVIDER_MARKER_HEADER]: "1",
     "x-opencode-session": sessionId,
     "x-opencode-session-id": sessionId,
     "x-session-affinity": sessionId,
@@ -174,7 +225,7 @@ export function buildFingerprintHeaders(sessionId: string, cliVersion: string) {
  * Updates the active session id on requests assembled for this provider.
  *
  * The marker header keeps the mutation from leaking into built-in providers
- * that share the OpenCode endpoint but do not use the free-tier fingerprint.
+ * that share the OpenCode endpoint but do not use the free-tier client headers.
  * Matching header names are replaced case-insensitively, and the legacy
  * `x-opencode-request` header is removed. Unmarked requests are left unchanged.
  *
@@ -183,12 +234,12 @@ export function buildFingerprintHeaders(sessionId: string, cliVersion: string) {
  * @param cliVersion - Client version carried by the user agent
  * @returns Whether the request belonged to this extension
  */
-export function applyFingerprintHeaders(
+export function applyClientHeaders(
   headers: ProviderHeaders,
   sessionId: string,
   cliVersion: string,
 ): boolean {
-  if (!hasFingerprintMarker(headers)) return false;
+  if (!hasProviderMarker(headers)) return false;
 
   setHeader(headers, "User-Agent", buildUserAgent(cliVersion));
   setHeader(headers, "x-opencode-client", "cli");
@@ -206,9 +257,9 @@ export function applyFingerprintHeaders(
 }
 
 /** Checks for a case-insensitive marker header whose value is exactly `"1"`. */
-function hasFingerprintMarker(headers: ProviderHeaders): boolean {
+function hasProviderMarker(headers: ProviderHeaders): boolean {
   for (const [name, value] of Object.entries(headers)) {
-    if (name.toLowerCase() === FINGERPRINT_MARKER_HEADER && value === "1") return true;
+    if (name.toLowerCase() === PROVIDER_MARKER_HEADER && value === "1") return true;
   }
 
   return false;

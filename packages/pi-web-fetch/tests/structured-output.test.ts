@@ -55,6 +55,21 @@ describe("web_fetch structured output", () => {
     expect(result.content[0].text).toContain("Hello");
   });
 
+  it("reports OpenAPI classification in structured output", async () => {
+    const result = await executeWebFetch(
+      { url: `${origin}/openapi-json` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(Check(webFetchOutputSchema, result.structuredContent)).toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      contentKind: "openapi-spec",
+      markdown: expect.stringContaining('"openapi"'),
+    });
+  });
+
   it("uses structured continuation offsets without skipping JSON-escaped content", async () => {
     let offset = 0;
     let received = "";

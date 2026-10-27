@@ -25,6 +25,7 @@ function fakeResponse(
     statusCode,
     headers: { "content-type": contentType, ...extraHeaders },
     destroy() {},
+    resume() {},
     ...iterator,
   } as IncomingMessage;
 }
@@ -69,11 +70,23 @@ describe("buildLlmsTxtCandidateUrls", () => {
   it("maps any page path to the root index plus ancestor directory indexes", () => {
     expect(
       buildLlmsTxtCandidateUrls("https://example.com/a/b/c?x=1#frag").map((u) => u.href),
-    ).toEqual(["https://example.com/llms.txt", "https://example.com/a/llms.txt"]);
+    ).toEqual([
+      "https://example.com/llms.txt",
+      "https://example.com/a/llms.txt",
+      "https://example.com/a/b/llms.txt",
+    ]);
     expect(buildLlmsTxtCandidateUrls("https://example.com").map((u) => u.href)).toEqual([
       "https://example.com/llms.txt",
     ]);
     expect(buildLlmsTxtCandidateUrls("http://example.com/a/b")[0].protocol).toBe("http:");
+  });
+
+  it("reaches a section index nested below a locale prefix", () => {
+    expect(
+      buildLlmsTxtCandidateUrls("https://example.com/en/docs/catalog/pay/api/rest-api").map(
+        (u) => u.pathname,
+      ),
+    ).toEqual(["/llms.txt", "/en/llms.txt", "/en/docs/llms.txt"]);
   });
 
   it("treats a trailing slash as a directory and never probes the page itself", () => {
@@ -135,7 +148,7 @@ describe("executeWebFetch llms.txt support", () => {
     );
 
     expect(result.content[0]?.text).not.toContain("Caution:");
-    expect(result.content[0]?.text).not.toContain("Documentation index available:");
+    expect(result.content[0]?.text).not.toContain("Index:");
     expect(result.content[0]?.text).not.toContain("<untrusted_web_content");
   });
 
@@ -213,7 +226,7 @@ describe("executeWebFetch llms.txt support", () => {
     expect(requests).toHaveLength(2);
     expect(result.details.llmsTxtFallback).toBe(false);
     expect(result.details.llmsTxtUrl).toBe("https://indexed.example.com/llms.txt");
-    expect(result.content[0]?.text).toContain("Documentation index available:");
+    expect(result.content[0]?.text).toContain("Index: https://indexed.example.com/llms.txt");
     expect(result.content[0]?.text).toContain("A perfectly readable plain-text page.");
 
     const second = await executeWebFetch(
@@ -223,7 +236,7 @@ describe("executeWebFetch llms.txt support", () => {
       dependencies,
     );
 
-    expect(second.content[0]?.text).toContain("Documentation index available:");
+    expect(second.content[0]?.text).toContain("Index: https://indexed.example.com/llms.txt");
   });
 
   it("prefers a deeper section index over the site-wide one", async () => {
@@ -249,8 +262,8 @@ describe("executeWebFetch llms.txt support", () => {
       dependencies,
     );
 
-    // Page + probes for root and /r2/; the deepest AVAILABLE index wins.
-    expect(requests).toHaveLength(3);
+    // Page + probes for root, /r2/, and /r2/buckets/; the deepest AVAILABLE index wins.
+    expect(requests).toHaveLength(4);
     expect(requests).toContain("https://sections.example.com/r2/llms.txt");
     expect(result.details.llmsTxtUrl).toBe("https://sections.example.com/r2/llms.txt");
   });
@@ -268,14 +281,126 @@ describe("executeWebFetch llms.txt support", () => {
 
     const requested = `https://r2shell.example.com/r2/buckets/page-${process.pid}`;
     const result = await executeWebFetch({ url: requested }, undefined, undefined, dependencies);
-    // Page + two probed candidates (root and /r2/); only /r2/ is usable.
-    expect(requests).toHaveLength(3);
+    // Page + three probed candidates (root, /r2/, /r2/buckets/); only /r2/ is usable.
+    expect(requests).toHaveLength(4);
     expect(result.details.llmsTxtFallback).toBe(true);
     expect(result.details.finalUrl).toBe("https://r2shell.example.com/r2/llms.txt");
     expect(result.details.contentKind).toBe("llms-index");
   });
 
+  it("serves a usable site index when a bot challenge withholds the page", async () => {
+    const { dependencies, requests } = recordingDependencies((href) => {
+      if (href === "https://waf.example.com/en/docs/llms.txt")
+        return fakeResponse(200, "text/markdown", LLMS_TXT);
+
+      if (href.endsWith("/llms.txt")) return fakeResponse(404, "text/plain", "Not Found");
+
+      return fakeResponse(202, "text/html; charset=UTF-8", "", {
+        "x-amzn-waf-action": "challenge",
+      });
+    });
+
+    const requested = `https://waf.example.com/en/docs/catalog/pay/api/rest-api-${process.pid}`;
+    const result = await executeWebFetch({ url: requested }, undefined, undefined, dependencies);
+
+    // Page + probes for root, /en/, and /en/docs/; the section index is the deepest one.
+    expect(requests).toHaveLength(4);
+    expect(result.details.llmsTxtFallback).toBe(true);
+    expect(result.details.requestedUrl).toBe(requested);
+    expect(result.details.finalUrl).toBe("https://waf.example.com/en/docs/llms.txt");
+    expect(result.details.contentKind).toBe("llms-index");
+    expect(result.content[0]?.text).toContain("Showing the site's documentation index instead");
+    expect(result.content[0]?.text).toContain("# Example site");
+  });
+
+  it("refetches a recovered page instead of serving a fresh cached index fallback", async () => {
+    let blocked = true;
+
+    const { dependencies, requests } = recordingDependencies((href) => {
+      if (href.endsWith("/llms.txt")) return fakeResponse(200, "text/markdown", LLMS_TXT);
+
+      if (blocked) return fakeResponse(202, "text/html", "", { "x-amzn-waf-action": "challenge" });
+
+      return fakeResponse(200, "text/plain", "Recovered documentation page ".repeat(20));
+    });
+
+    const url = `https://recover-index.example.com/page-${process.pid}`;
+    const first = await executeWebFetch({ url }, undefined, undefined, dependencies);
+    expect(first.details.llmsTxtFallback).toBe(true);
+
+    blocked = false;
+    const second = await executeWebFetch({ url }, undefined, undefined, dependencies);
+    expect(second.details.llmsTxtFallback).toBe(false);
+    expect(second.content[0]?.text).toContain("Recovered documentation page");
+    expect(requests.filter((href) => href === url)).toHaveLength(2);
+  });
+
+  it("reports the challenge when a withheld page has no usable index", async () => {
+    const { dependencies } = recordingDependencies((href) =>
+      href.endsWith("/llms.txt")
+        ? fakeResponse(404, "text/plain", "Not Found")
+        : fakeResponse(403, "text/html; charset=UTF-8", "", { "cf-mitigated": "challenge" }),
+    );
+
+    await expect(
+      executeWebFetch(
+        { url: `https://noindex.example.com/docs/page-${process.pid}` },
+        undefined,
+        undefined,
+        dependencies,
+      ),
+    ).rejects.toThrow("web_fetch was blocked by Cloudflare's anti-bot challenge (HTTP 403).");
+  });
+
+  it("accepts Markdown documentation served as application/octet-stream", async () => {
+    const body = [
+      "# Wallet API",
+      "",
+      "## Deposit History (supporting network)",
+      "",
+      "GET /sapi/v1/capital/deposit/hisrec",
+      "",
+    ]
+      .join("\n")
+      .repeat(8);
+
+    const { dependencies } = recordingDependencies((href) =>
+      href.endsWith("/llms.txt")
+        ? fakeResponse(404, "text/plain", "Not Found")
+        : fakeResponse(200, "application/octet-stream", body),
+    );
+
+    const result = await executeWebFetch(
+      { url: `https://octet.example.com/en/docs/wallet/Introduction.md` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.details.contentType).toBe("application/octet-stream");
+    expect(result.details.extractor).toBe("raw");
+    expect(result.content[0]?.text).toContain("Deposit History (supporting network)");
+  });
+
+  it("still rejects generic binary responses whose path is not a text document", async () => {
+    const { dependencies } = recordingDependencies((href) =>
+      href.endsWith("/llms.txt")
+        ? fakeResponse(404, "text/plain", "Not Found")
+        : fakeResponse(200, "application/octet-stream", "\u0000\u0001binary"),
+    );
+
+    await expect(
+      executeWebFetch(
+        { url: `https://octet.example.com/archive-${process.pid}.bin` },
+        undefined,
+        undefined,
+        dependencies,
+      ),
+    ).rejects.toThrow("does not support application/octet-stream");
+  });
+
   it("stays silent when the site has no usable /llms.txt", async () => {
+    // TEMP-DEBUG
     const { dependencies, requests } = recordingDependencies((href) =>
       href.endsWith("/llms.txt")
         ? fakeResponse(404, "text/plain", "Not Found")
@@ -330,8 +455,8 @@ describe("executeWebFetch llms.txt support", () => {
 
     const requested = `https://advertised.example.com/a/b/page-${process.pid}`;
     const result = await executeWebFetch({ url: requested }, undefined, undefined, dependencies);
-    // Page + blind probes (root and /a/) + the advertised index.
-    expect(requests).toHaveLength(4);
+    // Page + blind probes (root, /a/, /a/b/) + the advertised index.
+    expect(requests).toHaveLength(5);
     expect(result.details.llmsTxtFallback).toBe(true);
     expect(result.details.finalUrl).toBe(advertisedIndex);
     expect(result.details.contentKind).toBe("llms-index");

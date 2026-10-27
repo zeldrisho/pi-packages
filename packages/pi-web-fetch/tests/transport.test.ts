@@ -310,6 +310,48 @@ describe("web_fetch transport", () => {
     expect(result.totalCharacters).toBe(1_500_000);
   });
 
+  it("structures minified source responses instead of returning one long line", async () => {
+    const result = await fetchRemoteContent(
+      `${origin}/minified-js`,
+      0,
+      6_000,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.extractor).toBe("raw");
+    expect(result.markdown.startsWith("```js\n")).toBe(true);
+    expect(result.markdown).toContain('\n  openapi:"3.1.1",');
+    expect(result.markdown).toContain('"/sapi/v1/capital/deposit/hisrec":{');
+    expect(result.markdown.split("\n").length).toBeGreaterThan(10);
+  });
+
+  it("structures JSON-like minified bodies that strict parsing rejects", async () => {
+    const result = await fetchRemoteContent(
+      `${origin}/minified-json-like`,
+      0,
+      6_000,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.markdown.startsWith("```json\n")).toBe(true);
+    expect(result.markdown).toContain('\n  openapi:"3.1.1",');
+  });
+
+  it("leaves long single-line prose untouched", async () => {
+    const result = await fetchRemoteContent(
+      `${origin}/single-line-plain-text`,
+      0,
+      6_000,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.markdown.startsWith("plain prose without structure")).toBe(true);
+    expect(result.markdown).not.toContain("```");
+  });
+
   it.each([
     ["/binary", "does not support application/octet-stream"],
     ["/status", "HTTP 418"],
@@ -365,6 +407,22 @@ describe("web_fetch transport", () => {
     await expect(
       fetchRemoteContent(`${origin}/cloudflare-challenge`, 0, 6_000, undefined, dependencies),
     ).rejects.toThrow(/blocked by Cloudflare's anti-bot challenge \(HTTP 403\)/);
+  });
+
+  it.each([202, 403])("reports AWS WAF challenges with HTTP %s", async (status) => {
+    const challengeDependencies: FetchRemoteDependencies = {
+      ...dependencies,
+      request: async () =>
+        fixtureResponse(
+          status,
+          { "content-type": "text/html", "x-amzn-waf-action": "challenge" },
+          "",
+        ),
+    };
+
+    await expect(
+      fetchRemoteContent(`${origin}/aws-waf`, 0, 6_000, undefined, challengeDependencies),
+    ).rejects.toThrow(`blocked by an AWS WAF anti-bot challenge (HTTP ${status})`);
   });
 
   it("explains that a missing page may be private or require authentication", async () => {

@@ -1,12 +1,13 @@
 import type { RefreshModelsContext } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ProviderConfig } from "@earendil-works/pi-coding-agent";
 
+import { createBunTransport } from "./bun-transport.ts";
 import { createCliVersionResolver } from "./cli-version.ts";
 import {
-  buildFingerprintHeaders,
+  buildClientHeaders,
   createCanonicalSessionId,
   createSessionSeed,
-} from "./fingerprint.ts";
+} from "./client-headers.ts";
 import {
   DEFAULT_BASE_URL,
   catalogFromStoredEntry,
@@ -19,6 +20,7 @@ import {
   type FreeModelsStoreEntry,
 } from "./models.ts";
 import { createFreeStream } from "./stream.ts";
+import { createSessionStore, resolveSessionId, type SessionStore } from "./session-store.ts";
 
 /** Provider id used by `/model` and the provider-scoped request adapter. */
 export const PROVIDER_ID = "opencode-free";
@@ -38,13 +40,17 @@ interface CatalogRefreshState {
 export interface OpencodeFreeDependencies {
   randomSeed: () => Uint8Array;
   fetcher: typeof fetch;
+  /** Identity store; defaults to a JSON file in the Pi agent directory. */
+  sessionStore?: SessionStore;
+  /** Clock used to date and validate identities; defaults to `Date.now`. */
+  now?: () => number;
 }
 
 /**
  * Registers the OpenCode free provider and its request adapter.
  *
- * Seeds the catalog from bundled models, rotates session identity on session
- * start, and normalizes requests for this provider. Discovery runs when Pi
+ * Seeds the catalog from bundled models, keeps one persisted session identity
+ * across runs, and normalizes requests for this provider. Discovery runs when Pi
  * invokes the registered model refresh hook.
  *
  * @param pi - Extension API supplied by Pi
@@ -55,14 +61,25 @@ export function registerOpencodeFree(
   pi: ExtensionAPI,
   dependencies: OpencodeFreeDependencies,
 ): void {
-  let sessionId = createCanonicalSessionId(dependencies.randomSeed());
+  const now = dependencies.now ?? Date.now;
+  const store = dependencies.sessionStore ?? createSessionStore();
+
+  /** Reuses a persisted identity so each launch does not consume a new free-tier session. */
+  const resolveCurrentSessionId = (): string =>
+    resolveSessionId({
+      now: now(),
+      create: (timestamp) => createCanonicalSessionId(dependencies.randomSeed(), timestamp),
+      store,
+    });
+
+  let sessionId = resolveCurrentSessionId();
 
   const resolveVersion = createCliVersionResolver(dependencies.fetcher);
   const initialModels = initialFreeModels();
   const refreshState: CatalogRefreshState = {};
 
   pi.on("session_start", () => {
-    sessionId = createCanonicalSessionId(dependencies.randomSeed());
+    sessionId = resolveCurrentSessionId();
   });
 
   const config: ProviderConfig = {
@@ -89,7 +106,7 @@ export function registerOpencodeFree(
  * offline, canceled, version resolution fails, or discovery returns no usable
  * models. Version resolution and discovery share an eight-second abort deadline.
  * Like native Pi, catalogs with lastModified (including zero) and a valid checkedAt
- * stay fresh for four hours after checkedAt. Force bypasses freshness, never
+ * stay fresh for four hours after checkedAt. Force skips freshness checks, never
  * offline mode or cancellation. HTTP failures
  * retain the body and validators while advancing checkedAt; first failures without
  * Last-Modified remain immediately retryable. Transport, parsing, version lookup,
@@ -161,7 +178,7 @@ async function refreshModels(
 
   const outcome = await discoverFreeModelsWithStatus({
     baseUrl,
-    headers: buildFingerprintHeaders(sessionId, cliVersion),
+    headers: buildClientHeaders(sessionId, cliVersion),
     signal,
     fetcher: dependencies.fetcher,
     allowNetwork: context.allowNetwork,
@@ -204,16 +221,14 @@ function isRecent(timestamp: number | undefined, now: number, ttl: number): bool
   );
 }
 
-const defaultDependencies: OpencodeFreeDependencies = {
-  randomSeed: createSessionSeed,
-  fetcher: globalThis.fetch,
-};
-
 /**
  * Pi extension entry point. Registers the `opencode-free` provider.
  *
  * @param pi - Extension API supplied by Pi
  */
 export default function piOpencodeFree(pi: ExtensionAPI): void {
-  registerOpencodeFree(pi, defaultDependencies);
+  const transport = createBunTransport();
+
+  pi.on("session_shutdown", () => transport.dispose());
+  registerOpencodeFree(pi, { randomSeed: createSessionSeed, fetcher: transport });
 }

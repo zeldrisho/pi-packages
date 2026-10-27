@@ -6,6 +6,7 @@
 - Use `vp run <name>` for project scripts; `vp <name>` invokes a built-in command.
 - Use `vp pm <command>` for package-manager commands Vite+ does not provide; it delegates to pnpm (for example, `vp pm publish`).
 - Use `fd` for file discovery.
+- Use `rg` for content search.
 
 ## Commands
 

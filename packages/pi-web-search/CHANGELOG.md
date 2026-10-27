@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.2] - 2026-10-28
+
+### Changed
+
+- Label generated answers without repeating the search query or fallback notice.
+
 ## [0.14.1] - 2026-10-25
 
 ### Changed
@@ -177,7 +183,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded Brave web search ([cbc9491](https://github.com/zeldrisho/pi-packages/commit/cbc9491dce36555ab91b6bef203ec8b380596a89))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.1...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.2...HEAD
+[0.14.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.1...pi-web-search-v0.14.2
 [0.14.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.0...pi-web-search-v0.14.1
 [0.14.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.13.0...pi-web-search-v0.14.0
 [0.13.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.12.1...pi-web-search-v0.13.0

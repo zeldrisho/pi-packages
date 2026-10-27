@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type {
   Model,
   ModelsPublication,
@@ -11,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 
 import piOpencodeFree, { PROVIDER_ID, registerOpencodeFree } from "../src/index";
 import { CLI_NPM_URL, CLI_UPDATE_URL } from "../src/cli-version";
-import { FINGERPRINT_MARKER_HEADER } from "../src/fingerprint";
+import { PROVIDER_MARKER_HEADER } from "../src/client-headers";
 import { DEFAULT_BASE_URL, MODEL_CATALOG_URL, initialFreeModels } from "../src/models";
 import type { ProviderRequestPayload } from "../src/request";
 
@@ -93,8 +96,12 @@ function deterministicSeed(value: number): Uint8Array {
   return Uint8Array.from({ length: 20 }, (_, index) => (index + value) % 256);
 }
 
+/** Fixed clock so generated identities are deterministic across a test. */
+const SESSION_NOW = 1_793_000_000_000;
+
 function dependencies(environment: Record<string, string | undefined>, fetcher: typeof fetch) {
   let seedValue = 0;
+  let storedSessionId: string | undefined;
 
   return {
     randomSeed: () => {
@@ -104,6 +111,13 @@ function dependencies(environment: Record<string, string | undefined>, fetcher: 
     },
     fetcher,
     environment,
+    now: () => SESSION_NOW,
+    sessionStore: {
+      load: () => storedSessionId,
+      save: (id: string) => {
+        storedSessionId = id;
+      },
+    },
   };
 }
 
@@ -422,7 +436,7 @@ describe("opencode-free extension", () => {
     expect(publications).toHaveLength(0);
   });
 
-  it("rotates session identity for inference, including requests without extension hooks", async () => {
+  it("reuses the persisted session identity for inference across session starts", async () => {
     const { pi, state } = createFakePi();
     const sessions: Array<string | null> = [];
     let versionLookups = 0;
@@ -439,7 +453,7 @@ describe("opencode-free extension", () => {
         sessions.push(headers.get("x-opencode-session"));
         expect(headers.get("User-Agent")).toBe("opencode/latest/2.1.4/cli");
         expect(headers.get("Authorization")).toBe("Bearer public");
-        expect(headers.get(FINGERPRINT_MARKER_HEADER)).toBe("1");
+        expect(headers.get(PROVIDER_MARKER_HEADER)).toBe("1");
 
         return new Response(
           JSON.stringify({
@@ -466,8 +480,7 @@ describe("opencode-free extension", () => {
     expect(sessions[0]).toMatch(/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/u);
     await handlerFor(state, "session_start")({ type: "session_start" }, {});
     await native(storedModel, context, { apiKey: "public", maxRetries: 0 }).result();
-    expect(sessions[1]).not.toBe(sessions[0]);
-    expect(sessions[1]).toMatch(/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/u);
+    expect(sessions[1]).toBe(sessions[0]);
     expect(sessions).toHaveLength(2);
     expect(versionLookups).toBe(1);
   });
@@ -866,7 +879,7 @@ describe("opencode-free extension", () => {
       expect(publications).toEqual([]);
     });
 
-    it("allows force to bypass successful and failed HTTP freshness checks", async () => {
+    it("allows force to skip successful and failed HTTP freshness checks", async () => {
       const calls: string[] = [];
       const successfulFetch = discoveryFetcher(calls);
       let failed = false;
@@ -984,13 +997,19 @@ describe("opencode-free extension", () => {
   });
 
   it("provides a default export for Pi", () => {
-    const { pi, state } = createFakePi();
+    const directory = mkdtempSync(join(tmpdir(), "opencode-free-test-"));
+    vi.stubEnv("PI_CODING_AGENT_DIR", directory);
 
-    piOpencodeFree(pi);
+    try {
+      const { pi, state } = createFakePi();
+      piOpencodeFree(pi);
+      expect(state.provider?.name).toBe(PROVIDER_ID);
 
-    expect(state.provider?.name).toBe(PROVIDER_ID);
-
-    const ids = state.provider?.config.models?.map((model) => model.id) ?? [];
-    expect(ids.length).toBeGreaterThan(0);
+      const ids = state.provider?.config.models?.map((model) => model.id) ?? [];
+      expect(ids.length).toBeGreaterThan(0);
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

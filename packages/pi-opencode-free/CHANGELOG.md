@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-28
+
+### Added
+
+- Add an experimental Bun transport for free-tier requests, requiring Bun on `PATH` or `PI_OPENCODE_FREE_BUN`.
+
+### Changed
+
+- Enable free-tier models in Pi using Pi's own system prompt and tools, without an OpenCode installation.
+- Reuse one session identity across Pi runs.
+
+### Fixed
+
+- Date session identifiers from the system clock so their 30-day retention window matches the OpenCode CLI.
+
 ## [0.2.1] - 2026-10-25
 
 ### Changed
@@ -40,7 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Discover free models through Pi's native OpenCode catalog from pi.dev instead of models.dev, preserving Pi's capabilities and compatibility metadata.
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.2.1...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.0...HEAD
+[0.3.0]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.2.1...pi-opencode-free-v0.3.0
 [0.2.1]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.2.0...pi-opencode-free-v0.2.1
 [0.2.0]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.1.0...pi-opencode-free-v0.2.0
 [0.1.0]: https://github.com/zeldrisho/pi-packages/releases/tag/pi-opencode-free-v0.1.0

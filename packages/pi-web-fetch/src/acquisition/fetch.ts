@@ -27,6 +27,8 @@ import {
 } from "../document/evidence.ts";
 import { extractHtmlToMarkdown } from "../document/extract.ts";
 import { assertConversionDepth } from "../document/complexity.ts";
+import { formatMinifiedSource } from "../document/source-format.ts";
+import { isOpenapiSource } from "../document/openapi.ts";
 import {
   requestFollowingRedirects,
   type RedirectDependencies,
@@ -154,16 +156,46 @@ function isHtmlContentType(
   return value === "text/html" || value === "application/xhtml+xml";
 }
 
+/**
+ * Path suffixes whose content is read as plain text when a server labels it
+ * `application/octet-stream`. Static hosts commonly serve Markdown documentation
+ * with that generic binary type; restricting the exception to these suffixes keeps
+ * real binary downloads out of extraction.
+ */
+const TEXT_DOCUMENT_PATH_PATTERN = /\.(?:md|markdown|mdx|txt)$/i;
+
 /** Narrows a media type to those web_fetch is willing to read. */
-function isAllowedContentType(value: string | undefined): value is string {
-  return (
-    value !== undefined && (value.startsWith("text/") || ALLOWED_CONTENT_TYPES.includes(value))
-  );
+function isAllowedContentType(value: string | undefined, pathname: string): value is string {
+  if (value === undefined) return false;
+
+  if (value.startsWith("text/") || ALLOWED_CONTENT_TYPES.includes(value)) return true;
+
+  return value === "application/octet-stream" && TEXT_DOCUMENT_PATH_PATTERN.test(pathname);
+}
+
+/**
+ * Identifies a page a bot-protection layer refused to serve.
+ *
+ * The response carries no page content, so callers may substitute a site index the
+ * same page would otherwise have been extracted from.
+ */
+export class ChallengeBlockedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ChallengeBlockedError";
+  }
 }
 
 /** Throws the established error for a response whose status is not successful. */
 function assertSuccessfulResponse(response: IncomingMessage): void {
   const status = response.statusCode ?? 0;
+
+  if (responseHeader(response, "x-amzn-waf-action")?.trim().toLowerCase() === "challenge") {
+    response.resume();
+    throw new ChallengeBlockedError(
+      `web_fetch was blocked by an AWS WAF anti-bot challenge (HTTP ${status}).`,
+    );
+  }
 
   if (status >= 200 && status < 300) return;
 
@@ -173,7 +205,9 @@ function assertSuccessfulResponse(response: IncomingMessage): void {
   response.resume();
 
   if (cloudflareChallenge) {
-    throw new Error(`web_fetch was blocked by Cloudflare's anti-bot challenge (HTTP ${status}).`);
+    throw new ChallengeBlockedError(
+      `web_fetch was blocked by Cloudflare's anti-bot challenge (HTTP ${status}).`,
+    );
   }
 
   const authenticationHint = [401, 403, 404].includes(status)
@@ -243,6 +277,8 @@ async function documentFromDecoded(
   let extractor: CompleteDocument["extractor"] = "raw";
   let describedBy: string | undefined = linkHints.describedBy;
   let markdownAlternateUrl: string | undefined = linkHints.markdownAlternate;
+  let sourceLanguage: string | undefined;
+  const openapiSpec = isOpenapiSource(raw, contentType);
 
   if (isHtmlContentType(contentType)) {
     const extracted = await awaitWithAbort(extractHtml(raw, target.url), signal);
@@ -254,12 +290,23 @@ async function documentFromDecoded(
     markdownAlternateUrl = markdownAlternateUrl ?? extracted.markdownAlternateLink;
   } else if (contentType === "application/json") {
     try {
-      markdown = `\`\`\`json\n${JSON.stringify(JSON.parse(raw), null, 2)}\n\`\`\``;
+      const parsed: unknown = JSON.parse(raw);
+
+      markdown = `\`\`\`json\n${JSON.stringify(parsed, null, 2)}\n\`\`\``;
+      sourceLanguage = "json";
     } catch {
-      markdown = raw;
+      // Minified or JSON-like bodies are still worth structuring even when they do
+      // not parse as strict JSON.
+      const formatted = formatMinifiedSource(raw, contentType);
+
+      markdown = formatted?.markdown ?? raw;
+      sourceLanguage = formatted?.language;
     }
   } else {
-    markdown = raw;
+    const formatted = formatMinifiedSource(raw, contentType);
+
+    markdown = formatted?.markdown ?? raw;
+    sourceLanguage = formatted?.language;
 
     const markdownContent = /\bmarkdown\b|\.md(?:$|[?#])/i.test(
       contentTypeHeader + target.url.pathname,
@@ -306,6 +353,8 @@ async function documentFromDecoded(
     cachedAt: Date.now(),
     llmsTxtDescribedBy: describedBy,
     markdownAlternateUrl,
+    sourceLanguage,
+    openapiSpec,
   };
 }
 
@@ -334,7 +383,7 @@ async function documentFromResponse(
   const contentTypeHeader = responseContentTypeHeader(response);
   const contentType = normalizeContentType(contentTypeHeader);
 
-  if (!isAllowedContentType(contentType)) {
+  if (!isAllowedContentType(contentType, target.url.pathname)) {
     response.destroy();
     throw new Error(
       `web_fetch does not support ${contentType ?? (contentTypeHeader || "this content type")}.`,
@@ -368,6 +417,7 @@ async function documentFromAcquisition(
   dependencies: FetchRemoteDependencies,
   allowSolve: boolean,
 ): Promise<CompleteDocument> {
+  assertSuccessfulResponse(response);
   const status = response.statusCode ?? 0;
   const contentTypeHeader = responseContentTypeHeader(response);
   const contentType = normalizeContentType(contentTypeHeader);
@@ -458,6 +508,7 @@ async function fetchDocument(
   dependencies: FetchRemoteDependencies,
   cached?: CompleteDocument,
   allowEmptyContent = false,
+  retryRepresentationMiss = true,
 ): Promise<{ document: CompleteDocument; revalidated: boolean }> {
   assertAbsoluteHttpUrlForFetch(normalizeGitHubRawUrl(rawUrl));
   const controller = new AbortController();
@@ -499,8 +550,10 @@ async function fetchDocument(
     // Some servers route Markdown negotiation to a missing representation even
     // though their HTML page exists (for example, Redis documentation URLs).
     // Retry only these representation-related statuses, through the same
-    // validated redirect/network boundary, with HTML preferred.
-    if ([404, 406].includes(response.statusCode ?? 0)) {
+    // validated redirect/network boundary, with HTML preferred. Callers that probe
+    // for one exact representation opt out: HTML from that URL is never the
+    // representation they are looking for.
+    if (retryRepresentationMiss && [404, 406].includes(response.statusCode ?? 0)) {
       response.resume();
       ({ target, response } = await requestFollowingRedirects(
         target.url,
@@ -566,13 +619,30 @@ async function fetchDocument(
   }
 }
 
+/**
+ * Fetches a complete document for one URL.
+ *
+ * @param allowEmptyContent - Whether an empty body is acceptable
+ * @param retryRepresentationMiss - Whether a 404/406 may be retried as HTML. Probe
+ *   callers that want one exact representation pass false.
+ */
 export async function fetchCompleteDocument(
   rawUrl: string,
   signal: AbortSignal | undefined,
   dependencies: FetchRemoteDependencies,
   allowEmptyContent = false,
+  retryRepresentationMiss = true,
 ): Promise<CompleteDocument> {
-  return (await fetchDocument(rawUrl, signal, dependencies, undefined, allowEmptyContent)).document;
+  return (
+    await fetchDocument(
+      rawUrl,
+      signal,
+      dependencies,
+      undefined,
+      allowEmptyContent,
+      retryRepresentationMiss,
+    )
+  ).document;
 }
 
 /** Revalidates a stale representation with its ETag and Last-Modified validators. */
