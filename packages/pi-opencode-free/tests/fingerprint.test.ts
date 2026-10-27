@@ -96,7 +96,16 @@ describe("opencode session identity", () => {
 
   it("returns no age for malformed identifiers", () => {
     expect(sessionIdCreatedAt("ses_xyz")).toBeUndefined();
+    expect(sessionIdCreatedAt("ses_000000000000")).toBeUndefined();
     expect(sessionIdAgeMs("not-a-session", Date.now())).toBeUndefined();
+  });
+
+  it("measures ages on both sides of the timestamp wrap", () => {
+    const beforeWrap = createCanonicalSessionId(deterministicSeed(), SESSION_TS_MODULUS - 500);
+    const afterWrap = createCanonicalSessionId(deterministicSeed(), SESSION_TS_MODULUS + 500);
+
+    expect(sessionIdAgeMs(beforeWrap, SESSION_TS_MODULUS + 500)).toBe(1_000);
+    expect(sessionIdAgeMs(afterWrap, SESSION_TS_MODULUS - 500)).toBe(-1_000);
   });
 
   it("keeps the suffix well formed when seed bytes are rejected", () => {

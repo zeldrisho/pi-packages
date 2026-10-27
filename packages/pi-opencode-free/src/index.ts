@@ -233,18 +233,14 @@ function readSessionOverride(): string | undefined {
   return process.env[SESSION_ID_ENV]?.trim() || undefined;
 }
 
-const defaultDependencies: OpencodeFreeDependencies = {
-  randomSeed: createSessionSeed,
-  // Free-tier inference only accepts the OpenCode CLI's TLS stack, so gateway
-  // requests run through Bun while catalog and version lookups stay direct.
-  fetcher: createBunTransport(),
-};
-
 /**
  * Pi extension entry point. Registers the `opencode-free` provider.
  *
  * @param pi - Extension API supplied by Pi
  */
 export default function piOpencodeFree(pi: ExtensionAPI): void {
-  registerOpencodeFree(pi, defaultDependencies);
+  const transport = createBunTransport();
+
+  pi.on("session_shutdown", () => transport.dispose());
+  registerOpencodeFree(pi, { randomSeed: createSessionSeed, fetcher: transport });
 }

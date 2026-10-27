@@ -1,4 +1,13 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import {
+  closeSync,
+  mkdirSync,
+  openSync,
+  readSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -13,11 +22,13 @@ const STORE_FILE_NAME = "session.json";
 /** Current on-disk schema version. */
 const STORE_VERSION = 1;
 
+/** Upper bound for the small persisted JSON record. */
+const MAX_RECORD_BYTES = 4_096;
+
 /**
  * How long a stored identity is reused before a fresh one is generated.
  *
- * The gateway accepts identifiers dated up to roughly ninety days back, so this
- * stays well inside that window while still rotating periodically.
+ * This is a local retention policy, not a guarantee of upstream entitlement.
  */
 export const SESSION_REUSE_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -66,6 +77,8 @@ export function sessionStorePath(directory = agentDirectory()): string {
  * @returns Whether the identifier is safe to reuse
  */
 export function isReusableSessionId(id: string, now: number): boolean {
+  if (!Number.isFinite(now)) return false;
+
   if (!SESSION_ID_PATTERN.test(id)) return false;
 
   const age = sessionIdAgeMs(id, now);
@@ -105,6 +118,10 @@ export function parseSessionRecord(value: unknown, now: number): SessionRecord |
   // oxlint-disable-next-line anti-slop/no-runtime-typeof -- validates untrusted persisted JSON at the storage boundary
   if (typeof createdAt !== "number" || !Number.isFinite(createdAt)) return undefined;
 
+  const age = now - createdAt;
+
+  if (age < -SESSION_FUTURE_TOLERANCE_MS || age >= SESSION_REUSE_MS) return undefined;
+
   return { id, createdAt };
 }
 
@@ -121,7 +138,18 @@ export function createSessionStore(path = sessionStorePath()): SessionStore {
   return {
     load(now) {
       try {
-        return parseSessionRecord(JSON.parse(readFileSync(path, "utf8")), now)?.id;
+        const descriptor = openSync(path, "r");
+
+        try {
+          const bytes = Buffer.alloc(MAX_RECORD_BYTES + 1);
+          const length = readSync(descriptor, bytes, 0, bytes.length, 0);
+
+          if (length > MAX_RECORD_BYTES) return undefined;
+
+          return parseSessionRecord(JSON.parse(bytes.toString("utf8", 0, length)), now)?.id;
+        } finally {
+          closeSync(descriptor);
+        }
       } catch {
         return undefined;
       }
@@ -133,14 +161,20 @@ export function createSessionStore(path = sessionStorePath()): SessionStore {
         createdAt: now,
       };
 
-      const temporary = `${path}.${process.pid}.${Date.now()}.tmp`;
+      const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
 
       try {
         mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-        writeFileSync(temporary, `${JSON.stringify(record)}\n`, { mode: 0o600 });
+        writeFileSync(temporary, `${JSON.stringify(record)}\n`, { mode: 0o600, flag: "wx" });
         renameSync(temporary, path);
       } catch {
-        // A lost identity only costs a new session slot on the next launch.
+        // Persistence must not prevent inference.
+      } finally {
+        try {
+          unlinkSync(temporary);
+        } catch {
+          // The rename normally consumed the temporary file already.
+        }
       }
     },
   };
@@ -171,7 +205,7 @@ export function resolveSessionId(options: {
 
   const stored = store?.load(now);
 
-  if (stored) return stored;
+  if (stored && isReusableSessionId(stored, now)) return stored;
 
   const id = create(now);
 

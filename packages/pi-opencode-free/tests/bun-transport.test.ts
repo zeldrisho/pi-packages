@@ -1,17 +1,35 @@
 import { EventEmitter } from "node:events";
-import { existsSync, statSync } from "node:fs";
-import { describe, expect, it } from "vite-plus/test";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { runInNewContext } from "node:vm";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {
   BUN_PATH_ENV,
   BunTransportError,
   createBunTransport,
+  type BunTransport,
+  type BunTransportOptions,
   type ProxySpawn,
 } from "../src/bun-transport";
 
 const GATEWAY_URL = "https://opencode.ai/inference/v1/chat/completions";
 
 const MODELS_URL = "https://opencode.ai/inference/v1/models";
+
+const transports: BunTransport[] = [];
+
+function transportFixture(options: BunTransportOptions): BunTransport {
+  const transport = createBunTransport(options);
+
+  transports.push(transport);
+
+  return transport;
+}
+
+afterEach(() => {
+  for (const transport of transports.splice(0)) transport.dispose();
+  vi.useRealTimers();
+});
 
 interface FetchCall {
   input: Parameters<typeof fetch>[0];
@@ -105,7 +123,7 @@ describe("Bun gateway transport", () => {
     const harness = spawnHarness([]);
     const fetches = fetchHarness();
 
-    const transport = createBunTransport({
+    const transport = transportFixture({
       spawnProcess: harness.spawnProcess,
       fetch: fetches.fetcher,
     });
@@ -126,7 +144,7 @@ describe("Bun gateway transport", () => {
     const harness = spawnHarness([child]);
     const fetches = fetchHarness("data: [DONE]\n\n");
 
-    const transport = createBunTransport({
+    const transport = transportFixture({
       bunPath: "/opt/bun/bin/bun",
       spawnProcess: harness.spawnProcess,
       fetch: fetches.fetcher,
@@ -200,7 +218,7 @@ describe("Bun gateway transport", () => {
     const harness = spawnHarness([child]);
     const fetches = fetchHarness('{"object":"list"}');
 
-    const transport = createBunTransport({
+    const transport = transportFixture({
       spawnProcess: harness.spawnProcess,
       fetch: fetches.fetcher,
     });
@@ -235,7 +253,7 @@ describe("Bun gateway transport", () => {
     process.env[BUN_PATH_ENV] = "/custom/bun";
 
     try {
-      const transport = createBunTransport({
+      const transport = transportFixture({
         spawnProcess: harness.spawnProcess,
         fetch: fetches.fetcher,
       });
@@ -257,7 +275,7 @@ describe("Bun gateway transport", () => {
     const harness = spawnHarness([child]);
     const fetches = fetchHarness();
 
-    const transport = createBunTransport({
+    const transport = transportFixture({
       spawnProcess: harness.spawnProcess,
       fetch: fetches.fetcher,
     });
@@ -281,7 +299,7 @@ describe("Bun gateway transport", () => {
     const harness = spawnHarness([first, second]);
     const fetches = fetchHarness();
 
-    const transport = createBunTransport({
+    const transport = transportFixture({
       spawnProcess: harness.spawnProcess,
       fetch: fetches.fetcher,
     });
@@ -298,5 +316,214 @@ describe("Bun gateway transport", () => {
 
     expect(harness.calls).toHaveLength(2);
     expect(fetches.calls.at(-1)?.input).toBe("http://127.0.0.1:7000/inference/v1/models");
+  });
+
+  it("honors RequestInit overrides on Request inputs", async () => {
+    const child = new FakeProcess();
+    const harness = spawnHarness([child]);
+    const fetches = fetchHarness();
+
+    const transport = transportFixture({
+      spawnProcess: harness.spawnProcess,
+      fetch: fetches.fetcher,
+    });
+
+    const original = new Request(GATEWAY_URL, { method: "POST", body: "old" });
+    const pending = transport(original, { method: "PUT", body: "new" });
+
+    child.announce(4321);
+    await pending;
+
+    expect(fetches.calls[0]?.init?.method).toBe("PUT");
+    expect(await readBody(fetches.calls[0]?.init?.body)).toBe("new");
+  });
+
+  it("coalesces startup and lets one waiter cancel independently", async () => {
+    const child = new FakeProcess();
+    const harness = spawnHarness([child]);
+    const fetches = fetchHarness();
+
+    const transport = transportFixture({
+      spawnProcess: harness.spawnProcess,
+      fetch: fetches.fetcher,
+    });
+
+    const controller = new AbortController();
+    const canceled = captureError(transport(MODELS_URL, { signal: controller.signal }));
+    const live = transport(MODELS_URL);
+
+    controller.abort();
+    expect((await canceled).name).toBe("AbortError");
+    expect(harness.calls).toHaveLength(1);
+    child.announce(4321);
+    await live;
+    expect(fetches.calls).toHaveLength(1);
+  });
+
+  it("does not spawn for an already canceled request", async () => {
+    const harness = spawnHarness([]);
+    const transport = transportFixture({ spawnProcess: harness.spawnProcess });
+
+    expect((await captureError(transport(MODELS_URL, { signal: AbortSignal.abort() }))).name).toBe(
+      "AbortError",
+    );
+    expect(harness.calls).toHaveLength(0);
+  });
+
+  it("does not revive an endpoint disposed during startup", async () => {
+    const child = new FakeProcess();
+    const harness = spawnHarness([child]);
+    const fetches = fetchHarness();
+
+    const transport = transportFixture({
+      spawnProcess: harness.spawnProcess,
+      fetch: fetches.fetcher,
+    });
+
+    const pending = captureError(transport(MODELS_URL));
+
+    transport.dispose();
+    child.announce(4321);
+
+    expect((await pending).message).toContain("transport stopped during startup");
+    expect(fetches.calls).toHaveLength(0);
+  });
+
+  it.each(["error", "timeout", "invalid port", "throw"])(
+    "cleans up after startup %s",
+    async (mode) => {
+      vi.useFakeTimers();
+      const child = new FakeProcess();
+      const harness = spawnHarness(mode === "throw" ? [] : [child]);
+      const transport = transportFixture({ spawnProcess: harness.spawnProcess });
+      const pending = captureError(transport(MODELS_URL));
+      const script = harness.calls[0]?.args[0];
+
+      if (mode === "error") child.emit("error", new Error("ENOENT"));
+
+      if (mode === "timeout") await vi.advanceTimersByTimeAsync(10_000);
+
+      if (mode === "invalid port") child.announce(70_000);
+
+      expect(await pending).toBeInstanceOf(BunTransportError);
+      expect(script && existsSync(script)).toBe(false);
+    },
+  );
+
+  it("cleans up on exit and restarts on the next request", async () => {
+    const first = new FakeProcess();
+    const second = new FakeProcess();
+    const harness = spawnHarness([first, second]);
+    const fetches = fetchHarness();
+
+    const transport = transportFixture({
+      spawnProcess: harness.spawnProcess,
+      fetch: fetches.fetcher,
+    });
+
+    const initial = transport(MODELS_URL);
+
+    first.announce(4321);
+    await initial;
+    first.emit("exit", 1, null);
+    expect(existsSync(harness.calls[0]!.args[0]!)).toBe(false);
+
+    const retry = transport(MODELS_URL);
+
+    second.announce(4322);
+    await retry;
+    transport.dispose();
+    transport.dispose();
+    expect(second.signals).toEqual(["SIGTERM"]);
+    expect(existsSync(harness.calls[1]!.args[0]!)).toBe(false);
+  });
+
+  it("runs the generated proxy against local fetch fixtures without Bun or upstream requests", async () => {
+    const child = new FakeProcess();
+    const harness = spawnHarness([child]);
+    const fetches = fetchHarness();
+
+    const transport = transportFixture({
+      spawnProcess: harness.spawnProcess,
+      fetch: fetches.fetcher,
+    });
+
+    const pending = transport(MODELS_URL);
+    const script = harness.calls[0]!.args[0]!;
+    const token = harness.calls[0]!.env!.PI_PROXY_TOKEN!;
+
+    const handler = {
+      fetch: async (_request: Request): Promise<Response> => new Response(null, { status: 500 }),
+    };
+
+    const upstream: FetchCall[] = [];
+    let fail = false;
+
+    runInNewContext(readFileSync(script, "utf8"), {
+      URL,
+      Headers,
+      Request,
+      Response,
+      process: { env: { PI_PROXY_TOKEN: token }, on() {} },
+      console: { log() {} },
+      Bun: {
+        serve(options: { fetch: (request: Request) => Promise<Response> }) {
+          handler.fetch = options.fetch;
+
+          return { port: 4321 };
+        },
+      },
+      fetch: async (input: URL, init: RequestInit) => {
+        upstream.push({ input, init });
+
+        if (fail) throw new Error("fixture failed");
+
+        return new Response("data: [DONE]\n\n", {
+          headers: {
+            "content-type": "text/event-stream",
+            "content-encoding": "gzip",
+            connection: "x-private",
+            "x-private": "remove",
+            "retry-after": "60",
+          },
+        });
+      },
+    });
+    child.announce(4321);
+    await pending;
+
+    expect((await handler.fetch(new Request("http://127.0.0.1/inference/v1/models"))).status).toBe(
+      403,
+    );
+    const headers = { "x-pi-proxy-token": token, connection: "x-private", "x-private": "remove" };
+
+    expect((await handler.fetch(new Request("http://127.0.0.1/other", { headers }))).status).toBe(
+      404,
+    );
+
+    const response = await handler.fetch(
+      new Request("http://127.0.0.1/inference/v1/chat/completions?q=1", {
+        method: "POST",
+        headers,
+        body: "payload",
+      }),
+    );
+
+    expect(await response.text()).toBe("data: [DONE]\n\n");
+    expect(response.headers.get("retry-after")).toBe("60");
+    expect(response.headers.has("content-encoding")).toBe(false);
+    expect(response.headers.has("x-private")).toBe(false);
+    expect(upstream[0]?.input).toEqual(
+      new URL("https://opencode.ai/inference/v1/chat/completions?q=1"),
+    );
+    expect(await readBody(upstream[0]?.init?.body)).toBe("payload");
+    expect(new Headers(upstream[0]?.init?.headers).has("x-private")).toBe(false);
+    expect(new Headers(upstream[0]?.init?.headers).has("x-pi-proxy-token")).toBe(false);
+    expect(upstream[0]?.init?.redirect).toBe("manual");
+    fail = true;
+    expect(
+      (await handler.fetch(new Request("http://127.0.0.1/inference/v1/models", { headers })))
+        .status,
+    ).toBe(502);
   });
 });

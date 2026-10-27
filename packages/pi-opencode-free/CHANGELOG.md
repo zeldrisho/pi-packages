@@ -7,13 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add an experimental Bun transport for gateway requests, requiring Bun on `PATH` or `PI_OPENCODE_FREE_BUN`. Free-tier access from Pi remains unsupported by OpenCode and is not yet verified working reliably.
+
 ### Changed
 
 - Keep one session identity across Pi runs instead of opening a new free-tier session on every launch, and allow pinning an identity with `PI_OPENCODE_FREE_SESSION_ID`.
 
 ### Fixed
 
-- Stop every request being rejected as a free usage limit by dating the session identifier from the system clock, matching the OpenCode CLI.
+- Date session identifiers from the system clock instead of random seed bytes, matching the OpenCode CLI's timestamp format.
 
 ## [0.2.1] - 2026-10-25
 

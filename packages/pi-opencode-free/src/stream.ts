@@ -4,6 +4,7 @@ import {
   type Model,
 } from "@earendil-works/pi-ai/compat";
 import type { ProviderConfig } from "@earendil-works/pi-coding-agent";
+import { BunTransportError } from "./bun-transport.ts";
 import { applyFingerprintHeaders, buildFingerprintHeaders } from "./fingerprint.ts";
 import { isFreeUsageLimitMessage, usageLimitMessage } from "./quota.ts";
 import { isProviderRequestPayload, normalizeFreeRequestPayload } from "./request.ts";
@@ -39,6 +40,7 @@ export function createFreeStream(
         const headers = { ...options?.headers, ...buildFingerprintHeaders(sessionId, cliVersion) };
         applyFingerprintHeaders(headers, sessionId, cliVersion);
         let quotaMessage: string | undefined;
+        let transportMessage: string | undefined;
         // SAFETY: this adapter is registered only for the openai-completions API.
         const nativeModel = model as Model<"openai-completions">;
 
@@ -54,15 +56,28 @@ export function createFreeStream(
               : request;
           },
           fetch: async (input, init) => {
-            const response = await (options?.fetch ?? fetcher)(input, init);
-            quotaMessage =
-              response.status === 429 ? usageLimitMessage(response.headers, Date.now()) : undefined;
+            transportMessage = undefined;
 
-            return response;
+            try {
+              const response = await (options?.fetch ?? fetcher)(input, init);
+              quotaMessage =
+                response.status === 429
+                  ? usageLimitMessage(response.headers, Date.now())
+                  : undefined;
+
+              return response;
+            } catch (error) {
+              if (error instanceof BunTransportError) transportMessage = error.message;
+              throw error;
+            }
           },
         });
 
         for await (const event of inner) {
+          if (event.type === "error" && event.reason !== "aborted" && transportMessage) {
+            event.error.errorMessage = transportMessage;
+          }
+
           if (
             event.type === "error" &&
             event.reason !== "aborted" &&

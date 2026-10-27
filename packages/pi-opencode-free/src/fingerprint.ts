@@ -140,7 +140,7 @@ export function createSessionSeed(): Uint8Array {
  *
  * @param seed - At least twenty bytes; defaults to fresh cryptographic randomness
  * @param now - Creation time in epoch milliseconds, defaulting to the wall clock
- * @returns A `ses_` identifier accepted by the free-tier gate
+ * @returns A canonical `ses_` identifier; upstream acceptance is not guaranteed
  * @throws If the seed contains fewer than twenty bytes or default seed generation fails
  */
 export function createCanonicalSessionId(
@@ -166,9 +166,11 @@ export function createCanonicalSessionId(
  * absolute date.
  *
  * @param id - Candidate identifier
- * @returns Creation time in epoch milliseconds, or undefined for a malformed id
+ * @returns Creation time modulo the timestamp range, or undefined for a malformed id
  */
 export function sessionIdCreatedAt(id: string): number | undefined {
+  if (!SESSION_ID_PATTERN.test(id)) return undefined;
+
   const match = /^ses_([0-9a-f]{12})/u.exec(id);
 
   if (!match?.[1]) return undefined;
@@ -194,7 +196,7 @@ export function sessionIdAgeMs(id: string, now: number): number | undefined {
 
   if (createdAt === undefined) return undefined;
 
-  const age = (now - createdAt) % SESSION_TS_MODULUS;
+  const age = (((now - createdAt) % SESSION_TS_MODULUS) + SESSION_TS_MODULUS) % SESSION_TS_MODULUS;
 
   return age > SESSION_TS_HALF ? age - SESSION_TS_MODULUS : age;
 }

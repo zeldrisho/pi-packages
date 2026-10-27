@@ -22,15 +22,14 @@ export const BUN_PATH_ENV = "PI_OPENCODE_FREE_BUN";
 /**
  * Proxy program executed by Bun.
  *
- * Bun's TLS stack matches the OpenCode CLI, which free-tier inference accepts
- * while generic Node, curl, and OpenSSL clients are refused. The proxy buffers
+ * Uses Bun's TLS stack for experimental gateway compatibility. This does not
+ * guarantee free-tier access from a third-party client. The proxy buffers
  * the request so the upstream connection carries a definite length and no
  * hop-by-hop headers, then streams the upstream body back unchanged. Identity
  * encoding avoids reporting a compressed body as an uncompressed one.
  */
 const PROXY_SOURCE = `
 const token = process.env.PI_PROXY_TOKEN;
-const debugPath = process.env.PI_PROXY_DEBUG;
 const upstreamOrigin = ${JSON.stringify(UPSTREAM_ORIGIN)};
 const hopByHop = ["host", "connection", "content-length", "keep-alive", "proxy-connection", "te", "trailer", "transfer-encoding", "upgrade", "${TOKEN_HEADER}"];
 
@@ -44,8 +43,17 @@ const server = Bun.serve({
     }
 
     const incoming = new URL(request.url);
+    if (!incoming.pathname.startsWith("${GATEWAY_PATH_PREFIX}")) {
+      return new Response("not found", { status: 404 });
+    }
+    const target = new URL(upstreamOrigin);
+    target.pathname = incoming.pathname;
+    target.search = incoming.search;
     const headers = new Headers(request.headers);
 
+    for (const name of (headers.get("connection") ?? "").split(",")) {
+      if (name.trim()) headers.delete(name.trim());
+    }
     for (const name of hopByHop) headers.delete(name);
     headers.set("accept-encoding", "identity");
 
@@ -54,29 +62,23 @@ const server = Bun.serve({
     let upstream;
 
     try {
-      upstream = await fetch(new URL(incoming.pathname + incoming.search, upstreamOrigin), {
+      upstream = await fetch(target, {
         method: request.method,
         headers,
         body: requestBody,
         redirect: "manual",
+        signal: request.signal,
       });
     } catch (error) {
       return new Response(String(error), { status: 502 });
     }
 
-    if (debugPath) {
-      await Bun.write(debugPath, JSON.stringify({
-        url: incoming.pathname + incoming.search,
-        requestHeaders: [...headers],
-        requestBody: requestBody ? new TextDecoder().decode(requestBody) : null,
-        status: upstream.status,
-        responseHeaders: [...upstream.headers],
-      }) + "\\n");
-    }
-
     const responseHeaders = new Headers(upstream.headers);
 
-    for (const name of ["content-encoding", "content-length", "transfer-encoding", "connection"]) {
+    for (const name of (responseHeaders.get("connection") ?? "").split(",")) {
+      if (name.trim()) responseHeaders.delete(name.trim());
+    }
+    for (const name of [...hopByHop, "content-encoding"]) {
       responseHeaders.delete(name);
     }
 
@@ -120,6 +122,9 @@ export interface ProxyProcess {
   kill(signal?: NodeJS.Signals): boolean;
 }
 
+/** Fetch-compatible transport with explicit lifecycle cleanup. */
+export type BunTransport = typeof fetch & { dispose(): void };
+
 /** Spawns the Bun proxy executable. */
 export type ProxySpawn = (
   command: string,
@@ -156,7 +161,7 @@ export class BunTransportError extends Error {
  * @param options - Executable path, spawn, and fetch overrides
  * @returns Fetch-compatible function for the OpenCode gateway
  */
-export function createBunTransport(options: BunTransportOptions = {}): typeof fetch {
+export function createBunTransport(options: BunTransportOptions = {}): BunTransport {
   const bunPath = options.bunPath ?? (process.env[BUN_PATH_ENV]?.trim() || "bun");
   const spawnProcess: ProxySpawn = options.spawnProcess ?? spawn;
   const directFetch = options.fetch ?? globalThis.fetch;
@@ -194,28 +199,31 @@ export function createBunTransport(options: BunTransportOptions = {}): typeof fe
       exitHookAttached = true;
     }
 
-    // A fresh directory per attempt keeps a retry from reusing a stale script.
-    const created = mkdtempSync(join(tmpdir(), "pi-opencode-free-"));
-    const script = join(created, "proxy.mjs");
-    const token = randomBytes(16).toString("hex");
-
-    directory = created;
-    writeFileSync(script, PROXY_SOURCE, { mode: 0o600 });
-
-    const spawned = spawnProcess(bunPath, [script], {
-      stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, PI_PROXY_TOKEN: token },
-    });
-
-    child = spawned;
-
     try {
+      // A fresh directory per attempt keeps a retry from reusing a stale script.
+      const created = mkdtempSync(join(tmpdir(), "pi-opencode-free-"));
+      const script = join(created, "proxy.mjs");
+      const token = randomBytes(16).toString("hex");
+
+      directory = created;
+      writeFileSync(script, PROXY_SOURCE, { mode: 0o600 });
+
+      const spawned = spawnProcess(bunPath, [script], {
+        stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env, PI_PROXY_TOKEN: token },
+      });
+
+      child = spawned;
+
       const port = await readReadyPort(spawned);
+
+      if (child !== spawned) throw new Error("transport stopped during startup");
+
       const started = { port, token };
 
       endpoint = started;
       spawned.once("exit", () => {
-        if (endpoint === started) endpoint = undefined;
+        if (child === spawned) stop();
       });
 
       return started;
@@ -238,21 +246,27 @@ export function createBunTransport(options: BunTransportOptions = {}): typeof fe
     return starting;
   };
 
-  return async (input, init) => {
-    const request = input instanceof Request ? input.clone() : new Request(input, init);
-    const url = new URL(request.url);
+  const fetcher: typeof fetch = async (input, init) => {
+    const url = new URL(input instanceof Request ? input.url : input);
 
     if (url.origin !== UPSTREAM_ORIGIN || !url.pathname.startsWith(GATEWAY_PATH_PREFIX)) {
       return directFetch(input, init);
     }
 
-    const proxy = await ensure();
+    const request = new Request(input, init);
+    request.signal.throwIfAborted();
+    const proxy = await waitForStartup(ensure(), request.signal);
+    request.signal.throwIfAborted();
     const headers = new Headers(request.headers);
 
     const body =
       request.method === "GET" || request.method === "HEAD"
         ? undefined
         : await request.arrayBuffer();
+
+    for (const name of (headers.get("connection") ?? "").split(",")) {
+      if (name.trim()) headers.delete(name.trim());
+    }
 
     for (const name of [
       "host",
@@ -279,6 +293,23 @@ export function createBunTransport(options: BunTransportOptions = {}): typeof fe
       signal: request.signal,
     });
   };
+
+  return Object.assign(fetcher, { dispose: stop });
+}
+
+/** Lets individual callers cancel while a shared proxy is still starting. */
+function waitForStartup(
+  starting: Promise<ProxyEndpoint>,
+  signal: AbortSignal,
+): Promise<ProxyEndpoint> {
+  return new Promise((resolve, reject) => {
+    const abort = (): void => reject(signal.reason);
+
+    signal.addEventListener("abort", abort, { once: true });
+
+    if (signal.aborted) abort();
+    starting.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort));
+  });
 }
 
 /**
@@ -318,11 +349,16 @@ function readReadyPort(child: ProxyProcess): Promise<number> {
     });
 
     child.stdout?.on("data", (chunk: Buffer) => {
-      output += chunk.toString("utf8");
+      output = `${output}${chunk.toString("utf8")}`.slice(-2_000);
 
       const match = /^READY (\d+)$/mu.exec(output);
 
-      if (match?.[1]) finish(undefined, Number(match[1]));
+      if (match?.[1]) {
+        const port = Number(match[1]);
+
+        if (port > 0 && port <= 65_535) finish(undefined, port);
+        else finish(new Error("Bun reported an invalid proxy port"));
+      }
     });
   });
 }

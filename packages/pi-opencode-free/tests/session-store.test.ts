@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vite-plus/test";
@@ -103,6 +111,15 @@ describe("session identity reuse", () => {
     expect(isReusableSessionId(identityAt(SESSION_REUSE_MS - 1), NOW)).toBe(true);
     expect(isReusableSessionId(identityAt(SESSION_REUSE_MS), NOW)).toBe(false);
   });
+
+  it("replaces stale identities returned by a custom store", () => {
+    const store = memoryStore(identityAt(SESSION_REUSE_MS));
+    const fresh = identityAt(0);
+
+    expect(resolveSessionId({ now: NOW, create: () => fresh, store })).toBe(fresh);
+    expect(store.state.saved).toEqual([fresh]);
+    expect(isReusableSessionId(fresh, Number.NaN)).toBe(false);
+  });
 });
 
 describe("persisted session records", () => {
@@ -117,6 +134,13 @@ describe("persisted session records", () => {
     expect(parseSessionRecord({ id, createdAt: NOW }, NOW)).toBeUndefined();
     expect(parseSessionRecord({ version: 1, id: "ses_bad", createdAt: NOW }, NOW)).toBeUndefined();
     expect(parseSessionRecord(null, NOW)).toBeUndefined();
+    expect(parseSessionRecord({ version: 1, id, createdAt: "yesterday" }, NOW)).toBeUndefined();
+    expect(
+      parseSessionRecord({ version: 1, id, createdAt: NOW - SESSION_REUSE_MS }, NOW),
+    ).toBeUndefined();
+    expect(
+      parseSessionRecord({ version: 1, id, createdAt: NOW + SESSION_FUTURE_TOLERANCE_MS + 1 }, NOW),
+    ).toBeUndefined();
 
     const stale = identityAt(SESSION_REUSE_MS + DAY_MS);
 
@@ -136,6 +160,8 @@ describe("persisted session records", () => {
       store.save(id, NOW);
 
       expect(store.load(NOW)).toBe(id);
+      expect(statSync(path).mode & 0o077).toBe(0);
+      expect(readdirSync(dirname(path))).toEqual(["session.json"]);
       expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({
         version: 1,
         id,
@@ -158,9 +184,31 @@ describe("persisted session records", () => {
 
       expect(store.load(NOW)).toBeUndefined();
 
+      writeFileSync(path, " ".repeat(4_097));
+      expect(store.load(NOW)).toBeUndefined();
+
       writeFileSync(path, JSON.stringify({ version: 1, id: "ses_bad", createdAt: NOW }));
 
       expect(store.load(NOW)).toBeUndefined();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("removes temporary files when the final rename fails", () => {
+    const directory = mkdtempSync(join(tmpdir(), "opencode-free-session-"));
+    const path = sessionStorePath(directory);
+
+    try {
+      mkdirSync(path, { recursive: true });
+      expect(() => createSessionStore(path).save(identityAt(0), NOW)).not.toThrow();
+      expect(readdirSync(dirname(path))).toEqual(["session.json"]);
+      const blocked = join(directory, "blocked");
+
+      writeFileSync(blocked, "not a directory");
+      expect(() =>
+        createSessionStore(join(blocked, "session.json")).save(identityAt(0), NOW),
+      ).not.toThrow();
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
