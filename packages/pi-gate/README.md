@@ -46,9 +46,7 @@ pi-gate is a guard rail, not a sandbox. Complex shell syntax, pipelines, redirec
 
 The built-in `bash` tool is gated, and `write`/`edit` calls targeting the gate config require approval. Prompt dialogs offer `Allow` and `Deny`; approvals are never remembered. To stop repeated prompts, add a specific `allow` rule to `gate.json`.
 
-Approval dialogs are serialized for concurrent tool calls; cancellation, shutdown, reload, session replacement, or a policy change while a dialog is open denies the pending call. Calls queued before shutdown or session replacement are also denied.
-
-The matched command text is highlighted in the TUI approval dialog. Long commands are truncated in approval dialogs, but an approved command executes in full. Denials, policy blocks, dismissals, and timeouts stop the turn; the agent is told to ask before retrying a denial or proceeding past a block, while a timeout asks whether to retry approval. Other allowed calls in a parallel batch may still run. In non-interactive modes (`-p`, JSON), commands requiring approval are denied.
+The approval dialog highlights the matched command text. Long commands are truncated in the dialog but execute in full if approved. Denials, blocks, dismissals, and timeouts stop the turn; other allowed calls in a parallel batch may still run. In non-interactive modes (`-p`, JSON), commands requiring approval are denied.
 
 In Herdr-managed panes, install Herdr's Pi integration with `herdr integration install pi` to report pending approvals as `blocked`. Herdr is optional.
 

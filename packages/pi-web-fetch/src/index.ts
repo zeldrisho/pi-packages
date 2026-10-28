@@ -20,6 +20,13 @@ export {
   type AnubisSolveContext,
 } from "./challenges/anubis.ts";
 
+export {
+  AWS_WAF_TOKEN_COOKIE,
+  isAwsWafChallengeResponse,
+  type AwsWafResolveContext,
+  type AwsWafResolver,
+} from "./challenges/aws-waf.ts";
+
 export { CookieJar } from "./network/cookies.ts";
 
 export type { FetchResult } from "./document/content.ts";

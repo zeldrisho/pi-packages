@@ -100,6 +100,27 @@ describe("CookieJar", () => {
     expect(jar.size).toBe(1);
   });
 
+  it("stores a solver token for the target origin only", () => {
+    const jar = new CookieJar();
+
+    expect(jar.set("aws-waf-token", "solved:token", new URL("https://example.test/page"))).toBe(
+      true,
+    );
+    expect(jar.headerFor(new URL("https://example.test/other"))).toBe("aws-waf-token=solved:token");
+    expect(jar.headerFor(new URL("https://other.test/"))).toBeUndefined();
+  });
+
+  it("rejects unsafe solver tokens", () => {
+    const jar = new CookieJar();
+    const url = new URL("https://example.test/");
+
+    expect(jar.set("aws-waf-token", "bad;token", url)).toBe(false);
+    expect(jar.set("aws-waf-token", "bad token", url)).toBe(false);
+    expect(jar.set("aws-waf-token", "bad\u0000token", url)).toBe(false);
+    expect(jar.set("bad name", "token", url)).toBe(false);
+    expect(jar.size).toBe(0);
+  });
+
   it("bounds the number of retained cookies", () => {
     const jar = new CookieJar();
 

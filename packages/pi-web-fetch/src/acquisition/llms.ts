@@ -191,7 +191,7 @@ async function probeUsableRawText(
         const document = await fetchCompleteDocument(
           candidate.toString(),
           sharedSignal,
-          { ...dependencies, solveAnubisChallenges: false },
+          { ...dependencies, solveAnubisChallenges: false, solveAwsWafChallenges: false },
           // An index probe never accepts an empty body.
           false,
           // A probe wants exactly this representation; retrying as HTML only burns

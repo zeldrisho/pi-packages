@@ -15,6 +15,13 @@ import {
   solveAnubisChallenge,
 } from "../challenges/anubis.ts";
 import {
+  AWS_WAF_TOKEN_COOKIE,
+  isAwsWafChallengeResponse,
+  type AwsWafResolver,
+  type AwsWafSolution,
+} from "../challenges/aws-waf.ts";
+import { nativeAwsWafResolver } from "../challenges/aws-waf-resolver.ts";
+import {
   sliceCompleteDocument,
   type CompleteDocument,
   type FetchResult,
@@ -89,6 +96,10 @@ export interface FetchRemoteDependencies extends RedirectDependencies {
   timeoutMs?: number;
   /** When false, an Anubis interstitial is reported as blocked instead of solved. Defaults to true. */
   solveAnubisChallenges?: boolean;
+  /** When false, an AWS WAF challenge is reported as blocked instead of solved. Defaults to true. */
+  solveAwsWafChallenges?: boolean;
+  /** Resolver used for AWS WAF challenges; defaults to the in-process resolver. */
+  awsWafResolver?: AwsWafResolver;
 }
 
 /**
@@ -190,7 +201,7 @@ export class ChallengeBlockedError extends Error {
 function assertSuccessfulResponse(response: IncomingMessage): void {
   const status = response.statusCode ?? 0;
 
-  if (responseHeader(response, "x-amzn-waf-action")?.trim().toLowerCase() === "challenge") {
+  if (isAwsWafChallengeResponse(response)) {
     response.resume();
     throw new ChallengeBlockedError(
       `web_fetch was blocked by an AWS WAF anti-bot challenge (HTTP ${status}).`,
@@ -494,6 +505,37 @@ function assertAbsoluteHttpUrlForFetch(value: string): URL {
 }
 
 /**
+ * Attempts one WAF token resolution while preserving caller cancellation.
+ * Solver failures are intentionally converted into the normal blocked path.
+ */
+async function resolveAwsWafToken(
+  resolver: AwsWafResolver,
+  target: ValidatedTarget,
+  signal: AbortSignal,
+  network: RedirectDependencies,
+  budgetMs: number,
+): Promise<AwsWafSolution | undefined> {
+  if (budgetMs <= 0) return undefined;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), budgetMs);
+  const resolverSignal = AbortSignal.any([signal, controller.signal]);
+
+  try {
+    return await awaitWithAbort(
+      resolver.resolve({ url: target.url, signal: resolverSignal, network }),
+      resolverSignal,
+    );
+  } catch (error) {
+    if (signal.aborted) throw error;
+
+    return undefined;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
  * Fetches a URL and returns the complete document with extracted content.
  *
  * @param rawUrl - The URL to fetch
@@ -513,6 +555,7 @@ async function fetchDocument(
   assertAbsoluteHttpUrlForFetch(normalizeGitHubRawUrl(rawUrl));
   const controller = new AbortController();
   const timeoutMs = dependencies.timeoutMs ?? REQUEST_TIMEOUT_MS;
+  const deadline = Date.now() + timeoutMs;
   const extractHtml = dependencies.extractHtml ?? extractHtmlToMarkdown;
   let timedOut = false;
 
@@ -576,6 +619,48 @@ async function fetchDocument(
           controller.signal,
           requestDependencies,
         ));
+      }
+    }
+
+    if (
+      isAwsWafChallengeResponse(response) &&
+      requestDependencies.solveAwsWafChallenges !== false
+    ) {
+      const resolver = requestDependencies.awsWafResolver ?? nativeAwsWafResolver;
+
+      if (resolver) {
+        response.resume();
+
+        const solution = await resolveAwsWafToken(
+          resolver,
+          target,
+          controller.signal,
+          requestDependencies,
+          Math.floor(Math.max(0, deadline - Date.now()) / 2),
+        );
+
+        if (solution) {
+          const stored = requestDependencies.cookies?.set(
+            AWS_WAF_TOKEN_COOKIE,
+            solution.token,
+            target.url,
+          );
+
+          if (stored) {
+            // Retry once inside the same validated redirect and cookie boundary.
+            // Keep the browser identity that earned the token, and report a
+            // second challenge as blocked instead of looping.
+            const retryDependencies = solution.userAgent
+              ? { ...requestDependencies, userAgent: solution.userAgent }
+              : requestDependencies;
+
+            ({ target, response } = await requestFollowingRedirects(
+              target.url,
+              controller.signal,
+              retryDependencies,
+            ));
+          }
+        }
       }
     }
 

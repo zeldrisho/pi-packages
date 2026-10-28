@@ -8,6 +8,9 @@ import type { ValidatedTarget } from "./network-policy.ts";
 /** Maximum size in bytes for raw HTTP response bodies. */
 export const FETCH_MAX_BYTES = 5 * 1_024 * 1_024;
 
+/** Fixed User-Agent used for page requests and challenge solvers. */
+export const WEB_FETCH_USER_AGENT = "Mozilla/5.0 (compatible; PiWebFetch/1.0; +https://pi.dev)";
+
 /**
  * Per-address connect deadline. A hanging address is abandoned after this
  * budget so the next validated address can be tried inside the overall
@@ -67,6 +70,8 @@ async function requestOnce(
   signal: AbortSignal,
   attemptTimeoutMs: number,
   headers: Readonly<Record<string, string>>,
+  method = "GET",
+  body?: string | Uint8Array,
 ): Promise<IncomingMessage> {
   const family = isIP(address);
 
@@ -114,11 +119,12 @@ async function requestOnce(
       target.url,
       {
         lookup,
+        method,
         signal: controller.signal,
         headers: {
           Accept:
             "text/markdown;q=1.0, text/x-markdown;q=0.9, text/plain;q=0.8, text/html;q=0.7, application/xhtml+xml;q=0.7, application/json;q=0.7, application/xml;q=0.7, */*;q=0.1",
-          "User-Agent": "Mozilla/5.0 (compatible; PiWebFetch/1.0; +https://pi.dev)",
+          "User-Agent": WEB_FETCH_USER_AGENT,
           ...headers,
         },
       },
@@ -139,7 +145,7 @@ async function requestOnce(
       if (attemptExpired) finish(() => reject(unreachableError()));
       else finish(() => reject(error));
     });
-    outgoing.end();
+    outgoing.end(body);
   });
 }
 
@@ -148,6 +154,10 @@ export interface RequestPinnedOptions {
   attemptTimeoutMs?: number;
   /** Additional fixed request headers, used for conditional cache revalidation. */
   headers?: Readonly<Record<string, string>>;
+  /** HTTP method; defaults to GET. */
+  method?: string;
+  /** Request body for non-GET requests. */
+  body?: string | Uint8Array;
 }
 
 /**
@@ -169,7 +179,15 @@ export async function requestPinned(
 
   for (const address of addresses) {
     try {
-      return await requestOnce(target, address, signal, attemptTimeoutMs, options.headers ?? {});
+      return await requestOnce(
+        target,
+        address,
+        signal,
+        attemptTimeoutMs,
+        options.headers ?? {},
+        options.method,
+        options.body,
+      );
     } catch (error) {
       lastError = error;
 

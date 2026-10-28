@@ -412,6 +412,7 @@ describe("web_fetch transport", () => {
   it.each([202, 403])("reports AWS WAF challenges with HTTP %s", async (status) => {
     const challengeDependencies: FetchRemoteDependencies = {
       ...dependencies,
+      solveAwsWafChallenges: false,
       request: async () =>
         fixtureResponse(
           status,
