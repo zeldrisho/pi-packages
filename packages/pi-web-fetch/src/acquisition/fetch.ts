@@ -513,13 +513,25 @@ async function resolveAwsWafToken(
   target: ValidatedTarget,
   signal: AbortSignal,
   network: RedirectDependencies,
+  budgetMs: number,
 ): Promise<AwsWafSolution | undefined> {
+  if (budgetMs <= 0) return undefined;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), budgetMs);
+  const resolverSignal = AbortSignal.any([signal, controller.signal]);
+
   try {
-    return await resolver.resolve({ url: target.url, signal, network });
+    return await awaitWithAbort(
+      resolver.resolve({ url: target.url, signal: resolverSignal, network }),
+      resolverSignal,
+    );
   } catch (error) {
     if (signal.aborted) throw error;
 
     return undefined;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -543,6 +555,7 @@ async function fetchDocument(
   assertAbsoluteHttpUrlForFetch(normalizeGitHubRawUrl(rawUrl));
   const controller = new AbortController();
   const timeoutMs = dependencies.timeoutMs ?? REQUEST_TIMEOUT_MS;
+  const deadline = Date.now() + timeoutMs;
   const extractHtml = dependencies.extractHtml ?? extractHtmlToMarkdown;
   let timedOut = false;
 
@@ -623,6 +636,7 @@ async function fetchDocument(
           target,
           controller.signal,
           requestDependencies,
+          Math.floor(Math.max(0, deadline - Date.now()) / 2),
         );
 
         if (solution) {

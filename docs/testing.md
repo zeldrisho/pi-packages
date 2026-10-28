@@ -16,8 +16,10 @@ XDG_CACHE_HOME="$cache_dir" pi --no-session \
   -e ./packages/pi-opencode-free \
   -e ./packages/<package-under-test> \
   --model <model> \
-  -p '<prompt>'
+  --mode json '<prompt>'
 ```
+
+JSON mode emits events; inspect the tool execution result to verify the behavior under test.
 
 `--no-extensions` blocks globally installed copies, while each `-e` still loads the named local package. `--no-context-files` prevents repository `AGENTS.md` files and similar context from changing the test. `--no-builtin-tools` leaves only tools supplied by the explicitly loaded extensions. Use the temporary `XDG_CACHE_HOME` so stale persistent cache entries cannot mask a failure.
 

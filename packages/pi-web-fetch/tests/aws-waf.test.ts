@@ -132,6 +132,42 @@ describe("AWS WAF acquisition", () => {
     expect(calls).toBe(1);
   });
 
+  it("reports a block when the resolver exceeds its budget", async () => {
+    let resolverSignal: AbortSignal | undefined;
+
+    await expect(
+      fetchRemoteContent(pageUrl, 0, 6_000, undefined, {
+        ...baseDependencies,
+        timeoutMs: 400,
+        awsWafResolver: {
+          async resolve(context) {
+            resolverSignal = context.signal;
+
+            return await new Promise(() => {});
+          },
+        },
+      }),
+    ).rejects.toThrow("blocked by an AWS WAF anti-bot challenge (HTTP 202)");
+    expect(resolverSignal?.aborted).toBe(true);
+  });
+
+  it("preserves caller cancellation during resolution", async () => {
+    const controller = new AbortController();
+
+    await expect(
+      fetchRemoteContent(pageUrl, 0, 6_000, controller.signal, {
+        ...baseDependencies,
+        awsWafResolver: {
+          async resolve() {
+            controller.abort();
+
+            return await new Promise(() => {});
+          },
+        },
+      }),
+    ).rejects.toThrow("web_fetch was cancelled.");
+  });
+
   it("does not resolve when AWS WAF solving is disabled for a probe", async () => {
     let calls = 0;
 
