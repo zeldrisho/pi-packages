@@ -97,21 +97,23 @@ Check language guides before flagging. Common false positives:
 
 What type of code am I reviewing?
 
-| Code Type               | Load These References                                   |
-| ----------------------- | ------------------------------------------------------- |
-| API endpoints, routes   | `authorization.md`, `authentication.md`, `injection.md` |
-| Frontend, templates     | `xss.md`, `csrf.md`                                     |
-| File handling, uploads  | `file-security.md`                                      |
-| Crypto, secrets, tokens | `cryptography.md`, `data-protection.md`                 |
-| Data serialization      | `deserialization.md`                                    |
-| External requests       | `ssrf.md`                                               |
-| LLM, WebSocket code     | `modern-threats.md`                                     |
-| Business workflows      | `business-logic.md`                                     |
-| GraphQL, REST design    | `api-security.md`                                       |
-| Config, headers, CORS   | `misconfiguration.md`                                   |
-| CI/CD, dependencies     | `supply-chain.md`                                       |
-| Error handling          | `error-handling.md`                                     |
-| Audit, logging          | `logging.md`                                            |
+| Code Type                                                                                                 | Load These References                                                          |
+| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| API endpoints, routes                                                                                     | `authorization.md`, `authentication.md`, `injection.md`                        |
+| Django/DRF views, permission classes, object-level access                                                 | `authorization.md`                                                             |
+| Frontend, templates                                                                                       | `xss.md`, `csrf.md`, `modern-threats.md` (DOM clobbering, prototype pollution) |
+| File handling, uploads                                                                                    | `file-security.md`                                                             |
+| Crypto, secrets, tokens                                                                                   | `cryptography.md`, `data-protection.md`                                        |
+| Data serialization                                                                                        | `deserialization.md`                                                           |
+| External requests                                                                                         | `ssrf.md`                                                                      |
+| LLM, WebSocket code                                                                                       | `modern-threats.md`                                                            |
+| Business workflows                                                                                        | `business-logic.md`                                                            |
+| GraphQL, REST design                                                                                      | `api-security.md`                                                              |
+| Config, headers, CORS                                                                                     | `misconfiguration.md`                                                          |
+| CI/CD, dependencies                                                                                       | `supply-chain.md`                                                              |
+| Error handling                                                                                            | `error-handling.md`                                                            |
+| Audit, logging                                                                                            | `logging.md`                                                                   |
+| Object merging/cloning, `__proto__`, DOM `id`/`name` lookups, WebSocket handlers, LLM prompt construction | `modern-threats.md`                                                            |
 
 ### 2. Load Language Guide
 
@@ -122,11 +124,15 @@ Based on file extension or imports:
 | `.py`, `django`, `flask`, `fastapi`             | `languages/python.md`     |
 | `.js`, `.ts`, `express`, `react`, `vue`, `next` | `languages/javascript.md` |
 
+For other languages there is no dedicated guide; rely on the `references/` files and verify framework protections directly in the codebase.
+
 ### 3. Load Infrastructure Guide (if applicable)
 
-| File Type                     | Guide                      |
-| ----------------------------- | -------------------------- |
-| `Dockerfile`, `.dockerignore` | `infrastructure/docker.md` |
+| File Type                                           | Guide                        |
+| --------------------------------------------------- | ---------------------------- |
+| `Dockerfile`, `.dockerignore`                       | `infrastructure/docker.md`   |
+| GitHub Actions workflows                            | `references/supply-chain.md` |
+| Other CI/CD pipelines, lockfiles, package manifests | `references/supply-chain.md` |
 
 ### 4. Research Before Flagging
 

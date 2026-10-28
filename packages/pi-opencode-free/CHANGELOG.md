@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-28
+
+### Changed
+
+- Keep Pi’s declared tools unchanged and minimize the compatibility prompt and tool added for free-tier requests.
+
 ## [0.3.0] - 2026-10-28
 
 ### Added
@@ -55,7 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Discover free models through Pi's native OpenCode catalog from pi.dev instead of models.dev, preserving Pi's capabilities and compatibility metadata.
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.1...HEAD
+[0.3.1]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.0...pi-opencode-free-v0.3.1
 [0.3.0]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.2.1...pi-opencode-free-v0.3.0
 [0.2.1]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.2.0...pi-opencode-free-v0.2.1
 [0.2.0]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.1.0...pi-opencode-free-v0.2.0

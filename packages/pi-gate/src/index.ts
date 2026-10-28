@@ -66,6 +66,7 @@ async function selectApproval(
   let uiDone: ((value: ApprovalAction | undefined) => void) | undefined;
   let settled = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let countdown: ReturnType<typeof setInterval> | undefined;
   let removeAbortListener: (() => void) | undefined;
 
   return new Promise<ApprovalAction | undefined>((resolve, reject) => {
@@ -74,6 +75,8 @@ async function selectApproval(
       settled = true;
 
       if (timer !== undefined) clearTimeout(timer);
+
+      if (countdown !== undefined) clearInterval(countdown);
       removeAbortListener?.();
       resolve(value);
       uiDone?.(value);
@@ -82,13 +85,15 @@ async function selectApproval(
     const onAbort = () => finish(undefined);
 
     try {
+      const deadline = Date.now() + timeoutMs;
       timer = setTimeout(() => finish(undefined), timeoutMs);
 
       const uiPromise = ctx.ui.custom<ApprovalAction | undefined>(
         (tui, theme, keybindings, done) => {
           uiDone = done;
+          countdown = setInterval(() => tui.requestRender(), 1_000);
 
-          return createApprovalPrompt(tui, theme, keybindings, done, command, rule);
+          return createApprovalPrompt(tui, theme, keybindings, done, command, rule, deadline);
         },
       );
 
@@ -97,6 +102,8 @@ async function selectApproval(
         .catch(reject)
         .finally(() => {
           if (timer !== undefined) clearTimeout(timer);
+
+          if (countdown !== undefined) clearInterval(countdown);
           removeAbortListener?.();
         });
 
@@ -110,6 +117,8 @@ async function selectApproval(
       settled = true;
 
       if (timer !== undefined) clearTimeout(timer);
+
+      if (countdown !== undefined) clearInterval(countdown);
       removeAbortListener?.();
       reject(error);
     }

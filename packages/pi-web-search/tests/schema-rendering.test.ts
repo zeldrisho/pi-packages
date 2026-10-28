@@ -182,9 +182,20 @@ describe("web_search schema rendering", () => {
     expect(collapsed).not.toContain("results ·");
     expect(collapsed).toContain("First title");
     expect(collapsed).toContain("more lines");
+    expect(collapsed).toContain(" total,");
     expect(collapsed).toContain("Third title");
     expect(expanded).toContain("Third title");
     expect(expanded).not.toContain("more lines");
+    expect(
+      tool
+        .renderResult(
+          { ...result, details: { ...result.details, fullOutputPath: "/tmp/results.txt" } },
+          { expanded: false, isPartial: false },
+          renderTheme,
+        )
+        .render(200)
+        .join("\n"),
+    ).toContain("Full output: /tmp/results.txt");
     expect(
       tool.renderCall({ query: "pi extensions" }, renderTheme).render(200).join("\n"),
     ).toContain("web_search pi extensions");

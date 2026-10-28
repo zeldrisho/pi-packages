@@ -105,8 +105,8 @@ describe("web_fetch rendering", () => {
       .join("\n");
 
     expect(focusedCall).toContain("web_fetch https://example.com");
-    expect(focusedCall).not.toContain("query=");
-    expect(focusedCall).not.toContain("offset=");
+    expect(focusedCall).toContain('query="cache\\npolicy"');
+    expect(focusedCall).not.toContain("offset=3000");
 
     const focusedResult = tool
       .renderResult(
@@ -127,6 +127,17 @@ describe("web_fetch rendering", () => {
 
     expect(focusedResult).not.toContain("hit ·");
     expect(focusedResult).not.toContain("next offset=");
+
+    const truncatedResult = tool
+      .renderResult(
+        { ...result, details: { ...result.details, truncated: true, nextOffset: 6000 } },
+        { expanded: false, isPartial: false },
+        renderTheme,
+      )
+      .render(200)
+      .join("\n");
+
+    expect(truncatedResult).toContain("Continue with offset=6000");
     expect(
       tool
         .renderResult(

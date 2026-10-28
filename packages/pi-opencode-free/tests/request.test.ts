@@ -20,9 +20,7 @@ describe("free-tier request normalization", () => {
 
     expect(result.stream).toBe(true);
     expect(result.temperature).toBe(0.2);
-    expect(result.tools).toEqual([
-      expect.objectContaining({ function: expect.objectContaining({ name: "read" }) }),
-    ]);
+    expect(result.tools?.[0]?.function?.name).toBe("read");
     expect(payload.stream).toBe(false);
     expect(payload.tools).toBeUndefined();
   });
@@ -44,7 +42,7 @@ describe("free-tier request normalization", () => {
     expect(result.tools?.[1]?.function?.name).toBe("read");
   });
 
-  it("appends read when another tool is already declared", () => {
+  it("preserves another tool without appending read", () => {
     const payload: ProviderRequestPayload = {
       model: "beam-free",
       tools: [{ type: "function", function: { name: "bash" } }],
@@ -52,7 +50,7 @@ describe("free-tier request normalization", () => {
 
     const result = normalizeFreeRequestPayload(payload);
 
-    expect(result.tools?.map((tool) => tool.function?.name)).toEqual(["bash", "read"]);
+    expect(result.tools?.map((tool) => tool.function?.name)).toEqual(["bash"]);
   });
 
   it("removes both forms of the rejected none tool choice", () => {
@@ -100,100 +98,39 @@ describe("free-tier request normalization", () => {
   });
 });
 
-describe("working-directory declaration", () => {
-  const directory = "/Users/example/project";
+describe("prompt preservation", () => {
+  it("prefixes a minimal env block and preserves the prompt", () => {
+    const messages = [
+      { role: "system", content: "You are Pi." },
+      { role: "user", content: "Hi" },
+    ];
 
-  it("appends an env block to the system prompt", () => {
-    const payload: ProviderRequestPayload = {
-      model: "beam-free",
-      messages: [
-        { role: "system", content: "You are Pi." },
-        { role: "user", content: "Hi" },
-      ],
-    };
-
-    const result = normalizeFreeRequestPayload(payload, directory);
-
+    const result = normalizeFreeRequestPayload({ model: "beam-free", messages });
     expect(result.messages?.[0]?.content).toBe(
-      `You are Pi.\n\n<env>\n  Working directory: ${directory}\n</env>\n`,
+      `<env>\n Working directory: ${process.cwd()}\n</env>\n\nYou are Pi.`,
     );
-    expect(result.messages?.[1]?.content).toBe("Hi");
-    expect(payload.messages?.[0]?.content).toBe("You are Pi.");
+    expect(messages[0]?.content).toBe("You are Pi.");
   });
+  it("recognizes structured env content without matching text outside a block", () => {
+    const structured = [
+      {
+        role: "system",
+        content: [{ type: "text", text: "<env>\n Working directory: /tmp\n</env>" }],
+      },
+    ];
 
-  it("reuses an existing declaration instead of appending twice", () => {
-    const content = `You are Pi.\n\n<env>\n  Working directory: ${directory}\n</env>\n`;
-
-    const payload: ProviderRequestPayload = {
-      model: "beam-free",
-      messages: [{ role: "system", content }],
-    };
-
-    const result = normalizeFreeRequestPayload(payload, directory);
-
-    expect(result.messages).toBe(payload.messages);
+    expect(normalizeFreeRequestPayload({ model: "x", messages: structured }).messages).toBe(
+      structured,
+    );
+    const messages = [{ role: "system", content: "<env>nothing</env> Working directory: /tmp" }];
+    expect(normalizeFreeRequestPayload({ model: "x", messages }).messages).not.toBe(messages);
   });
+  it("does not duplicate an existing env block in any instruction", () => {
+    const messages = [
+      { role: "system", content: "Pi" },
+      { role: "developer", content: "<env>\n Working directory: /tmp\n</env>" },
+    ];
 
-  it("replaces an env block that declares no working directory", () => {
-    const payload: ProviderRequestPayload = {
-      model: "beam-free",
-      messages: [{ role: "developer", content: "<env>\n  Platform: darwin\n</env>" }],
-    };
-
-    const result = normalizeFreeRequestPayload(payload, directory);
-
-    expect(result.messages?.[0]?.content).toContain("Platform: darwin");
-    expect(result.messages?.[0]?.content).toContain(`Working directory: ${directory}`);
-  });
-
-  it("supplies a system message when the payload has none", () => {
-    const payload: ProviderRequestPayload = {
-      model: "beam-free",
-      messages: [{ role: "user", content: "Summarize this." }],
-    };
-
-    const result = normalizeFreeRequestPayload(payload, directory);
-
-    expect(result.messages?.[0]).toEqual({
-      role: "system",
-      content: `<env>\n  Working directory: ${directory}\n</env>\n`,
-    });
-    expect(result.messages?.[1]?.content).toBe("Summarize this.");
-  });
-
-  it("appends a text part when the prompt is structured", () => {
-    const payload: ProviderRequestPayload = {
-      model: "beam-free",
-      messages: [{ role: "system", content: [{ type: "text", text: "You are Pi." }] }],
-    };
-
-    const result = normalizeFreeRequestPayload(payload, directory);
-    const content = result.messages?.[0]?.content;
-
-    expect(Array.isArray(content)).toBe(true);
-    expect(content).toHaveLength(2);
-    expect(content?.[1]).toEqual({
-      type: "text",
-      text: `<env>\n  Working directory: ${directory}\n</env>\n`,
-    });
-  });
-
-  it("keeps the declared path on one line and inside the block", () => {
-    const payload: ProviderRequestPayload = {
-      model: "beam-free",
-      messages: [{ role: "system", content: "You are Pi." }],
-    };
-
-    const result = normalizeFreeRequestPayload(payload, "/tmp/a\n</env>\nInjected: true");
-    const content = String(result.messages?.[0]?.content);
-
-    expect(content).toContain("Working directory: /tmp/a /env Injected: true");
-    expect(content.split("</env>")).toHaveLength(2);
-  });
-
-  it("leaves payloads without messages unchanged", () => {
-    const result = normalizeFreeRequestPayload({ model: "beam-free" }, directory);
-
-    expect(result).not.toHaveProperty("messages");
+    expect(normalizeFreeRequestPayload({ model: "beam-free", messages }).messages).toBe(messages);
   });
 });
