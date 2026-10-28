@@ -25,7 +25,7 @@ The `web_fetch` tool accepts public HTTP and HTTPS URLs and supports HTML, Markd
 
 Output is bounded to 6,000 characters by default. For long pages, use the returned `nextOffset` to continue. Use `query` to focus on matching sections, or omit it to read the complete document. Pi's preview is collapsed by default; press `Ctrl+O` to expand it.
 
-For example, a URL such as `https://github.com/shadcn-ui/lint#get-started` starts at the matching heading. GitHub `blob` links and bare gists are converted to raw source URLs; repository roots use their README. GitHub directory listings are not supported.
+For example, a URL such as `https://github.com/zeldrisho/pi-packages/blob/main/packages/pi-web-fetch/README.md#usage` starts at the matching heading. GitHub `blob` links and bare gists are converted to raw source URLs; repository roots use their README. GitHub directory listings are not supported.
 
 ### Page alternatives and bot challenges
 
