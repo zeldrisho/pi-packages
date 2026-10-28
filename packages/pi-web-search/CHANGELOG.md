@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Display expansion and full-output notices with clearer spacing, including when search results are collapsed.
+
 ## [0.14.2] - 2026-10-28
 
 ### Changed

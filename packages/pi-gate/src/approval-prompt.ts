@@ -1,5 +1,13 @@
+import { keyHint, rawKeyHint } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import {
+  Key,
+  matchesKey,
+  sliceByColumn,
+  truncateToWidth,
+  visibleWidth,
+  wrapTextWithAnsi,
+} from "@earendil-works/pi-tui";
 
 const ACTIONS = ["Allow", "Deny"] as const;
 
@@ -31,8 +39,12 @@ export function createApprovalPrompt(
   done: (result: Action | undefined) => void,
   command: string,
   rule: string,
+  deadline?: number,
 ): Component {
   let selectedIndex = 0;
+  let horizontalOffset = 0;
+  let maxHorizontalOffset = 0;
+  let pageWidth = 1;
 
   const invalidate = () => {};
 
@@ -55,11 +67,26 @@ export function createApprovalPrompt(
   const component: Component = {
     render(width: number): string[] {
       const available = innerWidth(width);
+
+      const longestLine = Math.max(
+        0,
+        ...command.split("\n").map((line) => visibleWidth(line.replace(/[»«]/gu, ""))),
+      );
+
+      pageWidth = longestLine > available ? Math.max(1, available - 2) : available;
+      maxHorizontalOffset = longestLine > available ? longestLine - pageWidth : 0;
+      horizontalOffset = Math.min(horizontalOffset, maxHorizontalOffset);
       const border = theme.style("─".repeat(available + 4), { fg: "border" });
 
       const lines = [
         border,
-        panelLine(theme.bold("pi-gate: allow this command?"), width, "accent"),
+        panelLine(
+          theme.bold(
+            `pi-gate: allow this command?${deadline === undefined ? "" : ` (${Math.max(0, Math.ceil((deadline - Date.now()) / 1_000))}s)`}`,
+          ),
+          width,
+          "accent",
+        ),
         panelLine("Review the requested command or file change:", width, "muted"),
         panelLine("", width),
         ...command.split("\n").map((line) => {
@@ -86,10 +113,15 @@ export function createApprovalPrompt(
             .join("");
 
           const visible = line.replace(/[»«]/gu, "");
-          const content = truncateToWidth(visible, contentWidth, "…");
-          const padding = " ".repeat(Math.max(0, contentWidth - visibleWidth(content)));
+          const content = sliceByColumn(rendered, horizontalOffset, pageWidth, true);
+          const prefix = horizontalOffset > 0 && visibleWidth(visible) > 0 ? "…" : "";
+          const suffix = visibleWidth(visible) > horizontalOffset + pageWidth ? "…" : "";
 
-          return `  ${rendered}${theme.style(padding, { fg: "toolOutput" })}  `;
+          const padding = " ".repeat(
+            Math.max(0, contentWidth - visibleWidth(prefix + content + suffix)),
+          );
+
+          return `  ${theme.style(prefix, { fg: "toolOutput" })}${content}${theme.style(suffix + padding, { fg: "toolOutput" })}  `;
         }),
         panelLine("", width),
         panelLine(`Matched rule: ${rule}`, width, "muted"),
@@ -105,14 +137,21 @@ export function createApprovalPrompt(
           });
         }),
         panelLine("", width),
-        panelLine("↑↓ move · enter confirm · esc cancel", width, "muted"),
+        ...wrapTextWithAnsi(
+          `${rawKeyHint("↑↓", "navigate")}  ${maxHorizontalOffset > 0 ? `${rawKeyHint("←→", "scroll command")}  ` : ""}${keyHint("tui.select.confirm", "select")}  ${keyHint("tui.select.cancel", "cancel")}`,
+          available,
+        ).map((line) => `  ${line}  `),
         border,
       ];
 
       return lines.map((line) => truncateToWidth(line, width));
     },
     handleInput(data: string): void {
-      if (keybindings.matches(data, "tui.select.up") || data === "k") {
+      if (matchesKey(data, Key.left)) {
+        horizontalOffset = Math.max(0, horizontalOffset - pageWidth);
+      } else if (matchesKey(data, Key.right)) {
+        horizontalOffset = Math.min(maxHorizontalOffset, horizontalOffset + pageWidth);
+      } else if (keybindings.matches(data, "tui.select.up") || data === "k") {
         selectedIndex = Math.max(0, selectedIndex - 1);
       } else if (keybindings.matches(data, "tui.select.down") || data === "j") {
         selectedIndex = Math.min(ACTIONS.length - 1, selectedIndex + 1);

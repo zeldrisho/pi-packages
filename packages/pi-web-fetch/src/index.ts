@@ -1,5 +1,5 @@
-import { getMarkdownTheme, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Markdown, Text } from "@earendil-works/pi-tui";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
   FETCH_MAX_OFFSET_CHARACTERS,
@@ -7,7 +7,7 @@ import {
   FETCH_MAX_URL_CHARACTERS,
 } from "./limits";
 import { redactUrlForDisplay } from "./redact";
-import { formatCollapsibleOutput } from "./render";
+import { renderCollapsibleOutput } from "./render";
 import { executeWebFetch, webFetchOutputSchema, type WebFetchDetails } from "./service";
 
 export { ExpiringLruCache } from "./cache";
@@ -108,7 +108,7 @@ export default function (pi: ExtensionAPI) {
     /** Renders the redacted URL, optional focus query, and character offset in the call preview. */
     renderCall(args, theme) {
       return new Text(
-        `${theme.fg("toolTitle", theme.bold("web_fetch"))} ${theme.fg("accent", redactUrlForDisplay(args.url))}`,
+        `${theme.fg("toolTitle", theme.bold("web_fetch"))} ${theme.fg("accent", redactUrlForDisplay(args.url))}${args.query === undefined ? "" : theme.fg("muted", ` query=${JSON.stringify(args.query)}`)}`,
         0,
         0,
       );
@@ -122,15 +122,21 @@ export default function (pi: ExtensionAPI) {
      * Renders partial text or "Fetching…" while pending. Completed text gets a
      * detail summary when available and a collapsible body; absent text shows "No content".
      */
-    renderResult(result, { expanded, isPartial }, theme) {
+    renderResult(result, { expanded, isPartial }, theme, context) {
       const content = result.content.find((item) => item.type === "text");
 
       if (isPartial) return new Text(theme.fg("warning", content?.text || "Fetching…"), 0, 0);
 
       return content?.type === "text"
-        ? new Markdown(formatCollapsibleOutput(content.text, expanded), 0, 0, getMarkdownTheme(), {
-            color: (text) => theme.fg("toolOutput", text),
-          })
+        ? renderCollapsibleOutput(
+            content.text,
+            expanded,
+            theme,
+            context?.isError,
+            result.details?.truncated && result.details.nextOffset !== undefined
+              ? `[Content truncated. Continue with offset=${result.details.nextOffset} to read the next chunk.]`
+              : undefined,
+          )
         : new Text(theme.fg("dim", "No content"), 0, 0);
     },
   });

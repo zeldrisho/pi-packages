@@ -1,21 +1,46 @@
-import { keyHint } from "@earendil-works/pi-coding-agent";
+import { getMarkdownTheme, keyHint } from "@earendil-works/pi-coding-agent";
+import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 
 const COLLAPSED_LINES = 10;
 
-/** Format tool output using Pi's built-in collapsed-preview convention. */
-export function formatCollapsibleOutput(output: string, expanded: boolean): string {
+/** Render document content separately from Pi-style interface notices. */
+export function renderCollapsibleOutput(
+  output: string,
+  expanded: boolean,
+  theme: { fg(color: "toolOutput" | "muted" | "warning", text: string): string },
+  isError = false,
+  warning?: string,
+): Container {
   const lines = output.replace(/\r\n/g, "\n").split("\n");
 
   while (lines.at(-1) === "") lines.pop();
-  const totalLines = lines.length;
-  const visibleLines = expanded ? lines : lines.slice(0, COLLAPSED_LINES);
-  let text = visibleLines.join("\n");
+  const visible = expanded ? lines : lines.slice(0, COLLAPSED_LINES);
+  const remaining = lines.length - visible.length;
+  const component = new Container();
+  const body = `\n${visible.join("\n")}`;
 
-  const remaining = totalLines - visibleLines.length;
+  component.addChild(
+    isError
+      ? new Text(theme.fg("toolOutput", body), 0, 0)
+      : new Markdown(body, 0, 0, getMarkdownTheme(), {
+          color: (text) => theme.fg("toolOutput", text),
+        }),
+  );
 
   if (remaining > 0) {
-    text += `\n... (${remaining} more lines, ${totalLines} total, ${keyHint("app.tools.expand", "to expand")})`;
+    component.addChild(
+      new Text(
+        `${theme.fg("muted", `... (${remaining} more lines, ${lines.length} total,`)} ${keyHint("app.tools.expand", "to expand")}${theme.fg("muted", ")")}`,
+        0,
+        0,
+      ),
+    );
   }
 
-  return `\n${text}`;
+  if (warning && remaining > 0) {
+    component.addChild(new Spacer(1));
+    component.addChild(new Text(theme.fg("warning", warning), 0, 0));
+  }
+
+  return component;
 }

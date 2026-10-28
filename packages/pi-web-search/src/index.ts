@@ -1,8 +1,8 @@
-import { getMarkdownTheme, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Markdown, Text } from "@earendil-works/pi-tui";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { SEARCH_WEB_MAX_QUERY_CHARACTERS } from "./limits";
-import { formatCollapsibleOutput } from "./render";
+import { renderCollapsibleOutput } from "./render";
 import { SearchRuntime, webSearchOutputSchema, type SearchDetails } from "./search";
 
 export { ExpiringLruCache } from "./cache";
@@ -67,15 +67,21 @@ export default function (pi: ExtensionAPI) {
      * Renders partial text or "Searching…" while pending. Completed text gets a
      * result and cache summary when available and a collapsible body; absent text shows "No results".
      */
-    renderResult(result, { expanded, isPartial }, theme) {
+    renderResult(result, { expanded, isPartial }, theme, context) {
       const content = result.content.find((item) => item.type === "text");
 
       if (isPartial) return new Text(theme.fg("warning", content?.text || "Searching…"), 0, 0);
 
       return content?.type === "text"
-        ? new Markdown(formatCollapsibleOutput(content.text, expanded), 0, 0, getMarkdownTheme(), {
-            color: (text) => theme.fg("toolOutput", text),
-          })
+        ? renderCollapsibleOutput(
+            content.text,
+            expanded,
+            theme,
+            context?.isError,
+            result.details?.fullOutputPath
+              ? `[${result.details.truncation?.truncated ? "Output truncated. " : "Structured payload omitted. "}Full output: ${result.details.fullOutputPath}]`
+              : undefined,
+          )
         : new Text(theme.fg("dim", "No results"), 0, 0);
     },
   });

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Show focus queries in tool calls, and display expansion and continuation notices with clearer spacing.
+
 ## [0.16.0] - 2026-10-28
 
 ### Added

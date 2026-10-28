@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Show the approval timeout and configured confirmation keys, and allow horizontal scrolling of long command lines.
+
 ## [0.7.2] - 2026-10-25
 
 ### Changed
