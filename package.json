@@ -14,6 +14,7 @@
     "format:changelog": "node scripts/format-changelog.ts",
     "sync:web-modules": "node scripts/sync-web-modules.ts sync --from pi-web-fetch",
     "build:anubis-worker": "vp exec tsc --ignoreConfig packages/pi-web-fetch/src/challenges/anubis-worker.ts packages/pi-web-fetch/src/challenges/anubis-solver.ts --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir packages/pi-web-fetch/workers --skipLibCheck --rewriteRelativeImportExtensions --types node",
+    "build:aws-waf-worker": "vp exec tsc --ignoreConfig packages/pi-web-fetch/src/challenges/aws-waf-worker.ts packages/pi-web-fetch/src/challenges/aws-waf-solver.ts --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir packages/pi-web-fetch/workers --skipLibCheck --rewriteRelativeImportExtensions --types node",
     "typecheck": "vp check --no-fmt --no-lint",
     "pack:dry-run": "for package in packages/*; do (cd \"$package\" && vp pm pack -- --dry-run) || exit; done",
     "test:contracts": "vp test tests/repository-contract.test.ts",

@@ -212,6 +212,47 @@ export class CookieJar {
   }
 
   /**
+   * Stores a challenge token returned by a resolver.
+   *
+   * The token is untrusted input. It is accepted only for the target origin,
+   * scoped to the whole origin, and held in memory for the current acquisition.
+   *
+   * @param name - Cookie name
+   * @param value - Cookie value
+   * @param url - The page URL the cookie belongs to
+   * @returns Whether the cookie was accepted
+   */
+  set(name: string, value: string, url: URL): boolean {
+    const token = value.trim();
+
+    if (
+      name.length === 0 ||
+      name.length > MAX_COOKIE_NAME_CHARACTERS ||
+      !COOKIE_NAME.test(name) ||
+      token.length === 0 ||
+      token.length > MAX_COOKIE_VALUE_CHARACTERS ||
+      hasInvalidCookieCharacter(token) ||
+      /[\s";,\\]/u.test(token)
+    ) {
+      return false;
+    }
+
+    const key = `${url.origin}\0${name}\0/`;
+    this.#cookies.delete(key);
+    this.#cookies.set(key, {
+      name,
+      value: token,
+      origin: url.origin,
+      path: "/",
+      secure: url.protocol === "https:",
+      createdAt: Date.now(),
+    });
+    this.#evict();
+
+    return true;
+  }
+
+  /**
    * Returns a Cookie header value for a URL, excluding expired, insecure, and
    * cross-origin cookies.
    *

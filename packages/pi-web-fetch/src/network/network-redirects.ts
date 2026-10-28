@@ -29,11 +29,16 @@ export interface RedirectDependencies {
     target: ValidatedTarget,
     signal: AbortSignal,
     headers?: Readonly<Record<string, string>>,
+    options?: { method?: string; body?: string | Uint8Array },
   ) => Promise<IncomingMessage>;
   random?: () => number;
   sleep?: (milliseconds: number, signal: AbortSignal) => Promise<void>;
   /** Origin-scoped cookies for the current acquisition, including challenge handshakes. */
   cookies?: CookieJar;
+  /** User-Agent override that persists across redirects. */
+  userAgent?: string;
+  /** Headers that survive a redirect, used by challenge handshakes that need browser identity. */
+  persistentHeaders?: Readonly<Record<string, string>>;
 }
 
 /** Creates the consistent abort error used by redirect and retry coordination. */
@@ -144,7 +149,14 @@ async function coordinatedRequest(
     const release = await acquireOrigin(target.url.origin, signal);
     let response: IncomingMessage;
     const cookieHeader = dependencies.cookies?.headerFor(target.url);
-    const requestHeaders = cookieHeader ? { Cookie: cookieHeader, ...headers } : headers;
+
+    const headersWithUserAgent = dependencies.userAgent
+      ? { "User-Agent": dependencies.userAgent, ...headers }
+      : headers;
+
+    const requestHeaders = cookieHeader
+      ? { Cookie: cookieHeader, ...headersWithUserAgent }
+      : headersWithUserAgent;
 
     try {
       response = await request(target, signal, requestHeaders);
@@ -197,7 +209,8 @@ export async function requestFollowingRedirects(
     response.resume();
     target = await awaitWithAbort(validateUrl(new URL(location, target.url)), signal);
     // Validators describe the originally cached resource and must not leak to a redirect target.
-    requestHeaders = {};
+    // Challenge handshakes opt into a fixed browser identity instead.
+    requestHeaders = dependencies.persistentHeaders ?? {};
   }
 
   throw new Error("web_fetch followed too many redirects.");

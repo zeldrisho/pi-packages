@@ -29,7 +29,13 @@ For example, a URL such as `https://github.com/shadcn-ui/lint#get-started` start
 
 ### Page alternatives and bot challenges
 
-The tool can discover advertised Markdown versions and `/llms.txt` indexes. When an index is discovered, its URL is shown in the result so you can follow it if the fetched page is insufficient; when the index replaces the requested page, the result explains that fallback. Markdown files served with a generic binary content type are read as text. Anubis proof-of-work challenges are supported, and a page withheld by an AWS WAF or Cloudflare bot challenge falls back to the site's documentation index when one exists. Other unsupported challenges and JavaScript CAPTCHAs return a blocked result. There is no browser fallback. Challenge cookies are not reused between fetches.
+The tool can discover advertised Markdown versions and `/llms.txt` indexes. When an index is discovered, its URL is shown in the result so you can follow it if the fetched page is insufficient; when the index replaces the requested page, the result explains that fallback. Markdown files served with a generic binary content type are read as text. Anubis and supported AWS WAF proof-of-work challenges are solved in-process. If a page remains blocked by an AWS WAF or Cloudflare bot challenge, it falls back to the site's documentation index when one exists. Other unsupported challenges and JavaScript CAPTCHAs return a blocked result. There is no browser fallback. Challenge cookies are not reused between fetches.
+
+### AWS WAF resolver
+
+AWS WAF solving is enabled by default and runs in-process. The resolver requests the challenged page and challenge metadata through the same validated, pinned transport and per-fetch cookie jar as `web_fetch`, builds browser fingerprint signals, solves the advertised proof of work, and submits the result. It retries once with the returned `aws-waf-token` and keeps that token in memory only for the current fetch.
+
+No downloaded challenge script, browser, or alternate TLS transport is used; the resolver works from the challenge metadata and static signal algorithm. If solving fails or the token is invalid, the normal blocked result or documentation-index fallback applies.
 
 Pages with HTML nested beyond 512 elements are rejected.
 

@@ -301,7 +301,11 @@ describe("executeWebFetch llms.txt support", () => {
     });
 
     const requested = `https://waf.example.com/en/docs/catalog/pay/api/rest-api-${process.pid}`;
-    const result = await executeWebFetch({ url: requested }, undefined, undefined, dependencies);
+
+    const result = await executeWebFetch({ url: requested }, undefined, undefined, {
+      ...dependencies,
+      solveAwsWafChallenges: false,
+    });
 
     // Page + probes for root, /en/, and /en/docs/; the section index is the deepest one.
     expect(requests).toHaveLength(4);
@@ -325,11 +329,12 @@ describe("executeWebFetch llms.txt support", () => {
     });
 
     const url = `https://recover-index.example.com/page-${process.pid}`;
-    const first = await executeWebFetch({ url }, undefined, undefined, dependencies);
+    const noWafSolver = { ...dependencies, solveAwsWafChallenges: false };
+    const first = await executeWebFetch({ url }, undefined, undefined, noWafSolver);
     expect(first.details.llmsTxtFallback).toBe(true);
 
     blocked = false;
-    const second = await executeWebFetch({ url }, undefined, undefined, dependencies);
+    const second = await executeWebFetch({ url }, undefined, undefined, noWafSolver);
     expect(second.details.llmsTxtFallback).toBe(false);
     expect(second.content[0]?.text).toContain("Recovered documentation page");
     expect(requests.filter((href) => href === url)).toHaveLength(2);
@@ -400,7 +405,6 @@ describe("executeWebFetch llms.txt support", () => {
   });
 
   it("stays silent when the site has no usable /llms.txt", async () => {
-    // TEMP-DEBUG
     const { dependencies, requests } = recordingDependencies((href) =>
       href.endsWith("/llms.txt")
         ? fakeResponse(404, "text/plain", "Not Found")
