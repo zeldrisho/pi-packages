@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.3] - 2026-10-28
+
 ### Changed
 
 - Display expansion and full-output notices with clearer spacing, including when search results are collapsed.
@@ -187,7 +189,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded Brave web search ([cbc9491](https://github.com/zeldrisho/pi-packages/commit/cbc9491dce36555ab91b6bef203ec8b380596a89))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.2...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.3...HEAD
+[0.14.3]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.2...pi-web-search-v0.14.3
 [0.14.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.1...pi-web-search-v0.14.2
 [0.14.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.0...pi-web-search-v0.14.1
 [0.14.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.13.0...pi-web-search-v0.14.0
