@@ -65,6 +65,7 @@ describe("approval prompt", () => {
     const output = component.render(40).join("\n");
 
     expect(output).toContain("(10s)");
+    expect(component.render(32).join("\n")).toContain("(10s)");
     expect(output).toContain("←→ scroll command");
     expect(output.indexOf("←→ scroll command")).toBeGreaterThan(output.indexOf("Deny"));
     expect(output).toContain("tui.select.cancel");

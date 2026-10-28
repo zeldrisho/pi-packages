@@ -23,7 +23,7 @@ This starts an interactive session. Inspect tool output and use the expand short
 
 Install and enable `pi-catppuccin` before testing, and select `catppuccin-mocha` with `--use-theme`, including for interactive checks. The theme affects interactive rendering, not JSON events.
 
-`--no-extensions` blocks globally installed extensions, while each `-e` loads the named local package. `--no-context-files` prevents repository `AGENTS.md` files and similar context from changing the test. Use the temporary `XDG_CACHE_HOME` so stale persistent cache entries cannot mask a failure. Built-in tools, MCP servers, prompt templates, and Gate's existing configuration remain available.
+`--no-extensions` blocks globally installed extensions, while each `-e` loads the named local package. `--no-context-files` prevents repository `AGENTS.md` files and similar context from changing the test. Use the temporary `XDG_CACHE_HOME` so stale persistent cache entries cannot mask a failure. Built-in tools, prompt templates, and Gate's existing configuration remain available. Built-in MCP support is disabled unless explicitly loaded.
 
 Web search requires `BRAVE_SEARCH_API_KEY` in the environment. Never put credentials in the prompt, committed files, or captured output.
 

@@ -36,7 +36,12 @@ describe("web output notices", () => {
     expect(styled).toContain("warning");
     expect(
       renderCollapsibleOutput(output, true, theme, false, "[Continue]").render(80).join("\n"),
-    ).not.toContain("[Continue]");
+    ).toContain("[Continue]");
+    expect(
+      renderCollapsibleOutput("short output", false, theme, false, "[Continue]")
+        .render(80)
+        .join("\n"),
+    ).toContain("[Continue]");
   });
 
   it("renders errors as literal text rather than Markdown", () => {
