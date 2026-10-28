@@ -20,7 +20,7 @@ import {
   type SearchMode,
   type SearchResult,
 } from "./brave";
-import { ExpiringLruCache, stableKeyHash, type CachePersistence } from "./cache";
+import { ExpiringLruCache, canonicalKey, stableKeyHash, type CachePersistence } from "./cache";
 import { resolveApiKey, type ApiKeySource } from "./credentials";
 import { InflightCoalescer } from "./inflight";
 import { SEARCH_DEFAULT_RESULT_COUNT } from "./limits";
@@ -404,7 +404,7 @@ export class SearchRuntime {
 
     const provider: Provider = "brave";
 
-    const cacheKey = JSON.stringify({
+    const cacheKey = canonicalKey({
       version: 2,
       provider,
       mode,
@@ -474,7 +474,7 @@ export class SearchRuntime {
 
       if (answerCredentials) {
         try {
-          const answerKey = JSON.stringify({
+          const answerKey = canonicalKey({
             version: 2,
             provider,
             mode: "answers",

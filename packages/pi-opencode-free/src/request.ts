@@ -1,8 +1,7 @@
-import { READ_TOOL } from "./client-headers.ts";
-
 interface ToolFunctionReference {
   name?: string;
   description?: string;
+  parameters?: object;
 }
 
 interface ToolDeclaration {
@@ -30,12 +29,6 @@ export interface ProviderRequestPayload {
   max_tokens?: number;
   messages?: readonly ChatMessageReference[];
 }
-
-/** Roles that carry request-level instructions. */
-const SYSTEM_ROLES = new Set(["system", "developer"]);
-
-/** Recognizes a declared working directory, which the gateway requires inside an env block. */
-const WORKING_DIRECTORY_PATTERN = /<env>[\s\S]*?\bWorking directory:/u;
 
 /**
  * Validates the subset of a provider request payload used for normalization.
@@ -73,120 +66,77 @@ export function isProviderRequestPayload(value: unknown): value is ProviderReque
   return true;
 }
 
-/**
- * Applies the free-tier request contract to a provider payload.
- *
- * The request must stream, must declare a tool named exactly `read`, and must
- * carry an env block declaring a working directory. Both `tool_choice: "none"`
- * and `tool_choice: { type: "none" }` are removed because the gateway rejects
- * them, while every other field and tool declaration is preserved. The original
- * payload is not mutated.
- *
- * The gateway requires a working directory declaration and accepts any path,
- * while a prompt without the block is refused. Pi writes its own `<cwd>` element,
- * so the block is appended instead of being copied from another client's prompt.
- *
- * @param payload - Validated provider request payload
- * @param workingDirectory - Absolute path declared to the gateway, defaulting to the process directory
- * @returns A normalized copy suitable for the free-tier endpoint
- */
+/** Apply only the gateway's observed streaming, environment and tool requirements. */
 export function normalizeFreeRequestPayload(
   payload: ProviderRequestPayload,
-  workingDirectory: string = process.cwd(),
 ): ProviderRequestPayload {
-  const tools = appendReadTool(payload.tools);
-
-  const normalized: ProviderRequestPayload = {
-    ...payload,
-    stream: true,
-  };
-
-  if (tools !== payload.tools) normalized.tools = tools;
+  const normalized = { ...payload, stream: true };
 
   if (isNoneToolChoice(payload.tool_choice)) delete normalized.tool_choice;
 
-  const messages = withWorkingDirectory(payload.messages, workingDirectory);
+  if (!payload.tools?.length)
+    normalized.tools = [
+      {
+        type: "function",
+        function: {
+          name: "read",
+          description: "Read a file",
+          parameters: {
+            type: "object",
+            properties: { path: { type: "string" } },
+            required: ["path"],
+          },
+        },
+      },
+    ];
+  const messages = payload.messages;
 
-  if (messages !== payload.messages) normalized.messages = messages;
+  if (messages) {
+    const instructions = messages.filter(
+      (message) => message.role === "system" || message.role === "developer",
+    );
+
+    const hasEnv = instructions.some((message) =>
+      /<env>(?:(?!<\/env>)[^])*?\bWorking directory:(?:(?!<\/env>)[^])*?<\/env>/u.test(
+        Array.isArray(message.content)
+          ? message.content.map((part) => textPart(part)).join("")
+          : (message.content ?? ""),
+      ),
+    );
+
+    if (!hasEnv) {
+      const block = `<env>\n Working directory: ${process.cwd().replaceAll(/[\r\n<>]+/gu, " ")}\n</env>`;
+
+      const index = messages.findIndex(
+        (message) => message.role === "system" || message.role === "developer",
+      );
+
+      if (index < 0) normalized.messages = [{ role: "system", content: block }, ...messages];
+      else
+        normalized.messages = messages.map((message, i) =>
+          i !== index
+            ? message
+            : {
+                ...message,
+                content: Array.isArray(message.content)
+                  ? [{ type: "text", text: block }, ...message.content]
+                  : `${block}\n\n${message.content ?? ""}`,
+              },
+        );
+    }
+  }
 
   return normalized;
 }
 
-/**
- * Ensures the request declares its working directory inside an env block.
- *
- * Reuses an existing block so repeated normalization stays idempotent, appends
- * to the last instruction message when the payload has one, and otherwise
- * prepends a message of its own.
- *
- * @param messages - Request messages, if the caller supplied any
- * @param workingDirectory - Path to declare
- * @returns The original array when no change is needed, otherwise a new array
- */
-function withWorkingDirectory(
-  messages: readonly ChatMessageReference[] | undefined,
-  workingDirectory: string,
-): readonly ChatMessageReference[] | undefined {
-  if (!messages) return messages;
+/** Extract text from an untrusted structured message part. */
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- structured content is supplied by callers.
+function textPart(part: unknown): string {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- inspect untrusted content parts.
+  if (part && typeof part === "object" && "text" in part && typeof part.text === "string")
+    return part.text;
 
-  const block = `<env>\n  Working directory: ${sanitizePath(workingDirectory)}\n</env>\n`;
-  const index = lastInstructionIndex(messages);
-  const target = index >= 0 ? messages[index] : undefined;
-
-  if (target && WORKING_DIRECTORY_PATTERN.test(messageText(target.content))) return messages;
-
-  if (!target) return [{ role: "system", content: block }, ...messages];
-
-  const content = Array.isArray(target.content)
-    ? [...target.content, { type: "text", text: block }]
-    : `${target.content ?? ""}\n\n${block}`;
-
-  return messages.map((message, position) =>
-    position === index ? { ...message, content } : message,
-  );
-}
-
-/** Flattens the textual parts of a message so a multiline prompt can be inspected. */
-function messageText(content: ChatMessageReference["content"]): string {
-  if (Array.isArray(content)) {
-    return content.map((part) => (isTextPart(part) ? part.text : "")).join("");
-  }
-
-  return content ?? "";
-}
-
-/** Finds the final message carrying request-level instructions. */
-function lastInstructionIndex(messages: readonly ChatMessageReference[]): number {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const role = messages[index]?.role;
-
-    if (role !== undefined && SYSTEM_ROLES.has(role)) return index;
-  }
-
-  return -1;
-}
-
-/** Narrows a structured content part that carries text. */
-function isTextPart(value: unknown): value is { text: string } {
-  return (
-    typeof value === "object" && value !== null && "text" in value && typeof value.text === "string"
-  );
-}
-
-/** Keeps a declared path on one line and prevents it from closing the block early. */
-function sanitizePath(workingDirectory: string): string {
-  return workingDirectory.replaceAll(/[\r\n<>]+/gu, " ");
-}
-
-/** Reuses tools containing an exact `read` name, or returns a new list with the default appended. */
-function appendReadTool(tools: readonly ToolDeclaration[] | undefined): readonly ToolDeclaration[] {
-  if (!tools) return [READ_TOOL];
-
-  for (const tool of tools) {
-    if (tool.function?.name === "read") return tools;
-  }
-
-  return [...tools, READ_TOOL];
+  return "";
 }
 
 /** Recognizes both the string and object forms of the rejected `none` tool choice. */

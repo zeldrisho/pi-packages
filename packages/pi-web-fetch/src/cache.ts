@@ -39,6 +39,26 @@ export function stableKeyHash(key: string): string {
   return createHash("sha256").update(key).digest("hex");
 }
 
+/** Hash canonical JSON, sorting object keys recursively while preserving array order. */
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- JSON serialization defines the accepted values.
+export function canonicalKey(value: unknown): string {
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- JSON replacer receives arbitrary JSON values.
+  const json = JSON.stringify(value, (_key, entry: unknown) => {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- recursively sort JSON objects.
+    if (entry !== null && typeof entry === "object" && !Array.isArray(entry)) {
+      return Object.fromEntries(
+        Object.entries(entry).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+      );
+    }
+
+    return entry;
+  });
+
+  if (json === undefined) throw new TypeError("Cache key must be JSON serializable");
+
+  return stableKeyHash(json);
+}
+
 /**
  * Resolves a cache entry's on-disk path and refuses to escape the cache
  * directory, guarding against a `keyToPath` that returns `..` segments. The

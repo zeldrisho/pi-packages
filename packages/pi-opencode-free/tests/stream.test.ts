@@ -70,6 +70,7 @@ async function requestPayload(input: string | URL | Request, init?: RequestInit)
   // SAFETY: the native OpenAI implementation serializes this request as JSON.
   return (await new Request(input, init).json()) as {
     stream: boolean;
+    messages: Array<{ role: string; content: string }>;
     tools: Array<{ function: { name: string } }>;
     tool_choice?: string;
     temperature?: number;
@@ -93,6 +94,8 @@ describe("OpenCode provider stream boundary", () => {
       const payload = await requestPayload(input, init);
       expect(payload.stream).toBe(true);
       expect(payload.tools.map((tool) => tool.function.name)).toEqual(["read"]);
+      expect(JSON.stringify(payload.messages)).toContain("Summarize without executing tools.");
+      expect(JSON.stringify(payload.messages)).toContain("<env>");
       expect(payload).not.toHaveProperty("tool_choice");
       expect(new Headers(init?.headers).get("x-opencode-session")).toBe(identity().sessionId);
 
@@ -139,7 +142,7 @@ describe("OpenCode provider stream boundary", () => {
         metadata: { preserved: true },
       });
       expect(payload).not.toHaveProperty("tool_choice");
-      expect(payload.tools.map((tool) => tool.function.name)).toEqual(["bash", "read"]);
+      expect(payload.tools.map((tool) => tool.function.name)).toEqual(["bash"]);
       const headers = new Headers(init?.headers);
       expect(headers.get("x-custom")).toBe("preserved");
       expect(headers.has("x-opencode-request")).toBe(false);

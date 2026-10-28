@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { ExpiringLruCache } from "../src/cache";
+import { canonicalKey, ExpiringLruCache } from "../src/cache";
 
 const sizeOf = (value: string): number => new TextEncoder().encode(value).byteLength;
 
@@ -51,5 +51,16 @@ describe("ExpiringLruCache", () => {
     expect(cache.get("a")).toBeUndefined();
     expect(cache.size).toBe(0);
     expect(cache.byteSize).toBe(0);
+  });
+});
+
+describe("canonical cache keys", () => {
+  it("sorts nested object keys but preserves array order and values", () => {
+    const a = canonicalKey({ z: [{ b: 2, a: 1 }], a: true });
+    expect(a).toMatch(/^[a-f0-9]{64}$/u);
+    expect(a).toBe(canonicalKey({ a: true, z: [{ a: 1, b: 2 }] }));
+    expect(a).not.toBe(canonicalKey({ a: true, z: [{ a: 1, b: 3 }] }));
+    expect(canonicalKey([1, 2])).not.toBe(canonicalKey([2, 1]));
+    expect(canonicalKey({ a: undefined })).toBe(canonicalKey({}));
   });
 });

@@ -17,7 +17,6 @@ import { isProviderRequestPayload, normalizeFreeRequestPayload } from "./request
  *
  * @param fetcher - Transport used when the caller supplies none
  * @param identity - Resolves the session identity and client version per call
- * @param resolveWorkingDirectory - Declares the request's working directory to the gateway
  * @returns A streaming callback that forwards native events and converts setup,
  *   identity resolution, or forwarding failures into error events before closing the stream;
  *   an aborted caller signal marks those failures as aborted
@@ -29,7 +28,6 @@ export function createFreeStream(
   ) =>
     | { sessionId: string; cliVersion: string }
     | Promise<{ sessionId: string; cliVersion: string }>,
-  resolveWorkingDirectory: () => string = () => process.cwd(),
 ): NonNullable<ProviderConfig["streamSimple"]> {
   const native = openAICompletionsApi();
 
@@ -56,7 +54,7 @@ export function createFreeStream(
             const request = replacement === undefined ? payload : replacement;
 
             return isProviderRequestPayload(request)
-              ? normalizeFreeRequestPayload(request, resolveWorkingDirectory())
+              ? normalizeFreeRequestPayload(request)
               : request;
           },
           fetch: async (input, init) => {

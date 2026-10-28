@@ -8,7 +8,7 @@ import {
   truncateHead,
   type AgentToolResult,
 } from "@earendil-works/pi-coding-agent";
-import { ExpiringLruCache, stableKeyHash, type CachePersistence } from "./cache";
+import { ExpiringLruCache, stableKeyHash, canonicalKey, type CachePersistence } from "./cache";
 import { sliceCompleteDocument, type CompleteDocument } from "./document/content.ts";
 import { revalidateCompleteDocument, type FetchRemoteDependencies } from "./acquisition/fetch.ts";
 import { fetchDocumentWithLlmsTxtSupport } from "./acquisition/llms.ts";
@@ -430,7 +430,8 @@ export async function executeWebFetch(
 
   const displayRequestedUrl = redactUrlForDisplay(params.url);
   const sourceUrl = urlWithoutFragment(params.url);
-  let document = fetchCache.get(sourceUrl);
+  const cacheKey = canonicalKey({ url: sourceUrl });
+  let document = fetchCache.get(cacheKey);
   const now = Date.now();
 
   const fresh = Boolean(
@@ -459,7 +460,7 @@ export async function executeWebFetch(
     const stale = document;
 
     const acquisition = await inflightFetches.run(
-      sourceUrl,
+      cacheKey,
       async (sharedSignal) => {
         let fetched: CompleteDocument;
         let acquisitionStatus: FetchAcquisition["cacheStatus"] = "miss";
@@ -479,7 +480,7 @@ export async function executeWebFetch(
         }
 
         if (!fetched.extractionDiagnostics?.botWall) {
-          fetchCache.set(sourceUrl, fetched, Date.now() + CACHE_STALE_RETENTION_MS);
+          fetchCache.set(cacheKey, fetched, Date.now() + CACHE_STALE_RETENTION_MS);
         }
 
         return { document: fetched, cacheStatus: acquisitionStatus };

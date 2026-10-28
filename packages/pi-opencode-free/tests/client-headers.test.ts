@@ -8,7 +8,6 @@ import {
   createCanonicalSessionId,
   createSessionSeed,
   PROVIDER_MARKER_HEADER,
-  READ_TOOL,
   SESSION_HEADER_NAMES,
   sessionIdAgeMs,
   sessionIdCreatedAt,
@@ -178,18 +177,5 @@ describe("opencode session identity", () => {
 
   it("builds the user agent from a resolved client version", () => {
     expect(buildUserAgent(CLI_VERSION)).toBe(`opencode/latest/${CLI_VERSION}/cli`);
-  });
-
-  it("declares the read tool with the v2 CLI schema", () => {
-    expect(READ_TOOL.type).toBe("function");
-    expect(READ_TOOL.function.name).toBe("read");
-    expect(READ_TOOL.function.parameters.required).toEqual(["path"]);
-    expect(READ_TOOL.function.parameters.additionalProperties).toBe(false);
-    expect(READ_TOOL.function.strict).toBe(false);
-    expect(Object.keys(READ_TOOL.function.parameters.properties)).toEqual([
-      "path",
-      "offset",
-      "limit",
-    ]);
   });
 });

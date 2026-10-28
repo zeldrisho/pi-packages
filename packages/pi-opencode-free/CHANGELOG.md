@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Keep Pi’s declared tools unchanged and minimize the compatibility prompt and tool added for free-tier requests.
+
 ## [0.3.0] - 2026-10-28
 
 ### Added
