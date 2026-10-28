@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Improved security-review guidance for frontend threats, Django access control, CI/CD, and languages without dedicated guides.
+
 ## [0.1.3] - 2026-09-28
 
 ### Changed
