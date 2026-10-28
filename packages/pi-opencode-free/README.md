@@ -1,16 +1,10 @@
 # @zeldrisho/pi-opencode-free
 
-Experimental access to OpenCode's free-tier models from Pi. No account, API key, or OpenCode installation is required.
-
-**Compatibility warning:** [OpenCode documents free-tier chat as requiring OpenCode](https://opencode.ai/v2/docs/console/models). This third-party extension is unsupported by that service, and its gateway checks — measured rather than published — can change without notice. See [Free-tier gateway contract](https://github.com/zeldrisho/pi-packages/blob/main/docs/architecture.md#free-tier-gateway-contract) for how they were determined, and [Usage limits](#usage-limits) when a model stops responding.
+Use OpenCode's free-tier models from Pi. This experimental extension is independently maintained, and access may change without notice. No account, API key, or OpenCode installation is required.
 
 ## Requirements
 
-Install [Bun](https://bun.sh) and make it available on Pi's `PATH`. OpenCode itself need not be installed. To use a Bun executable at another path, set `PI_OPENCODE_FREE_BUN` before starting Pi:
-
-```bash
-export PI_OPENCODE_FREE_BUN=/absolute/path/to/bun
-```
+Install the [Bun runtime](https://bun.sh); the extension uses it to send model requests. Bun must be available as `bun` on `PATH`. Optionally, set `PI_OPENCODE_FREE_BUN` to the Bun executable's path if you need to use a different installation.
 
 ## Install
 
@@ -29,17 +23,13 @@ Restart Pi after installing. Use `pi config` to enable or disable the extension,
 2. Type `opencode-free` to filter the list.
 3. Select a model tagged `[opencode-free]`.
 
-No `/login` is required, and your prompts are sent to OpenCode's service rather than to a local model. Endpoint and API-key environment overrides are not supported.
+Your prompts are sent to OpenCode's service. Endpoint and API-key environment overrides are not supported.
 
 The model list refreshes when you open `/model`. If discovery is unavailable, the last synced catalog or Pi's bundled free models remain available.
 
 ## Usage limits
 
-Free-tier availability, client restrictions, and usage limits are controlled by OpenCode. The gateway returns `FreeUsageLimitError` both for an exhausted allowance and for a refused request, so the message does not identify which one occurred. Retry later or select another provider with `/model`.
-
-The provider keeps one session identity in `<agent-dir>/opencode-free.json` and reuses it across Pi runs, replacing it after 30 days. The agent directory defaults to `~/.pi/agent` and respects `PI_CODING_AGENT_DIR`. Retaining an identity does not guarantee upstream access or exempt it from limits.
-
-When OpenCode returns a confirmed free-usage error, the error includes the server-reported reset time in your local date, time, and timezone when available; otherwise it says `Reset time unavailable.` Wait for the reported reset or select another provider with `/model`. A reported reset does not guarantee that access has been restored.
+OpenCode controls availability and usage limits. `FreeUsageLimitError` can mean either an exhausted allowance or a refused request. When available, the error shows the server-reported reset time in your local timezone; otherwise it says `Reset time unavailable.` Retry later or select another provider with `/model`. A reported reset does not guarantee restored access.
 
 ## Uninstall
 

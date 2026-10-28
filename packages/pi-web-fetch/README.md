@@ -23,21 +23,13 @@ The `web_fetch` tool accepts public HTTP and HTTPS URLs and supports HTML, Markd
 | `query`   | Optional; selects matching sections from a long page. Sections remain in source order.                    |
 | `offset`  | Optional character offset for continuing through extracted content; takes precedence over a URL fragment. |
 
-Output is bounded to 6,000 characters by default. For long pages, use the returned `nextOffset` to continue. A query selects a focused view of the fetched page; omit it to read the complete document. Large fenced source files can be focused in line-aligned excerpts; excerpts are not necessarily valid standalone source. OpenAPI and Swagger JSON or YAML documents and JavaScript bundles containing literal specs can be reported as `openapi-spec`; detection is best-effort and limited to source bodies up to 512 KiB. Pi's preview renders Markdown with the active theme and is collapsed by default (`Ctrl+O` expands it). The call preview shows the URL; the focus query and character offset are not repeated there.
+Output is bounded to 6,000 characters by default. For long pages, use the returned `nextOffset` to continue. Use `query` to focus on matching sections, or omit it to read the complete document. Pi's preview is collapsed by default; press `Ctrl+O` to expand it.
 
 For example, a URL such as `https://github.com/shadcn-ui/lint#get-started` starts at the matching heading. GitHub `blob` links and bare gists are converted to raw source URLs; repository roots use their README. GitHub directory listings are not supported.
 
 ### Page alternatives and bot challenges
 
-The tool can discover advertised Markdown versions and `/llms.txt` indexes. When an index is discovered, its URL is shown in the result so you can follow it if the fetched page is insufficient; when the index replaces the requested page, the result explains that fallback. Markdown files served with a generic binary content type are read as text. Anubis and supported AWS WAF proof-of-work challenges are solved in-process. If a page remains blocked by an AWS WAF or Cloudflare bot challenge, it falls back to the site's documentation index when one exists. Other unsupported challenges and JavaScript CAPTCHAs return a blocked result. There is no browser fallback. Challenge cookies are not reused between fetches.
-
-### AWS WAF resolver
-
-AWS WAF solving is enabled by default and runs in-process. The resolver requests the challenged page and challenge metadata through the same validated, pinned transport and per-fetch cookie jar as `web_fetch`, builds browser fingerprint signals, solves the advertised proof of work, and submits the result. It retries once with the returned `aws-waf-token` and keeps that token in memory only for the current fetch.
-
-No downloaded challenge script, browser, or alternate TLS transport is used; the resolver works from the challenge metadata and static signal algorithm. If solving fails or the token is invalid, the normal blocked result or documentation-index fallback applies.
-
-Pages with HTML nested beyond 512 elements are rejected.
+The tool can discover advertised Markdown versions and `/llms.txt` indexes. An index URL appears in the result when found; follow it if the page is insufficient. The tool can solve Anubis and supported AWS WAF proof-of-work challenges. If an AWS WAF or Cloudflare challenge remains blocked, it may fall back to the site's documentation index. Unsupported challenges and JavaScript CAPTCHAs return a blocked result; there is no browser fallback.
 
 ### Caching
 
