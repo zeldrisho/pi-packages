@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Replace Pi's working-directory block with the block free-tier requests require instead of sending both.
+
 ## [0.3.1] - 2026-10-28
 
 ### Changed
