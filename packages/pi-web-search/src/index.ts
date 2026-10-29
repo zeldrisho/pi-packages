@@ -46,7 +46,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool<typeof webSearchParameters, Partial<SearchDetails>>({
     name: "web_search",
     label: "Web Search",
-    description: "Search the web. Use web_fetch to read sources.",
+    description: "Search the web.",
     parameters: webSearchParameters,
     outputSchema: webSearchOutputSchema,
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
