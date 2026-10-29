@@ -66,7 +66,7 @@ export function isProviderRequestPayload(value: unknown): value is ProviderReque
   return true;
 }
 
-/** Apply only the gateway's observed streaming, environment and tool requirements. */
+/** Apply the gateway's observed streaming, environment and tool-choice requirements. */
 export function normalizeFreeRequestPayload(
   payload: ProviderRequestPayload,
 ): ProviderRequestPayload {
@@ -74,21 +74,6 @@ export function normalizeFreeRequestPayload(
 
   if (isNoneToolChoice(payload.tool_choice)) delete normalized.tool_choice;
 
-  if (!payload.tools?.length)
-    normalized.tools = [
-      {
-        type: "function",
-        function: {
-          name: "read",
-          description: "Read a file",
-          parameters: {
-            type: "object",
-            properties: { path: { type: "string" } },
-            required: ["path"],
-          },
-        },
-      },
-    ];
   const messages = payload.messages;
 
   if (messages) {

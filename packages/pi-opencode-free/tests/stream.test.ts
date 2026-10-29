@@ -89,11 +89,11 @@ describe("OpenCode provider stream boundary", () => {
 
     expect((await native(model, summary, options).result()).errorMessage).toBe(message);
   });
-  it("normalizes a tool-free compaction request without relying on turn hooks", async () => {
+  it("normalizes a tool-free compaction request without injecting tools", async () => {
     const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const payload = await requestPayload(input, init);
       expect(payload.stream).toBe(true);
-      expect(payload.tools.map((tool) => tool.function.name)).toEqual(["read"]);
+      expect(payload).not.toHaveProperty("tools");
       expect(JSON.stringify(payload.messages)).toContain("Summarize without executing tools.");
       expect(JSON.stringify(payload.messages)).toContain("<env>");
       expect(payload).not.toHaveProperty("tool_choice");
