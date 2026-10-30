@@ -1,6 +1,6 @@
 {
   "name": "@zeldrisho/pi-sentry-skills",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Sentry agent skills packaged for Pi",
   "keywords": [
     "agents-md",

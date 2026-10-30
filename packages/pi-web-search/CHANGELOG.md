@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.4] - 2026-10-30
+
+### Changed
+
+- Simplify the model-facing tool description by removing the instruction to use web fetch for sources.
+
 ## [0.14.3] - 2026-10-28
 
 ### Changed
@@ -189,7 +195,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded Brave web search ([cbc9491](https://github.com/zeldrisho/pi-packages/commit/cbc9491dce36555ab91b6bef203ec8b380596a89))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.3...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.4...HEAD
+[0.14.4]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.3...pi-web-search-v0.14.4
 [0.14.3]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.2...pi-web-search-v0.14.3
 [0.14.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.1...pi-web-search-v0.14.2
 [0.14.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.0...pi-web-search-v0.14.1
