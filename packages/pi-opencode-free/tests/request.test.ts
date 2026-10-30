@@ -145,6 +145,31 @@ describe("prompt preservation", () => {
 });
 
 describe("working directory block", () => {
+  it("keeps an existing env authoritative and removes instruction cwd blocks without mutation", () => {
+    const parts = [
+      { type: "text", text: "before <cwd>/other</cwd> after" },
+      { type: "image", data: "image" },
+    ];
+
+    const messages = [
+      { role: "system", content: "<env>\n Working directory: /authoritative\n</env>" },
+      { role: "developer", content: "rules <cwd>/different</cwd> end <cwd>/third</cwd>" },
+      { role: "developer", content: parts },
+      { role: "user", content: "<cwd>/user</cwd>" },
+    ];
+
+    const result = normalizeFreeRequestPayload({ model: "beam-free", messages });
+    expect(result.messages?.[0]).toBe(messages[0]);
+    expect(result.messages?.[1]?.content).toBe("rules  end ");
+    expect(result.messages?.[2]?.content).toEqual([
+      { type: "text", text: "before  after" },
+      parts[1],
+    ]);
+    expect(result.messages?.[3]).toBe(messages[3]);
+    expect(parts[0]?.text).toBe("before <cwd>/other</cwd> after");
+    expect(messages[1]?.content).toBe("rules <cwd>/different</cwd> end <cwd>/third</cwd>");
+  });
+
   it("replaces Pi's cwd block instead of adding a second directory block", () => {
     const prompt = "You are Pi.\n\n<cwd>\n/workspace/project\n</cwd>\n\nFollow the rules.";
 

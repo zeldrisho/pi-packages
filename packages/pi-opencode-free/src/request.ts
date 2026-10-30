@@ -81,7 +81,9 @@ export function normalizeFreeRequestPayload(
       (message) => isInstructionMessage(message) && ENV_BLOCK.test(messageText(message.content)),
     );
 
-    if (!hasEnv) normalized.messages = replaceEnvironment(messages);
+    normalized.messages = hasEnv
+      ? removeInstructionCwdBlocks(messages)
+      : replaceEnvironment(messages);
   }
 
   return normalized;
@@ -119,6 +121,47 @@ function envBlock(path: string): string {
   const directory = sanitizePath(path) || sanitizePath(process.cwd());
 
   return `<env>\n Working directory: ${directory}\n</env>`;
+}
+
+/** Removes cwd blocks from instruction messages when an environment block already exists. */
+function removeInstructionCwdBlocks(
+  messages: readonly ChatMessageReference[],
+): readonly ChatMessageReference[] {
+  let changed = false;
+
+  const updated = messages.map((message) => {
+    if (!isInstructionMessage(message)) return message;
+    const content = message.content;
+
+    if (Array.isArray(content)) {
+      let partChanged = false;
+
+      const parts = content.map((part) => {
+        const text = textPart(part);
+
+        if (!CWD_BLOCK.test(text)) return part;
+        partChanged = true;
+
+        // SAFETY: A matching textPart confirms this is an object with a string text field.
+        return {
+          ...(part as ContentPartReference),
+          text: text.replaceAll(/<cwd>([^]*?)<\/cwd>/gu, ""),
+        };
+      });
+
+      if (!partChanged) return message;
+      changed = true;
+
+      return { ...message, content: parts };
+    }
+
+    if (content === undefined || !CWD_BLOCK.test(content)) return message;
+    changed = true;
+
+    return { ...message, content: content.replaceAll(/<cwd>([^]*?)<\/cwd>/gu, "") };
+  });
+
+  return changed ? updated : messages;
 }
 
 /** Result of converting Pi's `<cwd>` block within a single message. */
