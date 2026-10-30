@@ -1,6 +1,6 @@
 # Architecture
 
-This repository publishes independent Pi packages from `packages/*`. Most packages are extensions that load directly from TypeScript; skill-only packages expose `pi.skills` without `src/index.ts`; prompt-only packages publish Markdown templates through their Pi manifest. Each package owns runtime dependencies and can be installed without the rest of the workspace. Package behavior is documented in the package READMEs; development and release procedures are in [development.md](development.md) and [release.md](release.md).
+This repository publishes independent Pi packages from `packages/*`. Most packages are extensions that load directly from TypeScript; skill-only packages expose `pi.skills` without `src/index.ts`; prompt-only packages publish Markdown templates through their Pi manifest. Each package owns runtime dependencies and can be installed without the rest of the workspace. Package behavior is documented in the package READMEs; development and release procedures are in [development.md](development.md) and [releasing.md](releasing.md).
 
 ## Package boundaries
 
@@ -70,7 +70,7 @@ Bun compatibility is empirical, not evidence of entitlement. Measured on 2026-10
 
 Everything else is free to differ: both `/inference/v1` and `/inference/openai/v1` work, and project id, bearer token, tool count, tool names, and prompt text made no difference. The identity headers are checked separately: the client user agent, `x-opencode-client`, and the four session headers are required, while `x-opencode-project` is not. Each session header must carry a `ses_` identifier — an arbitrary string is refused — although the four values need not agree. The identifier's encoded creation time must be recent: an 89-day-old identifier was served while a 91-day-old one was refused. This is why the provider persists one identity and replaces it after thirty days, well inside that window.
 
-The request contract prefixes a minimal working-directory env block unless an instruction already contains one, adds a minimal `read` declaration only when the caller declares no tools, and forces streaming, while keeping Pi's own system prompt and tools. On 2026-10-28 with CLI 2.2.0, `beam-free` returned 200 with these additions, both with normal tools and without caller tools; without the env block or without tools it returned 429. `big-pickle` returned 429 even with an env block and normal tools, which may reflect quota or model availability. These requirements are observed rather than published and can change without notice.
+The request contract ensures one working-directory env block and forces streaming while keeping Pi's own system prompt and tools. Requests without tools pass through without a synthetic `read` declaration. On 2026-10-28 with CLI 2.2.0, `beam-free` returned 200 with these additions, both with normal tools and without caller tools; without the env block or without tools it returned 429. `big-pickle` returned 429 even with an env block and normal tools, which may reflect quota or model availability. These requirements are observed rather than published and can change without notice.
 
 ## Command recognition and approvals
 

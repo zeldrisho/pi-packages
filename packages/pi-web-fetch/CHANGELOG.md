@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.2] - 2026-10-30
+
+### Changed
+
+- Remove the package's Node.js engine restriction; Node.js 24 remains the tested runtime.
+- Clarify the model-facing tool description to reflect support for public URLs beyond webpages.
+
 ## [0.16.1] - 2026-10-28
 
 ### Changed
@@ -301,7 +308,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.1...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.2...HEAD
+[0.16.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.1...pi-web-fetch-v0.16.2
 [0.16.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.0...pi-web-fetch-v0.16.1
 [0.16.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.15.0...pi-web-fetch-v0.16.0
 [0.15.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.14.1...pi-web-fetch-v0.15.0

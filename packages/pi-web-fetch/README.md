@@ -1,6 +1,6 @@
 # @zeldrisho/pi-web-fetch
 
-Fetch public HTTP(S) pages and source files as bounded Markdown with Pi. No API key is required.
+Fetch bounded content from public HTTP(S) pages and source files with Pi. No API key is required.
 
 ## Install
 

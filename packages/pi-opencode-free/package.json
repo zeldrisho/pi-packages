@@ -1,6 +1,6 @@
 {
   "name": "@zeldrisho/pi-opencode-free",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Pi provider extension for OpenCode's free-tier models",
   "keywords": [
     "opencode",
@@ -48,9 +48,6 @@
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*"
-  },
-  "engines": {
-    "node": ">=24"
   },
   "pi": {
     "extensions": [

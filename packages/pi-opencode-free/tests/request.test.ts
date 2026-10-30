@@ -20,9 +20,18 @@ describe("free-tier request normalization", () => {
 
     expect(result.stream).toBe(true);
     expect(result.temperature).toBe(0.2);
-    expect(result.tools?.[0]?.function?.name).toBe("read");
+    expect(result.tools).toBeUndefined();
     expect(payload.stream).toBe(false);
     expect(payload.tools).toBeUndefined();
+  });
+
+  it("preserves an explicitly empty toolset", () => {
+    const payload: ProviderRequestPayload = { model: "big-pickle", tools: [] };
+
+    const result = normalizeFreeRequestPayload(payload);
+
+    expect(result.tools).toBe(payload.tools);
+    expect(result.tools).toEqual([]);
   });
 
   it("reuses an existing read declaration", () => {
@@ -132,5 +141,143 @@ describe("prompt preservation", () => {
     ];
 
     expect(normalizeFreeRequestPayload({ model: "beam-free", messages }).messages).toBe(messages);
+  });
+});
+
+describe("working directory block", () => {
+  it("keeps an existing env authoritative and removes instruction cwd blocks without mutation", () => {
+    const parts = [
+      { type: "text", text: "before <cwd>/other</cwd> after" },
+      { type: "image", data: "image" },
+    ];
+
+    const messages = [
+      { role: "system", content: "<env>\n Working directory: /authoritative\n</env>" },
+      { role: "developer", content: "rules <cwd>/different</cwd> end <cwd>/third</cwd>" },
+      { role: "developer", content: parts },
+      { role: "user", content: "<cwd>/user</cwd>" },
+    ];
+
+    const result = normalizeFreeRequestPayload({ model: "beam-free", messages });
+    expect(result.messages?.[0]).toBe(messages[0]);
+    expect(result.messages?.[1]?.content).toBe("rules  end ");
+    expect(result.messages?.[2]?.content).toEqual([
+      { type: "text", text: "before  after" },
+      parts[1],
+    ]);
+    expect(result.messages?.[3]).toBe(messages[3]);
+    expect(parts[0]?.text).toBe("before <cwd>/other</cwd> after");
+    expect(messages[1]?.content).toBe("rules <cwd>/different</cwd> end <cwd>/third</cwd>");
+  });
+
+  it("replaces Pi's cwd block instead of adding a second directory block", () => {
+    const prompt = "You are Pi.\n\n<cwd>\n/workspace/project\n</cwd>\n\nFollow the rules.";
+
+    const messages = [
+      { role: "system", content: prompt },
+      { role: "user", content: "Hi" },
+    ];
+
+    const result = normalizeFreeRequestPayload({ model: "beam-free", messages });
+    const content = String(result.messages?.[0]?.content);
+
+    expect(content).toBe(
+      "You are Pi.\n\n<env>\n Working directory: /workspace/project\n</env>\n\nFollow the rules.",
+    );
+    expect(content).not.toContain("<cwd>");
+    expect(content.match(/Working directory:/gu)).toHaveLength(1);
+    expect(messages[0]?.content).toBe(prompt);
+    expect(result.messages?.[1]).toBe(messages[1]);
+  });
+
+  it("converts only the first cwd and removes remaining instruction blocks", () => {
+    const parts = [
+      { type: "text", text: "<cwd>/first</cwd> keep <cwd>/second</cwd>" },
+      { type: "text", text: "<cwd>/third</cwd> tail" },
+    ];
+
+    const messages = [
+      { role: "system", content: parts },
+      { role: "developer", content: "<cwd>/fourth</cwd> rules" },
+      { role: "user", content: "<cwd>/user</cwd>" },
+    ];
+
+    const result = normalizeFreeRequestPayload({ model: "beam-free", messages });
+
+    expect(result.messages?.[0]?.content).toEqual([
+      { type: "text", text: "<env>\n Working directory: /first\n</env> keep " },
+      { type: "text", text: " tail" },
+    ]);
+    expect(result.messages?.[1]?.content).toBe(" rules");
+    expect(result.messages?.[2]).toBe(messages[2]);
+    expect(parts[0]?.text).toBe("<cwd>/first</cwd> keep <cwd>/second</cwd>");
+    expect(messages[1]?.content).toBe("<cwd>/fourth</cwd> rules");
+  });
+
+  it("keeps Pi's cwd block available for other providers", () => {
+    const messages = [{ role: "system", content: "<cwd>\n/workspace\n</cwd>" }];
+
+    normalizeFreeRequestPayload({ model: "beam-free", messages });
+
+    expect(messages[0]?.content).toBe("<cwd>\n/workspace\n</cwd>");
+  });
+
+  it("converts the cwd block of structured content without mutating it", () => {
+    const content = [
+      { type: "text", text: "<cwd>\n/workspace\n</cwd>" },
+      { type: "text", text: "tail" },
+    ];
+
+    const result = normalizeFreeRequestPayload({
+      model: "beam-free",
+      messages: [{ role: "developer", content }],
+    });
+
+    expect(result.messages?.[0]?.content).toEqual([
+      { type: "text", text: "<env>\n Working directory: /workspace\n</env>" },
+      { type: "text", text: "tail" },
+    ]);
+    expect(content[0]?.text).toBe("<cwd>\n/workspace\n</cwd>");
+  });
+
+  it("converts a cwd block in a later instruction message in place", () => {
+    const messages = [
+      { role: "system", content: "Pi" },
+      { role: "developer", content: "<cwd>\n/workspace\n</cwd>" },
+    ];
+
+    const result = normalizeFreeRequestPayload({ model: "beam-free", messages });
+
+    expect(result.messages?.[0]?.content).toBe("Pi");
+    expect(result.messages?.[1]?.content).toBe("<env>\n Working directory: /workspace\n</env>");
+  });
+
+  it("flattens malformed cwd paths that would close the env block early", () => {
+    const messages = [{ role: "system", content: "<cwd>\n/tmp\n<bad>\n</cwd>" }];
+
+    const result = normalizeFreeRequestPayload({ model: "beam-free", messages });
+
+    expect(result.messages?.[0]?.content).toBe("<env>\n Working directory: /tmp bad\n</env>");
+  });
+
+  it("falls back to the process directory for an empty cwd block", () => {
+    const messages = [{ role: "system", content: "<cwd>\n\n</cwd>" }];
+
+    const result = normalizeFreeRequestPayload({ model: "beam-free", messages });
+
+    expect(result.messages?.[0]?.content).toBe(
+      `<env>\n Working directory: ${process.cwd()}\n</env>`,
+    );
+  });
+
+  it("leaves a cwd block in a user message untouched", () => {
+    const messages = [{ role: "user", content: "<cwd>\n/workspace\n</cwd>" }];
+
+    const result = normalizeFreeRequestPayload({ model: "beam-free", messages });
+
+    expect(result.messages?.[1]?.content).toBe("<cwd>\n/workspace\n</cwd>");
+    expect(result.messages?.[0]?.content).toBe(
+      `<env>\n Working directory: ${process.cwd()}\n</env>`,
+    );
   });
 });

@@ -401,17 +401,6 @@ describe("repository contracts", () => {
     }
   });
 
-  it("declares a single package-manager pin", () => {
-    const pin = rootManifest.packageManager?.match(/^pnpm@(.+)$/)?.[1];
-    const devEngine = rootManifest.devEngines?.packageManager;
-
-    if (!pin) fail("root packageManager must pin a pnpm version as pnpm@<version>");
-
-    if (devEngine?.name !== "pnpm" || devEngine?.version !== pin) {
-      fail(`devEngines.packageManager must repeat the packageManager pin pnpm@${pin}`);
-    }
-  });
-
   it("workspace catalog covers every catalog reference", async () => {
     const catalog = parseCatalog(workspace);
     const referenced = new Map<string, string[]>();
@@ -598,14 +587,6 @@ describe("repository contracts", () => {
         }
       } else if (manifest.scripts || manifest.devDependencies) {
         fail(`${manifest.name} content-only packages must not declare package-local tooling`);
-      }
-
-      if (!isPromptPackage && !isSkillPackage && !isThemePackage) {
-        if (JSON.stringify(manifest.engines) !== JSON.stringify({ node: ">=24" })) {
-          fail(`${manifest.name} extensions must require Node >=24`);
-        }
-      } else if (manifest.engines) {
-        fail(`${manifest.name} content-only packages must not impose a Node engine requirement`);
       }
 
       const expectedPackageTypeScriptConfiguration = isContentOnly

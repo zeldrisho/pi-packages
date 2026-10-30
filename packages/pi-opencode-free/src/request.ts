@@ -66,7 +66,7 @@ export function isProviderRequestPayload(value: unknown): value is ProviderReque
   return true;
 }
 
-/** Apply only the gateway's observed streaming, environment and tool requirements. */
+/** Apply the gateway's observed streaming, environment and tool-choice requirements. */
 export function normalizeFreeRequestPayload(
   payload: ProviderRequestPayload,
 ): ProviderRequestPayload {
@@ -74,59 +74,186 @@ export function normalizeFreeRequestPayload(
 
   if (isNoneToolChoice(payload.tool_choice)) delete normalized.tool_choice;
 
-  if (!payload.tools?.length)
-    normalized.tools = [
-      {
-        type: "function",
-        function: {
-          name: "read",
-          description: "Read a file",
-          parameters: {
-            type: "object",
-            properties: { path: { type: "string" } },
-            required: ["path"],
-          },
-        },
-      },
-    ];
   const messages = payload.messages;
 
   if (messages) {
-    const instructions = messages.filter(
-      (message) => message.role === "system" || message.role === "developer",
+    const hasEnv = messages.some(
+      (message) => isInstructionMessage(message) && ENV_BLOCK.test(messageText(message.content)),
     );
 
-    const hasEnv = instructions.some((message) =>
-      /<env>(?:(?!<\/env>)[^])*?\bWorking directory:(?:(?!<\/env>)[^])*?<\/env>/u.test(
-        Array.isArray(message.content)
-          ? message.content.map((part) => textPart(part)).join("")
-          : (message.content ?? ""),
-      ),
-    );
-
-    if (!hasEnv) {
-      const block = `<env>\n Working directory: ${process.cwd().replaceAll(/[\r\n<>]+/gu, " ")}\n</env>`;
-
-      const index = messages.findIndex(
-        (message) => message.role === "system" || message.role === "developer",
-      );
-
-      if (index < 0) normalized.messages = [{ role: "system", content: block }, ...messages];
-      else
-        normalized.messages = messages.map((message, i) =>
-          i !== index
-            ? message
-            : {
-                ...message,
-                content: Array.isArray(message.content)
-                  ? [{ type: "text", text: block }, ...message.content]
-                  : `${block}\n\n${message.content ?? ""}`,
-              },
-        );
-    }
+    normalized.messages = hasEnv
+      ? removeInstructionCwdBlocks(messages)
+      : replaceEnvironment(messages);
   }
 
   return normalized;
+}
+
+/** A structured prompt part; only the textual fields are read. */
+interface ContentPartReference {
+  type?: string;
+  text?: string;
+}
+
+/** Matches Pi's harness `<cwd>` block and captures the path it declares. */
+const CWD_BLOCK = /<cwd>([^]*?)<\/cwd>/u;
+
+/** Matches the gateway's environment block when it already declares a working directory. */
+const ENV_BLOCK = /<env>(?:(?!<\/env>)[^])*?\bWorking directory:(?:(?!<\/env>)[^])*?<\/env>/u;
+
+/** Returns whether a message carries prompt instructions for the gateway. */
+function isInstructionMessage(message: ChatMessageReference): boolean {
+  return message.role === "system" || message.role === "developer";
+}
+
+/** Joins the textual parts of a message content value. */
+function messageText(content: ChatMessageReference["content"]): string {
+  return Array.isArray(content) ? content.map((part) => textPart(part)).join("") : (content ?? "");
+}
+
+/** Flattens path separators that would end the environment block early. */
+function sanitizePath(path: string): string {
+  return path.replaceAll(/[\r\n<>]+/gu, " ").trim();
+}
+
+/** Formats the gateway's required environment block for a working directory. */
+function envBlock(path: string): string {
+  const directory = sanitizePath(path) || sanitizePath(process.cwd());
+
+  return `<env>\n Working directory: ${directory}\n</env>`;
+}
+
+/** Removes cwd blocks from instruction messages when an environment block already exists. */
+function removeInstructionCwdBlocks(
+  messages: readonly ChatMessageReference[],
+): readonly ChatMessageReference[] {
+  let changed = false;
+
+  const updated = messages.map((message) => {
+    if (!isInstructionMessage(message)) return message;
+    const content = message.content;
+
+    if (Array.isArray(content)) {
+      let partChanged = false;
+
+      const parts = content.map((part) => {
+        const text = textPart(part);
+
+        if (!CWD_BLOCK.test(text)) return part;
+        partChanged = true;
+
+        // SAFETY: A matching textPart confirms this is an object with a string text field.
+        return {
+          ...(part as ContentPartReference),
+          text: text.replaceAll(/<cwd>([^]*?)<\/cwd>/gu, ""),
+        };
+      });
+
+      if (!partChanged) return message;
+      changed = true;
+
+      return { ...message, content: parts };
+    }
+
+    if (content === undefined || !CWD_BLOCK.test(content)) return message;
+    changed = true;
+
+    return { ...message, content: content.replaceAll(/<cwd>([^]*?)<\/cwd>/gu, "") };
+  });
+
+  return changed ? updated : messages;
+}
+
+/** Result of converting Pi's `<cwd>` block within a single message. */
+interface CwdBlockConversion {
+  content: string | unknown[];
+  converted: boolean;
+}
+
+/**
+ * Replaces Pi's `<cwd>` block with the gateway's environment block.
+ *
+ * @param content - String or structured message content
+ * @returns The possibly updated content and whether a block was converted
+ */
+function convertCwdBlock(content: ChatMessageReference["content"]): CwdBlockConversion {
+  if (Array.isArray(content)) {
+    for (const [index, part] of content.entries()) {
+      const text = textPart(part);
+
+      if (!CWD_BLOCK.test(text)) continue;
+
+      const parts = [...content];
+
+      // SAFETY: textPart returned this part's text, so it declares a string text field.
+      const source = part as ContentPartReference;
+
+      parts[index] = {
+        ...source,
+        text: text.replace(CWD_BLOCK, (_match, path: string) => envBlock(path)),
+      };
+
+      return { content: parts, converted: true };
+    }
+
+    return { content, converted: false };
+  }
+
+  const text = content ?? "";
+
+  if (!CWD_BLOCK.test(text)) return { content: text, converted: false };
+
+  return {
+    content: text.replace(CWD_BLOCK, (_match, path: string) => envBlock(path)),
+    converted: true,
+  };
+}
+
+/** Prepends a prompt block, keeping structured content intact. */
+function prependBlock(content: ChatMessageReference["content"], block: string): string | unknown[] {
+  return Array.isArray(content)
+    ? [{ type: "text", text: block }, ...content]
+    : `${block}\n\n${content ?? ""}`;
+}
+
+/**
+ * Resolves the gateway environment block without mutating the caller's messages.
+ *
+ * The first instruction message carrying Pi's `<cwd>` block has that block
+ * replaced, so the request keeps one working directory. Without a `<cwd>`
+ * block the environment block is prepended to the first instruction message,
+ * creating one when no instruction message exists.
+ *
+ * @param messages - Provider messages to copy when a block is written
+ * @returns New messages when converted, otherwise the original messages
+ */
+function replaceEnvironment(
+  messages: readonly ChatMessageReference[],
+): readonly ChatMessageReference[] {
+  let converted = false;
+
+  const updated = messages.map((message) => {
+    if (converted || !isInstructionMessage(message)) return message;
+
+    const result = convertCwdBlock(message.content);
+
+    if (!result.converted) return message;
+
+    converted = true;
+
+    return { ...message, content: result.content };
+  });
+
+  if (converted) return removeInstructionCwdBlocks(updated);
+
+  const block = envBlock(process.cwd());
+  const index = messages.findIndex(isInstructionMessage);
+
+  if (index < 0) return [{ role: "system", content: block }, ...messages];
+
+  return updated.map((message, i) =>
+    i === index ? { ...message, content: prependBlock(message.content, block) } : message,
+  );
 }
 
 /** Extract text from an untrusted structured message part. */

@@ -100,7 +100,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool<typeof webFetchParameters, Partial<WebFetchDetails>>({
     name: "web_fetch",
     label: "Web Fetch",
-    description: "Read a public webpage as Markdown.",
+    description: "Read content from a public URL.",
     parameters: webFetchParameters,
     outputSchema: webFetchOutputSchema,
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
