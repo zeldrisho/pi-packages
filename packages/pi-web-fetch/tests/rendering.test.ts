@@ -138,6 +138,28 @@ describe("web_fetch rendering", () => {
       .join("\n");
 
     expect(truncatedResult).toContain("Continue with offset=6000");
+
+    const notice = "[Content truncated. Continue with offset=6000 to read the next chunk.]";
+
+    for (const text of [`${output}\n\n${notice}`, `Short content\n\n${notice}`]) {
+      for (const expanded of [false, true]) {
+        const rendered = tool
+          .renderResult(
+            {
+              ...result,
+              content: [{ type: "text", text }],
+              details: { ...result.details, truncated: true, nextOffset: 6000 },
+            },
+            { expanded, isPartial: false },
+            renderTheme,
+          )
+          .render(200)
+          .join("\n");
+
+        expect(rendered.split("Continue with offset=6000")).toHaveLength(2);
+      }
+    }
+
     expect(
       tool
         .renderResult(
