@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Simplified agents-md template headings to `Rules` and `References` and clarified repository-path guidance.
+
 ## [0.1.4] - 2026-10-28
 
 ### Changed

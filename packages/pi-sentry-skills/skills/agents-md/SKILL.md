@@ -43,11 +43,11 @@ Use only sections that add non-obvious value.
 | Test file | `pnpm vitest run path/to/file.test.ts` |
 | Lint file | `pnpm eslint path/to/file.ts`          |
 
-## Key Conventions
+## Rules
 
 - Generated files: update with `pnpm generate`; do not edit by hand.
 
-## External References
+## References
 
 | Need            | File                   |
 | --------------- | ---------------------- |
@@ -61,7 +61,7 @@ Use only sections that add non-obvious value.
 - Use headings, bullets, and tables; avoid paragraphs.
 - Use repo-relative paths; avoid vague references like "see docs".
 - Reference existing docs/specs/policies instead of copying them.
-- List exact external files for setup, architecture, API specs, security, release, and policy docs when they exist.
+- List exact repository paths for setup, architecture, API specs, security, release, and policy docs when they exist.
 - Prefer file-scoped test/lint/typecheck commands; include full builds only when no narrower command exists.
 - Put commands in tables when there is more than one.
 - Keep one rule per bullet.
@@ -70,12 +70,12 @@ Use only sections that add non-obvious value.
 - Do not list installed skills or plugins.
 - Do not include generic quality slogans.
 
-## External Reference Rules
+## Reference Guidelines
 
 Good:
 
 ```markdown
-## External References
+## References
 
 | Need            | File                |
 | --------------- | ------------------- |
