@@ -244,7 +244,7 @@ function replaceEnvironment(
     return { ...message, content: result.content };
   });
 
-  if (converted) return updated;
+  if (converted) return removeInstructionCwdBlocks(updated);
 
   const block = envBlock(process.cwd());
   const index = messages.findIndex(isInstructionMessage);

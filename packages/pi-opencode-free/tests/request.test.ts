@@ -190,6 +190,30 @@ describe("working directory block", () => {
     expect(result.messages?.[1]).toBe(messages[1]);
   });
 
+  it("converts only the first cwd and removes remaining instruction blocks", () => {
+    const parts = [
+      { type: "text", text: "<cwd>/first</cwd> keep <cwd>/second</cwd>" },
+      { type: "text", text: "<cwd>/third</cwd> tail" },
+    ];
+
+    const messages = [
+      { role: "system", content: parts },
+      { role: "developer", content: "<cwd>/fourth</cwd> rules" },
+      { role: "user", content: "<cwd>/user</cwd>" },
+    ];
+
+    const result = normalizeFreeRequestPayload({ model: "beam-free", messages });
+
+    expect(result.messages?.[0]?.content).toEqual([
+      { type: "text", text: "<env>\n Working directory: /first\n</env> keep " },
+      { type: "text", text: " tail" },
+    ]);
+    expect(result.messages?.[1]?.content).toBe(" rules");
+    expect(result.messages?.[2]).toBe(messages[2]);
+    expect(parts[0]?.text).toBe("<cwd>/first</cwd> keep <cwd>/second</cwd>");
+    expect(messages[1]?.content).toBe("<cwd>/fourth</cwd> rules");
+  });
+
   it("keeps Pi's cwd block available for other providers", () => {
     const messages = [{ role: "system", content: "<cwd>\n/workspace\n</cwd>" }];
 
