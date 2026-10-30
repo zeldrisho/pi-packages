@@ -17,8 +17,7 @@ catalog:
   "@earendil-works/pi-ai": "^1.4.0"
   "@earendil-works/pi-coding-agent": "^1.4.0"
   "@earendil-works/pi-tui": "^1.4.0"
-  # Node types track the supported runtime floor (engines.node), not the newest
-  # release, so APIs unavailable on Node 24 fail type checking.
+  # Node types track the tested Node 24 runtime, so newer APIs fail type checking.
   "@types/node": "^24.19.2"
   "@vitest/coverage-v8": 5.0.5
   typebox: "^1.4.2"

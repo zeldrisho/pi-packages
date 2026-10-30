@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.2] - 2026-10-30
 
+### Changed
+
+- Remove the package's Node.js engine restriction; Node.js 24 remains the tested runtime.
+
 ### Fixed
 
 - Replace Pi's working-directory block with the block free-tier requests require instead of sending both.

@@ -10,7 +10,7 @@ Install [Vite+](https://vite-plus.dev/) and workspace dependencies:
 vp install
 ```
 
-Use Node.js 24.11.0 or newer. Common commands:
+Node.js 24.11.0 or newer is recommended. Common commands:
 
 | Task                         | Command          |
 | ---------------------------- | ---------------- |
@@ -56,6 +56,6 @@ Before review, inspect the final diff for unrelated behavior, new network paths,
 
 ## Dependencies
 
-Open dependency updates manually. Review upstream notes, lockfile changes, GitHub Action major tags, and run validation. Keep Typebox, Vite+, TypeScript, and major toolchain updates separate. Keep `@types/node` on the newest release of the Node major declared by `engines.node` so type checking rejects APIs the supported runtime lacks. Refresh the `@earendil-works/*` catalog at least once per release cycle; after catalog or lockfile changes, check the override conditions in `pnpm-workspace.yaml` and remove satisfied overrides. `vp run ready` includes `vp pm audit -- --audit-level high`; production advisories are not allowlisted.
+Open dependency updates manually. Review upstream notes, lockfile changes, GitHub Action major tags, and run validation. Keep Typebox, Vite+, TypeScript, and major toolchain updates separate. Keep `@types/node` on the newest Node 24 release so type checking rejects APIs unavailable in the tested runtime. Refresh the `@earendil-works/*` catalog at least once per release cycle; after catalog or lockfile changes, check the override conditions in `pnpm-workspace.yaml` and remove satisfied overrides. `vp run ready` includes `vp pm audit -- --audit-level high`; production advisories are not allowlisted.
 
 Before a catalog bump, smoke-test Pi's latest APIs with `PI_SMOKE_DEPENDENCIES=latest vp run test:packages` while retaining the locked Typebox version.

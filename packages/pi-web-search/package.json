@@ -51,9 +51,6 @@
     "@earendil-works/pi-tui": "*",
     "typebox": "*"
   },
-  "engines": {
-    "node": ">=24"
-  },
   "pi": {
     "extensions": [
       "./src/index.ts"

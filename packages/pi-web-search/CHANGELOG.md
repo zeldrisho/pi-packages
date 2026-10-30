@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Remove the package's Node.js engine restriction; Node.js 24 remains the tested runtime.
 - Simplify the model-facing tool description by removing the instruction to use web fetch for sources.
 
 ## [0.14.3] - 2026-10-28
