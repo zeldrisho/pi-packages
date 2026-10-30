@@ -22,8 +22,8 @@ catalog:
   "@vitest/coverage-v8": 5.0.5
   typebox: "^1.4.2"
   typescript: "^7.0.2"
-  vite: npm:@voidzero-dev/vite-plus-core@1.3.0
-  vite-plus: 1.3.0
+  vite: npm:@voidzero-dev/vite-plus-core@1.4.0
+  vite-plus: 1.4.0
   vitest: 5.0.5
 
 minimumReleaseAgeExclude:
@@ -46,17 +46,17 @@ minimumReleaseAgeExclude:
   - "@vitest/utils@5.0.5"
   - "@vitest/ui@5.0.5"
   - "vitest@5.0.5"
-  - "@voidzero-dev/vite-plus-core@1.3.0"
-  - "@voidzero-dev/vite-plus-darwin-arm64@1.3.0"
-  - "@voidzero-dev/vite-plus-darwin-x64@1.3.0"
-  - "@voidzero-dev/vite-plus-linux-arm64-gnu@1.3.0"
-  - "@voidzero-dev/vite-plus-linux-arm64-musl@1.3.0"
-  - "@voidzero-dev/vite-plus-linux-x64-gnu@1.3.0"
-  - "@voidzero-dev/vite-plus-linux-x64-musl@1.3.0"
-  - "@voidzero-dev/vite-plus-win32-arm64-msvc@1.3.0"
-  - "@voidzero-dev/vite-plus-win32-x64-msvc@1.3.0"
+  - "@voidzero-dev/vite-plus-core@1.4.0"
+  - "@voidzero-dev/vite-plus-darwin-arm64@1.4.0"
+  - "@voidzero-dev/vite-plus-darwin-x64@1.4.0"
+  - "@voidzero-dev/vite-plus-linux-arm64-gnu@1.4.0"
+  - "@voidzero-dev/vite-plus-linux-arm64-musl@1.4.0"
+  - "@voidzero-dev/vite-plus-linux-x64-gnu@1.4.0"
+  - "@voidzero-dev/vite-plus-linux-x64-musl@1.4.0"
+  - "@voidzero-dev/vite-plus-win32-arm64-msvc@1.4.0"
+  - "@voidzero-dev/vite-plus-win32-x64-msvc@1.4.0"
   - "typebox@1.4.2"
-  - "vite-plus@1.3.0"
+  - "vite-plus@1.4.0"
 overrides:
   # Dependency-override lifecycle, tracked in issue #37
   # (https://github.com/zeldrisho/pi-packages/issues/37). Re-check the removal
