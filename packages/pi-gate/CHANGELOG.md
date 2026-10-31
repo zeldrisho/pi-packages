@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Shorten approval timeout and cancellation notices.
 - Remove the package's Node.js engine restriction; Node.js 24 remains the tested runtime.
 
 ## [0.7.3] - 2026-10-28

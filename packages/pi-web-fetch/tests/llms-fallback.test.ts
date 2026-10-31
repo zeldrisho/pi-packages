@@ -174,7 +174,7 @@ describe("executeWebFetch llms.txt support", () => {
     expect(result.details.contentKind).toBe("llms-index");
     expect(result.details.extractor).toBe("raw");
     expect(result.details.confidence).toBe("high");
-    expect(result.content[0]?.text).toContain("Showing the site's documentation index instead");
+    expect(result.content[0]?.text).toContain("Showing the site index instead");
     expect(result.content[0]?.text).not.toContain("also publishes");
     expect(result.content[0]?.text).toContain("# Example site");
   });
@@ -313,7 +313,7 @@ describe("executeWebFetch llms.txt support", () => {
     expect(result.details.requestedUrl).toBe(requested);
     expect(result.details.finalUrl).toBe("https://waf.example.com/en/docs/llms.txt");
     expect(result.details.contentKind).toBe("llms-index");
-    expect(result.content[0]?.text).toContain("Showing the site's documentation index instead");
+    expect(result.content[0]?.text).toContain("Showing the site index instead");
     expect(result.content[0]?.text).toContain("# Example site");
   });
 
@@ -514,7 +514,7 @@ describe("executeWebFetch llms.txt support", () => {
     expect(result.details.markdownAlternateFallback).toBe(true);
     expect(result.details.llmsTxtFallback).toBe(false);
     expect(result.details.extractor).toBe("raw");
-    expect(result.content[0]?.text).toContain("Markdown version advertised by the site");
+    expect(result.content[0]?.text).toContain("site's advertised Markdown version");
     expect(result.content[0]?.text).toContain("# Example site");
   });
 
@@ -541,7 +541,7 @@ describe("executeWebFetch llms.txt support", () => {
     );
 
     expect(result.details.markdownAlternateFallback).toBe(true);
-    expect(result.content[0]?.text).toContain("Markdown version advertised by the site");
+    expect(result.content[0]?.text).toContain("site's advertised Markdown version");
   });
 
   it("preserves the empty-content error when no fallback is available", async () => {

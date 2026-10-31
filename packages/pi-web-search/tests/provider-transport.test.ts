@@ -114,7 +114,7 @@ describe("web_search provider transport", () => {
 
     await expect(
       createSearchTool().execute("call", { query: "unreadable error test" }, undefined, undefined),
-    ).rejects.toThrow("Search provider returned HTTP 502");
+    ).rejects.toThrow("Provider returned HTTP 502");
   });
 
   it("bounds provider error bodies and strips markup", async () => {
@@ -125,7 +125,7 @@ describe("web_search provider transport", () => {
     );
     await expect(
       createSearchTool().execute("call", { query: "provider error test" }, undefined, undefined),
-    ).rejects.toThrow(/^Search provider returned HTTP 429: failure/);
+    ).rejects.toThrow(/^Provider returned HTTP 429: failure/);
   });
 
   it("stops reading oversized provider errors while preserving the HTTP status", async () => {
@@ -156,7 +156,7 @@ describe("web_search provider transport", () => {
     expect(error).toBeInstanceOf(Error);
     // SAFETY: the rejection value is always an Error thrown by the provider transport.
     const err = error as Error;
-    expect(err.message).toMatch(/^Search provider returned HTTP 429: failure/);
+    expect(err.message).toMatch(/^Provider returned HTTP 429: failure/);
     expect(err.message).not.toContain("<b>");
     expect(err.message.length).toBeLessThan(550);
     expect(cancelled).toBe(true);
@@ -207,7 +207,7 @@ describe("web_search provider transport", () => {
       undefined,
     );
 
-    const expectation = expect(pending).rejects.toThrow("timed out after 20 seconds");
+    const expectation = expect(pending).rejects.toThrow("Timed out after 20 seconds");
     await vi.advanceTimersByTimeAsync(20_000);
     await expectation;
   });
@@ -236,6 +236,6 @@ describe("web_search provider transport", () => {
     );
 
     controller.abort();
-    await expect(pending).rejects.toThrow("cancelled");
+    await expect(pending).rejects.toThrow("Cancelled.");
   });
 });

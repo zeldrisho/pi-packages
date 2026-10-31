@@ -115,7 +115,19 @@ export default function (pi: ExtensionAPI) {
     },
 
     async execute(_toolCallId, params, signal, onUpdate) {
-      return executeWebFetch(params, signal, onUpdate);
+      try {
+        return await executeWebFetch(params, signal, onUpdate);
+      } catch (error) {
+        if (error instanceof Error && /^web_fetch(?:: | )/.test(error.message)) {
+          const message = error.message.replace(/^web_fetch(?:: | )/, "");
+          error.message =
+            message === "was cancelled."
+              ? "Cancelled."
+              : message.charAt(0).toUpperCase() + message.slice(1);
+        }
+
+        throw error;
+      }
     },
 
     /**

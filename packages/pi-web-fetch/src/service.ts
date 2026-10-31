@@ -615,13 +615,13 @@ export async function executeWebFetch(
     : [
         ...(result.markdownAlternateFallback
           ? [
-              "[The requested page looked like an app shell or had little readable text, so this is the Markdown version advertised by the site instead.]",
+              "[Page content was sparse; showing the site's advertised Markdown version instead.]",
               "",
             ]
           : []),
         ...(result.llmsTxtFallback
           ? [
-              "[Showing the site's documentation index instead of the requested page. Follow a relevant link to read the documentation.]",
+              "[Showing the site index instead of the requested page. Follow a link for details.]",
               "",
             ]
           : []),
@@ -630,7 +630,7 @@ export async function executeWebFetch(
           : []),
         ...(resolvedFragment.fragment !== undefined && !fragmentMatched
           ? [
-              "[The requested URL fragment was not found; showing the page from the beginning.]",
+              "[Fragment not found; showing the page from the beginning.]",
               ...(fragmentSuggestions.length
                 ? [`[This page links to the requested fragment: ${fragmentSuggestions.join(", ")}]`]
                 : []),

@@ -146,15 +146,14 @@ export async function requestText(
         // Preserve the useful HTTP status when an untrusted error body cannot be read.
       }
 
-      throw new Error(`Search provider returned HTTP ${response.status}${body ? `: ${body}` : ""}`);
+      throw new Error(`Provider returned HTTP ${response.status}${body ? `: ${body}` : ""}`);
     }
 
     return await readResponseText(response, SEARCH_MAX_RESPONSE_BYTES);
   } catch (error) {
-    if (timedOut)
-      throw new Error(`Web search timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds.`);
+    if (timedOut) throw new Error(`Timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds.`);
 
-    if (signal?.aborted) throw new Error("Web search was cancelled.");
+    if (signal?.aborted) throw new Error("Cancelled.");
     throw error;
   } finally {
     clearTimeout(timeout);

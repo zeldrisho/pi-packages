@@ -221,11 +221,14 @@ function assertSuccessfulResponse(response: IncomingMessage): void {
     );
   }
 
-  const authenticationHint = [401, 403, 404].includes(status)
-    ? " The page may be missing, private, or require authentication."
-    : "";
+  const hint =
+    status === 404
+      ? " Page not found or inaccessible."
+      : status === 401 || status === 403
+        ? " Access denied or authentication required."
+        : "";
 
-  throw new Error(`web_fetch returned HTTP ${status}.${authenticationHint}`);
+  throw new Error(`HTTP ${status}.${hint}`);
 }
 
 /**

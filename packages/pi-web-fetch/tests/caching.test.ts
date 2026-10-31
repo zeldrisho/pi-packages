@@ -25,7 +25,7 @@ describe("web_fetch caching", () => {
       dependencies,
     );
 
-    expect(result.content[0].text).toContain("fragment was not found");
+    expect(result.content[0].text).toContain("Fragment not found");
     expect(result.content[0].text).toContain(
       `${origin}/settings/dependency-resolution#trustpolicyexclude`,
     );

@@ -463,7 +463,7 @@ export class SearchRuntime {
           return entry;
         },
         signal,
-        "Web search was cancelled.",
+        "Cancelled.",
       ));
 
     if (payload.results.length === 0 && !payload.answer) {
@@ -505,7 +505,7 @@ export class SearchRuntime {
                 return entry;
               },
               signal,
-              "Web search was cancelled.",
+              "Cancelled.",
             ));
           cached = cachedAnswer !== undefined;
           apiKeySource = answerCredentials.source;
@@ -595,8 +595,8 @@ export class SearchRuntime {
       }
 
       text += truncation.truncated
-        ? `\n\n[Output truncated to ${truncation.outputLines} of ${truncation.totalLines} lines (${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}). Full output saved to: ${fullOutputPath}]`
-        : `\n\n[Structured payload omitted to fit output limits. Full output saved to: ${fullOutputPath}]`;
+        ? `\n\n[Output truncated: ${truncation.outputLines}/${truncation.totalLines} lines (${formatSize(truncation.outputBytes)}/${formatSize(truncation.totalBytes)}). Full output: ${fullOutputPath}]`
+        : `\n\n[Structured payload omitted due to limits. Full output: ${fullOutputPath}]`;
     }
 
     structured.fullOutputPath = fullOutputPath;

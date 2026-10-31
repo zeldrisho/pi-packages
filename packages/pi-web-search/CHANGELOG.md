@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Shorten guidance when a search returns few or no results.
+- Shorten search guidance, error, and output-limit notices.
 
 ## [0.14.4] - 2026-10-30
 

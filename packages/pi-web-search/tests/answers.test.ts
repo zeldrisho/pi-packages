@@ -252,7 +252,7 @@ describe("Answers mode", () => {
       undefined,
     );
 
-    const expectation = expect(pending).rejects.toThrow("timed out after 20 seconds");
+    const expectation = expect(pending).rejects.toThrow("Timed out after 20 seconds");
     await vi.advanceTimersByTimeAsync(20_000);
     await expectation;
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -285,7 +285,7 @@ describe("Answers mode", () => {
       undefined,
     );
 
-    const expectation = expect(pending).rejects.toThrow("cancelled");
+    const expectation = expect(pending).rejects.toThrow("Cancelled.");
     await ready;
     controller.abort();
     await expectation;

@@ -55,7 +55,7 @@ describe("web_search caching coalescing", () => {
     const cancelled = tool.execute("first", params, controller.signal, undefined);
     const completed = tool.execute("second", params, undefined, undefined);
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    const cancelledExpectation = expect(cancelled).rejects.toThrow("cancelled");
+    const cancelledExpectation = expect(cancelled).rejects.toThrow("Cancelled.");
     controller.abort();
     resolveResponse(
       jsonResponse({

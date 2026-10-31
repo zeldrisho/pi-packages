@@ -138,7 +138,7 @@ function reasonRuleName(pattern: string): string {
 
 /** Formats an approval timeout with the matched rule, elapsed limit in seconds, and retry guidance. */
 function timeoutReason(pattern: string, timeoutMs: number): string {
-  return `pi-gate: no response to rule "${reasonRuleName(pattern)}" within ${timeoutMs / 1_000}s; command not run. Ask the user whether to retry approval.`;
+  return `pi-gate: approval timed out after ${timeoutMs / 1_000}s (rule "${reasonRuleName(pattern)}"); command not run. Ask the user before retrying.`;
 }
 
 function reportHerdrBlocked(pi: ExtensionAPI, ctx: { mode?: string }, active: boolean): void {
@@ -342,7 +342,7 @@ export default function piGate(pi: ExtensionAPI): void {
         return {
           block: true,
           reason:
-            "pi-gate: approval cancelled or policy changed; command not run. Ask the user whether to retry.",
+            "pi-gate: approval cancelled or policy changed; command not run. Ask the user before retrying.",
           terminate: true,
         };
       }
