@@ -119,7 +119,7 @@ export function sliceCompleteDocument(
   if (truncated) {
     markdown += `\n\n[Content truncated. Continue with offset=${end} to read the next chunk.]`;
   } else if (offset > 0) {
-    markdown += "\n\n[End of page content.]";
+    markdown += "\n\n[End of results.]";
   }
 
   return {

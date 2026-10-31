@@ -1,6 +1,6 @@
 const WORD_PATTERN = /[\p{L}\p{N}_+#]+/gu;
 
-const HEADING_PATTERN = /^#{1,6}\s+\S/;
+const HEADING_PATTERN = /^(?:#{1,6}\s+\S| {0,3}<h[1-6](?:\s[^>]*|)>)/i;
 
 /** Metadata describing deterministic query-focused extraction. */
 export interface FocusDetails {
@@ -35,18 +35,91 @@ const WINDOW_TARGET_CHARACTERS = 8_000;
 const WINDOW_MIN_LINES = 80;
 
 /** Fewest characters a headingless block needs before it is split into windows. */
-const WINDOW_MIN_CHARACTERS = 12_000;
+const WINDOW_MIN_CHARACTERS = 6_000;
+
+const STOP_WORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "are",
+  "for",
+  "how",
+  "in",
+  "is",
+  "of",
+  "on",
+  "the",
+  "to",
+  "with",
+]);
 
 function tokens(value: string): string[] {
-  return (value.toLowerCase().match(WORD_PATTERN) ?? []).filter((token) => token.length > 1);
+  return (value.toLowerCase().match(WORD_PATTERN) ?? []).map((word) => {
+    if (word.length > 6 && word.endsWith("ion")) return word.slice(0, -3);
+
+    if (word.length > 4 && /(?:ing|ed)$/.test(word)) return word.replace(/(?:ing|ed)$/, "");
+
+    if (word.length > 4 && /(?:ch|sh|v)e$/.test(word)) return word.slice(0, -1);
+
+    if (word.length > 4 && word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
+
+    return word;
+  });
+}
+
+function containsIdentifier(markdown: string, identifier: string): boolean {
+  const text = markdown.toLowerCase();
+  let index = text.indexOf(identifier);
+
+  while (index !== -1) {
+    const before = text[index - 1] ?? "";
+    const after = text[index + identifier.length] ?? "";
+
+    const beforeWord =
+      /[\p{L}\p{N}_+#-]/u.test(before) ||
+      (before === "." && /[\p{L}\p{N}]/u.test(text[index - 2] ?? ""));
+
+    const afterWord =
+      /[\p{L}\p{N}_+#-]/u.test(after) ||
+      (after === "." && /[\p{L}\p{N}]/u.test(text[index + identifier.length + 1] ?? ""));
+
+    if (!beforeWord && !afterWord) return true;
+    index = text.indexOf(identifier, index + 1);
+  }
+
+  return false;
+}
+
+/** Split long lines at whitespace without breaking identifiers or surrogate pairs. */
+function splitLongLine(line: string): string[] {
+  const parts: string[] = [];
+  let start = 0;
+  const target = WINDOW_TARGET_CHARACTERS / 2;
+
+  while (line.length - start > target) {
+    let end = start + target;
+
+    while (end > start && !/\s/u.test(line[end])) end -= 1;
+
+    if (end === start) {
+      end = start + target;
+
+      while (end < line.length && !/\s/u.test(line[end])) end += 1;
+    }
+
+    if (end >= line.length) break;
+    parts.push(line.slice(start, end));
+    start = end;
+  }
+
+  if (start < line.length) parts.push(line.slice(start));
+
+  return parts;
 }
 
 /**
- * Splits one headingless, blank-line-free block into line-aligned windows.
- *
- * Formatted source and log files have neither headings nor blank lines, so treating the
- * whole body as a single section would make focus select everything. Windows are bounded
- * by characters but never cut a line, and short blocks keep their single section.
+ * Splits headingless blocks into line-aligned windows, splitting long lines at
+ * whitespace when possible. Unbroken tokens stay intact even if oversized.
  */
 function splitIntoWindows(block: string): string[] {
   const lines = block.split(/\r?\n/);
@@ -58,6 +131,15 @@ function splitIntoWindows(block: string): string[] {
   let size = 0;
 
   for (const line of lines) {
+    if (line.length > WINDOW_TARGET_CHARACTERS / 2) {
+      if (current.length) windows.push(current.join("\n"));
+      current = [];
+      size = 0;
+
+      windows.push(...splitLongLine(line));
+      continue;
+    }
+
     if (size > 0 && size + line.length + 1 > WINDOW_TARGET_CHARACTERS) {
       windows.push(current.join("\n"));
       current = [];
@@ -134,9 +216,41 @@ function splitSections(markdown: string): SplitSections {
   const hasHeadings = headingLines.some(Boolean);
 
   if (!hasHeadings) {
-    // Keep mixed fenced Markdown intact rather than splitting a fence at blank lines.
+    // Split mixed prose and fenced blocks only at blank lines outside fences.
     if (lines.some((line) => /^[ \t]{0,3}(`{3,}|~{3,})/.test(line))) {
-      return { sections: [{ markdown, tokens: tokens(markdown) }], separator: "\n\n" };
+      const parts: string[] = [];
+      let current: string[] = [];
+      let fence: { marker: string; length: number } | undefined;
+
+      for (const line of lines) {
+        const match = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+
+        if (match) {
+          if (!fence) fence = { marker: match[1][0], length: match[1].length };
+          else if (
+            match[1][0] === fence.marker &&
+            match[1].length >= fence.length &&
+            !match[2].trim()
+          )
+            fence = undefined;
+        }
+
+        if (!fence && !line.trim()) {
+          const part = current.join("\n").trim();
+
+          if (part) parts.push(part);
+          current = [];
+        } else current.push(line);
+      }
+
+      const part = current.join("\n").trim();
+
+      if (part) parts.push(part);
+
+      return {
+        sections: parts.map((part) => ({ markdown: part, tokens: tokens(part) })),
+        separator: "\n\n",
+      };
     }
 
     const windowed = blocks.flatMap(splitIntoWindows);
@@ -164,8 +278,55 @@ function splitSections(markdown: string): SplitSections {
 
   flush();
 
+  // Split oversized sections at blank lines outside fences, so matches do not pull
+  // in an entire chapter. Keep the heading with its first content block.
+  const bounded = sections.flatMap((section) => {
+    if (section.length <= WINDOW_MIN_CHARACTERS) return [section];
+    const chunks: string[] = [];
+    let current: string[] = [];
+    let size = 0;
+    let inFence: { marker: string; length: number } | undefined;
+
+    for (const line of section.split("\n")) {
+      const match = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+
+      if (match) {
+        if (!inFence) inFence = { marker: match[1][0], length: match[1].length };
+        else if (
+          match[1][0] === inFence.marker &&
+          match[1].length >= inFence.length &&
+          !match[2].trim()
+        )
+          inFence = undefined;
+      }
+
+      if (!inFence && line.length > WINDOW_TARGET_CHARACTERS / 2) {
+        if (current.length) chunks.push(current.join("\n").trim());
+        current = [];
+        size = 0;
+
+        chunks.push(...splitLongLine(line));
+      } else if (!inFence && !line.trim() && size >= WINDOW_TARGET_CHARACTERS / 2) {
+        const chunk = current.join("\n").trim();
+
+        if (chunk) chunks.push(chunk);
+        current = [];
+        size = 0;
+      } else {
+        current.push(line);
+        size += line.length + 1;
+      }
+    }
+
+    const chunk = current.join("\n").trim();
+
+    if (chunk) chunks.push(chunk);
+
+    return chunks;
+  });
+
   return {
-    sections: sections.map((section) => ({ markdown: section, tokens: tokens(section) })),
+    sections: bounded.map((section) => ({ markdown: section, tokens: tokens(section) })),
     separator: "\n\n",
   };
 }
@@ -177,11 +338,13 @@ function splitSections(markdown: string): SplitSections {
  */
 export function focusMarkdown(markdown: string, query: string): FocusResult {
   const normalizedQuery = query.trim();
-  const queryTerms = [...new Set(tokens(normalizedQuery))];
+  const allTerms = [...new Set(tokens(normalizedQuery))];
+  const meaningfulTerms = allTerms.filter((term) => !STOP_WORDS.has(term));
+  const queryTerms = meaningfulTerms.length ? meaningfulTerms : allTerms;
   const { sections, separator } = splitSections(markdown);
   const originalCharacters = markdown.length;
 
-  if (queryTerms.length === 0 || sections.length === 0) {
+  if (!normalizedQuery || sections.length === 0) {
     return {
       markdown: "",
       details: {
@@ -207,7 +370,14 @@ export function focusMarkdown(markdown: string, query: string): FocusResult {
     );
   }
 
-  const selected = sections.filter((section) => {
+  // Punctuated identifiers and flags are literal, never broad component searches.
+  const literalIdentifier =
+    !/\s/u.test(normalizedQuery) && /[.\-/]/u.test(normalizedQuery)
+      ? normalizedQuery.toLowerCase()
+      : undefined;
+
+  const scores = sections.map((section) => {
+    if (literalIdentifier) return containsIdentifier(section.markdown, literalIdentifier) ? 1 : 0;
     const frequencies = new Map<string, number>();
 
     for (const token of section.tokens) frequencies.set(token, (frequencies.get(token) ?? 0) + 1);
@@ -229,8 +399,14 @@ export function focusMarkdown(markdown: string, query: string): FocusResult {
         ((frequency * (1.2 + 1)) / (frequency + 1.2 * lengthNormalization));
     }
 
-    return score > 0;
+    return score;
   });
+
+  const highestScore = scores.reduce((highest, score) => Math.max(highest, score), 0);
+
+  const selected = sections.filter(
+    (_, index) => scores[index] > 0 && scores[index] >= highestScore * 0.5,
+  );
 
   const focused = selected.map((section) => section.markdown).join(separator);
 

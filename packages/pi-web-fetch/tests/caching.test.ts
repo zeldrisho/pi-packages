@@ -143,7 +143,7 @@ describe("web_fetch caching", () => {
     );
 
     expect(second.offset).toBe(1_000);
-    expect(second.markdown).toContain("[End of page content.]");
+    expect(second.markdown).toContain("[End of results.]");
   });
 
   it("reuses one extracted page across continuation chunks", async () => {
@@ -198,6 +198,9 @@ describe("web_fetch caching", () => {
 
     const complete = await executeWebFetch({ url }, undefined, undefined, dependencies);
 
+    expect(focused.content[0].text).toContain(
+      "[Query matched 1/3 sections. Offsets apply to this view; omit query for the full page.]",
+    );
     expect(focused.content[0].text).toContain("Caching stores complete pages.");
     expect(focused.content[0].text).not.toContain("Installation uses Vite+.");
     expect(focused.details.focus).toMatchObject({
@@ -220,7 +223,7 @@ describe("web_fetch caching", () => {
       dependencies,
     );
 
-    expect(result.content[0].text).toContain("No source sections matched the focus query");
+    expect(result.content[0].text).toContain("No sections matched. Omit query for the full page.");
     expect(result.content[0].text).not.toContain("page contained no readable text");
     expect(result.details.focus?.matchedSections).toBe(0);
   });

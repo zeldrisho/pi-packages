@@ -20,6 +20,7 @@
 ## Rules
 
 - Use Conventional Commits.
+- Before implementing package changes, research related existing packages at `site:pi.dev/packages`.
 - Keep READMEs user-guide-only; put implementation and maintenance details in `docs/`.
 - Record only user-facing changes under `Unreleased` in package changelogs; run `vp run format:changelog` after edits.
 - Edit shared `cache.ts`, `inflight.ts`, and `render.ts` in `packages/pi-web-fetch/src/`, then run `vp run sync:web-modules` to update `pi-web-search`.

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Improve focus queries for identifiers, common words, word variants, HTML headings, and oversized content.
+- Keep fragment-focused continuation offsets on the same view.
+- Shorten focus and end-of-results notices.
+
 ## [0.16.2] - 2026-10-30
 
 ### Changed

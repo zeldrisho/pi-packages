@@ -159,16 +159,13 @@ function escapeMarkdownLinkText(value: string): string {
 function formatResults(query: string, results: SearchResult[], requestedCount: number): string {
   const returnedCount = results.length;
 
-  const retryAdvice =
-    "If evidence is insufficient, fetch promising sources or broaden the query (fewer quotes; relax nonessential site: restrictions).";
-
   const guidance =
     returnedCount < requestedCount
-      ? `Returned ${returnedCount} of ${requestedCount} requested results. ${retryAdvice} Preserve required source restrictions.`
+      ? `Returned ${returnedCount}/${requestedCount} results. If needed, read relevant pages or broaden the query; keep required site restrictions.`
       : "";
 
   if (returnedCount === 0) {
-    return `No web results found for ${JSON.stringify(query)}. Broaden the query (fewer quotes; relax nonessential site: restrictions). Preserve required source restrictions. No results do not prove absence.`;
+    return `No web results for ${JSON.stringify(query)}. Try broadening the query; keep required site restrictions. No results do not prove absence.`;
   }
 
   const entries = results.map((result, index) => {

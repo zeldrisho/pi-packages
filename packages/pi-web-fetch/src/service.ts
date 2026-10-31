@@ -374,7 +374,8 @@ const inflightFetches = new InflightCoalescer<string, FetchAcquisition>(MAX_INFL
  * Executes a validated web fetch, including caching, focusing, and bounded pagination.
  *
  * A URL fragment selects the starting heading, anchor, or source range unless
- * an explicit offset is supplied. A query selects sections before pagination.
+ * an explicit offset is supplied without a query. A query selects sections before pagination;
+ * its continuation offsets retain the fragment-selected view.
  * Missing fragments may suggest up to three links to other pages with that
  * fragment. Discovered llms.txt index URLs appear on every unblocked result,
  * including cache hits. Detected bot-wall documents return a blocked result
@@ -539,13 +540,13 @@ export async function executeWebFetch(
 
   const startingOffset = explicitOffset ?? fragmentOffset ?? FETCH_DEFAULT_OFFSET;
 
-  const hasFragmentRange =
-    explicitOffset === undefined &&
-    fragmentOffset !== undefined &&
-    resolvedFragment.endOffset !== undefined;
+  const useFragment =
+    fragmentOffset !== undefined && (explicitOffset === undefined || params.query !== undefined);
+
+  const hasFragmentRange = useFragment && resolvedFragment.endOffset !== undefined;
 
   const fragmentDocument =
-    explicitOffset === undefined && fragmentOffset !== undefined
+    useFragment && fragmentOffset !== undefined
       ? {
           ...document,
           markdown: hasFragmentRange
@@ -640,8 +641,8 @@ export async function executeWebFetch(
         ...(focused
           ? [
               focused.details.matchedSections > 0
-                ? `[Showing ${focused.details.matchedSections} of ${focused.details.totalSections} source sections selected by the focus query. Offsets apply to this focused view; omit query to read the complete document.]`
-                : "[No source sections matched the focus query. Omit query to read the complete document.]",
+                ? `[Query matched ${focused.details.matchedSections}/${focused.details.totalSections} sections. Offsets apply to this view; omit query for the full page.]`
+                : "[No sections matched. Omit query for the full page.]",
               "",
             ]
           : []),

@@ -48,7 +48,7 @@ vp run benchmark:web-fetch-extraction
 
 ## Verification
 
-`vp run ready` runs the dependency audit, formatting, linting, type checking, tests, repository contracts, tarball inspection, and packaged smoke tests. Tarballs should contain only the package README, changelog, license, manifest, runtime `src/` files, and explicitly contracted metadata such as `pi-gate`'s schema. `pi-web-fetch` also packages generated JavaScript challenge workers and solvers under `workers/` because Node cannot strip TypeScript from worker files installed under `node_modules`; regenerate them with `vp run build:anubis-worker` and `vp run build:aws-waf-worker`.
+`vp run ready` runs formatting, linting, type checking, tests, repository contracts, tarball inspection, and packaged smoke tests. Tarballs should contain only the package README, changelog, license, manifest, runtime `src/` files, and explicitly contracted metadata such as `pi-gate`'s schema. `pi-web-fetch` also packages generated JavaScript challenge workers and solvers under `workers/` because Node cannot strip TypeScript from worker files installed under `node_modules`; regenerate them with `vp run build:anubis-worker` and `vp run build:aws-waf-worker`.
 
 The deterministic suites use local fixtures and mocked Brave responses. Manually verify affected behavior, including missing keys and both search modes; fetch formats, redirects, blocked targets, limits, caching, coalescing, cancellation, and continuation; and temporary-file cleanup. For manual end-to-end verification, follow [testing.md](testing.md): disable ambient discovery, load `pi-opencode-free` plus only the packages under test, and ask the user which model to use before running the check. Run the changed extension through Pi with a real tool invocation—not only a direct call to its implementation or a load-only smoke test.
 
@@ -56,6 +56,6 @@ Before review, inspect the final diff for unrelated behavior, new network paths,
 
 ## Dependencies
 
-Open dependency updates manually. Review upstream notes, lockfile changes, GitHub Action major tags, and run validation. Keep Typebox, Vite+, TypeScript, and major toolchain updates separate. Keep `@types/node` on the newest Node 24 release so type checking rejects APIs unavailable in the tested runtime. Refresh the `@earendil-works/*` catalog at least once per release cycle; after catalog or lockfile changes, check the override conditions in `pnpm-workspace.yaml` and remove satisfied overrides. `vp run ready` includes `vp pm audit -- --audit-level high`; production advisories are not allowlisted.
+Open dependency updates manually. Review upstream notes, lockfile changes, GitHub Action major tags, and run validation. Keep Typebox, Vite+, TypeScript, and major toolchain updates separate. Keep `@types/node` on Node 24 so type checking rejects APIs unavailable in the tested runtime. After catalog or lockfile changes, check the override conditions in `pnpm-workspace.yaml` and remove satisfied overrides.
 
 Before a catalog bump, smoke-test Pi's latest APIs with `PI_SMOKE_DEPENDENCIES=latest vp run test:packages` while retaining the locked Typebox version.
