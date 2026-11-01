@@ -1,41 +1,20 @@
 # Review authentication and recovery
 
-Use this before running a review and after a pre-review authentication failure.
+Use this before running a review in a local sandbox, or after an authentication or sandbox access failure.
 
 ## Execution boundary
 
-Resolve `coderabbit` to its canonical absolute path in the agent's execution
-environment; keep discovery sandboxed when using a local sandbox. Check PATH
-once and, on macOS/Linux, the official installer's default
-`~/.local/bin/coderabbit`. Use path and permission metadata, not binary contents;
-do not search the whole filesystem. Trust only an expected user or system
-installation from an official source. Reject repository, workspace, temporary,
-alias, and wrapper executables. Location alone does not establish trust; ask the
-user to confirm the source if uncertain.
+Use the installed `coderabbit` command from the user's normal command environment.
+Do not run a repository-provided binary or wrapper. Invoke the CLI directly with
+literal arguments; do not wrap calls in pipes, command substitutions, or
+repository scripts.
 
-If discovery fails or the path is untrusted, report availability as unknown and
-stop; preserve the error. A failed PATH lookup or inaccessible path does not prove
-the CLI is missing. Canonicalize and apply the same metadata and trust checks to
-any candidate path supplied by the user. Only if the user confirms the CLI is not
-installed, direct them to <https://www.coderabbit.ai/cli> to install it themselves;
-never install it from this skill. After installation, repeat discovery and the
-authentication check; installation does not establish login.
-
-Reuse the validated path for this task; repeat discovery after installation
-changes or once after an executable-launch error. If unchanged, report the error
-and stop. Invoke the quoted, validated absolute path directly with literal,
-validated arguments; do not use wrappers, pipes, command substitutions, or
-repository scripts. Examples below use `coderabbit` as shorthand for that path.
-
-Choose the execution context before the first authentication or review command.
 In a local agent sandbox, use the harness's actual command-scoped host execution
 and approval controls for authentication status and the user-requested review
 when host access is required. Request approval with a command-specific reason.
-Do not run authentication or review in the sandbox merely to probe permissions.
 Do not change session-wide sandbox settings or silently fall back to an
 unapproved execution context. If host execution is unavailable or denied, stop
 and report that. Keep diagnostic `--version` and `--help` commands sandboxed.
-Run diagnostics only when needed to check support for the requested invocation.
 Tool metadata and these instructions do not enforce a security boundary; rely
 on the harness's actual permission controls.
 

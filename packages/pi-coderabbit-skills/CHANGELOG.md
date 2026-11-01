@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Strengthened CLI discovery and execution-context guidance for CodeRabbit reviews, with a user-run installation handoff.
+- Run CodeRabbit reviews directly in host-native sessions, consulting authentication recovery only when needed.
 
 ## [0.1.3] - 2026-10-17
 
