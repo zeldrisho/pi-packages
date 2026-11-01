@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { CLI_NPM_URL, CLI_UPDATE_URL, createCliVersionResolver } from "../src/cli-version";
 
 function updateMetadata(version = "2.1.4") {
@@ -235,6 +235,8 @@ describe("runtime OpenCode CLI version", () => {
     // SAFETY: listen() above binds a TCP socket, so its address is an AddressInfo.
     const address = server.address() as AddressInfo;
     let timedOut = false;
+    const timeout = AbortSignal.timeout.bind(AbortSignal);
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout").mockImplementation(() => timeout(100));
 
     const resolve = createCliVersionResolver(async (input, init) => {
       if (input === CLI_NPM_URL) return npmResponse();
@@ -253,7 +255,9 @@ describe("runtime OpenCode CLI version", () => {
     try {
       expect(await resolve()).toBe("2.1.4");
       expect(timedOut).toBe(true);
+      expect(timeoutSpy).toHaveBeenCalledWith(5_000);
     } finally {
+      timeoutSpy.mockRestore();
       server.closeAllConnections();
       await new Promise<void>((done, reject) =>
         server.close((error) => (error ? reject(error) : done())),

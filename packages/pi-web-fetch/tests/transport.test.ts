@@ -114,7 +114,7 @@ describe("web_fetch transport", () => {
     response.resume();
   });
 
-  it("falls back to the next validated address when the first is refused", async () => {
+  it("falls back to the next validated address when the first is unreachable", async () => {
     const response = await requestPinned(
       {
         url: new URL(`http://refused-test.invalid:${new URL(origin).port}/html`),
@@ -123,6 +123,7 @@ describe("web_fetch transport", () => {
         addresses: ["127.0.0.2", "127.0.0.1"],
       },
       new AbortController().signal,
+      { attemptTimeoutMs: 100 },
     );
 
     expect(response.statusCode).toBe(200);

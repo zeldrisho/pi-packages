@@ -83,6 +83,8 @@ function run(command: string, args: string[], cwd: string) {
     process.stderr.write(result.stderr);
     throw new Error(`${command} ${args.join(" ")} failed with exit code ${result.status}`);
   }
+
+  return result.stdout;
 }
 
 try {
@@ -104,6 +106,35 @@ try {
     );
 
     if (!tarball) throw new Error(`No tarball was produced for ${manifest.name}`);
+
+    const entries = run("tar", ["-tzf", join(tarballDirectory, tarball)], directory)
+      .trim()
+      .split("\n");
+
+    const allowed = ["package.json", "README.md", "LICENSE", ...manifest.files];
+
+    for (const entry of entries) {
+      const path = entry.replace(/^package\//, "");
+
+      if (
+        !entry.startsWith("package/") ||
+        path.split("/").some((part) => part === ".." || part === ".") ||
+        !allowed.some((name: string) => path === name || path.startsWith(`${name}/`))
+      ) {
+        throw new Error(`Unexpected tarball entry for ${manifest.name}: ${entry}`);
+      }
+    }
+
+    for (const name of allowed) {
+      if (
+        !entries.some(
+          (entry) => entry === `package/${name}` || entry.startsWith(`package/${name}/`),
+        )
+      ) {
+        throw new Error(`Missing tarball entry for ${manifest.name}: ${name}`);
+      }
+    }
+
     dependencies[manifest.name] = `file:${join(tarballDirectory, tarball)}`;
     packageNames.push(manifest.name);
   }

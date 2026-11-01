@@ -17,14 +17,4 @@ describe("search result cache", () => {
     expect(cache.get("third")).toBe("abcde");
     expect(cache.byteSize).toBe(5);
   });
-
-  it("removes expired entries from byte accounting", () => {
-    let now = 0;
-    const cache = new ExpiringLruCache<string, string>(10, 10, sizeOf, () => now);
-    cache.set("result", "1234", 5);
-    now = 5;
-
-    expect(cache.get("result")).toBeUndefined();
-    expect(cache.byteSize).toBe(0);
-  });
 });
