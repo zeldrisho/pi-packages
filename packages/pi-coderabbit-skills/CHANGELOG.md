@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Strengthened CLI discovery and execution-context guidance for CodeRabbit reviews, with a user-run installation handoff.
+
 ## [0.1.3] - 2026-10-17
 
 ### Changed
