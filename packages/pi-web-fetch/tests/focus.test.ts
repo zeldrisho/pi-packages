@@ -141,6 +141,21 @@ describe("query-focused Markdown", () => {
     expect(result.markdown).not.toContain("# C");
   });
 
+  it("omits weaker matching sections below half the best score", () => {
+    const result = focusMarkdown(
+      "# Strong\ncache validator policy cache validator policy\n# Weak\ncache unrelated unrelated unrelated unrelated unrelated unrelated unrelated unrelated",
+      "cache validator policy",
+    );
+
+    expect(result.markdown).toContain("# Strong");
+    expect(result.markdown).not.toContain("# Weak");
+    expect(result.details).toMatchObject({
+      matchedSections: 1,
+      totalSections: 2,
+      omittedSections: 1,
+    });
+  });
+
   it("matches identifiers and punctuation literally without falling back to components", () => {
     const markdown =
       "# A\nnotmorphe.keystore.bak\n# B\nMorphe keystore\n# C\nerror-startup and -- flags.";
@@ -153,6 +168,25 @@ describe("query-focused Markdown", () => {
 
   it("finds common word inflections", () => {
     expect(focusMarkdown("Cached pages expire.", "caching").markdown).toContain("Cached");
+  });
+
+  it.each([
+    ["cache", "caches"],
+    ["archive", "archives"],
+    ["string", "strings"],
+    ["process", "processes"],
+  ])("matches %s and %s in either direction", (singular, plural) => {
+    expect(focusMarkdown(`Target: ${plural}`, singular).markdown).toContain(plural);
+    expect(focusMarkdown(`Target: ${singular}`, plural).markdown).toContain(singular);
+  });
+
+  it("does not confuse plural stems with unrelated words", () => {
+    expect(
+      focusMarkdown("# Target\nprocesses\n# Other\nprocedures", "process").markdown,
+    ).not.toContain("procedures");
+    expect(focusMarkdown("# Target\nstrings\n# Other\nstripes", "string").markdown).not.toContain(
+      "stripes",
+    );
   });
 
   it("focuses long single-line paragraphs and mixed fences", () => {

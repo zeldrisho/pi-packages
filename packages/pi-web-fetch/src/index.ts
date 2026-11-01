@@ -120,10 +120,12 @@ export default function (pi: ExtensionAPI) {
       } catch (error) {
         if (error instanceof Error && /^web_fetch(?:: | )/.test(error.message)) {
           const message = error.message.replace(/^web_fetch(?:: | )/, "");
-          error.message =
+          throw new Error(
             message === "was cancelled."
               ? "Cancelled."
-              : message.charAt(0).toUpperCase() + message.slice(1);
+              : message.charAt(0).toUpperCase() + message.slice(1),
+            { cause: error },
+          );
         }
 
         throw error;

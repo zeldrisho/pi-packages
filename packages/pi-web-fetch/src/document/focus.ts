@@ -54,14 +54,18 @@ const STOP_WORDS = new Set([
 ]);
 
 function tokens(value: string): string[] {
-  return (value.toLowerCase().match(WORD_PATTERN) ?? []).map((word) => {
+  return (value.toLowerCase().match(WORD_PATTERN) ?? []).map((token) => {
+    let word = token;
+
+    if (word.length > 5 && /(?:ss|ch|sh|x|z)es$/.test(word)) word = word.slice(0, -2);
+    else if (word.length > 4 && word.endsWith("s") && !word.endsWith("ss"))
+      word = word.slice(0, -1);
+
     if (word.length > 6 && word.endsWith("ion")) return word.slice(0, -3);
 
     if (word.length > 4 && /(?:ing|ed)$/.test(word)) return word.replace(/(?:ing|ed)$/, "");
 
     if (word.length > 4 && /(?:ch|sh|v)e$/.test(word)) return word.slice(0, -1);
-
-    if (word.length > 4 && word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
 
     return word;
   });

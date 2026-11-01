@@ -39,9 +39,12 @@ describe("web_fetch rendering", () => {
       execute(id: string, params: { url: string; offset: number }): Promise<void>;
     };
 
-    await expect(tool.execute("call", { url: "https://example.com", offset: -1 })).rejects.toThrow(
-      "Offset must be an integer between 0 and 20000000.",
-    );
+    await expect(
+      tool.execute("call", { url: "https://example.com", offset: -1 }),
+    ).rejects.toMatchObject({
+      message: "Offset must be an integer between 0 and 20000000.",
+      cause: { message: "web_fetch offset must be an integer between 0 and 20000000." },
+    });
   });
 
   it("shows a Pi-style preview until tool output is expanded", () => {

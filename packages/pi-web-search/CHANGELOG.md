@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Shorten search guidance, error, and output-limit notices.
 
+### Fixed
+
+- Avoid duplicate overflow notices in expanded search results.
+
 ## [0.14.4] - 2026-10-30
 
 ### Changed

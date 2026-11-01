@@ -72,14 +72,26 @@ export default function (pi: ExtensionAPI) {
 
       if (isPartial) return new Text(theme.fg("warning", content?.text || "Searching…"), 0, 0);
 
+      const path = result.details?.fullOutputPath;
+      const lastLine = content?.text.trimEnd().split("\n").at(-1);
+
+      const overflowNotice =
+        path &&
+        lastLine?.endsWith(`Full output: ${path}]`) &&
+        (lastLine.startsWith("[Output truncated:") ||
+          lastLine.startsWith("[Structured payload omitted due to limits."))
+          ? lastLine
+          : undefined;
+
       return content?.type === "text"
         ? renderCollapsibleOutput(
             content.text,
             expanded,
             theme,
             context?.isError,
-            result.details?.fullOutputPath
-              ? `[${result.details.truncation?.truncated ? "Output truncated. " : "Structured payload omitted. "}Full output: ${result.details.fullOutputPath}]`
+            path
+              ? (overflowNotice ??
+                  `[${result.details?.truncation?.truncated ? "Output truncated. " : "Structured payload omitted. "}Full output: ${path}]`)
               : undefined,
           )
         : new Text(theme.fg("dim", "No results"), 0, 0);

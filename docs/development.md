@@ -10,7 +10,7 @@ Install [Vite+](https://vite-plus.dev/) and workspace dependencies:
 vp install
 ```
 
-Node.js 24.11.0 or newer is recommended. Common commands:
+The current Node.js LTS release is recommended and used in CI and release workflows. Common commands:
 
 | Task                         | Command          |
 | ---------------------------- | ---------------- |
@@ -56,6 +56,6 @@ Before review, inspect the final diff for unrelated behavior, new network paths,
 
 ## Dependencies
 
-Open dependency updates manually. Review upstream notes, lockfile changes, GitHub Action major tags, and run validation. Keep Typebox, Vite+, TypeScript, and major toolchain updates separate. Keep `@types/node` on Node 24 so type checking rejects APIs unavailable in the tested runtime. After catalog or lockfile changes, check the override conditions in `pnpm-workspace.yaml` and remove satisfied overrides.
+Open dependency updates manually. Review upstream notes, lockfile changes, GitHub Action major tags, and run validation. Keep Typebox, TypeScript, and major toolchain updates separate. Keep `@types/node` aligned with the current Node.js LTS major; update it when LTS advances so type checking matches the tested runtime. After catalog or lockfile changes, check the override conditions in `pnpm-workspace.yaml` and remove satisfied overrides.
 
 Before a catalog bump, smoke-test Pi's latest APIs with `PI_SMOKE_DEPENDENCIES=latest vp run test:packages` while retaining the locked Typebox version.
