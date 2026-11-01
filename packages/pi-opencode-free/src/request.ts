@@ -81,9 +81,8 @@ export function normalizeFreeRequestPayload(
       (message) => isInstructionMessage(message) && ENV_BLOCK.test(messageText(message.content)),
     );
 
-    normalized.messages = hasEnv
-      ? removeInstructionCwdBlocks(messages)
-      : replaceEnvironment(messages);
+    const prepared = hasEnv ? removeInstructionCwdBlocks(messages) : replaceEnvironment(messages);
+    normalized.messages = ensureFirstEnvironment(prepared);
   }
 
   return normalized;
@@ -100,6 +99,38 @@ const CWD_BLOCK = /<cwd>([^]*?)<\/cwd>/u;
 
 /** Matches the gateway's environment block when it already declares a working directory. */
 const ENV_BLOCK = /<env>(?:(?!<\/env>)[^])*?\bWorking directory:(?:(?!<\/env>)[^])*?<\/env>/u;
+
+/** Ensures an earlier incomplete or unrelated env block cannot shadow the usable one. */
+function ensureFirstEnvironment(
+  messages: readonly ChatMessageReference[],
+): readonly ChatMessageReference[] {
+  const text = messages
+    .flatMap((message) => (isInstructionMessage(message) ? [messageText(message.content)] : []))
+    .join("\n");
+
+  const first = /<env>([^]*?)<\/env>/u.exec(text);
+
+  if (first && !first[1]?.includes("<env>") && /\bWorking directory:/u.test(first[1] ?? "")) {
+    return messages;
+  }
+
+  const usable = [...text.matchAll(/<env>((?:(?!<env>|<\/env>)[^])*)<\/env>/gu)].find((match) =>
+    /\bWorking directory:/u.test(match[1] ?? ""),
+  );
+
+  const directory =
+    /\bWorking directory:[ \t]*([^\n<]*)/u.exec(usable?.[1] ?? "")?.[1] ?? process.cwd();
+
+  const index = messages.findIndex(isInstructionMessage);
+
+  if (index < 0) return [{ role: "system", content: envBlock(directory) }, ...messages];
+
+  return messages.map((message, i) =>
+    i === index
+      ? { ...message, content: prependBlock(message.content, envBlock(directory)) }
+      : message,
+  );
+}
 
 /** Returns whether a message carries prompt instructions for the gateway. */
 function isInstructionMessage(message: ChatMessageReference): boolean {

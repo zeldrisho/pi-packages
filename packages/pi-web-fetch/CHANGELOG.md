@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Close unused redirect and error responses promptly, including stalled responses.
+- Avoid retrying before a server's longer requested delay.
+- Bound concurrent page acquisitions, including slow downloads, and reject requests when the waiting queue is full.
+
 ## [0.16.3] - 2026-11-01
 
 ### Fixed

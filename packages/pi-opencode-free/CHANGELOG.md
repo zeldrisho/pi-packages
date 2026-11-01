@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve existing instructions while placing the working-directory declaration before conflicting or incomplete environment blocks.
+- Clarify that a free-usage error may indicate a refused request rather than exhausted quota.
+
 ## [0.3.2] - 2026-10-30
 
 ### Changed

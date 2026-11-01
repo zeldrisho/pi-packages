@@ -117,15 +117,17 @@ describe("web_search provider transport", () => {
     ).rejects.toThrow("Provider returned HTTP 502");
   });
 
-  it("bounds provider error bodies and strips markup", async () => {
+  it("does not expose provider error bodies or echoed credentials", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "error-secret";
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response(`<b>${"failure ".repeat(100)}</b>`, { status: 429 })),
+      vi.fn(
+        async () => new Response(`<b>error-secret ${"failure ".repeat(100)}</b>`, { status: 429 }),
+      ),
     );
     await expect(
       createSearchTool().execute("call", { query: "provider error test" }, undefined, undefined),
-    ).rejects.toThrow(/^Provider returned HTTP 429: failure/);
+    ).rejects.toThrow(/^Provider returned HTTP 429$/);
   });
 
   it("stops reading oversized provider errors while preserving the HTTP status", async () => {
@@ -156,7 +158,7 @@ describe("web_search provider transport", () => {
     expect(error).toBeInstanceOf(Error);
     // SAFETY: the rejection value is always an Error thrown by the provider transport.
     const err = error as Error;
-    expect(err.message).toMatch(/^Provider returned HTTP 429: failure/);
+    expect(err.message).toBe("Provider returned HTTP 429");
     expect(err.message).not.toContain("<b>");
     expect(err.message.length).toBeLessThan(550);
     expect(cancelled).toBe(true);

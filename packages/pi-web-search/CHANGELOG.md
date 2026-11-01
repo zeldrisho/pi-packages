@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Refuse provider redirects to prevent subscription tokens from being forwarded to another origin.
+- Omit untrusted provider error bodies, which could echo credentials or search queries.
+
 ## [0.14.5] - 2026-11-01
 
 ### Changed

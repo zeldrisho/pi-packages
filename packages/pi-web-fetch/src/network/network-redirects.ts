@@ -116,18 +116,17 @@ async function defaultSleep(milliseconds: number, signal: AbortSignal): Promise<
   });
 }
 
-/** Parses a Retry-After header into a bounded delay in milliseconds. */
+/** Parses a Retry-After header into a delay in milliseconds. */
 function retryAfterMilliseconds(value: string | undefined, now = Date.now()): number | undefined {
   if (!value) return undefined;
-  const seconds = Number(value.trim());
+  const trimmed = value.trim();
 
-  if (Number.isFinite(seconds) && seconds >= 0)
-    return Math.min(seconds * 1_000, MAX_RETRY_DELAY_MS);
+  if (/^\d+(?:\.\d+)?$/u.test(trimmed)) return Number(trimmed) * 1_000;
   const date = Date.parse(value);
 
   if (!Number.isFinite(date)) return undefined;
 
-  return Math.min(Math.max(0, date - now), MAX_RETRY_DELAY_MS);
+  return Math.max(0, date - now);
 }
 
 /** Sends one origin-limited request and retries transient rate-limit responses. */
@@ -170,10 +169,14 @@ async function coordinatedRequest(
     const status = response.statusCode ?? 0;
 
     if (![429, 503].includes(status) || attempt >= MAX_RETRIES) return response;
-    // The retry decision uses headers only. Drop an untrusted error body so it cannot
-    // consume unbounded bandwidth while the caller is backing off.
-    response.destroy();
     const advertised = retryAfterMilliseconds(responseHeader(response, "retry-after"));
+
+    // Do not retry earlier than the server requested. Return the response so the
+    // caller can report its status rather than waiting beyond our retry budget.
+    if (advertised !== undefined && advertised > MAX_RETRY_DELAY_MS) return response;
+
+    // The retry decision uses headers only. Drop the untrusted error body.
+    response.destroy();
     const exponential = BASE_RETRY_DELAY_MS * 2 ** attempt;
     const jittered = Math.round(exponential * (0.75 + Math.min(1, Math.max(0, random())) * 0.5));
     await sleep(advertised ?? Math.min(jittered, MAX_RETRY_DELAY_MS), signal);
@@ -202,11 +205,14 @@ export async function requestFollowingRedirects(
 
     const location = responseHeader(response, "location");
 
+    // Redirect bodies are unused and may never finish. Close before validation
+    // or error handling so no discarded response survives the acquisition.
+    response.destroy();
+
     if (!location) throw new Error("web_fetch received a redirect without a Location header.");
 
     if (redirects === FETCH_MAX_REDIRECTS)
       throw new Error("web_fetch followed too many redirects.");
-    response.resume();
     target = await awaitWithAbort(validateUrl(new URL(location, target.url)), signal);
     // Validators describe the originally cached resource and must not leak to a redirect target.
     // Challenge handshakes opt into a fixed browser identity instead.

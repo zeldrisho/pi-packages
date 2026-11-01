@@ -1,4 +1,5 @@
 import type { IncomingMessage } from "node:http";
+import { acquisitionAdmission } from "./admission.ts";
 import {
   lineFragmentOffsets,
   markdownFragmentOffsets,
@@ -202,7 +203,7 @@ function assertSuccessfulResponse(response: IncomingMessage): void {
   const status = response.statusCode ?? 0;
 
   if (isAwsWafChallengeResponse(response)) {
-    response.resume();
+    response.destroy();
     throw new ChallengeBlockedError(
       `web_fetch was blocked by an AWS WAF anti-bot challenge (HTTP ${status}).`,
     );
@@ -213,7 +214,7 @@ function assertSuccessfulResponse(response: IncomingMessage): void {
   const cloudflareChallenge =
     responseHeader(response, "cf-mitigated")?.trim().toLowerCase() === "challenge";
 
-  response.resume();
+  response.destroy();
 
   if (cloudflareChallenge) {
     throw new ChallengeBlockedError(
@@ -569,6 +570,9 @@ async function fetchDocument(
 
   const cancel = () => controller.abort();
   signal?.addEventListener("abort", cancel, { once: true });
+
+  if (signal?.aborted) cancel();
+  let release: (() => void) | undefined;
   const conditionalHeaders: Record<string, string> = {};
 
   if (cached?.validators?.etag) conditionalHeaders["If-None-Match"] = cached.validators.etag;
@@ -584,6 +588,7 @@ async function fetchDocument(
   };
 
   try {
+    release = await acquisitionAdmission.acquire(controller.signal);
     const requestUrl = normalizeGitHubRawUrl(rawUrl);
 
     let { target, response } = await requestFollowingRedirects(
@@ -600,7 +605,7 @@ async function fetchDocument(
     // for one exact representation opt out: HTML from that URL is never the
     // representation they are looking for.
     if (retryRepresentationMiss && [404, 406].includes(response.statusCode ?? 0)) {
-      response.resume();
+      response.destroy();
       ({ target, response } = await requestFollowingRedirects(
         target.url,
         controller.signal,
@@ -616,7 +621,7 @@ async function fetchDocument(
       const fallbackUrl = npmRegistryFallbackUrl(rawUrl);
 
       if (fallbackUrl) {
-        response.resume();
+        response.destroy();
         ({ target, response } = await requestFollowingRedirects(
           fallbackUrl,
           controller.signal,
@@ -632,7 +637,7 @@ async function fetchDocument(
       const resolver = requestDependencies.awsWafResolver ?? nativeAwsWafResolver;
 
       if (resolver) {
-        response.resume();
+        response.destroy();
 
         const solution = await resolveAwsWafToken(
           resolver,
@@ -668,7 +673,7 @@ async function fetchDocument(
     }
 
     if (response.statusCode === 304 && cached) {
-      response.resume();
+      response.destroy();
       const etag = responseHeader(response, "etag") ?? cached.validators?.etag;
 
       const lastModified =
@@ -702,6 +707,7 @@ async function fetchDocument(
     if (signal?.aborted) throw new Error("web_fetch was cancelled.");
     throw error;
   } finally {
+    release?.();
     clearTimeout(timeout);
     signal?.removeEventListener("abort", cancel);
   }

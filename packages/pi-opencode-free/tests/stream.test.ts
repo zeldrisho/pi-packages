@@ -205,7 +205,9 @@ describe("OpenCode provider stream boundary", () => {
             ? `Reset time: ${formatResetTime(Date.parse("2026-10-23T13:00:00Z"))}.`
             : "Reset time unavailable.";
 
-        expect(result.errorMessage).toBe(`OpenCode Free quota exceeded.\n${reset}`);
+        expect(result.errorMessage).toBe(
+          `OpenCode Free usage limit or request refusal (FreeUsageLimitError).\n${reset}`,
+        );
         expect(isRetryableAssistantError(result)).toBe(false);
         expect(fetcher).toHaveBeenCalledTimes(1);
         expect(result.errorMessage).not.toMatch(/Retry-After|https:\/\//u);
@@ -285,6 +287,56 @@ describe("OpenCode provider stream boundary", () => {
               },
             ],
           })}\n\ndata: [DONE]\n\n`,
+          { headers: { "content-type": "text/event-stream" } },
+        ),
+      identity,
+    );
+
+    const result = await native(model, summary, options).result();
+    expect(result.stopReason).toBe("toolUse");
+    expect(result.content).toMatchObject([
+      { type: "toolCall", name: "read", arguments: { path: "README.md" } },
+    ]);
+  });
+
+  it("assembles fragmented streamed tool calls without changing their arguments", async () => {
+    const frames =
+      [
+        { index: 0, id: "call-1", type: "function", function: { name: "read", arguments: '{"pa' } },
+        { index: 0, function: { arguments: 'th":"README.md"}' } },
+      ]
+        .map(
+          (call, index) =>
+            `data: ${JSON.stringify({
+              id: "tool-response",
+              object: "chat.completion.chunk",
+              created: 0,
+              model: model.id,
+              choices: [
+                {
+                  index: 0,
+                  delta: { tool_calls: [call] },
+                  finish_reason: index === 1 ? "tool_calls" : null,
+                },
+              ],
+            })}\n\n`,
+        )
+        .join("") + "data: [DONE]\n\n";
+
+    const bytes = new TextEncoder().encode(frames);
+
+    const native = createFreeStream(
+      async () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              for (let index = 0; index < bytes.length; index += 7) {
+                controller.enqueue(bytes.slice(index, index + 7));
+              }
+
+              controller.close();
+            },
+          }),
           { headers: { "content-type": "text/event-stream" } },
         ),
       identity,
@@ -500,7 +552,7 @@ describe("quota timing", () => {
     expect(quotaResetAt(new Headers({ "retry-after": "0" }), now)).toBe(now);
     expect(quotaResetAt(new Headers({ "retry-after": "0.5" }), now)).toBe(now + 500);
     expect(usageLimitMessage(new Headers(), now)).toBe(
-      "OpenCode Free quota exceeded.\nReset time unavailable.",
+      "OpenCode Free usage limit or request refusal (FreeUsageLimitError).\nReset time unavailable.",
     );
   });
 });

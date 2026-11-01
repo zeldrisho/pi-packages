@@ -394,7 +394,7 @@ async function fetchWasmModule(
   const status = response.statusCode ?? 0;
 
   if (status < 200 || status >= 300) {
-    response.resume();
+    response.destroy();
     throw new Error(`web_fetch could not download the Anubis challenge module (HTTP ${status}).`);
   }
 

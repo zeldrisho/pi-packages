@@ -108,6 +108,24 @@ describe("free-tier request normalization", () => {
 });
 
 describe("prompt preservation", () => {
+  it.each([
+    "<env>\n Platform: darwin\n</env>",
+    "<env>\n Working directory: /incomplete",
+    "<env>broken<env>Working directory: /nested</env>",
+  ])("keeps a usable first environment before shadowing text", (content) => {
+    const messages = [
+      { role: "system", content },
+      { role: "developer", content: "<env>\n Working directory: /later\n</env>" },
+    ];
+
+    const result = normalizeFreeRequestPayload({ model: "beam-free", messages });
+    expect(String(result.messages?.[0]?.content)).toMatch(
+      /^<env>\n Working directory: .+\n<\/env>\n\n/,
+    );
+    expect(result.messages?.[0]?.content).toContain(content);
+    expect(normalizeFreeRequestPayload(result).messages).toBe(result.messages);
+    expect(messages[0]?.content).toBe(content);
+  });
   it("prefixes a minimal env block and preserves the prompt", () => {
     const messages = [
       { role: "system", content: "You are Pi." },
