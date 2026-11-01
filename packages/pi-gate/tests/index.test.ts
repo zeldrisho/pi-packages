@@ -840,7 +840,7 @@ describe("piGate extension", () => {
       expect(result).toEqual({
         block: true,
         reason:
-          'pi-gate: no response to rule "rm -rf" within 0.02s; command not run. Ask the user whether to retry approval.',
+          'pi-gate: approval timed out after 0.02s (rule "rm -rf"); command not run. Ask the user before retrying.',
         terminate: true,
       });
     });

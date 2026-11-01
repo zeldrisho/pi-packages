@@ -25,6 +25,28 @@ const renderTheme: RenderTheme = {
 };
 
 describe("web_fetch rendering", () => {
+  it("omits the tool name from errors exposed to callers", async () => {
+    let registered: unknown;
+    // SAFETY: capture the tool registered by the extension for a boundary-level check.
+    registerWebFetch({
+      registerTool(tool: any) {
+        registered = tool;
+      },
+    } as ExtensionAPI);
+
+    // SAFETY: the extension registers the execute signature exercised below.
+    const tool = registered as {
+      execute(id: string, params: { url: string; offset: number }): Promise<void>;
+    };
+
+    await expect(
+      tool.execute("call", { url: "https://example.com", offset: -1 }),
+    ).rejects.toMatchObject({
+      message: "Offset must be an integer between 0 and 20000000.",
+      cause: { message: "web_fetch offset must be an integer between 0 and 20000000." },
+    });
+  });
+
   it("shows a Pi-style preview until tool output is expanded", () => {
     let registered: unknown;
     // SAFETY: registerWebFetch registers a single web_fetch tool via `registerTool`;
@@ -138,6 +160,28 @@ describe("web_fetch rendering", () => {
       .join("\n");
 
     expect(truncatedResult).toContain("Continue with offset=6000");
+
+    const notice = "[Content truncated. Continue with offset=6000 to read the next chunk.]";
+
+    for (const text of [`${output}\n\n${notice}`, `Short content\n\n${notice}`]) {
+      for (const expanded of [false, true]) {
+        const rendered = tool
+          .renderResult(
+            {
+              ...result,
+              content: [{ type: "text", text }],
+              details: { ...result.details, truncated: true, nextOffset: 6000 },
+            },
+            { expanded, isPartial: false },
+            renderTheme,
+          )
+          .render(200)
+          .join("\n");
+
+        expect(rendered.split("Continue with offset=6000")).toHaveLength(2);
+      }
+    }
+
     expect(
       tool
         .renderResult(

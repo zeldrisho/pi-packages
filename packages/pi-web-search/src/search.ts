@@ -159,16 +159,13 @@ function escapeMarkdownLinkText(value: string): string {
 function formatResults(query: string, results: SearchResult[], requestedCount: number): string {
   const returnedCount = results.length;
 
-  const retryAdvice =
-    "If evidence is insufficient, fetch promising sources or broaden the query (fewer quotes; relax nonessential site: restrictions).";
-
   const guidance =
     returnedCount < requestedCount
-      ? `Returned ${returnedCount} of ${requestedCount} requested results. ${retryAdvice} Preserve required source restrictions.`
+      ? `Returned ${returnedCount}/${requestedCount} results. If needed, read relevant pages or broaden the query; keep required site restrictions.`
       : "";
 
   if (returnedCount === 0) {
-    return `No web results found for ${JSON.stringify(query)}. Broaden the query (fewer quotes; relax nonessential site: restrictions). Preserve required source restrictions. No results do not prove absence.`;
+    return `No web results for ${JSON.stringify(query)}. Try broadening the query; keep required site restrictions. No results do not prove absence.`;
   }
 
   const entries = results.map((result, index) => {
@@ -466,7 +463,7 @@ export class SearchRuntime {
           return entry;
         },
         signal,
-        "Web search was cancelled.",
+        "Cancelled.",
       ));
 
     if (payload.results.length === 0 && !payload.answer) {
@@ -508,7 +505,7 @@ export class SearchRuntime {
                 return entry;
               },
               signal,
-              "Web search was cancelled.",
+              "Cancelled.",
             ));
           cached = cachedAnswer !== undefined;
           apiKeySource = answerCredentials.source;
@@ -598,8 +595,8 @@ export class SearchRuntime {
       }
 
       text += truncation.truncated
-        ? `\n\n[Output truncated to ${truncation.outputLines} of ${truncation.totalLines} lines (${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}). Full output saved to: ${fullOutputPath}]`
-        : `\n\n[Structured payload omitted to fit output limits. Full output saved to: ${fullOutputPath}]`;
+        ? `\n\n[Output truncated: ${truncation.outputLines}/${truncation.totalLines} lines (${formatSize(truncation.outputBytes)}/${formatSize(truncation.totalBytes)}). Full output: ${fullOutputPath}]`
+        : `\n\n[Structured payload omitted due to limits. Full output: ${fullOutputPath}]`;
     }
 
     structured.fullOutputPath = fullOutputPath;

@@ -2,11 +2,38 @@ import { readFile, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { Check } from "typebox/value";
-import { DEFAULT_MAX_BYTES } from "@earendil-works/pi-coding-agent";
+import { DEFAULT_MAX_BYTES, initTheme } from "@earendil-works/pi-coding-agent";
 import { webSearchOutputSchema } from "../src/search";
-import { answerResponse, createSearchHarness } from "./harness";
+import {
+  answerResponse,
+  createSearchHarness,
+  renderTheme,
+  type SearchExecutionResult,
+  type SearchTool,
+} from "./harness";
+
+function expectOneOverflowNotice(tool: SearchTool, result: SearchExecutionResult) {
+  const notice = result.content[0].text.trimEnd().split("\n").at(-1)!;
+
+  const longResult = {
+    ...result,
+    content: [
+      { type: "text" as const, text: `${Array(12).fill("Result line").join("\n")}\n\n${notice}` },
+    ],
+  };
+
+  for (const expanded of [false, true]) {
+    const rendered = tool
+      .renderResult(longResult, { expanded, isPartial: false }, renderTheme)
+      .render(200)
+      .join("\n");
+
+    expect(rendered.match(/Full output:/g)).toHaveLength(1);
+  }
+}
 
 describe("web_search truncation lifecycle", () => {
+  initTheme();
   it("bounds JSON escaping even when the model-facing text fits", async () => {
     process.env.BRAVE_ANSWERS_API_KEY = "escaped-answer-secret";
     vi.stubGlobal(
@@ -26,6 +53,7 @@ describe("web_search truncation lifecycle", () => {
       expect(Check(webSearchOutputSchema, result.structuredContent)).toBe(true);
       expect(result.structuredContent).toMatchObject({ payloadOmitted: true, truncated: true });
       expect(result.content[0].text).toContain("Structured payload omitted");
+      expectOneOverflowNotice(harness.tool, result);
       expect(Buffer.byteLength(JSON.stringify(result.structuredContent))).toBeLessThanOrEqual(
         DEFAULT_MAX_BYTES,
       );
@@ -64,6 +92,7 @@ describe("web_search truncation lifecycle", () => {
     expect(Buffer.byteLength(JSON.stringify(result.structuredContent))).toBeLessThanOrEqual(
       DEFAULT_MAX_BYTES,
     );
+    expectOneOverflowNotice(harness.tool, result);
     expect(result.details.truncated).toBe(true);
     expect(result.details.fullOutputPath).toBeDefined();
     const fullOutputPath = result.details.fullOutputPath!;

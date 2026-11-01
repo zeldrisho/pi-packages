@@ -1,6 +1,6 @@
 # Review authentication and recovery
 
-Use this before running a review and after a pre-review authentication failure.
+Use this before running a review in a local sandbox, or after an authentication or sandbox access failure.
 
 ## Execution boundary
 

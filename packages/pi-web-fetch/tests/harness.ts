@@ -41,6 +41,15 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
     return;
   }
 
+  if (request.url?.startsWith("/focused-fragment")) {
+    response.setHeader("content-type", "text/plain; charset=utf-8");
+    response.end(
+      `# Before\n\n${"needle before ".repeat(400)}\n\n# Target\n\n${"needle target ".repeat(1200)}\n\n# After\n\nneedle after`,
+    );
+
+    return;
+  }
+
   if (request.url?.startsWith("/markdown-fragments")) {
     response.setHeader("content-type", "text/plain; charset=utf-8");
     response.end(

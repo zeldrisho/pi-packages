@@ -116,6 +116,32 @@ describe("web_fetch structured output", () => {
     expect(received).toBe("\u0001".repeat(40_000));
   });
 
+  it("continues a fragment-focused view without switching to the whole document", async () => {
+    const url = `${origin}/focused-fragment#L5`;
+
+    const first = await executeWebFetch(
+      { url, query: "needle", maxCharacters: 1000 },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    const offset = first.details.nextOffset;
+    expect(offset).toBeDefined();
+
+    const second = await executeWebFetch(
+      { url, query: "needle", offset, maxCharacters: 1000 },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(second.details.focus?.totalSections).toBe(first.details.focus?.totalSections);
+    expect(second.details.totalCharacters).toBe(first.details.totalCharacters);
+    expect(second.content[0].text).toContain("target");
+    expect(second.content[0].text).not.toContain("before");
+  });
+
   it("returns focused and cached metadata without changing the canonical document", async () => {
     const focused = await executeWebFetch(
       { url: `${origin}/focused`, query: "Redirect" },

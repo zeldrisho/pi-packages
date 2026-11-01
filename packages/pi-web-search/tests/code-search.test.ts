@@ -138,13 +138,16 @@ describe("web_search recovery guidance", () => {
     expect(text).not.toContain("_Provider:");
 
     if (count === 0) {
-      expect(text).toContain("No web results found");
+      expect(text).toContain(
+        `No web results for "guidance 0". Try broadening the query; keep required site restrictions.`,
+      );
       expect(text).toContain("No results do not prove absence");
     } else if (count < 5) {
-      expect(text).toContain(`Returned ${count} of 5 requested results.`);
-      expect(text.match(/If evidence is insufficient/g)).toHaveLength(1);
+      expect(text).toContain(
+        `Returned ${count}/5 results. If needed, read relevant pages or broaden the query; keep required site restrictions.`,
+      );
       expect(text.indexOf("Returned")).toBeLessThan(text.indexOf("1. ["));
-    } else expect(text).not.toContain("If evidence is insufficient");
+    } else expect(text).not.toContain("If needed, read relevant pages");
     const cached = await tool.execute("cached", params, undefined, undefined);
     expect(cached.content).toEqual(result.content);
     expect(fetchMock).toHaveBeenCalledTimes(1);

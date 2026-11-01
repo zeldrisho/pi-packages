@@ -17,13 +17,13 @@ Use `pi config` to enable or disable the extension, and `pi list` to see configu
 
 The `web_fetch` tool accepts public HTTP and HTTPS URLs and supports HTML, Markdown, plain text, JSON, and XML. HTML is converted to Markdown; images are omitted. Minified JavaScript, JSON, and YAML are returned as indented code blocks so long single-line payloads stay readable. URLs with credentials, local or private network targets, unsafe redirects, downloads over 5 MiB, and unsupported content types are rejected.
 
-| Parameter | Description                                                                                               |
-| --------- | --------------------------------------------------------------------------------------------------------- |
-| `url`     | Required page URL. URL fragments can start output at a matching heading or anchor.                        |
-| `query`   | Optional; selects matching sections from a long page. Sections remain in source order.                    |
-| `offset`  | Optional character offset for continuing through extracted content; takes precedence over a URL fragment. |
+| Parameter | Description                                                                                                                                                                                         |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`     | Required page URL. URL fragments can start output at a matching heading or anchor.                                                                                                                  |
+| `query`   | Optional; selects matching sections from a long page. Sections remain in source order.                                                                                                              |
+| `offset`  | Optional character offset for continuing through extracted content. With a query and fragment, offsets apply to the fragment-focused view; otherwise, an offset takes precedence over the fragment. |
 
-Output is bounded to 6,000 characters by default. For long pages, use the returned `nextOffset` to continue. Use `query` to focus on matching sections, or omit it to read the complete document. Pi's preview is collapsed by default; press `Ctrl+O` to expand it.
+Output is bounded to 6,000 characters by default. For long pages, use the returned `nextOffset` to continue with the same URL and query. Use `query` to focus on matching sections, or omit it to read the complete document. Queries use approximate word matching and relevance selection; dotted or hyphenated identifiers and flags are matched literally. Focus can omit relevant content, so omit the query when completeness matters. Pi's preview is collapsed by default; press `Ctrl+O` to expand it.
 
 For example, a URL such as `https://github.com/zeldrisho/pi-packages/blob/main/packages/pi-web-fetch/README.md#usage` starts at the matching heading. GitHub `blob` links and bare gists are converted to raw source URLs; repository roots use their README. GitHub directory listings are not supported.
 

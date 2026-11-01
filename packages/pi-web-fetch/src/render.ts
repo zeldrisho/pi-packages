@@ -37,7 +37,7 @@ export function renderCollapsibleOutput(
     );
   }
 
-  if (warning) {
+  if (warning && !visible.includes(warning)) {
     component.addChild(new Spacer(1));
     component.addChild(new Text(theme.fg("warning", warning), 0, 0));
   }

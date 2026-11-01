@@ -76,6 +76,6 @@ describe("generated-answer fallback", () => {
       resultType: "search-results",
       results: [],
     });
-    expect(result.content[0].text).toContain("No web results found");
+    expect(result.content[0].text).toContain("No web results for");
   });
 });

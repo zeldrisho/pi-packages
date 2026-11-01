@@ -29,7 +29,7 @@ When user asks to:
 
 ### 1. Check CLI and Authentication
 
-Before running a review, follow [authentication and recovery](references/auth-recovery.md). Confirm `coderabbit auth status --agent` reports `authenticated: true` in the same execution context that will run the review. Never start login automatically or access credentials. If the CLI is unavailable, direct the user to the official installation instructions: <https://www.coderabbit.ai/cli>.
+Use the installed CLI and existing authentication. Never start login automatically or access credentials. If the CLI is unavailable, direct the user to the official installation instructions: <https://www.coderabbit.ai/cli>. If authentication or sandbox access fails, follow [authentication and recovery](references/auth-recovery.md).
 
 Use `coderabbit` from the user's normal command environment. Check `coderabbit review --help` when support for an option is uncertain. Older binaries may lack current public flags; report that mismatch and use the official upgrade path rather than inventing replacements.
 
@@ -47,7 +47,7 @@ Use `--agent` for output optimized for AI agents:
 coderabbit review --agent
 ```
 
-Use the same approved execution context as the authentication check. If local sandbox permissions prevent access to the user's authenticated CLI context, use only the harness's command-scoped host execution and approval controls. Do not change session-wide sandbox settings or silently fall back to an unapproved context. Follow the bounded recovery procedure only for a pre-review sandbox authentication failure.
+In a host-native session, use the normal shell. If running in a local sandbox, follow [authentication and recovery](references/auth-recovery.md) before the review to select an approved execution context. Do not change session-wide sandbox settings or silently fall back to an unapproved context.
 
 If the user asks to review a specific directory, append `--dir <path>`. The directory must be inside an initialized Git working tree.
 

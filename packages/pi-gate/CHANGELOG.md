@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-11-01
+
 ### Changed
 
-- Remove the package's Node.js engine restriction; Node.js 24 remains the tested runtime.
+- Shorten approval timeout and cancellation notices.
+- Remove the package's Node.js engine restriction; the current Node.js LTS release is the tested runtime.
 
 ## [0.7.3] - 2026-10-28
 
@@ -122,7 +125,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - support `prompt`, `block`, and `allow` actions, with longest-pattern-wins resolution
 - block rather than auto-approve in non-UI modes
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.7.3...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.7.4...HEAD
+[0.7.4]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.7.3...pi-gate-v0.7.4
 [0.7.3]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.7.2...pi-gate-v0.7.3
 [0.7.2]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.7.1...pi-gate-v0.7.2
 [0.7.1]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.7.0...pi-gate-v0.7.1

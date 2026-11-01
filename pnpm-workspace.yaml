@@ -17,46 +17,15 @@ catalog:
   "@earendil-works/pi-ai": "^1.4.0"
   "@earendil-works/pi-coding-agent": "^1.4.0"
   "@earendil-works/pi-tui": "^1.4.0"
-  # Node types track the tested Node 24 runtime, so newer APIs fail type checking.
-  "@types/node": "^24.19.2"
+  # Keep Node types aligned with the current LTS major used in CI.
+  "@types/node": "^26.6.5"
   "@vitest/coverage-v8": 5.0.5
   typebox: "^1.4.2"
   typescript: "^7.0.2"
-  vite: npm:@voidzero-dev/vite-plus-core@1.3.0
-  vite-plus: 1.3.0
+  vite: npm:@voidzero-dev/vite-plus-core@1.4.0
+  vite-plus: 1.4.0
   vitest: 5.0.5
 
-minimumReleaseAgeExclude:
-  # Reviewed releases published within the seven-day minimum-age window as of
-  # 2026-10-24. Remove entries after they age past the window.
-  - "@earendil-works/pi-ai@1.4.0"
-  - "@earendil-works/pi-coding-agent@1.4.0"
-  - "@earendil-works/pi-tui@1.4.0"
-  - "@earendil-works/pi-agent-core@1.4.0"
-  - "@earendil-works/pi-codemode@1.4.0"
-  - "@earendil-works/pi-mcp@1.4.0"
-  - "@earendil-works/pi-telemetry@1.4.0"
-  - "@vitest/browser-preview@5.0.5"
-  - "@vitest/browser@5.0.5"
-  - "@vitest/coverage-v8@5.0.5"
-  - "@vitest/mocker@5.0.5"
-  - "@vitest/pretty-format@5.0.5"
-  - "@vitest/snapshot@5.0.5"
-  - "@vitest/spy@5.0.5"
-  - "@vitest/utils@5.0.5"
-  - "@vitest/ui@5.0.5"
-  - "vitest@5.0.5"
-  - "@voidzero-dev/vite-plus-core@1.3.0"
-  - "@voidzero-dev/vite-plus-darwin-arm64@1.3.0"
-  - "@voidzero-dev/vite-plus-darwin-x64@1.3.0"
-  - "@voidzero-dev/vite-plus-linux-arm64-gnu@1.3.0"
-  - "@voidzero-dev/vite-plus-linux-arm64-musl@1.3.0"
-  - "@voidzero-dev/vite-plus-linux-x64-gnu@1.3.0"
-  - "@voidzero-dev/vite-plus-linux-x64-musl@1.3.0"
-  - "@voidzero-dev/vite-plus-win32-arm64-msvc@1.3.0"
-  - "@voidzero-dev/vite-plus-win32-x64-msvc@1.3.0"
-  - "typebox@1.4.2"
-  - "vite-plus@1.3.0"
 overrides:
   # Dependency-override lifecycle, tracked in issue #37
   # (https://github.com/zeldrisho/pi-packages/issues/37). Re-check the removal

@@ -426,10 +426,10 @@ describe("web_fetch transport", () => {
     ).rejects.toThrow(`blocked by an AWS WAF anti-bot challenge (HTTP ${status})`);
   });
 
-  it("explains that a missing page may be private or require authentication", async () => {
+  it("explains that a missing page may be inaccessible", async () => {
     await expect(
       fetchRemoteContent(`${origin}/missing`, 0, 6_000, undefined, dependencies),
-    ).rejects.toThrow(/HTTP 404.*page may be missing, private, or require authentication/);
+    ).rejects.toThrow("HTTP 404. Page not found or inaccessible.");
   });
 
   it.each(["/declared-large", "/streamed-large"])(
