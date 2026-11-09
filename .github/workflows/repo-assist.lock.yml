@@ -2989,6 +2989,19 @@ jobs:
             setupGlobals(core, github, context, exec, io, getOctokit, process.env.GH_AW_GITHUB_TOKEN_SOURCE);
             const { main } = require(path.join(actionsDir, 'process_safe_outputs.cjs'));
             await main();
+      - name: Require complete safe-output application
+        if: always()
+        env:
+          PROCESS_OUTCOME: ${{ steps.process_safe_outputs.outcome }}
+          SKIPPED: ${{ steps.process_safe_outputs.outputs.items_skipped }}
+          FAILED: ${{ steps.process_safe_outputs.outputs.items_failed }}
+          DEFERRED: ${{ steps.process_safe_outputs.outputs.items_deferred }}
+          CANCELLED: ${{ steps.process_safe_outputs.outputs.items_cancelled }}
+        run: |
+          if [ "$PROCESS_OUTCOME" != success ] || [ "$SKIPPED" != 0 ] || [ "$FAILED" != 0 ] || [ "$DEFERRED" != 0 ] || [ "$CANCELLED" != 0 ]; then
+            echo "::error::Safe outputs were not fully applied (skipped: $SKIPPED, failed: $FAILED, deferred: $DEFERRED, cancelled: $CANCELLED). Memory will not be published. Inspect the safe-output summary and artifacts."
+            exit 1
+          fi
       - name: Upload Safe Outputs Items
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

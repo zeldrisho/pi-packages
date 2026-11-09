@@ -56,7 +56,7 @@ Before review, inspect the final diff for unrelated behavior, new network paths,
 
 ## Repo Assist compilation
 
-After editing `.github/workflows/repo-assist.md`, run `vp run compile:repo-assist` rather than calling `gh aw compile` directly. The wrapper uses the installed gh-aw compiler and adds a fail-closed memory publication condition to its generated job: memory is saved only when the agent and safe outputs both succeed. The compiler does not currently expose this job's condition as configuration. The repository contract test detects a missing gate; inspect the generated job and update the wrapper when upgrading gh-aw. Failed or partially applied output batches do not save memory, so subsequent runs must reconcile against live GitHub state.
+After editing `.github/workflows/repo-assist.md`, run `vp run compile:repo-assist` rather than calling `gh aw compile` directly. The wrapper uses the installed gh-aw compiler and adds a fail-closed memory publication condition to its generated job: memory is saved only when the agent and safe outputs both succeed. The compiler does not currently expose this job's condition as configuration. The wrapper also fails the safe-output job when any output is skipped, failed, deferred, cancelled, or its outcome is unavailable; this conservatively prevents memory publication even for skips unrelated to protected files. The repository contract test detects missing gates; inspect the generated jobs and update the wrapper when upgrading gh-aw. Failed or partially applied output batches do not save memory, so subsequent runs must reconcile against live GitHub state.
 
 ## Dependencies
 

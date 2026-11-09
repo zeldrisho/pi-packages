@@ -38,7 +38,29 @@ try {
     "needs.agent.result == 'success' && needs.safe_outputs.result == 'success'",
   );
 
-  writeFileSync(lockPath, compiled.slice(0, start) + gated + compiled.slice(end));
+  const gatedCompiled = compiled.slice(0, start) + gated + compiled.slice(end);
+  const upload = "      - name: Upload Safe Outputs Items\n";
+
+  if (gatedCompiled.split(upload).length !== 2) {
+    throw new Error("Expected exactly one safe-output artifact upload step");
+  }
+
+  const outcomeGate = `      - name: Require complete safe-output application
+        if: always()
+        env:
+          PROCESS_OUTCOME: \${{ steps.process_safe_outputs.outcome }}
+          SKIPPED: \${{ steps.process_safe_outputs.outputs.items_skipped }}
+          FAILED: \${{ steps.process_safe_outputs.outputs.items_failed }}
+          DEFERRED: \${{ steps.process_safe_outputs.outputs.items_deferred }}
+          CANCELLED: \${{ steps.process_safe_outputs.outputs.items_cancelled }}
+        run: |
+          if [ "$PROCESS_OUTCOME" != success ] || [ "$SKIPPED" != 0 ] || [ "$FAILED" != 0 ] || [ "$DEFERRED" != 0 ] || [ "$CANCELLED" != 0 ]; then
+            echo "::error::Safe outputs were not fully applied (skipped: $SKIPPED, failed: $FAILED, deferred: $DEFERRED, cancelled: $CANCELLED). Memory will not be published. Inspect the safe-output summary and artifacts."
+            exit 1
+          fi
+`;
+
+  writeFileSync(lockPath, gatedCompiled.replace(upload, outcomeGate + upload));
 } catch (error) {
   writeFileSync(lockPath, original);
   throw error;

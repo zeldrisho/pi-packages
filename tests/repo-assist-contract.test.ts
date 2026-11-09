@@ -27,6 +27,22 @@ describe("repo-assist workflow contracts", () => {
     expect(job).toContain("(!cancelled())");
   });
 
+  it("fails safe-output processing on skipped or incomplete results before publishing memory", () => {
+    const job = compiled.split("\n  safe_outputs:\n")[1];
+    expect(job).toContain("- name: Require complete safe-output application");
+
+    for (const output of ["items_skipped", "items_failed", "items_deferred", "items_cancelled"]) {
+      expect(job).toContain(`steps.process_safe_outputs.outputs.${output}`);
+    }
+
+    expect(job).toContain('"$PROCESS_OUTCOME" != success');
+    expect(job).toContain('"$SKIPPED" != 0');
+    expect(job).toContain('"$FAILED" != 0');
+    expect(job).toContain('"$DEFERRED" != 0');
+    expect(job).toContain('"$CANCELLED" != 0');
+    expect(job).toContain("Memory will not be published");
+  });
+
   it("requires review on creation and refuses protected-file branch pushes", () => {
     for (const [output, policy] of [
       ["create-pull-request", "request-review"],
