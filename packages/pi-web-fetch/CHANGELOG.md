@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.4] - 2026-11-09
+
 ### Fixed
 
 - Close unused redirect and error responses promptly, including stalled responses.
@@ -322,7 +324,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.3...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.4...HEAD
+[0.16.4]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.3...pi-web-fetch-v0.16.4
 [0.16.3]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.2...pi-web-fetch-v0.16.3
 [0.16.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.1...pi-web-fetch-v0.16.2
 [0.16.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.0...pi-web-fetch-v0.16.1
