@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Discover eligible free models listed with the Responses API through chat-completions translation.
+- Shorten the missing-Bun error while retaining diagnostics for other startup failures.
+- Support tool-free compaction requests on gateways that require a tool declaration.
 - Preserve existing instructions while placing the working-directory declaration before conflicting or incomplete environment blocks.
 - Clarify that a free-usage error may indicate a refused request rather than exhausted quota.
 

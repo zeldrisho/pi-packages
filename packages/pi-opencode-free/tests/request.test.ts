@@ -20,18 +20,18 @@ describe("free-tier request normalization", () => {
 
     expect(result.stream).toBe(true);
     expect(result.temperature).toBe(0.2);
-    expect(result.tools).toBeUndefined();
+    expect(result.tools?.[0]?.function?.name).toBe("read");
     expect(payload.stream).toBe(false);
     expect(payload.tools).toBeUndefined();
   });
 
-  it("preserves an explicitly empty toolset", () => {
+  it("adds a compatibility declaration to an explicitly empty toolset", () => {
     const payload: ProviderRequestPayload = { model: "big-pickle", tools: [] };
 
     const result = normalizeFreeRequestPayload(payload);
 
-    expect(result.tools).toBe(payload.tools);
-    expect(result.tools).toEqual([]);
+    expect(result.tools).toEqual([{ type: "function", function: { name: "read" } }]);
+    expect(payload.tools).toEqual([]);
   });
 
   it("reuses an existing read declaration", () => {

@@ -74,6 +74,17 @@ export function normalizeFreeRequestPayload(
 
   if (isNoneToolChoice(payload.tool_choice)) delete normalized.tool_choice;
 
+  if (!payload.tools?.length) {
+    normalized.tools = [
+      {
+        type: "function",
+        function: {
+          name: "read",
+        },
+      },
+    ];
+  }
+
   const messages = payload.messages;
 
   if (messages) {

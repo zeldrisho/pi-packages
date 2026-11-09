@@ -39,6 +39,14 @@ const summary = normalizeContext({
   messages: [{ role: "user", content: "Summarize the conversation.", timestamp: 0 }],
 });
 
+const summaryWithTools = normalizeContext({
+  systemPrompt: "Summarize.",
+  messages: [{ role: "user", content: "Read the file.", timestamp: 0 }],
+  tools: [
+    { name: "read", description: "Read a file", parameters: { type: "object", properties: {} } },
+  ],
+});
+
 function completion(): Response {
   return new Response(
     `data: ${JSON.stringify({
@@ -89,11 +97,11 @@ describe("OpenCode provider stream boundary", () => {
 
     expect((await native(model, summary, options).result()).errorMessage).toBe(message);
   });
-  it("normalizes a tool-free compaction request without injecting tools", async () => {
+  it("adds a compatibility declaration to a tool-free compaction request", async () => {
     const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const payload = await requestPayload(input, init);
       expect(payload.stream).toBe(true);
-      expect(payload).not.toHaveProperty("tools");
+      expect(payload.tools.map((tool) => tool.function.name)).toEqual(["read"]);
       expect(JSON.stringify(payload.messages)).toContain("Summarize without executing tools.");
       expect(JSON.stringify(payload.messages)).toContain("<env>");
       expect(payload).not.toHaveProperty("tool_choice");
@@ -292,7 +300,14 @@ describe("OpenCode provider stream boundary", () => {
       identity,
     );
 
-    const result = await native(model, summary, options).result();
+    const guarded = native(model, summary, options);
+    const events = [];
+
+    for await (const event of guarded) events.push(event);
+    expect((await guarded.result()).errorMessage).toContain("compatibility-only tool");
+    expect(events.some((event) => event.type.startsWith("toolcall_"))).toBe(false);
+
+    const result = await native(model, summaryWithTools, options).result();
     expect(result.stopReason).toBe("toolUse");
     expect(result.content).toMatchObject([
       { type: "toolCall", name: "read", arguments: { path: "README.md" } },
@@ -342,7 +357,7 @@ describe("OpenCode provider stream boundary", () => {
       identity,
     );
 
-    const result = await native(model, summary, options).result();
+    const result = await native(model, summaryWithTools, options).result();
     expect(result.stopReason).toBe("toolUse");
     expect(result.content).toMatchObject([
       { type: "toolCall", name: "read", arguments: { path: "README.md" } },
