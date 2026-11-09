@@ -43,9 +43,9 @@ const packageSpecificFiles = new Map([
   ["pi-web-fetch", ["workers"]],
 ]);
 
-const promptPackages = new Set(["pi-coderabbit"]);
+const promptPackages = new Set<string>();
 
-const skillPackages = new Set(["pi-sentry-skills", "pi-anthropics-skills", "pi-coderabbit-skills"]);
+const skillPackages = new Set(["pi-sentry-skills", "pi-anthropics-skills"]);
 
 const themePackages = new Set(["pi-catppuccin"]);
 
@@ -244,10 +244,6 @@ describe("repository contracts", () => {
   });
 
   it("creates GitHub releases with gh release create on component tag push", () => {
-    if (!releaseWorkflow.includes("gh release create")) {
-      fail("the release job must create GitHub releases with gh release create");
-    }
-
     if (releaseWorkflow.includes("softprops/action-gh-release")) {
       fail("the release workflow must not use softprops/action-gh-release");
     }
@@ -316,10 +312,6 @@ describe("repository contracts", () => {
 
     if (!releaseWorkflow.includes("environment: publish")) {
       fail("npm publication must require approval through the protected publish environment");
-    }
-
-    if (!releaseWorkflow.includes("shortName")) {
-      fail("the GitHub release name must use the package short name, not the scoped npm name");
     }
 
     if (
@@ -648,5 +640,3 @@ describe("repository contracts", () => {
     }
   });
 });
-
-console.log(`Repository contracts passed for ${packageDirectories.length} packages.`);

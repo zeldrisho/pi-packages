@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.6] - 2026-11-09
+
+### Security
+
+- Refuse provider redirects to prevent subscription tokens from being forwarded to another origin.
+- Omit untrusted provider error bodies, which could echo credentials or search queries.
+
 ## [0.14.5] - 2026-11-01
 
 ### Changed
@@ -206,7 +213,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded Brave web search ([cbc9491](https://github.com/zeldrisho/pi-packages/commit/cbc9491dce36555ab91b6bef203ec8b380596a89))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.5...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.6...HEAD
+[0.14.6]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.5...pi-web-search-v0.14.6
 [0.14.5]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.4...pi-web-search-v0.14.5
 [0.14.4]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.3...pi-web-search-v0.14.4
 [0.14.3]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.2...pi-web-search-v0.14.3

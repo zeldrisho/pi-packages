@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-11-09
+
+### Fixed
+
+- Avoid treating environment tags split across instruction messages as a valid working-directory declaration.
+- Discover eligible free models listed with the Responses API through chat-completions translation.
+- Shorten the missing-Bun error while retaining diagnostics for other startup failures.
+- Support tool-free compaction requests on gateways that require a tool declaration.
+- Preserve existing instructions while placing the working-directory declaration before conflicting or incomplete environment blocks.
+- Clarify that a free-usage error may indicate a refused request rather than exhausted quota.
+
 ## [0.3.2] - 2026-10-30
 
 ### Changed
@@ -72,7 +83,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Discover free models through Pi's native OpenCode catalog from pi.dev instead of models.dev, preserving Pi's capabilities and compatibility metadata.
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.2...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.3...HEAD
+[0.3.3]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.2...pi-opencode-free-v0.3.3
 [0.3.2]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.1...pi-opencode-free-v0.3.2
 [0.3.1]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.0...pi-opencode-free-v0.3.1
 [0.3.0]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.2.1...pi-opencode-free-v0.3.0

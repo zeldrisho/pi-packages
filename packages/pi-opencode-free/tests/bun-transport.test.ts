@@ -293,6 +293,22 @@ describe("Bun gateway transport", () => {
     expect(fetches.calls).toHaveLength(0);
   });
 
+  it("reports a concise missing Bun error for ENOENT", async () => {
+    const child = new FakeProcess();
+    const harness = spawnHarness([child]);
+
+    const transport = transportFixture({
+      spawnProcess: harness.spawnProcess,
+      fetch: fetchHarness().fetcher,
+    });
+
+    const pending = transport(GATEWAY_URL, { method: "GET" });
+    child.emit("error", Object.assign(new Error("spawn bun ENOENT"), { code: "ENOENT" }));
+    expect((await captureError(pending)).message).toBe(
+      `Bun not found. Install Bun or set ${BUN_PATH_ENV}.`,
+    );
+  });
+
   it("starts a new proxy after a failed attempt", async () => {
     const first = new FakeProcess();
     const second = new FakeProcess();

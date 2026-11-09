@@ -39,6 +39,14 @@ const summary = normalizeContext({
   messages: [{ role: "user", content: "Summarize the conversation.", timestamp: 0 }],
 });
 
+const summaryWithTools = normalizeContext({
+  systemPrompt: "Summarize.",
+  messages: [{ role: "user", content: "Read the file.", timestamp: 0 }],
+  tools: [
+    { name: "read", description: "Read a file", parameters: { type: "object", properties: {} } },
+  ],
+});
+
 function completion(): Response {
   return new Response(
     `data: ${JSON.stringify({
@@ -89,11 +97,11 @@ describe("OpenCode provider stream boundary", () => {
 
     expect((await native(model, summary, options).result()).errorMessage).toBe(message);
   });
-  it("normalizes a tool-free compaction request without injecting tools", async () => {
+  it("adds a compatibility declaration to a tool-free compaction request", async () => {
     const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const payload = await requestPayload(input, init);
       expect(payload.stream).toBe(true);
-      expect(payload).not.toHaveProperty("tools");
+      expect(payload.tools.map((tool) => tool.function.name)).toEqual(["read"]);
       expect(JSON.stringify(payload.messages)).toContain("Summarize without executing tools.");
       expect(JSON.stringify(payload.messages)).toContain("<env>");
       expect(payload).not.toHaveProperty("tool_choice");
@@ -205,7 +213,9 @@ describe("OpenCode provider stream boundary", () => {
             ? `Reset time: ${formatResetTime(Date.parse("2026-10-23T13:00:00Z"))}.`
             : "Reset time unavailable.";
 
-        expect(result.errorMessage).toBe(`OpenCode Free quota exceeded.\n${reset}`);
+        expect(result.errorMessage).toBe(
+          `OpenCode Free usage limit or request refusal (FreeUsageLimitError).\n${reset}`,
+        );
         expect(isRetryableAssistantError(result)).toBe(false);
         expect(fetcher).toHaveBeenCalledTimes(1);
         expect(result.errorMessage).not.toMatch(/Retry-After|https:\/\//u);
@@ -290,7 +300,64 @@ describe("OpenCode provider stream boundary", () => {
       identity,
     );
 
-    const result = await native(model, summary, options).result();
+    const guarded = native(model, summary, options);
+    const events = [];
+
+    for await (const event of guarded) events.push(event);
+    expect((await guarded.result()).errorMessage).toContain("compatibility-only tool");
+    expect(events.some((event) => event.type.startsWith("toolcall_"))).toBe(false);
+
+    const result = await native(model, summaryWithTools, options).result();
+    expect(result.stopReason).toBe("toolUse");
+    expect(result.content).toMatchObject([
+      { type: "toolCall", name: "read", arguments: { path: "README.md" } },
+    ]);
+  });
+
+  it("assembles fragmented streamed tool calls without changing their arguments", async () => {
+    const frames =
+      [
+        { index: 0, id: "call-1", type: "function", function: { name: "read", arguments: '{"pa' } },
+        { index: 0, function: { arguments: 'th":"README.md"}' } },
+      ]
+        .map(
+          (call, index) =>
+            `data: ${JSON.stringify({
+              id: "tool-response",
+              object: "chat.completion.chunk",
+              created: 0,
+              model: model.id,
+              choices: [
+                {
+                  index: 0,
+                  delta: { tool_calls: [call] },
+                  finish_reason: index === 1 ? "tool_calls" : null,
+                },
+              ],
+            })}\n\n`,
+        )
+        .join("") + "data: [DONE]\n\n";
+
+    const bytes = new TextEncoder().encode(frames);
+
+    const native = createFreeStream(
+      async () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              for (let index = 0; index < bytes.length; index += 7) {
+                controller.enqueue(bytes.slice(index, index + 7));
+              }
+
+              controller.close();
+            },
+          }),
+          { headers: { "content-type": "text/event-stream" } },
+        ),
+      identity,
+    );
+
+    const result = await native(model, summaryWithTools, options).result();
     expect(result.stopReason).toBe("toolUse");
     expect(result.content).toMatchObject([
       { type: "toolCall", name: "read", arguments: { path: "README.md" } },
@@ -500,7 +567,7 @@ describe("quota timing", () => {
     expect(quotaResetAt(new Headers({ "retry-after": "0" }), now)).toBe(now);
     expect(quotaResetAt(new Headers({ "retry-after": "0.5" }), now)).toBe(now + 500);
     expect(usageLimitMessage(new Headers(), now)).toBe(
-      "OpenCode Free quota exceeded.\nReset time unavailable.",
+      "OpenCode Free usage limit or request refusal (FreeUsageLimitError).\nReset time unavailable.",
     );
   });
 });

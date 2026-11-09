@@ -11,7 +11,6 @@ Monorepo for my personal Pi extensions, skills, and themes.
 | [`@zeldrisho/pi-web-fetch`](packages/pi-web-fetch)                 | Extension | Fetch public web pages as bounded Markdown             | `pi install npm:@zeldrisho/pi-web-fetch`         |
 | [`@zeldrisho/pi-web-search`](packages/pi-web-search)               | Extension | Search the web with Brave Search                       | `pi install npm:@zeldrisho/pi-web-search`        |
 | [`@zeldrisho/pi-anthropics-skills`](packages/pi-anthropics-skills) | Skills    | Skills adapted from Anthropic                          | `pi install npm:@zeldrisho/pi-anthropics-skills` |
-| [`@zeldrisho/pi-coderabbit-skills`](packages/pi-coderabbit-skills) | Skills    | CodeRabbit review and autofix skills                   | `pi install npm:@zeldrisho/pi-coderabbit-skills` |
 | [`@zeldrisho/pi-sentry-skills`](packages/pi-sentry-skills)         | Skills    | Skills adapted from Sentry                             | `pi install npm:@zeldrisho/pi-sentry-skills`     |
 | [`@zeldrisho/pi-catppuccin`](packages/pi-catppuccin)               | Theme     | Catppuccin Mocha theme for Pi                          | `pi install npm:@zeldrisho/pi-catppuccin`        |
 

@@ -211,6 +211,33 @@ describe("persisted catalog metadata", () => {
 });
 
 describe("free model discovery", () => {
+  it("discovers free Responses models through chat translation without Responses-only compatibility", async () => {
+    const crouton = {
+      ...remoteBeam,
+      id: "crouton-alpha-free",
+      api: "openai-responses",
+      compat: { sessionAffinityFormat: "openai-nosession" },
+    };
+
+    const { fetcher } = createFetcher((url) =>
+      url === MODEL_CATALOG_URL
+        ? jsonResponse(JSON.stringify([crouton]), 200, { "last-modified": FUTURE_LAST_MODIFIED })
+        : jsonResponse(JSON.stringify({ data: [{ id: "crouton-alpha-free" }] })),
+    );
+
+    const models = requireModels(
+      await discoverFreeModels({
+        baseUrl: "http://proxy.test/v1",
+        headers: {},
+        signal: new AbortController().signal,
+        fetcher,
+        allowNetwork: true,
+      }),
+    );
+
+    expect(models.map((model) => model.id)).toEqual(["crouton-alpha-free"]);
+    expect(models[0]?.compat).toBeUndefined();
+  });
   it("intersects live models with Pi's native free chat catalog", async () => {
     const { fetcher, calls } = createFetcher((url) => {
       if (url === MODEL_CATALOG_URL) {

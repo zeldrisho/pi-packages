@@ -20,18 +20,18 @@ describe("free-tier request normalization", () => {
 
     expect(result.stream).toBe(true);
     expect(result.temperature).toBe(0.2);
-    expect(result.tools).toBeUndefined();
+    expect(result.tools?.[0]?.function?.name).toBe("read");
     expect(payload.stream).toBe(false);
     expect(payload.tools).toBeUndefined();
   });
 
-  it("preserves an explicitly empty toolset", () => {
+  it("adds a compatibility declaration to an explicitly empty toolset", () => {
     const payload: ProviderRequestPayload = { model: "big-pickle", tools: [] };
 
     const result = normalizeFreeRequestPayload(payload);
 
-    expect(result.tools).toBe(payload.tools);
-    expect(result.tools).toEqual([]);
+    expect(result.tools).toEqual([{ type: "function", function: { name: "read" } }]);
+    expect(payload.tools).toEqual([]);
   });
 
   it("reuses an existing read declaration", () => {
@@ -108,6 +108,36 @@ describe("free-tier request normalization", () => {
 });
 
 describe("prompt preservation", () => {
+  it.each([
+    "<env>\n Platform: darwin\n</env>",
+    "<env>\n Working directory: /incomplete",
+    "<env>broken<env>Working directory: /nested</env>",
+  ])("keeps a usable first environment before shadowing text", (content) => {
+    const messages = [
+      { role: "system", content },
+      { role: "developer", content: "<env>\n Working directory: /later\n</env>" },
+    ];
+
+    const result = normalizeFreeRequestPayload({ model: "beam-free", messages });
+    expect(String(result.messages?.[0]?.content)).toMatch(
+      /^<env>\n Working directory: .+\n<\/env>\n\n/,
+    );
+    expect(result.messages?.[0]?.content).toContain(content);
+    expect(normalizeFreeRequestPayload(result).messages).toBe(result.messages);
+    expect(messages[0]?.content).toBe(content);
+  });
+  it("does not combine environment tags across instruction messages", () => {
+    const messages = [
+      { role: "system", content: "<env>\n Working directory: /incomplete" },
+      { role: "developer", content: "</env>" },
+      { role: "developer", content: "<env>\n Working directory: /valid\n</env>" },
+    ];
+
+    const result = normalizeFreeRequestPayload({ model: "beam-free", messages });
+    expect(result.messages?.[0]?.content).toBe(
+      "<env>\n Working directory: /valid\n</env>\n\n<env>\n Working directory: /incomplete",
+    );
+  });
   it("prefixes a minimal env block and preserves the prompt", () => {
     const messages = [
       { role: "system", content: "You are Pi." },

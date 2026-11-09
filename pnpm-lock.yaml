@@ -227,8 +227,6 @@ importers:
 
   packages/pi-catppuccin: {}
 
-  packages/pi-coderabbit-skills: {}
-
   packages/pi-gate:
     devDependencies:
       '@earendil-works/pi-coding-agent':

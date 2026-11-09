@@ -2,8 +2,6 @@ const REQUEST_TIMEOUT_MS = 20_000;
 
 const SEARCH_MAX_RESPONSE_BYTES = 2_000_000;
 
-const SEARCH_ERROR_EXCERPT_BYTES = 8_192;
-
 /**
  * Normalizes text by removing HTML tags, collapsing whitespace, and truncating to a maximum length.
  *
@@ -23,23 +21,18 @@ export function normalizeText(value: string, maxLength: number): string {
 }
 
 /**
- * Reads response body bytes with size limits and optional truncation.
+ * Reads response body bytes with size limits.
  *
  * @param response - HTTP response to read
  * @param maxBytes - Maximum bytes to read
- * @param truncate - Whether to truncate at limit or throw error
  * @returns Promise resolving to the response bytes
- * @throws {Error} When response exceeds maxBytes and truncate is false
+ * @throws {Error} When response exceeds maxBytes
  */
-async function readResponseBytes(
-  response: Response,
-  maxBytes: number,
-  truncate: boolean,
-): Promise<Uint8Array> {
+async function readResponseBytes(response: Response, maxBytes: number): Promise<Uint8Array> {
   const contentLength = response.headers.get("content-length");
   const declared = contentLength === null ? Number.NaN : Number(contentLength);
 
-  if (!truncate && Number.isFinite(declared) && declared > maxBytes && declared > 0) {
+  if (Number.isFinite(declared) && declared > maxBytes && declared > 0) {
     await response.body?.cancel().catch(() => undefined);
     throw new Error("Search provider response is too large.");
   }
@@ -58,14 +51,7 @@ async function readResponseBytes(
       const remaining = maxBytes - total;
 
       if (value.byteLength > remaining) {
-        if (truncate && remaining > 0) chunks.push(value.subarray(0, remaining));
         await reader.cancel().catch(() => undefined);
-
-        if (truncate) {
-          total = maxBytes;
-          break;
-        }
-
         throw new Error("Search provider response is too large.");
       }
 
@@ -92,16 +78,11 @@ async function readResponseBytes(
  *
  * @param response - HTTP response to read
  * @param maxBytes - Maximum bytes to read
- * @param truncate - Whether to truncate at limit or throw error
  * @returns Promise resolving to the decoded text
  * @throws {Error} When response exceeds maxBytes and truncate is false
  */
-async function readResponseText(
-  response: Response,
-  maxBytes: number,
-  truncate = false,
-): Promise<string> {
-  return new TextDecoder().decode(await readResponseBytes(response, maxBytes, truncate));
+async function readResponseText(response: Response, maxBytes: number): Promise<string> {
+  return new TextDecoder().decode(await readResponseBytes(response, maxBytes));
 }
 
 /**
@@ -132,21 +113,14 @@ export async function requestText(
   if (signal?.aborted) controller.abort();
 
   try {
-    const response = await fetch(url, { ...init, signal: controller.signal });
+    // Custom subscription-token headers are not stripped by fetch on cross-origin
+    // redirects. Never follow a provider-controlled redirect with credentials.
+    const response = await fetch(url, { ...init, redirect: "error", signal: controller.signal });
 
     if (!response.ok) {
-      let body = "";
-
-      try {
-        body = normalizeText(
-          await readResponseText(response, SEARCH_ERROR_EXCERPT_BYTES, true),
-          500,
-        );
-      } catch {
-        // Preserve the useful HTTP status when an untrusted error body cannot be read.
-      }
-
-      throw new Error(`Provider returned HTTP ${response.status}${body ? `: ${body}` : ""}`);
+      // Error bodies are untrusted and can echo credentials or private queries.
+      void response.body?.cancel().catch(() => undefined);
+      throw new Error(`Provider returned HTTP ${response.status}`);
     }
 
     return await readResponseText(response, SEARCH_MAX_RESPONSE_BYTES);

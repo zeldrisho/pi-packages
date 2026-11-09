@@ -29,6 +29,7 @@ export default defineConfig({
       "packages/pi-web-fetch/workers/anubis-solver.js",
       "packages/pi-web-fetch/workers/anubis-worker.js",
       "pnpm-lock.yaml",
+      ".github/workflows/*.lock.yml",
       ".agent/**",
       ".agents/**",
       ".claude/**",

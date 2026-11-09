@@ -43,6 +43,7 @@ export function createFreeStream(
         applyClientHeaders(headers, sessionId, cliVersion);
         let quotaMessage: string | undefined;
         let transportMessage: string | undefined;
+        let syntheticTool = false;
         // SAFETY: this adapter is registered only for the openai-completions API.
         const nativeModel = model as Model<"openai-completions">;
 
@@ -53,9 +54,10 @@ export function createFreeStream(
             const replacement = await options?.onPayload?.(payload, requestModel);
             const request = replacement === undefined ? payload : replacement;
 
-            return isProviderRequestPayload(request)
-              ? normalizeFreeRequestPayload(request)
-              : request;
+            if (!isProviderRequestPayload(request)) return request;
+            syntheticTool = !request.tools?.length;
+
+            return normalizeFreeRequestPayload(request);
           },
           fetch: async (input, init) => {
             transportMessage = undefined;
@@ -76,6 +78,22 @@ export function createFreeStream(
         });
 
         for await (const event of inner) {
+          if (syntheticTool && event.type.startsWith("toolcall_")) continue;
+
+          if (syntheticTool && event.type === "done" && event.reason === "toolUse") {
+            stream.push({
+              type: "error",
+              reason: "error",
+              error: {
+                ...event.message,
+                stopReason: "error",
+                errorMessage:
+                  "OpenCode Free requested a compatibility-only tool; no tool was executed.",
+              },
+            });
+            continue;
+          }
+
           if (event.type === "error" && event.reason !== "aborted" && transportMessage) {
             event.error.errorMessage = transportMessage;
           }

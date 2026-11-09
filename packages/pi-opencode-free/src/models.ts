@@ -285,16 +285,19 @@ export async function discoverFreeModels(
   return (await discoverFreeModelsWithStatus(options)).models;
 }
 
-/** Indexes bundled OpenAI-completions models with zero input and output costs by model id. */
+/** Indexes bundled free OpenAI chat and Responses models for chat translation. */
 function freeBuiltinModels(): Map<string, FreeChatModelConfig> {
   const models = new Map<string, FreeChatModelConfig>();
 
   for (const model of getBuiltinModels("opencode")) {
-    if (model.api !== "openai-completions") continue;
+    if (model.api !== "openai-completions" && model.api !== "openai-responses") continue;
 
     if (model.cost.input !== 0 || model.cost.output !== 0) continue;
 
-    models.set(model.id, fromModel(model));
+    const config = fromModel(model);
+
+    if (model.api === "openai-responses") delete config.compat;
+    models.set(model.id, config);
   }
 
   return models;
@@ -335,7 +338,7 @@ function fromModel(model: Model<Api>): FreeChatModelConfig {
 }
 
 /**
- * Converts a zero-input/output-cost OpenAI-completions chat entry with finite
+ * Converts a zero-input/output-cost OpenAI chat or Responses entry with finite
  * token limits of at least one, reasoning, and input metadata, or returns
  * `undefined` when those checks fail. Fractional token limits are rounded down;
  * supplied cache costs must be finite and nonnegative and are preserved.
@@ -343,7 +346,7 @@ function fromModel(model: Model<Api>): FreeChatModelConfig {
 function configFromRemote(entry: RemoteCatalogEntry): FreeChatModelConfig | undefined {
   if (entry.type !== undefined && entry.type !== "chat") return undefined;
 
-  if (entry.api !== "openai-completions") return undefined;
+  if (entry.api !== "openai-completions" && entry.api !== "openai-responses") return undefined;
 
   if (entry.cost?.input !== 0 || entry.cost.output !== 0) return undefined;
 
@@ -380,7 +383,7 @@ function configFromRemote(entry: RemoteCatalogEntry): FreeChatModelConfig | unde
 
   if (entry.thinkingLevelMap) config.thinkingLevelMap = entry.thinkingLevelMap;
 
-  if (entry.compat) config.compat = entry.compat;
+  if (entry.api === "openai-completions" && entry.compat) config.compat = entry.compat;
 
   if (entry.inputLimits) config.inputLimits = entry.inputLimits;
 

@@ -76,7 +76,7 @@ export function formatResetTime(
 
 /**
  * Formats a quota error with the reported reset time, or an unavailable-time notice.
- * Uses "quota exceeded" so Pi recognizes exhausted usage as non-retryable.
+ * Retains the upstream error tag so Pi recognizes the response as non-retryable.
  *
  * @param now - Current time in milliseconds since the Unix epoch
  */
@@ -86,5 +86,5 @@ export function usageLimitMessage(headers: Headers, now: number): string {
   const reset =
     resetAt === undefined ? "Reset time unavailable." : `Reset time: ${formatResetTime(resetAt)}.`;
 
-  return `OpenCode Free quota exceeded.\n${reset}`;
+  return `OpenCode Free usage limit or request refusal (FreeUsageLimitError).\n${reset}`;
 }

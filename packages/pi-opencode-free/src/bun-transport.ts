@@ -230,6 +230,10 @@ export function createBunTransport(options: BunTransportOptions = {}): BunTransp
     } catch (error) {
       stop();
 
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+        throw new BunTransportError(`Bun not found. Install Bun or set ${BUN_PATH_ENV}.`);
+      }
+
       throw new BunTransportError(
         `OpenCode Free could not start its Bun transport (${error instanceof Error ? error.message : String(error)}). Install Bun or set ${BUN_PATH_ENV}.`,
       );

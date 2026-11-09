@@ -89,10 +89,11 @@ describe("origin coordination and retries", () => {
     expect(delays).toEqual([2_000, 2_000]);
   });
 
-  it("parses and bounds an HTTP-date Retry-After value", async () => {
+  it("does not retry earlier than a long HTTP-date Retry-After", async () => {
     const statuses = [503, 200];
     const delays: number[] = [];
-    await requestFollowingRedirects(
+
+    const result = await requestFollowingRedirects(
       "https://date.example.com/resource",
       new AbortController().signal,
       {
@@ -106,7 +107,44 @@ describe("origin coordination and retries", () => {
         },
       },
     );
-    expect(delays).toEqual([10_000]);
+
+    expect(delays).toEqual([]);
+    expect(result.response.statusCode).toBe(503);
+    expect(statuses).toEqual([200]);
+  });
+
+  it("does not retry an overflowing numeric Retry-After", async () => {
+    const request = vi.fn(async () => response(429, { "retry-after": "9".repeat(400) }));
+
+    const result = await requestFollowingRedirects(
+      "https://long-delay.example.com/resource",
+      new AbortController().signal,
+      { validateUrl: async (value) => target(value), request },
+    );
+
+    expect(result.response.statusCode).toBe(429);
+    expect(request).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { status: 302, location: undefined },
+    { status: 302, location: "http://[" },
+  ])("destroys unused redirect bodies even on invalid locations", async ({ status, location }) => {
+    const redirect = response(status, location ? { location } : {});
+    const destroy = vi.spyOn(redirect, "destroy");
+    const resume = vi.spyOn(redirect, "resume");
+    await expect(
+      requestFollowingRedirects(
+        "https://redirect-cleanup.example/resource",
+        new AbortController().signal,
+        {
+          validateUrl: async (value) => target(value),
+          request: async () => redirect,
+        },
+      ),
+    ).rejects.toThrow();
+    expect(destroy).toHaveBeenCalledOnce();
+    expect(resume).not.toHaveBeenCalled();
   });
 
   it("bounds jittered backoff and stops after two retries", async () => {
