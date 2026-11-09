@@ -302,15 +302,6 @@ jobs:
           EOF
 
 steps:
-  - name: Set up Vite+ and Node.js
-    uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
-    with:
-      node-version: "lts"
-      cache: true
-
-  - name: Install workspace dependencies
-    run: vp install
-
   - name: Initialize Repo Assist memory
     env:
       MEMORY_DIR: /tmp/gh-aw/repo-memory/default
@@ -678,9 +669,7 @@ Maintain a single open issue titled `[repo-assist] Monthly Activity {YYYY}-{MM}`
 - **No breaking changes** without maintainer approval via a tracked issue.
 - **No new dependencies** without discussion in an issue first.
 - **Small, focused PRs** - one concern per PR.
-- **Read AGENTS.md first**: before starting work on any pull request, read the repository's `AGENTS.md` file (if present) to understand project-specific conventions, coding standards, and contribution requirements. Follow its package research, shared-module synchronization, security, architecture, and release-process requirements.
-- **Workspace validation**: use Vite+ as specified in `AGENTS.md`; run `vp install` and `vp run ready` before every PR. Do not create a PR if validation cannot be completed successfully.
-- **Human-controlled releases**: never merge, publish packages, or create or push release tags. Release preparation must follow `docs/releasing.md` and remain a draft PR for a maintainer.
+- **Read AGENTS.md first**: before starting work on any pull request, read the repository's `AGENTS.md` file (if present) to understand project-specific conventions, coding standards, and contribution requirements.
 - **Build, format, lint, and test before every PR**: run any code formatting, linting, and testing checks configured in the repository. Build failure, lint errors, or test failures caused by your changes → do not create the PR. Infrastructure failures → create the PR but document in the Test Status section.
 - **Respect existing style** - match code formatting and naming conventions.
 - **AI transparency**: every comment, PR, and issue must include a Repo Assist disclosure with 🤖.
