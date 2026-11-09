@@ -43,9 +43,9 @@ const packageSpecificFiles = new Map([
   ["pi-web-fetch", ["workers"]],
 ]);
 
-const promptPackages = new Set(["pi-coderabbit"]);
+const promptPackages = new Set<string>();
 
-const skillPackages = new Set(["pi-sentry-skills", "pi-anthropics-skills", "pi-coderabbit-skills"]);
+const skillPackages = new Set(["pi-sentry-skills", "pi-anthropics-skills"]);
 
 const themePackages = new Set(["pi-catppuccin"]);
 
