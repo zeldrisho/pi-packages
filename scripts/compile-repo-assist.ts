@@ -23,10 +23,14 @@ try {
   const job = compiled.slice(start, end);
   const condition = "needs.agent.result != 'skipped'";
 
-  if (!job.includes("      - safe_outputs\n") || job.split(condition).length !== 2) {
-    throw new Error(
-      "Unexpected repo-memory job; inspect the compiler output before updating the gate",
-    );
+  if (!job.includes("      - safe_outputs\n")) {
+    throw new Error("Generated repo-memory job is missing its safe_outputs dependency");
+  }
+
+  const occurrences = job.split(condition).length - 1;
+
+  if (occurrences !== 1) {
+    throw new Error(`Expected one repo-memory agent condition; found ${occurrences}`);
   }
 
   const gated = job.replace(
