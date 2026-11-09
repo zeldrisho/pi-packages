@@ -27,12 +27,19 @@ describe("repo-assist workflow contracts", () => {
     expect(job).toContain("(!cancelled())");
   });
 
-  it("requires review of protected files when creating or updating PRs", () => {
-    for (const output of ["create-pull-request", "push-to-pull-request-branch"]) {
+  it("requires review on creation and refuses protected-file branch pushes", () => {
+    for (const [output, policy] of [
+      ["create-pull-request", "request-review"],
+      ["push-to-pull-request-branch", "fallback-to-issue"],
+    ]) {
       const section = source.split(`  ${output}:\n`)[1]?.split(/\n  [a-z][a-z-]+:\n/u)[0];
-      expect(section).toContain("policy: request-review");
+      expect(section).toContain(`policy: ${policy}`);
     }
 
-    expect(compiled).not.toContain('\\"protected_files_policy\\":\\"allowed\\"');
+    const config = compiled.match(/GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "(.*)"/u)?.[1];
+    expect(config).toBeDefined();
+    const parsed = JSON.parse(JSON.parse(`"${config}"`));
+    expect(parsed.create_pull_request.protected_files_policy).toBe("request-review");
+    expect(parsed.push_to_pull_request_branch.protected_files_policy).toBe("fallback-to-issue");
   });
 });

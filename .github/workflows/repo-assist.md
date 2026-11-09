@@ -209,7 +209,7 @@ safe-outputs:
     required-title-prefix: "[repo-assist] "
     max: 4
     protected-files:
-      policy: request-review
+      policy: fallback-to-issue
       exclude:
         - CHANGELOG.md
         - README.md
