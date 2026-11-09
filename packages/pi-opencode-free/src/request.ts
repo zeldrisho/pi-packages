@@ -115,19 +115,20 @@ const ENV_BLOCK = /<env>(?:(?!<\/env>)[^])*?\bWorking directory:(?:(?!<\/env>)[^
 function ensureFirstEnvironment(
   messages: readonly ChatMessageReference[],
 ): readonly ChatMessageReference[] {
-  const text = messages
-    .flatMap((message) => (isInstructionMessage(message) ? [messageText(message.content)] : []))
-    .join("\n");
+  const texts = messages.flatMap((message) =>
+    isInstructionMessage(message) ? [messageText(message.content)] : [],
+  );
 
-  const first = /<env>([^]*?)<\/env>/u.exec(text);
+  const firstText = texts.find((text) => text.includes("<env>"));
+  const first = firstText ? /<env>([^]*?)<\/env>/u.exec(firstText) : null;
 
   if (first && !first[1]?.includes("<env>") && /\bWorking directory:/u.test(first[1] ?? "")) {
     return messages;
   }
 
-  const usable = [...text.matchAll(/<env>((?:(?!<env>|<\/env>)[^])*)<\/env>/gu)].find((match) =>
-    /\bWorking directory:/u.test(match[1] ?? ""),
-  );
+  const usable = texts
+    .flatMap((text) => [...text.matchAll(/<env>((?:(?!<env>|<\/env>)[^])*)<\/env>/gu)])
+    .find((match) => /\bWorking directory:/u.test(match[1] ?? ""));
 
   const directory =
     /\bWorking directory:[ \t]*([^\n<]*)/u.exec(usable?.[1] ?? "")?.[1] ?? process.cwd();

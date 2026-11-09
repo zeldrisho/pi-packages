@@ -126,6 +126,18 @@ describe("prompt preservation", () => {
     expect(normalizeFreeRequestPayload(result).messages).toBe(result.messages);
     expect(messages[0]?.content).toBe(content);
   });
+  it("does not combine environment tags across instruction messages", () => {
+    const messages = [
+      { role: "system", content: "<env>\n Working directory: /incomplete" },
+      { role: "developer", content: "</env>" },
+      { role: "developer", content: "<env>\n Working directory: /valid\n</env>" },
+    ];
+
+    const result = normalizeFreeRequestPayload({ model: "beam-free", messages });
+    expect(result.messages?.[0]?.content).toBe(
+      "<env>\n Working directory: /valid\n</env>\n\n<env>\n Working directory: /incomplete",
+    );
+  });
   it("prefixes a minimal env block and preserves the prompt", () => {
     const messages = [
       { role: "system", content: "You are Pi." },

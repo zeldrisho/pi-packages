@@ -54,6 +54,10 @@ The deterministic suites use local fixtures and mocked Brave responses. Manually
 
 Before review, inspect the final diff for unrelated behavior, new network paths, cache changes, implicit mutation, forceful fallbacks, and output growth. Run focused tests, `vp check --fix`, required normalization tasks, and finally `vp run ready`.
 
+## Repo Assist compilation
+
+After editing `.github/workflows/repo-assist.md`, run `vp run compile:repo-assist` rather than calling `gh aw compile` directly. The wrapper uses the installed gh-aw compiler and adds a fail-closed memory publication condition to its generated job: memory is saved only when the agent and safe outputs both succeed. The compiler does not currently expose this job's condition as configuration. The repository contract test detects a missing gate; inspect the generated job and update the wrapper when upgrading gh-aw. Failed or partially applied output batches do not save memory, so subsequent runs must reconcile against live GitHub state.
+
 ## Dependencies
 
 Open dependency updates manually. Review upstream notes, lockfile changes, GitHub Action major tags, and run validation. Keep Typebox, TypeScript, and major toolchain updates separate. Keep `@types/node` aligned with the current Node.js LTS major; update it when LTS advances so type checking matches the tested runtime. After catalog or lockfile changes, check the override conditions in `pnpm-workspace.yaml` and remove satisfied overrides.

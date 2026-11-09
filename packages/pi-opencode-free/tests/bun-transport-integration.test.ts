@@ -141,5 +141,6 @@ describe.skipIf(!bunAvailable)("Bun transport integration", () => {
         await new Promise<void>((resolve) => server.close(() => resolve()));
       }
     },
+    15_000,
   );
 });

@@ -28,7 +28,7 @@ Repository overlay (optional):
 
 Read only the files you need:
 Use a local guidance checkout only when its repository/ref matches the requested guidance; otherwise use the resolved guidance repository/ref (default `github/gh-aw`).
-If GitHub API, `gh api`, or GitHub MCP downloads return HTTP 403 (including a token SAML-authorized for a different organization), do not retry with the same token. Fetch the public file without authentication from `https://raw.githubusercontent.com/github/gh-aw/main/<path>` instead, preserving its repository-relative path (including `.github/`). For example: `curl --fail --silent --show-error --location 'https://raw.githubusercontent.com/github/gh-aw/main/.github/aw/create-agentic-workflow.md'`. Use the same fallback for referenced instructions and `SKILL.md` files; never send an Authorization header or token to the raw URL. If the public download fails, report that error rather than proceeding without the required instructions. This fallback is for public `github/gh-aw` content only, not private or enterprise repositories.
+If GitHub API, `gh api`, or GitHub MCP downloads return HTTP 403 (including a token SAML-authorized for a different organization), do not retry with the same token. Fetch the public file without authentication from `https://raw.githubusercontent.com/github/gh-aw/<ref>/<path>` instead, using the resolved ref (default `main`) and preserving its repository-relative path (including `.github/`). For example: `curl --fail --silent --show-error --location 'https://raw.githubusercontent.com/github/gh-aw/main/.github/aw/create-agentic-workflow.md'`. Use the same fallback for referenced instructions and `SKILL.md` files; never send an Authorization header or token to the raw URL. If the public download fails, report that error rather than proceeding without the required instructions. This fallback is for public `github/gh-aw` content only, not private or enterprise repositories.
 
 - `.github/aw/action-container-substitutions.md`
 - `.github/aw/agent-runtime-instructions.md`
@@ -149,6 +149,6 @@ After loading the matching workflow prompt or skill, follow it directly:
 - Design long-running multi-agent research workflows: `.github/aw/multi-agent-research.md`
 - Add skills or agent plugins requested by the user (`skills:` / `plugins:` frontmatter, never on-the-fly installs): `.github/aw/skills.md`
 
-When the task involves OTEL, OTLP, traces, observability backends, or telemetry-driven analysis, also read and follow `skills/otel-queries/SKILL.md` after loading the matching workflow prompt or skill.
+When the task involves OTEL, OTLP, traces, observability backends, or telemetry-driven analysis, also read and follow `.github/skills/otel-queries/SKILL.md` after loading the matching workflow prompt or skill.
 
 When creating, updating, diagnosing or upgrading a workflow that uses `tools.work-queue`, also load `.github/aw/work-queue.md` after the primary prompt. Load deployment docs, operator reference or specification only when that task needs them.
