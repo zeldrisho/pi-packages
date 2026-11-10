@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.5] - 2026-11-10
+
 ### Fixed
 
 - Exclude explicitly hidden elements from the basic HTML extraction fallback.
@@ -330,7 +332,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.4...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.5...HEAD
+[0.16.5]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.4...pi-web-fetch-v0.16.5
 [0.16.4]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.3...pi-web-fetch-v0.16.4
 [0.16.3]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.2...pi-web-fetch-v0.16.3
 [0.16.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.1...pi-web-fetch-v0.16.2

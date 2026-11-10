@@ -7,10 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-10
+
 ### Added
 
-- Compact long sessions on free-tier models by summarizing the history in segments with the model you already selected, without switching models or asking for a thinking level. Summaries that stop at the output cap are discarded instead of saved, and one that skips the expected sections is requested again before falling back to Pi's compaction.
-- Summarize a long branch in segments when leaving it through `/tree`, keeping Pi's branch-summary format and preamble and carrying the branch's file lists forward.
+- Compact long free-tier sessions in segments with the model you already selected, without switching models or thinking levels; if a summary can't be used, Pi's native compaction still applies.
+- Summarize a long branch in segments when leaving it through `/tree`, keeping Pi's branch-summary format and file lists.
 
 ## [0.3.3] - 2026-11-09
 
@@ -88,7 +90,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Discover free models through Pi's native OpenCode catalog from pi.dev instead of models.dev, preserving Pi's capabilities and compatibility metadata.
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.3...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.4.0...HEAD
+[0.4.0]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.3...pi-opencode-free-v0.4.0
 [0.3.3]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.2...pi-opencode-free-v0.3.3
 [0.3.2]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.1...pi-opencode-free-v0.3.2
 [0.3.1]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.0...pi-opencode-free-v0.3.1
