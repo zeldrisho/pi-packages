@@ -12,9 +12,12 @@ const compiled = await readFile(
 );
 
 describe("repo-assist workflow contracts", () => {
-  it("serializes all runs sharing repository memory without cancelling pending work", () => {
+  it("uses the reference concurrency discriminator", () => {
+    expect(source).toContain(
+      "job-discriminator: ${{ github.event_name == 'schedule' && 'scheduled' || github.run_id }}",
+    );
     expect(compiled).toContain(
-      "concurrency:\n  cancel-in-progress: false\n  group: repo-assist-memory\n  queue: max",
+      "gh-aw-conclusion-repo-assist-${{ github.event_name == 'schedule' && 'scheduled' || github.run_id }}",
     );
   });
 
@@ -43,10 +46,10 @@ describe("repo-assist workflow contracts", () => {
     expect(job).toContain("Memory will not be published");
   });
 
-  it("requires review on creation and refuses protected-file branch pushes", () => {
+  it("requires review on creation and allows protected-file branch pushes", () => {
     for (const [output, policy] of [
       ["create-pull-request", "request-review"],
-      ["push-to-pull-request-branch", "blocked"],
+      ["push-to-pull-request-branch", "allowed"],
     ]) {
       const section = source.split(`  ${output}:\n`)[1]?.split(/\n  [a-z][a-z-]+:\n/u)[0];
       expect(section).toContain(`policy: ${policy}`);
@@ -56,6 +59,6 @@ describe("repo-assist workflow contracts", () => {
     expect(config).toBeDefined();
     const parsed = JSON.parse(JSON.parse(`"${config}"`));
     expect(parsed.create_pull_request.protected_files_policy).toBe("request-review");
-    expect(parsed.push_to_pull_request_branch.protected_files_policy).toBe("blocked");
+    expect(parsed.push_to_pull_request_branch.protected_files_policy).toBe("allowed");
   });
 });

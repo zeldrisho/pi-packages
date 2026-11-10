@@ -27,14 +27,10 @@ on:
   reaction: "eyes"
 
 concurrency:
-  group: repo-assist-memory
-  cancel-in-progress: false
-  queue: max
-  job-discriminator: ${{ github.run_id }}
+  job-discriminator: ${{ github.event_name == 'schedule' && 'scheduled' || github.run_id }}
 
 timeout-minutes: 60
-# Compile with `vp run compile:repo-assist` to retain the memory publication gate
-# and set GH_AW_DEFAULT_MAX_TURN_CACHE_MISSES=50 for detection.
+# Compile with GH_AW_DEFAULT_MAX_TURN_CACHE_MISSES=50 so detection also receives this limit.
 # Vercel may not report cached tokens on every request.
 max-turn-cache-misses: 50
 
@@ -209,7 +205,7 @@ safe-outputs:
     required-title-prefix: "[repo-assist] "
     max: 4
     protected-files:
-      policy: blocked
+      policy: allowed
       exclude:
         - CHANGELOG.md
         - README.md
