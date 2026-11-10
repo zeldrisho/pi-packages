@@ -290,6 +290,27 @@ describe("segmented compaction", () => {
     expect(Math.ceil(finalPrompt.length / 4)).toBeLessThanOrEqual(6_000);
   });
 
+  it("keeps merge inputs when a merge stops at the token cap", async () => {
+    const harness = createHarness({
+      contextWindow: 40_000,
+      respond: (call) => {
+        if (call.prompt.includes("Merge these digests")) return response("PARTIAL-MERGE", "length");
+
+        return response(
+          isCheckpointRequest(call) ? CHECKPOINT : `DIGEST-${call.prompt.length}`,
+          "stop",
+        );
+      },
+    });
+
+    const result = await harness.handler(harness.event, harness.context);
+    const finalPrompt = harness.calls.at(-1)?.prompt ?? "";
+
+    expect(result?.compaction?.summary).toContain("## Goal");
+    expect(finalPrompt).not.toContain("PARTIAL-MERGE");
+    expect(finalPrompt.match(/DIGEST-/g)?.length ?? 0).toBeGreaterThan(1);
+  });
+
   it("falls back to Pi's compaction when the provider fails", async () => {
     const harness = createHarness({
       contextWindow: 40_000,

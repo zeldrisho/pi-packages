@@ -668,7 +668,10 @@ async function mergeDigests(
     );
 
     accumulated = addUsage(accumulated, result.usage);
-    merged.push(result.text);
+
+    // A merge that stopped at the cap drops facts silently, so keep its inputs instead.
+    if (result.truncated) merged.push(...batch);
+    else merged.push(result.text);
   }
 
   return { level: merged, usage: accumulated };
