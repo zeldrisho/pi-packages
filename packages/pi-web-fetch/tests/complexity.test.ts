@@ -53,6 +53,22 @@ describe("conversion depth preflight", () => {
     expect(exceedsConversionDepth(html)).toBe(true);
   });
 
+  it("keeps an implied tag open when an intervening element blocks the close", () => {
+    // linkedom closes an implied end tag only while it is on top of its stack, so these
+    // nest even though a `li`, `td`, or `p` appears open earlier.
+    const cases = [
+      `<ul>${"<li><div>x".repeat(400)}</ul>`,
+      `${"<p>a<span>b<p>c".repeat(400)}`,
+      `<table>${"<tr><td><div>x".repeat(400)}`,
+      `<ul>${"<li><p>item".repeat(400)}`,
+    ];
+
+    for (const html of cases) {
+      expect(linkedomDepth(html)).toBeGreaterThan(MAX_CONVERSION_DEPTH);
+      expect(exceedsConversionDepth(html)).toBe(true);
+    }
+  });
+
   it("still refuses unclosed elements that linkedom nests", () => {
     const html = `${"<section><span>text".repeat(400)}`;
     expect(linkedomDepth(html)).toBeGreaterThan(MAX_CONVERSION_DEPTH);

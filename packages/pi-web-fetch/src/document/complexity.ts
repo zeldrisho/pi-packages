@@ -27,60 +27,73 @@ const VOID_ELEMENTS = new Set([
 // in particular, linkedom parses nested elements inside <noscript>.
 const RAW_TEXT_ELEMENTS = new Set(["script", "style", "textarea"]);
 
-/** Elements whose end tag may be omitted, mapped to the start tags that close them. */
-const IMPLIED_END_TAGS = new Map<string, ReadonlySet<string>>(
-  Object.entries({
-    li: ["li"],
-    dt: ["dt", "dd"],
-    dd: ["dt", "dd"],
-    td: ["td", "th"],
-    th: ["td", "th"],
-    tr: ["td", "th", "tr"],
-    thead: ["td", "th", "tr", "thead", "tbody", "tfoot"],
-    tbody: ["td", "th", "tr", "thead", "tbody", "tfoot"],
-    tfoot: ["td", "th", "tr", "thead", "tbody", "tfoot"],
-    option: ["option"],
-    optgroup: ["option", "optgroup"],
-    rt: ["rt", "rp"],
-    rp: ["rt", "rp"],
-  }).map(([name, closed]) => [name, new Set(closed)]),
-);
-
-/** Start tags that implicitly close an open `p`, per the HTML parsing rules. */
-const CLOSES_PARAGRAPH = new Set([
-  "address",
-  "article",
-  "aside",
-  "blockquote",
-  "details",
-  "div",
-  "dl",
-  "fieldset",
-  "figcaption",
-  "figure",
-  "footer",
-  "form",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "header",
-  "hgroup",
-  "hr",
-  "main",
-  "menu",
-  "nav",
-  "ol",
-  "p",
-  "pre",
-  "section",
-  "table",
-  "ul",
+/** Form elements that close each other in linkedom's parser, mirroring htmlparser2. */
+const FORM_ELEMENTS = new Set([
+  "input",
+  "option",
+  "optgroup",
+  "select",
+  "button",
+  "datalist",
+  "textarea",
 ]);
 
-const PARAGRAPH = new Set(["p"]);
+const P_TAG = new Set(["p"]);
+
+/**
+ * Start tags that imply an end tag, mapped to the tags they close, mirroring
+ * htmlparser2's `openImpliesClose` table used by linkedom. A tag closes only while it
+ * is on top of the open-element stack; an intervening element keeps it open.
+ */
+const IMPLIED_END_TAGS = new Map<string, ReadonlySet<string>>([
+  ["tr", new Set(["tr", "th", "td"])],
+  ["th", new Set(["th"])],
+  ["td", new Set(["thead", "th", "td"])],
+  ["body", new Set(["head", "link", "script"])],
+  ["li", new Set(["li"])],
+  ["p", P_TAG],
+  ["h1", P_TAG],
+  ["h2", P_TAG],
+  ["h3", P_TAG],
+  ["h4", P_TAG],
+  ["h5", P_TAG],
+  ["h6", P_TAG],
+  ["select", FORM_ELEMENTS],
+  ["input", FORM_ELEMENTS],
+  ["output", FORM_ELEMENTS],
+  ["button", FORM_ELEMENTS],
+  ["datalist", FORM_ELEMENTS],
+  ["textarea", FORM_ELEMENTS],
+  ["option", new Set(["option"])],
+  ["optgroup", new Set(["optgroup", "option"])],
+  ["dd", new Set(["dd", "dt"])],
+  ["dt", new Set(["dd", "dt"])],
+  ["address", P_TAG],
+  ["article", P_TAG],
+  ["aside", P_TAG],
+  ["blockquote", P_TAG],
+  ["details", P_TAG],
+  ["div", P_TAG],
+  ["dl", P_TAG],
+  ["fieldset", P_TAG],
+  ["figcaption", P_TAG],
+  ["figure", P_TAG],
+  ["footer", P_TAG],
+  ["form", P_TAG],
+  ["header", P_TAG],
+  ["hr", P_TAG],
+  ["main", P_TAG],
+  ["nav", P_TAG],
+  ["ol", P_TAG],
+  ["pre", P_TAG],
+  ["section", P_TAG],
+  ["table", P_TAG],
+  ["ul", P_TAG],
+  ["rt", new Set(["rt", "rp"])],
+  ["rp", new Set(["rt", "rp"])],
+  ["tbody", new Set(["thead", "tbody"])],
+  ["tfoot", new Set(["thead", "tbody"])],
+] satisfies Array<[string, ReadonlySet<string>]>);
 
 /**
  * Elements that open foreign content, where self-closing syntax is honored.
@@ -112,22 +125,22 @@ function findRawTextEnd(html: string, name: string, from: number): number {
  * Conservatively checks lexical HTML depth in one pass, before creating a DOM.
  * Only a matching top-of-stack closing tag reduces depth, plus the implied end tags
  * that linkedom itself applies for optional-end-tag elements; without those, ordinary
- * documents whose `p`, `li`, or `td` end tags are omitted would be refused. Self-closing
- * syntax on non-void HTML elements is counted as opening, just as linkedom treats it,
- * while foreign content (`svg`, `math`) honors it.
+ * documents whose `p`, `li`, or `td` end tags are omitted would be refused. An implied
+ * close applies only while its tag is on top of the stack, matching linkedom's parser,
+ * so an intervening element keeps counting toward depth. Self-closing syntax on non-void
+ * HTML elements is counted as opening, just as linkedom treats it, while foreign content
+ * (`svg`, `math`) honors it.
  * Quoted attributes, comments, and raw-text bodies cannot hide nested markup.
  */
 export function exceedsConversionDepth(html: string): boolean {
   // Preserve code-unit positions when normalizing ASCII tag names.
   const lower = html.replace(/[A-Z]+/g, (match) => match.toLowerCase());
   const stack: string[] = [];
-  const open = new Map<string, number>();
   let foreignDepth = 0;
   let offset = 0;
 
   const push = (name: string): void => {
     stack.push(name);
-    open.set(name, (open.get(name) ?? 0) + 1);
 
     if (FOREIGN_ROOTS.has(name)) foreignDepth += 1;
   };
@@ -136,44 +149,24 @@ export function exceedsConversionDepth(html: string): boolean {
     const name = stack.pop();
 
     if (name === undefined) return;
-    const remaining = (open.get(name) ?? 1) - 1;
-
-    if (remaining === 0) open.delete(name);
-    else open.set(name, remaining);
 
     if (FOREIGN_ROOTS.has(name)) foreignDepth -= 1;
   };
 
-  const hasOpen = (names: ReadonlySet<string>): boolean => {
-    for (const name of names) {
-      if (open.has(name)) return true;
-    }
-
-    return false;
-  };
-
   // The scan is charged to the elements it pops, so total work stays linear.
-  const popThrough = (names: ReadonlySet<string>): void => {
-    let target = -1;
-
-    for (let index = stack.length - 1; index >= 0; index -= 1) {
-      if (names.has(stack[index])) {
-        target = index;
-        break;
-      }
-    }
-
-    if (target === -1) return;
-
-    while (stack.length > target) pop();
-  };
-
   const closeImplied = (name: string): void => {
     const implied = IMPLIED_END_TAGS.get(name);
 
-    if (implied !== undefined && hasOpen(implied)) popThrough(implied);
+    if (implied === undefined) return;
 
-    if (CLOSES_PARAGRAPH.has(name) && open.has("p")) popThrough(PARAGRAPH);
+    // linkedom closes an implied end tag only while it is on top of its own stack.
+    while (stack.length > 0) {
+      const top = stack.at(-1);
+
+      if (top === undefined || !implied.has(top)) return;
+
+      pop();
+    }
   };
 
   while (offset < html.length) {
