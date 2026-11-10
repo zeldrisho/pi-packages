@@ -557,7 +557,7 @@ function isRemoteCatalogEntry(value: unknown): value is RemoteCatalogEntry {
 }
 
 /** Accepts arrays containing only strings, including empty arrays. */
-function isStringArray(value: unknown): value is readonly string[] {
+export function isStringArray(value: unknown): value is readonly string[] {
   if (!Array.isArray(value)) return false;
 
   for (const item of value) {

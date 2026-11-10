@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Compact long sessions on free-tier models by summarizing the history in segments with the model you already selected, without switching models or asking for a thinking level. Summaries that stop at the output cap are discarded instead of saved, and one that skips the expected sections is requested again before falling back to Pi's compaction.
+- Summarize a long branch in segments when leaving it through `/tree`, keeping Pi's branch-summary format and preamble and carrying the branch's file lists forward.
+
 ## [0.3.3] - 2026-11-09
 
 ### Fixed
