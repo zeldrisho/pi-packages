@@ -3,6 +3,7 @@ import type { ExtensionAPI, ProviderConfig } from "@earendil-works/pi-coding-age
 
 import { createBunTransport } from "./bun-transport.ts";
 import { createCliVersionResolver } from "./cli-version.ts";
+import { registerBranchSummary, registerChunkedCompaction } from "./compaction.ts";
 import {
   buildClientHeaders,
   createCanonicalSessionId,
@@ -47,11 +48,14 @@ export interface OpencodeFreeDependencies {
 }
 
 /**
- * Registers the OpenCode free provider and its request adapter.
+ * Registers the OpenCode free provider, its request adapter, and the segmented
+ * compaction handler used by free-tier models.
  *
  * Seeds the catalog from bundled models, keeps one persisted session identity
  * across runs, and normalizes requests for this provider. Discovery runs when Pi
- * invokes the registered model refresh hook.
+ * invokes the registered model refresh hook. Compaction summarizes long histories
+ * in segments with the user's current model when Pi's single request would run out
+ * of output room; other providers keep Pi's native compaction.
  *
  * @param pi - Extension API supplied by Pi
  * @param dependencies - Runtime dependencies for discovery and session generation
@@ -99,6 +103,8 @@ export function registerOpencodeFree(
   };
 
   pi.registerProvider(PROVIDER_ID, config);
+  registerChunkedCompaction(pi, PROVIDER_ID);
+  registerBranchSummary(pi, PROVIDER_ID);
 }
 
 /**

@@ -3,10 +3,13 @@ export class AcquisitionAdmission {
   #active = 0;
   readonly #waiting: Array<() => void> = [];
 
-  constructor(
-    readonly maxActive: number,
-    readonly maxWaiting: number,
-  ) {}
+  readonly maxActive: number;
+  readonly maxWaiting: number;
+
+  constructor(maxActive: number, maxWaiting: number) {
+    this.maxActive = maxActive;
+    this.maxWaiting = maxWaiting;
+  }
 
   async acquire(signal: AbortSignal): Promise<() => void> {
     signal.throwIfAborted();

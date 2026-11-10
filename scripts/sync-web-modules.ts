@@ -22,11 +22,11 @@ const PACKAGES = ["pi-web-fetch", "pi-web-search"] as const;
 
 const FILES = ["cache.ts", "inflight.ts", "render.ts"] as const;
 
-function pairs() {
+function pairs(root = ROOT) {
   return FILES.map((file) => ({
     file,
-    a: join(ROOT, "packages", PACKAGES[0], "src", file),
-    b: join(ROOT, "packages", PACKAGES[1], "src", file),
+    a: join(root, "packages", PACKAGES[0], "src", file),
+    b: join(root, "packages", PACKAGES[1], "src", file),
   }));
 }
 
@@ -34,10 +34,10 @@ function read(path: string): string | null {
   return existsSync(path) ? readFileSync(path, "utf8") : null;
 }
 
-function check(): number {
+function check(root = ROOT): number {
   let drift = 0;
 
-  for (const { file, a, b } of pairs()) {
+  for (const { file, a, b } of pairs(root)) {
     const left = read(a);
     const right = read(b);
 
@@ -58,7 +58,7 @@ function check(): number {
   return drift;
 }
 
-function sync(from: string): number {
+export function sync(from: string, root = ROOT): number {
   // SAFETY: `from` is a validated PACKAGES member; the assertion narrows the
   // CLI string so `includes` accepts the known union.
   if (!PACKAGES.includes(from as (typeof PACKAGES)[number])) {
@@ -70,22 +70,28 @@ function sync(from: string): number {
   const source = from === PACKAGES[0] ? PACKAGES[0] : PACKAGES[1];
   const target = source === PACKAGES[0] ? PACKAGES[1] : PACKAGES[0];
 
-  for (const { file } of pairs()) {
-    const src = join(ROOT, "packages", source, "src", file);
-    const dst = join(ROOT, "packages", target, "src", file);
-    const content = read(src);
+  const copies = FILES.map((file) => {
+    const src = join(root, "packages", source, "src", file);
 
-    if (content === null) {
-      console.error(`missing source: ${src}`);
+    return { file, src, dst: join(root, "packages", target, "src", file), content: read(src) };
+  });
 
-      return 1;
-    }
+  const missing = copies.find(({ content }) => content === null);
 
+  if (missing) {
+    console.error(`missing source: ${missing.src}`);
+
+    return 1;
+  }
+
+  for (const { file, dst, content } of copies) {
+    // The pre-pass above rejects a missing source, so this narrowing always succeeds.
+    if (content === null) throw new Error(`Missing source: ${file}`);
     writeFileSync(dst, content, "utf8");
     console.log(`synced ${file}: ${source} -> ${target}`);
   }
 
-  return check() === 0 ? 0 : 1;
+  return check(root) === 0 ? 0 : 1;
 }
 
 export interface SyncArguments {
@@ -104,18 +110,21 @@ export function parseSyncArguments(argv: string[]): SyncArguments {
     throw new Error(`unknown command: ${command} (expected "check" or "sync")`);
   }
 
-  const fromFlagIndex = rest.findIndex((arg) => arg === "--from");
-  const fromFlag = rest.find((arg) => arg.startsWith("--from="));
+  let from: string = PACKAGES[0];
 
-  // SAFETY: the `--from` value is validated against PACKAGES below; the
-  // assertions narrow the CLI string to the known union of package names.
-  const from = fromFlag
-    ? (fromFlag.split("=")[1] as (typeof PACKAGES)[number])
-    : fromFlagIndex !== -1
-      ? (rest[fromFlagIndex + 1] as (typeof PACKAGES)[number])
-      : PACKAGES[0];
+  if (rest.length > 0) {
+    if (command !== "sync") throw new Error("--from is only supported for sync");
 
-  if (!PACKAGES.includes(from)) {
+    if (rest.length === 1 && rest[0].startsWith("--from=")) {
+      from = rest[0].slice("--from=".length);
+    } else if (rest.length === 2 && rest[0] === "--from") {
+      from = rest[1];
+    } else {
+      throw new Error("Expected sync [--from pi-web-fetch|pi-web-search]");
+    }
+  }
+
+  if (from !== PACKAGES[0] && from !== PACKAGES[1]) {
     throw new Error(`--from must be one of: ${PACKAGES.join(", ")}`);
   }
 

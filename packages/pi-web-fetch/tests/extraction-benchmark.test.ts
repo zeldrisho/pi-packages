@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vite-plus/test";
 import { parseBenchmarkOptions, parseCorpusJson } from "../scripts/benchmark-extraction";
 
@@ -10,6 +12,13 @@ const validEntry = {
 };
 
 describe("extraction benchmark", () => {
+  it("runs directly under Node's TypeScript stripping", () => {
+    const script = fileURLToPath(new URL("../scripts/benchmark-extraction.ts", import.meta.url));
+    expect(execFileSync(process.execPath, [script, "--help"], { encoding: "utf8" })).toContain(
+      "Usage:",
+    );
+  });
+
   it("parses filters, timeouts, JSON output, and corpus paths", () => {
     const options = parseBenchmarkOptions([
       "--filter",

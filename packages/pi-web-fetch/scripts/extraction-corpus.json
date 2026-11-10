@@ -3,7 +3,7 @@
     "name": "example article",
     "category": "html",
     "url": "https://example.com/",
-    "requiredMarkers": ["documentation examples", "Learn more"],
+    "requiredMarkers": ["documentation examples", "permission"],
     "minimumCharacters": 100
   },
   {

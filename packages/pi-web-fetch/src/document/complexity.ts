@@ -27,6 +27,93 @@ const VOID_ELEMENTS = new Set([
 // in particular, linkedom parses nested elements inside <noscript>.
 const RAW_TEXT_ELEMENTS = new Set(["script", "style", "textarea"]);
 
+/** Form elements that close each other in linkedom's parser, mirroring htmlparser2. */
+const FORM_ELEMENTS = new Set([
+  "input",
+  "option",
+  "optgroup",
+  "select",
+  "button",
+  "datalist",
+  "textarea",
+]);
+
+const P_TAG = new Set(["p"]);
+
+/**
+ * Start tags that imply an end tag, mapped to the tags they close, mirroring
+ * htmlparser2's `openImpliesClose` table used by linkedom. A tag closes only while it
+ * is on top of the open-element stack; an intervening element keeps it open.
+ */
+const IMPLIED_END_TAGS = new Map<string, ReadonlySet<string>>([
+  ["tr", new Set(["tr", "th", "td"])],
+  ["th", new Set(["th"])],
+  ["td", new Set(["thead", "th", "td"])],
+  ["body", new Set(["head", "link", "script"])],
+  ["li", new Set(["li"])],
+  ["p", P_TAG],
+  ["h1", P_TAG],
+  ["h2", P_TAG],
+  ["h3", P_TAG],
+  ["h4", P_TAG],
+  ["h5", P_TAG],
+  ["h6", P_TAG],
+  ["select", FORM_ELEMENTS],
+  ["input", FORM_ELEMENTS],
+  ["output", FORM_ELEMENTS],
+  ["button", FORM_ELEMENTS],
+  ["datalist", FORM_ELEMENTS],
+  ["textarea", FORM_ELEMENTS],
+  ["option", new Set(["option"])],
+  ["optgroup", new Set(["optgroup", "option"])],
+  ["dd", new Set(["dd", "dt"])],
+  ["dt", new Set(["dd", "dt"])],
+  ["address", P_TAG],
+  ["article", P_TAG],
+  ["aside", P_TAG],
+  ["blockquote", P_TAG],
+  ["details", P_TAG],
+  ["div", P_TAG],
+  ["dl", P_TAG],
+  ["fieldset", P_TAG],
+  ["figcaption", P_TAG],
+  ["figure", P_TAG],
+  ["footer", P_TAG],
+  ["form", P_TAG],
+  ["header", P_TAG],
+  ["hr", P_TAG],
+  ["main", P_TAG],
+  ["nav", P_TAG],
+  ["ol", P_TAG],
+  ["pre", P_TAG],
+  ["section", P_TAG],
+  ["table", P_TAG],
+  ["ul", P_TAG],
+  ["rt", new Set(["rt", "rp"])],
+  ["rp", new Set(["rt", "rp"])],
+  ["tbody", new Set(["thead", "tbody"])],
+  ["tfoot", new Set(["thead", "tbody"])],
+] satisfies Array<[string, ReadonlySet<string>]>);
+
+/**
+ * Elements that open foreign content, where self-closing syntax is honored.
+ * In HTML content a trailing `/` is ignored, matching linkedom and the HTML rules.
+ */
+const FOREIGN_ROOTS = new Set(["svg", "math"]);
+
+/** Foreign-content elements that switch linkedom back to HTML parsing. */
+const HTML_INTEGRATION_ELEMENTS = new Set([
+  "mi",
+  "mo",
+  "mn",
+  "ms",
+  "mtext",
+  "annotation-xml",
+  "foreignobject",
+  "desc",
+  "title",
+]);
+
 /**
  * Finds a raw-text end tag in lowercased HTML, starting at the supplied code-unit
  * offset, without interpreting its body as markup. Returns -1 when none is found.
@@ -49,15 +136,58 @@ function findRawTextEnd(html: string, name: string, from: number): number {
 
 /**
  * Conservatively checks lexical HTML depth in one pass, before creating a DOM.
- * Only a matching top-of-stack closing tag reduces depth. Self-closing syntax
- * on non-void HTML elements is counted as opening, just as linkedom treats it.
+ * Only a matching top-of-stack closing tag reduces depth, plus the implied end tags
+ * that linkedom itself applies for optional-end-tag elements; without those, ordinary
+ * documents whose `p`, `li`, or `td` end tags are omitted would be refused. An implied
+ * close applies only while its tag is on top of the stack, matching linkedom's parser,
+ * so an intervening element keeps counting toward depth. Self-closing syntax on non-void
+ * HTML elements is counted as opening, just as linkedom treats it, while foreign content
+ * (`svg`, `math`) honors it.
  * Quoted attributes, comments, and raw-text bodies cannot hide nested markup.
  */
 export function exceedsConversionDepth(html: string): boolean {
   // Preserve code-unit positions when normalizing ASCII tag names.
   const lower = html.replace(/[A-Z]+/g, (match) => match.toLowerCase());
   const stack: string[] = [];
+  // htmlparser2 keeps this flag in parallel with its element stack. Integration points
+  // push HTML mode even under SVG or MathML; this must happen before self-closing checks.
+  const foreignContexts = [false];
   let offset = 0;
+
+  const push = (name: string): void => {
+    const parentForeign = foreignContexts.at(-1) ?? false;
+
+    const foreign = FOREIGN_ROOTS.has(name)
+      ? true
+      : HTML_INTEGRATION_ELEMENTS.has(name)
+        ? false
+        : parentForeign;
+
+    stack.push(name);
+    foreignContexts.push(foreign);
+  };
+
+  const pop = (): void => {
+    if (stack.pop() === undefined) return;
+
+    foreignContexts.pop();
+  };
+
+  // The scan is charged to the elements it pops, so total work stays linear.
+  const closeImplied = (name: string): void => {
+    const implied = IMPLIED_END_TAGS.get(name);
+
+    if (implied === undefined) return;
+
+    // linkedom closes an implied end tag only while it is on top of its own stack.
+    while (stack.length > 0) {
+      const top = stack.at(-1);
+
+      if (top === undefined || !implied.has(top)) return;
+
+      pop();
+    }
+  };
 
   while (offset < html.length) {
     const start = html.indexOf("<", offset);
@@ -121,9 +251,20 @@ export function exceedsConversionDepth(html: string): boolean {
     if (html[cursor - 1] !== ">") break;
 
     if (closing) {
-      if (stack.at(-1) === name) stack.pop();
+      if (stack.at(-1) === name) pop();
     } else if (!VOID_ELEMENTS.has(name)) {
-      stack.push(name);
+      // Implied closes apply only in HTML mode, matching htmlparser2/linkedom.
+      if (!foreignContexts.at(-1)) closeImplied(name);
+      push(name);
+
+      // Self-closing syntax is honored only in foreign mode. An unquoted attribute value
+      // can itself end in `/`, so it is not a self-closing marker. Check after push so an
+      // HTML integration point such as `<foreignObject/>` remains open as linkedom does.
+      if (html[cursor - 2] === "/" && !unquotedValue && foreignContexts.at(-1)) {
+        pop();
+        offset = cursor;
+        continue;
+      }
 
       if (stack.length > MAX_CONVERSION_DEPTH) return true;
 

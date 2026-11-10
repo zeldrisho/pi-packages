@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.5] - 2026-11-10
+
+### Fixed
+
+- Exclude explicitly hidden elements from the basic HTML extraction fallback.
+- Sanitize unsafe links and event handlers in HTML retained in extracted Markdown.
+- Accept pages whose optional end tags are omitted, such as documentation with unclosed `p`, `li`, and `td` elements, instead of rejecting them as excessively nested.
+- Reject markup whose intervening elements keep an optional end tag open, matching the depth the parser actually builds, so deeply nested pages are refused instead of freezing extraction.
+- Reject deeply nested SVG and MathML markup that uses HTML integration points or slashes in unquoted attribute values to bypass the depth preflight.
+
 ## [0.16.4] - 2026-11-09
 
 ### Fixed
@@ -324,7 +334,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.4...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.5...HEAD
+[0.16.5]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.4...pi-web-fetch-v0.16.5
 [0.16.4]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.3...pi-web-fetch-v0.16.4
 [0.16.3]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.2...pi-web-fetch-v0.16.3
 [0.16.2]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.1...pi-web-fetch-v0.16.2
