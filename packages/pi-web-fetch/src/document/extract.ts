@@ -147,6 +147,23 @@ export function htmlToMarkdownFallback(html: string): string {
     element.remove();
   }
 
+  for (const element of document.querySelectorAll("[hidden], [aria-hidden], [style]")) {
+    const style = element.getAttribute("style") ?? "";
+
+    const hiddenStyle =
+      /(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*hidden)\s*(?:!important\s*)?(?:;|$)/i.test(
+        style,
+      );
+
+    if (
+      element.hasAttribute("hidden") ||
+      element.getAttribute("aria-hidden")?.trim().toLowerCase() === "true" ||
+      hiddenStyle
+    ) {
+      element.remove();
+    }
+  }
+
   return document.body.textContent
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n[ \t]+/g, "\n")
