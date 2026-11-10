@@ -101,6 +101,19 @@ const IMPLIED_END_TAGS = new Map<string, ReadonlySet<string>>([
  */
 const FOREIGN_ROOTS = new Set(["svg", "math"]);
 
+/** Foreign-content elements that switch linkedom back to HTML parsing. */
+const HTML_INTEGRATION_ELEMENTS = new Set([
+  "mi",
+  "mo",
+  "mn",
+  "ms",
+  "mtext",
+  "annotation-xml",
+  "foreignobject",
+  "desc",
+  "title",
+]);
+
 /**
  * Finds a raw-text end tag in lowercased HTML, starting at the supplied code-unit
  * offset, without interpreting its body as markup. Returns -1 when none is found.
@@ -136,21 +149,28 @@ export function exceedsConversionDepth(html: string): boolean {
   // Preserve code-unit positions when normalizing ASCII tag names.
   const lower = html.replace(/[A-Z]+/g, (match) => match.toLowerCase());
   const stack: string[] = [];
-  let foreignDepth = 0;
+  // htmlparser2 keeps this flag in parallel with its element stack. Integration points
+  // push HTML mode even under SVG or MathML; this must happen before self-closing checks.
+  const foreignContexts = [false];
   let offset = 0;
 
   const push = (name: string): void => {
-    stack.push(name);
+    const parentForeign = foreignContexts.at(-1) ?? false;
 
-    if (FOREIGN_ROOTS.has(name)) foreignDepth += 1;
+    const foreign = FOREIGN_ROOTS.has(name)
+      ? true
+      : HTML_INTEGRATION_ELEMENTS.has(name)
+        ? false
+        : parentForeign;
+
+    stack.push(name);
+    foreignContexts.push(foreign);
   };
 
   const pop = (): void => {
-    const name = stack.pop();
+    if (stack.pop() === undefined) return;
 
-    if (name === undefined) return;
-
-    if (FOREIGN_ROOTS.has(name)) foreignDepth -= 1;
+    foreignContexts.pop();
   };
 
   // The scan is charged to the elements it pops, so total work stays linear.
@@ -233,16 +253,18 @@ export function exceedsConversionDepth(html: string): boolean {
     if (closing) {
       if (stack.at(-1) === name) pop();
     } else if (!VOID_ELEMENTS.has(name)) {
-      // Self-closing syntax is honored only for foreign content; linkedom ignores a
-      // trailing `/` on HTML elements, so those must still count as opening.
-      if (html[cursor - 2] === "/" && (foreignDepth > 0 || FOREIGN_ROOTS.has(name))) {
+      // Implied closes apply only in HTML mode, matching htmlparser2/linkedom.
+      if (!foreignContexts.at(-1)) closeImplied(name);
+      push(name);
+
+      // Self-closing syntax is honored only in foreign mode. An unquoted attribute value
+      // can itself end in `/`, so it is not a self-closing marker. Check after push so an
+      // HTML integration point such as `<foreignObject/>` remains open as linkedom does.
+      if (html[cursor - 2] === "/" && !unquotedValue && foreignContexts.at(-1)) {
+        pop();
         offset = cursor;
         continue;
       }
-
-      // Inside foreign content these elements are not HTML, so no implied end tags apply.
-      if (foreignDepth === 0) closeImplied(name);
-      push(name);
 
       if (stack.length > MAX_CONVERSION_DEPTH) return true;
 

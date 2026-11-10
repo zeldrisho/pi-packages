@@ -69,6 +69,28 @@ describe("conversion depth preflight", () => {
     }
   });
 
+  it("tracks foreign-content integration points before applying self-closing syntax", () => {
+    const cases = [
+      // foreignObject re-enters HTML mode, so its own slash is ignored and the following
+      // HTML elements nest; a normal SVG path remains self-closing.
+      { html: `<svg>${"<foreignObject/><div>".repeat(600)}`, exceeds: true },
+      { html: `<svg>${"<foreignObject><div/>".repeat(600)}`, exceeds: true },
+      { html: `<svg>${"<path/>".repeat(600)}`, exceeds: false },
+    ];
+
+    for (const { html, exceeds } of cases) {
+      expect(linkedomDepth(html) > MAX_CONVERSION_DEPTH).toBe(exceeds);
+      expect(exceedsConversionDepth(html)).toBe(exceeds);
+    }
+  });
+
+  it("does not treat a slash in an unquoted attribute value as self-closing", () => {
+    const html = `<svg>${"<g a=x/>".repeat(600)}`;
+
+    expect(linkedomDepth(html)).toBeGreaterThan(MAX_CONVERSION_DEPTH);
+    expect(exceedsConversionDepth(html)).toBe(true);
+  });
+
   it("still refuses unclosed elements that linkedom nests", () => {
     const html = `${"<section><span>text".repeat(400)}`;
     expect(linkedomDepth(html)).toBeGreaterThan(MAX_CONVERSION_DEPTH);

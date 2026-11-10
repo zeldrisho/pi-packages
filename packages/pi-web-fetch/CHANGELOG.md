@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sanitize unsafe links and event handlers in HTML retained in extracted Markdown.
 - Accept pages whose optional end tags are omitted, such as documentation with unclosed `p`, `li`, and `td` elements, instead of rejecting them as excessively nested.
 - Reject markup whose intervening elements keep an optional end tag open, matching the depth the parser actually builds, so deeply nested pages are refused instead of freezing extraction.
+- Reject deeply nested SVG and MathML markup that uses HTML integration points or slashes in unquoted attribute values to bypass the depth preflight.
 
 ## [0.16.4] - 2026-11-09
 
