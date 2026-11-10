@@ -349,43 +349,46 @@ describe("free model discovery", () => {
     expect(catalogCall?.headers.get("accept")).toBe("application/json");
   });
 
-  it("uses bundled native metadata when pi.dev has no newer catalog", async () => {
-    const bundledModels = initialFreeModels();
-    const remoteOnlyId = "test-remote-only-free";
+  it.each(["Thu, 01 Jan 1970 00:00:00 GMT", "invalid"])(
+    "uses bundled metadata when the catalog timestamp is older or invalid (%s)",
+    async (timestamp) => {
+      const bundledModels = initialFreeModels();
+      const remoteOnlyId = "test-remote-only-free";
 
-    const staleCatalog = [
-      ...bundledModels.map((model) => ({
-        ...remoteBeam,
-        id: model.id,
-        name: "Stale remote metadata",
-      })),
-      { ...remoteBeam, id: remoteOnlyId },
-    ];
+      const staleCatalog = [
+        ...bundledModels.map((model) => ({
+          ...remoteBeam,
+          id: model.id,
+          name: "Stale remote metadata",
+        })),
+        { ...remoteBeam, id: remoteOnlyId },
+      ];
 
-    const { fetcher } = createFetcher((url) =>
-      url === MODEL_CATALOG_URL
-        ? jsonResponse(JSON.stringify(staleCatalog), 200, {
-            "last-modified": "Thu, 01 Jan 1970 00:00:00 GMT",
-          })
-        : jsonResponse(
-            JSON.stringify({
-              data: [...bundledModels.map((model) => ({ id: model.id })), { id: remoteOnlyId }],
-            }),
-          ),
-    );
+      const { fetcher } = createFetcher((url) =>
+        url === MODEL_CATALOG_URL
+          ? jsonResponse(JSON.stringify(staleCatalog), 200, {
+              "last-modified": timestamp,
+            })
+          : jsonResponse(
+              JSON.stringify({
+                data: [...bundledModels.map((model) => ({ id: model.id })), { id: remoteOnlyId }],
+              }),
+            ),
+      );
 
-    const models = requireModels(
-      await discoverFreeModels({
-        baseUrl: DEFAULT_BASE_URL,
-        headers: {},
-        signal: new AbortController().signal,
-        fetcher,
-        allowNetwork: true,
-      }),
-    );
+      const models = requireModels(
+        await discoverFreeModels({
+          baseUrl: DEFAULT_BASE_URL,
+          headers: {},
+          signal: new AbortController().signal,
+          fetcher,
+          allowNetwork: true,
+        }),
+      );
 
-    expect(models).toEqual(bundledModels);
-  });
+      expect(models).toEqual(bundledModels);
+    },
+  );
 
   it("does not send a validator for an empty cached body or accept unsolicited 304", async () => {
     const { fetcher, calls } = createFetcher((url) =>
