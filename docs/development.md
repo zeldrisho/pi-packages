@@ -46,6 +46,8 @@ Keep source order and continuation semantics, and retain known misses as baselin
 vp run benchmark:web-fetch-extraction
 ```
 
+The live corpus is not a release gate: pages and network conditions change. A run after the Defuddle 0.19.6 update passed every entry, including the Node.js URL documentation page that an earlier run refused at the 512-element depth preflight because that page omits most `p` end tags. When a live page is refused, compare the preflight's estimate with the depth linkedom actually builds before changing either.
+
 ## Verification
 
 `vp run ready` runs formatting, linting, type checking, tests, repository contracts, tarball inspection, and packaged smoke tests. Tarballs should contain only the package README, changelog, license, manifest, runtime `src/` files, and explicitly contracted metadata such as `pi-gate`'s schema. `pi-web-fetch` also packages generated JavaScript challenge workers and solvers under `workers/` because Node cannot strip TypeScript from worker files installed under `node_modules`; regenerate them with `vp run build:anubis-worker` and `vp run build:aws-waf-worker`.

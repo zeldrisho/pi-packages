@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Exclude explicitly hidden elements from the basic HTML extraction fallback.
 - Sanitize unsafe links and event handlers in HTML retained in extracted Markdown.
+- Accept pages whose optional end tags are omitted, such as documentation with unclosed `p`, `li`, and `td` elements, instead of rejecting them as excessively nested.
 
 ## [0.16.4] - 2026-11-09
 
