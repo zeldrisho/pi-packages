@@ -85,6 +85,7 @@ export function sync(from: string, root = ROOT): number {
   }
 
   for (const { file, dst, content } of copies) {
+    // The pre-pass above rejects a missing source, so this narrowing always succeeds.
     if (content === null) throw new Error(`Missing source: ${file}`);
     writeFileSync(dst, content, "utf8");
     console.log(`synced ${file}: ${source} -> ${target}`);

@@ -169,6 +169,19 @@ describe("segmented branch summary", () => {
     expect(harness.calls).toHaveLength(0);
   });
 
+  it("counts custom instructions when deciding whether one request has room", async () => {
+    // Without the instructions in the estimate this branch would defer to Pi.
+    const harness = createHarness({
+      entryList: entries(6, 200),
+      contextWindow: 100_000,
+      customInstructions: "x".repeat(320_000),
+    });
+
+    await harness.handler(harness.event, harness.context);
+
+    expect(harness.calls.length).toBeGreaterThan(0);
+  });
+
   it("leaves other providers to Pi's branch summary", async () => {
     const harness = createHarness({ provider: "anthropic", contextWindow: 40_000 });
 

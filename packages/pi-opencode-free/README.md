@@ -31,7 +31,7 @@ The model list refreshes when you open `/model`. If discovery is unavailable, th
 
 Free-tier models can build up more history than a single compaction summary fits into. When one summary would leave too little room for the answer, the extension summarizes the history in segments with the model you already selected and merges the result into one checkpoint, without changing your model or thinking level. If a summary can't be used, Pi's native compaction still applies; small histories and other providers are unaffected.
 
-Leaving a long branch in `/tree` with **Summarize** works the same way and keeps Pi's branch-summary format. **No summary** and **Summarize with custom prompt** behave as before.
+Leaving a long branch in `/tree` with **Summarize** or **Summarize with custom prompt** works the same way; **Summarize** keeps Pi's branch-summary format, and a custom prompt is applied as Pi applies it. **No summary** behaves as before.
 
 ## Usage limits
 

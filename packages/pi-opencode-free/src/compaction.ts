@@ -12,7 +12,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 
-import { isStringArray } from "./models.ts";
+import { isStringArray } from "./values.ts";
 
 type AgentMessage = Parameters<typeof convertToLlm>[0][number];
 
@@ -342,6 +342,15 @@ function textTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
+/**
+ * Tokens Pi's native summary request adds beside the conversation: the previous
+ * checkpoint, the instructions, and its system prompt. Deferring on the conversation
+ * alone would leave Pi less output room than the estimate promises.
+ */
+function promptOverheadTokens(...parts: Array<string | undefined>): number {
+  return textTokens(parts.filter((part): part is string => Boolean(part)).join("\n"));
+}
+
 function serialize(messages: AgentMessage[]): string {
   return serializeConversation(convertToLlm(messages));
 }
@@ -470,6 +479,15 @@ function turnPrefixPrompt(customInstructions: string | undefined): PromptBuilder
 /** Builds the prompt for one block of messages, given its serialized form. */
 type PromptBuilder = (conversation: string, label: string) => string;
 
+/** Trims a conversation a single message pushed past the budget, keeping both ends. */
+function truncateConversation(conversation: string, budgetTokens: number): string {
+  const maxChars = budgetTokens * 4;
+  const head = Math.floor(maxChars / 2);
+  const tail = maxChars - head;
+
+  return `${conversation.slice(0, head)}\n\n[truncated to fit the summary budget]\n\n${conversation.slice(-tail)}`;
+}
+
 /** Summarizes one block of messages, halving it when the answer hits the token cap. */
 async function summarizeMessages(
   context: CompactionContext,
@@ -478,14 +496,24 @@ async function summarizeMessages(
   buildPrompt: PromptBuilder,
   label: string,
   signal: AbortSignal,
+  budgetTokens: number,
   depth: number,
   usage: Usage,
 ): Promise<{ text: string; usage: Usage }> {
+  // A single message can exceed the budget; halving cannot help one message, so trim it
+  // explicitly instead of sending a prompt that leaves the digest too little output room.
+  const conversation = serialize(messages);
+
+  const bounded =
+    textTokens(conversation) > budgetTokens
+      ? truncateConversation(conversation, budgetTokens)
+      : conversation;
+
   const result = await callModel(
     context,
     model,
     SEGMENT_SYSTEM_PROMPT,
-    buildPrompt(serialize(messages), label),
+    buildPrompt(bounded, label),
     signal,
   );
 
@@ -501,6 +529,7 @@ async function summarizeMessages(
       buildPrompt,
       `part 1 of 2 of ${label}`,
       signal,
+      budgetTokens,
       depth + 1,
       nextUsage,
     );
@@ -512,6 +541,7 @@ async function summarizeMessages(
       buildPrompt,
       `part 2 of 2 of ${label}`,
       signal,
+      budgetTokens,
       depth + 1,
       left.usage,
     );
@@ -569,7 +599,16 @@ async function reduceDigests(
     level = reduced.level;
   }
 
-  let result = await finalCheckpoint(context, model, level, previous, focus, signal, spec);
+  // A digest that still fills the budget, or a level that could not shrink, would leave
+  // the checkpoint too little output room. Trim it explicitly instead.
+  const digestInput = level.join("\n\n---\n\n");
+
+  const boundedLevel =
+    textTokens(digestInput) > budgetTokens
+      ? [truncateConversation(digestInput, budgetTokens)]
+      : level;
+
+  let result = await finalCheckpoint(context, model, boundedLevel, previous, focus, signal, spec);
 
   accumulated = addUsage(accumulated, result.usage);
 
@@ -581,7 +620,7 @@ async function reduceDigests(
     result = await finalCheckpoint(
       context,
       model,
-      level,
+      boundedLevel,
       previous,
       focus,
       signal,
@@ -758,7 +797,19 @@ export function createChunkedCompactionHandler(
     // Pi's own reserve decides whether one request still has room; the settings Pi
     // resolved for this session carry it, so the threshold follows the user's config.
     const reserveTokens = preparation.settings?.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
-    const singleShotInput = textTokens(serialize(messages));
+
+    const instructions = preparation.previousSummary
+      ? PI_SUMMARY_TEXT.updateInstructions
+      : PI_SUMMARY_TEXT.initialInstructions;
+
+    const singleShotInput =
+      textTokens(serialize(messages)) +
+      promptOverheadTokens(
+        preparation.previousSummary,
+        customInstructions,
+        instructions,
+        PI_SUMMARY_TEXT.systemPrompt,
+      );
 
     const singleShotOutput = Math.min(
       model.maxTokens ?? 0,
@@ -769,12 +820,13 @@ export function createChunkedCompactionHandler(
 
     const budget = requestInputBudget(contextWindow);
     const segments = segmentMessages(history, budget);
+    const segmentCount = Math.max(segments.length, 1);
 
     let usage = emptyUsage();
 
     try {
       context.setStatus(
-        `compacting ${singleShotInput.toLocaleString()} tokens in ${Math.max(segments.length, 1)} segment(s)`,
+        `compacting ${singleShotInput.toLocaleString()} tokens in ${segmentCount} ${segmentCount === 1 ? "segment" : "segments"}`,
       );
 
       // Pi keeps the previous checkpoint when a split turn leaves nothing before the tail.
@@ -791,6 +843,7 @@ export function createChunkedCompactionHandler(
             segmentPrompt,
             `segment ${index + 1} of ${segments.length}`,
             signal,
+            budget,
             0,
             usage,
           );
@@ -844,6 +897,7 @@ export function createChunkedCompactionHandler(
           turnPrefixPrompt(customInstructions),
           "turn prefix",
           signal,
+          budget,
           0,
           usage,
         );
@@ -865,7 +919,7 @@ export function createChunkedCompactionHandler(
       const files = computeFileLists(preparation.fileOps, previousFileLists(branchEntries));
 
       context.notify(
-        `Compacted ${messages.length} messages (${preparation.tokensBefore.toLocaleString()} tokens) in ${Math.max(segments.length, 1)} segment(s)`,
+        `Compacted ${messages.length} messages (${preparation.tokensBefore.toLocaleString()} tokens) in ${segmentCount} ${segmentCount === 1 ? "segment" : "segments"}`,
         "info",
       );
 
@@ -929,10 +983,21 @@ export function createBranchSummaryHandler(
       return { summary: { summary: "No content to summarize" } };
     }
 
+    const customInstructions = preparation.customInstructions;
+    const replace = preparation.replaceInstructions === true && customInstructions !== undefined;
+
+    // Pi appends custom instructions as focus unless they are asked to replace the prompt.
+    const instructions = replace ? customInstructions : PI_SUMMARY_TEXT.branchInstructions;
+
     const singleShotOutput = Math.min(
       model.maxTokens ?? 0,
       contextWindow -
         textTokens(serializeConversation(convertToLlm(prepared.messages))) -
+        promptOverheadTokens(
+          instructions,
+          replace ? undefined : customInstructions,
+          PI_SUMMARY_TEXT.systemPrompt,
+        ) -
         WINDOW_SAFETY_TOKENS,
     );
 
@@ -941,10 +1006,6 @@ export function createBranchSummaryHandler(
     const budget = requestInputBudget(contextWindow);
     const segments = segmentMessages(prepared.messages, budget);
 
-    const customInstructions = preparation.customInstructions;
-    const replace = preparation.replaceInstructions === true && customInstructions !== undefined;
-
-    // Pi appends custom instructions as focus unless they are asked to replace the prompt.
     const spec: SummarySpec = replace
       ? { instructions: customInstructions, sections: [] }
       : { instructions: PI_SUMMARY_TEXT.branchInstructions, sections: BRANCH_SECTIONS };
@@ -954,7 +1015,9 @@ export function createBranchSummaryHandler(
     let usage = emptyUsage();
 
     try {
-      context.setStatus(`summarizing branch in ${segments.length} segment(s)`);
+      context.setStatus(
+        `summarizing branch in ${segments.length} ${segments.length === 1 ? "segment" : "segments"}`,
+      );
 
       const digests: string[] = [];
 
@@ -966,6 +1029,7 @@ export function createBranchSummaryHandler(
           segmentPrompt,
           `branch part ${index + 1} of ${segments.length}`,
           signal,
+          budget,
           0,
           usage,
         );
@@ -1010,7 +1074,7 @@ export function createBranchSummaryHandler(
       const files = computeFileLists(prepared.fileOps);
 
       context.notify(
-        `Summarized branch: ${prepared.messages.length} messages in ${segments.length} segment(s)`,
+        `Summarized branch: ${prepared.messages.length} messages in ${segments.length} ${segments.length === 1 ? "segment" : "segments"}`,
         "info",
       );
 

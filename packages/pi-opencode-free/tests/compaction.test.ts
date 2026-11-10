@@ -248,6 +248,48 @@ describe("segmented compaction", () => {
     expect(harness.calls.length).toBeGreaterThanOrEqual(5);
   });
 
+  it("counts the previous checkpoint when deciding whether one request has room", async () => {
+    // Without the checkpoint in the estimate this history would defer to Pi.
+    const harness = createHarness({
+      messageList: messages(20, 400),
+      contextWindow: 100_000,
+      previousSummary: "p".repeat(340_000),
+    });
+
+    await harness.handler(harness.event, harness.context);
+
+    expect(harness.calls.length).toBeGreaterThan(0);
+  });
+
+  it("trims a single message that exceeds the segment budget", async () => {
+    const harness = createHarness({
+      messageList: messages(1, 200_000),
+      contextWindow: 40_000,
+    });
+
+    const result = await harness.handler(harness.event, harness.context);
+    const firstPrompt = harness.calls[0]?.prompt ?? "";
+
+    expect(result?.compaction?.summary).toContain("## Goal");
+    expect(firstPrompt).toContain("[truncated to fit the summary budget]");
+    expect(Math.ceil(firstPrompt.length / 4)).toBeLessThanOrEqual(6_000);
+  });
+
+  it("trims digests that still exceed the budget before the final checkpoint", async () => {
+    const harness = createHarness({
+      contextWindow: 40_000,
+      respond: (call) =>
+        response(isCheckpointRequest(call) ? CHECKPOINT : "d".repeat(40_000), "stop"),
+    });
+
+    const result = await harness.handler(harness.event, harness.context);
+    const finalPrompt = harness.calls.at(-1)?.prompt ?? "";
+
+    expect(result?.compaction?.summary).toContain("## Goal");
+    expect(finalPrompt).toContain("[truncated to fit the summary budget]");
+    expect(Math.ceil(finalPrompt.length / 4)).toBeLessThanOrEqual(6_000);
+  });
+
   it("falls back to Pi's compaction when the provider fails", async () => {
     const harness = createHarness({
       contextWindow: 40_000,
