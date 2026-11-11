@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Return the rendered README instead of repository file listings on GitHub repository pages when a README is available, without misclassifying short READMEs as sparse pages.
+
 ## [0.16.5] - 2026-11-10
 
 ### Fixed

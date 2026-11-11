@@ -293,6 +293,7 @@ async function documentFromDecoded(
   let describedBy: string | undefined = linkHints.describedBy;
   let markdownAlternateUrl: string | undefined = linkHints.markdownAlternate;
   let sourceLanguage: string | undefined;
+  let githubReadme = false;
   const openapiSpec = isOpenapiSource(raw, contentType);
 
   if (isHtmlContentType(contentType)) {
@@ -301,6 +302,7 @@ async function documentFromDecoded(
     title = extracted.title;
     fragmentOffsets = extracted.fragmentOffsets;
     extractor = extracted.extractor;
+    githubReadme = extracted.githubReadme === true;
     describedBy = describedBy ?? extracted.describedByLink;
     markdownAlternateUrl = markdownAlternateUrl ?? extracted.markdownAlternateLink;
   } else if (contentType === "application/json") {
@@ -346,6 +348,11 @@ async function documentFromDecoded(
   }
 
   const extractionDiagnostics = isHtml ? diagnoseExtraction(raw, markdown) : undefined;
+
+  // Repository chrome can dwarf a complete, intentionally short README.
+  if (extractionDiagnostics && githubReadme && markdown.trim()) {
+    extractionDiagnostics.sparseExtraction = false;
+  }
 
   const shellSuspected = extractionDiagnostics
     ? hasExtractionWarning(extractionDiagnostics)

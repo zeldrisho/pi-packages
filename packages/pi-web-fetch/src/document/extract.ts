@@ -259,6 +259,24 @@ function stripChromeWrappers(document: Document, baseUrl: URL): void {
   }
 }
 
+/** Restricts GitHub repository roots to their rendered README, when available. */
+function isolateGitHubReadme(document: Document, baseUrl: URL): boolean {
+  if (baseUrl.hostname !== "github.com" || baseUrl.pathname.split("/").filter(Boolean).length !== 2)
+    return false;
+
+  const readme = document.querySelector(
+    "main article.markdown-body.entry-content[itemprop='text']",
+  );
+
+  if (!readme || !readme.textContent?.trim()) return false;
+
+  const main = document.createElement("main");
+  main.appendChild(readme);
+  document.body.replaceChildren(main);
+
+  return true;
+}
+
 /**
  * Collapses consecutive duplicate markdown link lines (e.g. duplicated [Latest] on GitHub releases).
  *
@@ -426,10 +444,13 @@ export async function extractHtmlToMarkdown(
   fragmentOffsets?: Record<string, number>;
   describedByLink?: string;
   markdownAlternateLink?: string;
+  githubReadme?: boolean;
 }> {
   // Keep refusal outside the catch: the fallback also constructs a DOM.
   assertConversionDepth(html);
   let advertised: AdvertisedLinks = {};
+  let fallbackHtml = html;
+  let githubReadme = false;
 
   try {
     assertAbsoluteHttpUrl(baseUrl);
@@ -449,6 +470,10 @@ export async function extractHtmlToMarkdown(
     normalizeSelectorUnsafeIds(document);
     stripChromeWrappers(document, baseUrl);
     advertised = readAdvertisedLinks(document, baseUrl);
+
+    githubReadme = isolateGitHubReadme(document, baseUrl);
+
+    if (githubReadme) fallbackHtml = document.documentElement.outerHTML;
     // Pass the full absolute URL so Defuddle resolves relative links (e.g.
     // `/owner/repo/releases`) and metadata against the real origin instead of
     // dropping the scheme and host and constructing `new URL(pathname)`.
@@ -465,6 +490,7 @@ export async function extractHtmlToMarkdown(
         markdown,
         title: trimmedTitle || undefined,
         extractor: "defuddle",
+        githubReadme,
         fragmentOffsets: buildFragmentOffsets(document, markdown, originalIds),
         ...advertised,
       };
@@ -473,11 +499,11 @@ export async function extractHtmlToMarkdown(
     // Fall through to the basic converter for malformed or unsupported pages.
   }
 
-  const fallbackMarkdown = stripExtractedCssCruft(htmlToMarkdownFallback(html));
+  const fallbackMarkdown = stripExtractedCssCruft(htmlToMarkdownFallback(fallbackHtml));
   let fragmentOffsets: Record<string, number> = {};
 
   try {
-    fragmentOffsets = buildFragmentOffsets(parseHTML(html).document, fallbackMarkdown);
+    fragmentOffsets = buildFragmentOffsets(parseHTML(fallbackHtml).document, fallbackMarkdown);
   } catch {
     // Malformed HTML has already been reduced to plain text; no anchors are available.
   }
@@ -485,6 +511,7 @@ export async function extractHtmlToMarkdown(
   return {
     markdown: fallbackMarkdown,
     extractor: "basic",
+    githubReadme,
     fragmentOffsets,
     ...advertised,
   };

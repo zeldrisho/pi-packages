@@ -90,6 +90,51 @@ describe("extracted CSS cleanup", () => {
 });
 
 describe("HTML extraction", () => {
+  const githubRepository = `<html><head><title>Repository</title></head><body><main><table><tr><td colspan="2">FILE LISTING</td></tr></table><article class="markdown-body entry-content container-lg" itemprop="text"><h1 id="readme-title">README title</h1><p>${longText()}</p><a href="/owner/repo/blob/main/guide.md">Guide</a></article></main></body></html>`;
+
+  it("extracts only the rendered README from GitHub repository roots", async () => {
+    const result = await extractHtmlToMarkdown(
+      githubRepository,
+      new URL("https://github.com/owner/repo/"),
+    );
+
+    expect(result.markdown).toContain("README title");
+    expect(result.markdown).toContain("word149");
+    expect(result.markdown).toContain("https://github.com/owner/repo/blob/main/guide.md");
+    expect(result.markdown).not.toContain("FILE LISTING");
+    expect(result.fragmentOffsets?.["readme-title"]).toBeDefined();
+  });
+
+  it("keeps the README scope when Defuddle fails", async () => {
+    const { Defuddle } = await import("defuddle/node");
+    vi.mocked(Defuddle).mockRejectedValueOnce(new Error("failure"));
+
+    const result = await extractHtmlToMarkdown(
+      githubRepository,
+      new URL("https://github.com/owner/repo"),
+    );
+
+    expect(result.extractor).toBe("basic");
+    expect(result.markdown).toContain("README title");
+    expect(result.markdown).not.toContain("FILE LISTING");
+  });
+
+  it("does not scope other paths or hosts, or roots without a README", async () => {
+    const { Defuddle } = await import("defuddle/node");
+
+    for (const [html, url] of [
+      [githubRepository, "https://github.com/owner/repo/tree/main"],
+      [githubRepository, "https://example.com/owner/repo"],
+      ["<main><p>Repository without README</p></main>", "https://github.com/owner/repo"],
+    ]) {
+      vi.mocked(Defuddle).mockRejectedValueOnce(new Error("failure"));
+      const result = await extractHtmlToMarkdown(html, new URL(url));
+      expect(result.markdown).toContain(
+        html.includes("FILE LISTING") ? "FILE LISTING" : "Repository without README",
+      );
+    }
+  });
+
   it("maps section wrapper fragments to retained content when the heading is omitted", async () => {
     const result = await extractHtmlToMarkdown(
       `<main><div id="intro"><p>${longText()}</p></div><div id="install"><h1>Installation</h1><p>Before you can run hooks, install the pre-commit package manager.</p><pre>pip install pre-commit</pre></div></main>`,
