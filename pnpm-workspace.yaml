@@ -18,13 +18,13 @@ catalog:
   "@earendil-works/pi-coding-agent": "^1.4.0"
   "@earendil-works/pi-tui": "^1.4.0"
   # Keep Node types aligned with the current LTS major used in CI.
-  "@types/node": "^26.6.5"
-  "@vitest/coverage-v8": 5.0.5
-  typebox: "^1.4.2"
+  "@types/node": "^26.6.6"
+  "@vitest/coverage-v8": 5.1.0
+  typebox: "^1.4.3"
   typescript: "^7.0.2"
-  vite: npm:@voidzero-dev/vite-plus-core@1.4.0
-  vite-plus: 1.4.0
-  vitest: 5.0.5
+  vite: npm:@voidzero-dev/vite-plus-core@1.5.0
+  vite-plus: 1.5.0
+  vitest: 5.1.0
 
 overrides:
   # Dependency-override lifecycle, tracked in issue #37
