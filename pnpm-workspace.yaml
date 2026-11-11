@@ -32,13 +32,6 @@ overrides:
   # condition on every catalog or lockfile bump and drop the override in the
   # same change. tests/repository-contract.test.ts fails when an overridden
   # package disappears from the dependency graph.
-  # Dropped with the 0.84.0 catalog bump: undici (GHSA-4cwx-7wf7-3272,
-  # GHSA-8xcm-r25x-g524, GHSA-v3r7-h72x-cjcm, GHSA-jr45-8vmc-qm54,
-  # GHSA-m8rv-5g2x-5cg5) was forced to 8.9.0 because pi-coding-agent pinned
-  # undici@8.5.0; pi-coding-agent@0.84.0 repins undici@8.9.0, so the override
-  # became a no-op. brace-expansion was dropped earlier with the 0.83.0 bump.
-  # Undici override for GHSA-xjj6-f33q-929c, GHSA-4qv8-2p9j-2685 and
-  # GHSA-f72v-6w45-q472 removed: pi-coding-agent 1.5.0 pins 8.12.3.
   vite@*: "catalog:"
   vitest@*: "catalog:"
 
