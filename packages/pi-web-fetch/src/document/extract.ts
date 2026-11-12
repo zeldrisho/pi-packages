@@ -164,6 +164,12 @@ export function htmlToMarkdownFallback(html: string): string {
     }
   }
 
+  for (const element of document.body.querySelectorAll(
+    "p, div, section, article, li, blockquote, pre, h1, h2, h3, h4, h5, h6, br, tr",
+  )) {
+    element.after(document.createTextNode("\n\n"));
+  }
+
   return document.body.textContent
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n[ \t]+/g, "\n")
@@ -257,6 +263,24 @@ function stripChromeWrappers(document: Document, baseUrl: URL): void {
   for (const element of document.querySelectorAll("nav, header, footer, aside")) {
     element.remove();
   }
+}
+
+/** Restricts GitHub repository roots to their rendered README, when available. */
+function isolateGitHubReadme(document: Document, baseUrl: URL): boolean {
+  if (baseUrl.hostname !== "github.com" || baseUrl.pathname.split("/").filter(Boolean).length !== 2)
+    return false;
+
+  const readme = document.querySelector(
+    "main article.markdown-body.entry-content[itemprop='text']",
+  );
+
+  if (!readme || !readme.textContent?.trim()) return false;
+
+  const main = document.createElement("main");
+  main.appendChild(readme);
+  document.body.replaceChildren(main);
+
+  return true;
 }
 
 /**
@@ -426,10 +450,13 @@ export async function extractHtmlToMarkdown(
   fragmentOffsets?: Record<string, number>;
   describedByLink?: string;
   markdownAlternateLink?: string;
+  githubReadme?: boolean;
 }> {
   // Keep refusal outside the catch: the fallback also constructs a DOM.
   assertConversionDepth(html);
   let advertised: AdvertisedLinks = {};
+  let fallbackHtml = html;
+  let githubReadme = false;
 
   try {
     assertAbsoluteHttpUrl(baseUrl);
@@ -446,9 +473,13 @@ export async function extractHtmlToMarkdown(
       originalIds.set(element, element.id);
     }
 
-    normalizeSelectorUnsafeIds(document);
     stripChromeWrappers(document, baseUrl);
     advertised = readAdvertisedLinks(document, baseUrl);
+
+    githubReadme = isolateGitHubReadme(document, baseUrl);
+
+    if (githubReadme) fallbackHtml = document.documentElement.outerHTML;
+    normalizeSelectorUnsafeIds(document);
     // Pass the full absolute URL so Defuddle resolves relative links (e.g.
     // `/owner/repo/releases`) and metadata against the real origin instead of
     // dropping the scheme and host and constructing `new URL(pathname)`.
@@ -465,6 +496,7 @@ export async function extractHtmlToMarkdown(
         markdown,
         title: trimmedTitle || undefined,
         extractor: "defuddle",
+        githubReadme,
         fragmentOffsets: buildFragmentOffsets(document, markdown, originalIds),
         ...advertised,
       };
@@ -473,11 +505,11 @@ export async function extractHtmlToMarkdown(
     // Fall through to the basic converter for malformed or unsupported pages.
   }
 
-  const fallbackMarkdown = stripExtractedCssCruft(htmlToMarkdownFallback(html));
+  const fallbackMarkdown = stripExtractedCssCruft(htmlToMarkdownFallback(fallbackHtml));
   let fragmentOffsets: Record<string, number> = {};
 
   try {
-    fragmentOffsets = buildFragmentOffsets(parseHTML(html).document, fallbackMarkdown);
+    fragmentOffsets = buildFragmentOffsets(parseHTML(fallbackHtml).document, fallbackMarkdown);
   } catch {
     // Malformed HTML has already been reduced to plain text; no anchors are available.
   }
@@ -485,6 +517,7 @@ export async function extractHtmlToMarkdown(
   return {
     markdown: fallbackMarkdown,
     extractor: "basic",
+    githubReadme,
     fragmentOffsets,
     ...advertised,
   };

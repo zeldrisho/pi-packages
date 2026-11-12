@@ -1,6 +1,6 @@
 {
   "name": "@zeldrisho/pi-web-fetch",
-  "version": "0.16.5",
+  "version": "0.17.0",
   "description": "Pi extension for secure, bounded public web page fetching and Markdown extraction",
   "keywords": [
     "pi",
@@ -42,7 +42,7 @@
     "acorn": "^8.19.0",
     "acorn-walk": "^8.3.5",
     "defuddle": "^0.19.6",
-    "linkedom": "^0.18.13",
+    "linkedom": "^0.18.15",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
@@ -54,7 +54,7 @@
     "vite-plus": "catalog:"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-coding-agent": ">=0.99.0",
     "@earendil-works/pi-tui": "*",
     "typebox": "*"
   },

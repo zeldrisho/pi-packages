@@ -12,7 +12,6 @@
     "lint:fix": "vp lint --fix",
     "format": "vp fmt --write",
     "format:changelog": "node scripts/format-changelog.ts",
-    "compile:repo-assist": "node scripts/compile-repo-assist.ts",
     "sync:web-modules": "node scripts/sync-web-modules.ts sync --from pi-web-fetch",
     "build:anubis-worker": "vp exec tsc --ignoreConfig packages/pi-web-fetch/src/challenges/anubis-worker.ts packages/pi-web-fetch/src/challenges/anubis-solver.ts --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir packages/pi-web-fetch/workers --skipLibCheck --rewriteRelativeImportExtensions --types node",
     "build:aws-waf-worker": "vp exec tsc --ignoreConfig packages/pi-web-fetch/src/challenges/aws-waf-worker.ts packages/pi-web-fetch/src/challenges/aws-waf-solver.ts --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir packages/pi-web-fetch/workers --skipLibCheck --rewriteRelativeImportExtensions --types node",

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-12
+
+### Changed
+
+- **Breaking:** `web_fetch` requires Pi 0.99.0 or newer and can no longer be called by other tools, including codemode; use direct model calls instead.
+
+### Fixed
+
+- Solve supported Reddit JavaScript challenges and try the public post feed when a challenge remains blocked.
+- Return the rendered README instead of repository file listings on GitHub repository pages when a README is available, without misclassifying short READMEs as sparse pages.
+
 ## [0.16.5] - 2026-11-10
 
 ### Fixed
@@ -334,7 +345,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.5...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.17.0...HEAD
+[0.17.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.5...pi-web-fetch-v0.17.0
 [0.16.5]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.4...pi-web-fetch-v0.16.5
 [0.16.4]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.3...pi-web-fetch-v0.16.4
 [0.16.3]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.2...pi-web-fetch-v0.16.3

@@ -233,6 +233,54 @@ describe("web_fetch honest-evidence details", () => {
     });
   });
 
+  it.each([
+    [
+      "readme",
+      "<article class='markdown-body entry-content' itemprop='text'><h1>Short README</h1><p>Useful content.</p></article>",
+      false,
+      "repository-readme",
+    ],
+    ["missing", "<p>Short page without a README.</p>", true, "markup-shell"],
+    [
+      "challenge",
+      "<article class='markdown-body entry-content' itemprop='text'><h1>Short README</h1><p>Useful content.</p></article><p>Please enable JavaScript</p>",
+      true,
+      "markup-shell",
+    ],
+  ])(
+    "reports extraction evidence for a %s GitHub repository page",
+    async (name, content, warning, kind) => {
+      const fetchDependencies: FetchRemoteDependencies = {
+        validateUrl: async (value) => {
+          const url = value instanceof URL ? value : new URL(value);
+
+          return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
+        },
+        request: async () =>
+          fakeTextResponse(
+            `<html><body><main>${content}</main><script>${"x".repeat(20_000)}</script></body></html>`,
+            "text/html",
+          ),
+      };
+
+      const result = await executeWebFetch(
+        { url: `https://github.com/test-owner/${name}-${process.pid}` },
+        undefined,
+        undefined,
+        fetchDependencies,
+      );
+
+      expect(result.details.shellSuspected).toBe(warning);
+      expect(result.details.contentKind).toBe(kind);
+      expect(result.details.extractionDiagnostics?.sparseExtraction).toBe(name === "missing");
+
+      if (name === "readme") expect(result.details.confidence).not.toBe("low");
+
+      if (name === "challenge")
+        expect(result.details.extractionDiagnostics?.javascriptRequired).toBe(true);
+    },
+  );
+
   it("redacts credential-bearing query values from progress and result evidence", async () => {
     const requested = `https://credentials.example.com/page-${process.pid}?token=secret-token&page=2`;
     const redacted = `https://credentials.example.com/page-${process.pid}?token=REDACTED&page=2`;

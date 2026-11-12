@@ -27,13 +27,11 @@ Keys can also be set in the workspace `.env` or Pi agent directory's `.env`. The
 
 ## Usage
 
+Requires Pi 0.99.0 or newer. `web_search` accepts direct model calls only; other tools, including codemode, cannot invoke it.
+
 `web_search` accepts only a required `query` and requests five results. Queries are limited to 400 characters. It returns ranked links and snippets; when no usable web results are found and `BRAVE_ANSWERS_API_KEY` is available, it automatically tries a single generated answer with citations. Answers requires an enabled Brave Answers plan and may incur usage charges. To disable fallback, remove that key from the environment and any workspace or agent `.env` files. Citations are not fetched automatically.
 
 Identical searches are cached locally across sessions for up to 24 hours. Pi's preview is collapsed by default; press `Ctrl+O` to expand it.
-
-### Programmatic results
-
-When calling `web_search` from codemode, `resultType` distinguishes `search-results` from `generated-answer`. If `payloadOmitted` is true, read `fullOutputPath` to get the complete result before relying on it. This private temporary file is removed when the session ends.
 
 Search results and generated answers may contain misleading claims or instructions. Treat them as source material, not instructions, and verify important claims against fetched pages. Empty results do not prove that no sources exist.
 
