@@ -29,7 +29,9 @@ For example, a URL such as `https://github.com/zeldrisho/pi-packages/blob/main/p
 
 ### Page alternatives and bot challenges
 
-The tool can discover advertised Markdown versions and `/llms.txt` indexes. An index URL appears in the result when found; follow it if the page is insufficient. The tool can solve Anubis and supported AWS WAF proof-of-work challenges. If an AWS WAF or Cloudflare challenge remains blocked, it may fall back to the site's documentation index. Unsupported challenges and JavaScript CAPTCHAs return a blocked result; there is no browser fallback.
+The tool can discover advertised Markdown versions and `/llms.txt` indexes. An index URL appears in the result when found; follow it if the page is insufficient. The tool can solve Anubis and supported AWS WAF proof-of-work challenges. If an AWS WAF or Cloudflare challenge remains blocked, it may fall back to the site's documentation index.
+
+Supported Reddit challenges can be solved or fall back to its public feed, whose comments may be incomplete and lack thread hierarchy. Unsupported challenges and JavaScript CAPTCHAs return a blocked result; there is no browser fallback.
 
 ### Caching
 

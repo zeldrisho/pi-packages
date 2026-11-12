@@ -83,7 +83,14 @@ export function diagnoseExtraction(raw: string, markdown: string): ExtractionDia
   const { document } = parseHTML(raw);
   const anubisText = [...document.childNodes].map((node) => node.textContent ?? "").join(" ");
 
+  const redditChallenge =
+    markdown.trim().length < CAPTCHA_CHALLENGE_MAX_MARKDOWN_CHARACTERS &&
+    /<input\b[^>]*\bname=["']js_challenge["']/i.test(raw) &&
+    /<input\b[^>]*\bname=["']jsc_token["']/i.test(raw) &&
+    /<input\b[^>]*\bname=["']solution["']/i.test(raw);
+
   const captchaChallenge =
+    redditChallenge ||
     CAPTCHA_LOADER_MARKERS.some((marker) => marker.test(raw)) ||
     (markdown.trim().length < CAPTCHA_CHALLENGE_MAX_MARKDOWN_CHARACTERS &&
       CAPTCHA_WIDGET_MARKERS.some((marker) => marker.test(raw)));

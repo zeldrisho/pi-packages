@@ -22,6 +22,7 @@ import {
   type AwsWafSolution,
 } from "../challenges/aws-waf.ts";
 import { nativeAwsWafResolver } from "../challenges/aws-waf-resolver.ts";
+import { redditChallengeUrl } from "../challenges/reddit.ts";
 import {
   sliceCompleteDocument,
   type CompleteDocument,
@@ -34,6 +35,7 @@ import {
   hasExtractionWarning,
 } from "../document/evidence.ts";
 import { extractHtmlToMarkdown } from "../document/extract.ts";
+import { redditFeedUrl, extractRedditFeed } from "./reddit.ts";
 import { assertConversionDepth } from "../document/complexity.ts";
 import { formatMinifiedSource } from "../document/source-format.ts";
 import { isOpenapiSource } from "../document/openapi.ts";
@@ -339,15 +341,16 @@ async function documentFromDecoded(
   const isHtml = isHtmlContentType(contentType);
   const links = isHtml ? extractDocumentLinks(raw, target.url) : undefined;
 
+  const extractionDiagnostics = isHtml ? diagnoseExtraction(raw, markdown) : undefined;
+
   if (
     !markdown.trim() &&
     (!links || (links.internal.length === 0 && links.external.length === 0)) &&
-    !allowEmptyContent
+    !allowEmptyContent &&
+    !extractionDiagnostics?.botWall
   ) {
     throw new Error("web_fetch: Page has no extractable content.");
   }
-
-  const extractionDiagnostics = isHtml ? diagnoseExtraction(raw, markdown) : undefined;
 
   // Repository chrome can dwarf a complete, intentionally short README.
   if (extractionDiagnostics && githubReadme && markdown.trim()) {
@@ -444,16 +447,10 @@ async function documentFromAcquisition(
   const contentTypeHeader = responseContentTypeHeader(response);
   const contentType = normalizeContentType(contentTypeHeader);
 
-  if (
-    allowSolve &&
-    dependencies.solveAnubisChallenges !== false &&
-    status >= 200 &&
-    status < 300 &&
-    isHtmlContentType(contentType)
-  ) {
+  if (allowSolve && status >= 200 && status < 300 && isHtmlContentType(contentType)) {
     const body = await decodeResponseBody(response, signal, contentTypeHeader, contentType);
 
-    if (hasAnubisMarkers(body.raw)) {
+    if (dependencies.solveAnubisChallenges !== false && hasAnubisMarkers(body.raw)) {
       const challenge = parseAnubisChallenge(body.raw, target.url);
 
       if (challenge) {
@@ -484,6 +481,35 @@ async function documentFromAcquisition(
 
       // An unsolvable challenge, denial, or error page is returned as blocked.
       return documentFromDecoded(target, response, body, signal, extractHtml, allowEmptyContent);
+    }
+
+    const redditPass = redditChallengeUrl(body.raw, target.url);
+
+    if (redditPass) {
+      try {
+        const passed = await requestFollowingRedirects(redditPass, signal, dependencies);
+
+        if (
+          passed.target.url.origin === target.url.origin &&
+          passed.target.url.pathname === target.url.pathname
+        ) {
+          // The handshake query contains a token; never expose or cache it as the document URL.
+          return await documentFromAcquisition(
+            { ...passed.target, url: target.url },
+            passed.response,
+            signal,
+            extractHtml,
+            allowEmptyContent,
+            dependencies,
+            false,
+          );
+        }
+
+        passed.response.destroy();
+      } catch (error) {
+        if (signal.aborted || (error instanceof Error && error.name === "AbortError")) throw error;
+        // An unsupported or refused challenge falls back to the blocked document.
+      }
     }
 
     return documentFromDecoded(target, response, body, signal, extractHtml, allowEmptyContent);
@@ -696,18 +722,64 @@ async function fetchDocument(
       };
     }
 
-    return {
-      document: await documentFromAcquisition(
-        target,
-        response,
-        controller.signal,
-        extractHtml,
-        allowEmptyContent,
-        requestDependencies,
-        true,
-      ),
-      revalidated: false,
-    };
+    const document = await documentFromAcquisition(
+      target,
+      response,
+      controller.signal,
+      extractHtml,
+      allowEmptyContent,
+      requestDependencies,
+      true,
+    );
+
+    const feedUrl = document.extractionDiagnostics?.botWall ? redditFeedUrl(rawUrl) : undefined;
+
+    if (feedUrl && target.url.hostname === new URL(rawUrl).hostname) {
+      try {
+        const feed = await requestFollowingRedirects(
+          feedUrl,
+          controller.signal,
+          requestDependencies,
+        );
+
+        const type = normalizeContentType(responseContentTypeHeader(feed.response));
+
+        if (
+          feed.target.url.hostname === "www.reddit.com" &&
+          feed.target.url.protocol === "https:" &&
+          feed.response.statusCode === 200 &&
+          type === "application/atom+xml"
+        ) {
+          const body = await decodeResponseBody(
+            feed.response,
+            controller.signal,
+            responseContentTypeHeader(feed.response),
+            type,
+          );
+
+          const markdown = extractRedditFeed(body.raw, feedUrl);
+
+          if (markdown)
+            return {
+              document: {
+                ...document,
+                markdown,
+                extractor: "raw",
+                extractionDiagnostics: undefined,
+                shellSuspected: false,
+                validators: undefined,
+                links: undefined,
+              },
+              revalidated: false,
+            };
+        } else feed.response.destroy();
+      } catch (error) {
+        if (controller.signal.aborted) throw error;
+        // Reddit's anonymous feed may be unavailable or rate limited.
+      }
+    }
+
+    return { document, revalidated: false };
   } catch (error) {
     if (timedOut) throw new Error(`web_fetch timed out after ${timeoutMs / 1000} seconds.`);
 
