@@ -36,12 +36,14 @@ describe("Reddit JavaScript challenge", () => {
     async (comment) => {
       const page = comment ? new URL(url.href.replace("post/", "post/comment123/")) : url;
 
-      const challenge = comment
-        ? html.replace(
-            'action="/r/example/comments/abc/post/"',
-            'action="/r/example/comments/abc/post/comment123/"',
-          )
-        : html;
+      const challenge = (
+        comment
+          ? html.replace(
+              'action="/r/example/comments/abc/post/"',
+              'action="/r/example/comments/abc/post/comment123/"',
+            )
+          : html
+      ).replaceAll('name="', 'name = "');
 
       const calls: string[] = [];
 

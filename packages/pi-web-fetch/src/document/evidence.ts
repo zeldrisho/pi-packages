@@ -85,9 +85,9 @@ export function diagnoseExtraction(raw: string, markdown: string): ExtractionDia
 
   const redditChallenge =
     markdown.trim().length < CAPTCHA_CHALLENGE_MAX_MARKDOWN_CHARACTERS &&
-    /<input\b[^>]*\bname=["']js_challenge["']/i.test(raw) &&
-    /<input\b[^>]*\bname=["']jsc_token["']/i.test(raw) &&
-    /<input\b[^>]*\bname=["']solution["']/i.test(raw);
+    /<input\b[^>]*\bname\s*=\s*["']js_challenge["']/i.test(raw) &&
+    /<input\b[^>]*\bname\s*=\s*["']jsc_token["']/i.test(raw) &&
+    /<input\b[^>]*\bname\s*=\s*["']solution["']/i.test(raw);
 
   const captchaChallenge =
     redditChallenge ||
