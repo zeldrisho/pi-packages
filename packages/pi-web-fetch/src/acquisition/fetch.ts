@@ -442,15 +442,38 @@ async function documentFromAcquisition(
   dependencies: FetchRemoteDependencies,
   allowSolve: boolean,
 ): Promise<CompleteDocument> {
-  assertSuccessfulResponse(response);
   const status = response.statusCode ?? 0;
   const contentTypeHeader = responseContentTypeHeader(response);
   const contentType = normalizeContentType(contentTypeHeader);
 
-  if (allowSolve && status >= 200 && status < 300 && isHtmlContentType(contentType)) {
+  const reddit403 =
+    allowSolve &&
+    status === 403 &&
+    target.url.protocol === "https:" &&
+    ["reddit.com", "www.reddit.com", "old.reddit.com"].includes(target.url.hostname) &&
+    !target.url.username &&
+    !target.url.password &&
+    !target.url.port &&
+    isHtmlContentType(contentType);
+
+  if (!reddit403) assertSuccessfulResponse(response);
+
+  if (
+    allowSolve &&
+    ((status >= 200 && status < 300) || reddit403) &&
+    isHtmlContentType(contentType)
+  ) {
     const body = await decodeResponseBody(response, signal, contentTypeHeader, contentType);
 
-    if (dependencies.solveAnubisChallenges !== false && hasAnubisMarkers(body.raw)) {
+    if (reddit403 && !diagnoseExtraction(body.raw, "").botWall) assertSuccessfulResponse(response);
+
+    const blocked = reddit403
+      ? await documentFromDecoded(target, response, body, signal, extractHtml, allowEmptyContent)
+      : undefined;
+
+    if (reddit403 && !blocked?.extractionDiagnostics?.botWall) assertSuccessfulResponse(response);
+
+    if (!reddit403 && dependencies.solveAnubisChallenges !== false && hasAnubisMarkers(body.raw)) {
       const challenge = parseAnubisChallenge(body.raw, target.url);
 
       if (challenge) {
@@ -512,7 +535,9 @@ async function documentFromAcquisition(
       }
     }
 
-    return documentFromDecoded(target, response, body, signal, extractHtml, allowEmptyContent);
+    return (
+      blocked ?? documentFromDecoded(target, response, body, signal, extractHtml, allowEmptyContent)
+    );
   }
 
   return documentFromResponse(target, response, signal, extractHtml, allowEmptyContent);
@@ -730,33 +755,15 @@ async function fetchDocument(
         ? requestedFeed
         : undefined;
 
-    let document: CompleteDocument;
-    const typeHeader = responseContentTypeHeader(response);
-    const responseType = normalizeContentType(typeHeader);
-
-    if (eligibleFeed && response.statusCode === 403 && isHtmlContentType(responseType)) {
-      const body = await decodeResponseBody(response, controller.signal, typeHeader, responseType);
-
-      if (!diagnoseExtraction(body.raw, "").botWall) assertSuccessfulResponse(response);
-      document = await documentFromDecoded(
-        target,
-        response,
-        body,
-        controller.signal,
-        extractHtml,
-        allowEmptyContent,
-      );
-    } else {
-      document = await documentFromAcquisition(
-        target,
-        response,
-        controller.signal,
-        extractHtml,
-        allowEmptyContent,
-        requestDependencies,
-        true,
-      );
-    }
+    const document = await documentFromAcquisition(
+      target,
+      response,
+      controller.signal,
+      extractHtml,
+      allowEmptyContent,
+      requestDependencies,
+      true,
+    );
 
     const feedUrl = document.extractionDiagnostics?.botWall ? eligibleFeed : undefined;
 

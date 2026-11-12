@@ -31,6 +31,74 @@ describe("Reddit JavaScript challenge", () => {
     expect(redditChallengeUrl(html, new URL(`${url}&solution=evil`))).toBeUndefined();
   });
 
+  it.each([false, true])(
+    "solves 403 challenges before feed fallback (comment=%s)",
+    async (comment) => {
+      const page = comment ? new URL(url.href.replace("post/", "post/comment123/")) : url;
+
+      const challenge = comment
+        ? html.replace(
+            'action="/r/example/comments/abc/post/"',
+            'action="/r/example/comments/abc/post/comment123/"',
+          )
+        : html;
+
+      const calls: string[] = [];
+
+      const doc = await fetchCompleteDocument(page.href, undefined, {
+        validateUrl: async (value) => ({
+          url: new URL(value),
+          address: "93.184.216.34",
+          family: 4,
+        }),
+        request: async (target) => {
+          calls.push(target.url.href);
+
+          // SAFETY: this readable supplies the response fields used by the transport.
+          const response = Readable.from([
+            Buffer.from(
+              calls.length === 1 ? challenge : "<html><body>Recovered post content</body></html>",
+            ),
+          ]) as IncomingMessage;
+
+          response.statusCode = calls.length === 1 ? 403 : 200;
+          response.headers = { "content-type": "text/html" };
+
+          return response;
+        },
+      });
+
+      expect(doc.markdown).toContain("Recovered post content");
+      expect(doc.url).toBe(page.href);
+      expect(calls).toHaveLength(2);
+      expect(calls[1]).toContain("solution=");
+    },
+  );
+
+  it("rejects content-rich 403 pages even when they contain challenge inputs", async () => {
+    const rich = html.replace("</body>", `<p>${"readable text ".repeat(80)}</p></body>`);
+    let calls = 0;
+    await expect(
+      fetchCompleteDocument(url.href, undefined, {
+        validateUrl: async (value) => ({
+          url: new URL(value),
+          address: "93.184.216.34",
+          family: 4,
+        }),
+        request: async () => {
+          calls++;
+          // SAFETY: this readable supplies the response fields used by the transport.
+          const response = Readable.from([Buffer.from(rich)]) as IncomingMessage;
+          response.statusCode = 403;
+          response.headers = { "content-type": "text/html" };
+
+          return response;
+        },
+      }),
+    ).rejects.toThrow("HTTP 403");
+    expect(calls).toBe(1);
+  });
+
   it("preserves cancellation during a challenge pass", async () => {
     const controller = new AbortController();
     let calls = 0;
