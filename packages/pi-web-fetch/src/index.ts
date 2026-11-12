@@ -75,20 +75,8 @@ export {
 
 export const webFetchParameters = Type.Object({
   url: Type.String({ minLength: 1, maxLength: FETCH_MAX_URL_CHARACTERS }),
-  query: Type.Optional(
-    Type.String({
-      minLength: 1,
-      maxLength: FETCH_MAX_QUERY_CHARACTERS,
-      description: "Find sections matching this text.",
-    }),
-  ),
-  offset: Type.Optional(
-    Type.Integer({
-      minimum: 0,
-      maximum: FETCH_MAX_OFFSET_CHARACTERS,
-      description: "Start at this character offset.",
-    }),
-  ),
+  query: Type.Optional(Type.String({ minLength: 1, maxLength: FETCH_MAX_QUERY_CHARACTERS })),
+  offset: Type.Optional(Type.Integer({ minimum: 0, maximum: FETCH_MAX_OFFSET_CHARACTERS })),
 });
 
 /**
@@ -99,6 +87,7 @@ export const webFetchParameters = Type.Object({
 export default function (pi: ExtensionAPI) {
   pi.registerTool<typeof webFetchParameters, Partial<WebFetchDetails>>({
     name: "web_fetch",
+    exposure: "model-only",
     label: "Web Fetch",
     description: "Read content from a public URL.",
     parameters: webFetchParameters,

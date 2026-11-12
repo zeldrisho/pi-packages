@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Simplify the tool prompt and limit calls to the model.
+
 ### Fixed
 
 - Solve supported Reddit JavaScript challenges and try the public post feed when a challenge remains blocked.

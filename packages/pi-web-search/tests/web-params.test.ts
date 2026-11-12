@@ -28,6 +28,10 @@ async function runSearchCapturingUrl(params: SearchParameters): Promise<URL> {
 }
 
 describe("web_search web-mode parameters", () => {
+  it("registers for direct model calls only", () => {
+    expect(createSearchTool()).toMatchObject({ name: "web_search", exposure: "model-only" });
+  });
+
   it("passes country, safesearch, and extra_snippets to Brave", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "param-secret";
 
