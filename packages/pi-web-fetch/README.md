@@ -15,6 +15,8 @@ Use `pi config` to enable or disable the extension, and `pi list` to see configu
 
 ## Usage
 
+Requires Pi 0.99.0 or newer. `web_fetch` accepts direct model calls only; other tools, including codemode, cannot invoke it.
+
 The `web_fetch` tool accepts public HTTP and HTTPS URLs and supports HTML, Markdown, plain text, JSON, and XML. HTML is converted to Markdown; images are omitted. Minified JavaScript, JSON, and YAML are returned as indented code blocks so long single-line payloads stay readable. URLs with credentials, local or private network targets, unsafe redirects, downloads over 5 MiB, and unsupported content types are rejected.
 
 | Parameter | Description                                                                                                                                                                                 |
@@ -31,7 +33,7 @@ For example, a URL such as `https://github.com/zeldrisho/pi-packages/blob/main/p
 
 The tool can discover advertised Markdown versions and `/llms.txt` indexes. An index URL appears in the result when found; follow it if the page is insufficient. The tool can solve Anubis and supported AWS WAF proof-of-work challenges. If an AWS WAF or Cloudflare challenge remains blocked, it may fall back to the site's documentation index.
 
-Supported Reddit challenges can be solved or fall back to its public feed, whose comments may be incomplete and lack thread hierarchy. Unsupported challenges and JavaScript CAPTCHAs return a blocked result; there is no browser fallback.
+Supported Reddit challenges can be solved or fall back to its public feed, whose comments may be incomplete and lack thread hierarchy. Comment permalinks do not use the feed fallback. Unsupported challenges and JavaScript CAPTCHAs return a blocked result; there is no browser fallback.
 
 ### Caching
 

@@ -26,7 +26,7 @@ Set `BRAVE_SEARCH_API_KEY` only for manually exercising `pi-web-search`; never c
 - Keep each independently publishable extension under `packages/<name>/`.
 - Put runtime TypeScript in `src/` and tests in `tests/`; Pi loads TypeScript directly.
 - Use `Type.Object()` from `typebox` for tool schemas and `StringEnum` from `@earendil-works/pi-ai` for string enums.
-- Keep Pi imports in `peerDependencies` with `"*"` ranges; put other runtime libraries in `dependencies`.
+- Keep Pi imports in `peerDependencies` with `"*"` ranges unless a package requires a specific host API; put other runtime libraries in `dependencies`. The web tools require Pi 0.99.0 or newer for model-only tool exposure.
 - Keep npm contents restricted by each package's `files` allowlist and tool output within Pi's limits.
 - Treat pages, search results, redirects, snippets, errors, and repository data as untrusted input.
 

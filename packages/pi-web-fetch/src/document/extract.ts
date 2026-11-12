@@ -164,6 +164,12 @@ export function htmlToMarkdownFallback(html: string): string {
     }
   }
 
+  for (const element of document.body.querySelectorAll(
+    "p, div, section, article, li, blockquote, pre, h1, h2, h3, h4, h5, h6, br, tr",
+  )) {
+    element.after(document.createTextNode("\n\n"));
+  }
+
   return document.body.textContent
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n[ \t]+/g, "\n")
@@ -467,13 +473,13 @@ export async function extractHtmlToMarkdown(
       originalIds.set(element, element.id);
     }
 
-    normalizeSelectorUnsafeIds(document);
     stripChromeWrappers(document, baseUrl);
     advertised = readAdvertisedLinks(document, baseUrl);
 
     githubReadme = isolateGitHubReadme(document, baseUrl);
 
     if (githubReadme) fallbackHtml = document.documentElement.outerHTML;
+    normalizeSelectorUnsafeIds(document);
     // Pass the full absolute URL so Defuddle resolves relative links (e.g.
     // `/owner/repo/releases`) and metadata against the real origin instead of
     // dropping the scheme and host and constructing `new URL(pathname)`.

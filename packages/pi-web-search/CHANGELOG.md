@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Simplify the tool prompt and limit calls to the model.
+- **Breaking:** `web_search` requires Pi 0.99.0 or newer and can no longer be called by other tools, including codemode; use direct model calls instead.
 
 ## [0.14.6] - 2026-11-09
 

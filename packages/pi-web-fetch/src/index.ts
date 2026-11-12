@@ -75,8 +75,20 @@ export {
 
 export const webFetchParameters = Type.Object({
   url: Type.String({ minLength: 1, maxLength: FETCH_MAX_URL_CHARACTERS }),
-  query: Type.Optional(Type.String({ minLength: 1, maxLength: FETCH_MAX_QUERY_CHARACTERS })),
-  offset: Type.Optional(Type.Integer({ minimum: 0, maximum: FETCH_MAX_OFFSET_CHARACTERS })),
+  query: Type.Optional(
+    Type.String({
+      minLength: 1,
+      maxLength: FETCH_MAX_QUERY_CHARACTERS,
+      description: "Select page sections matching this text.",
+    }),
+  ),
+  offset: Type.Optional(
+    Type.Integer({
+      minimum: 0,
+      maximum: FETCH_MAX_OFFSET_CHARACTERS,
+      description: "Continue at this character offset in the selected view.",
+    }),
+  ),
 });
 
 /**

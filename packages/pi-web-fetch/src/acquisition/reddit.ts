@@ -15,9 +15,7 @@ export function redditFeedUrl(rawUrl: string): string | undefined {
   )
     return undefined;
 
-  const match = /^\/r\/([a-z0-9_]+)\/comments\/([a-z0-9]+)(?:\/[^/]*)?(?:\/[^/]*)?\/?$/i.exec(
-    url.pathname,
-  );
+  const match = /^\/r\/([a-z0-9_]+)\/comments\/([a-z0-9]+)(?:\/[^/]+)?\/?$/i.exec(url.pathname);
 
   if (!match) return undefined;
 

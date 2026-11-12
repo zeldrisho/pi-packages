@@ -722,19 +722,45 @@ async function fetchDocument(
       };
     }
 
-    const document = await documentFromAcquisition(
-      target,
-      response,
-      controller.signal,
-      extractHtml,
-      allowEmptyContent,
-      requestDependencies,
-      true,
-    );
+    const requestedFeed = redditFeedUrl(rawUrl);
+    const finalFeed = redditFeedUrl(target.url.href);
 
-    const feedUrl = document.extractionDiagnostics?.botWall ? redditFeedUrl(rawUrl) : undefined;
+    const eligibleFeed =
+      requestedFeed && finalFeed && requestedFeed.toLowerCase() === finalFeed.toLowerCase()
+        ? requestedFeed
+        : undefined;
 
-    if (feedUrl && target.url.hostname === new URL(rawUrl).hostname) {
+    let document: CompleteDocument;
+    const typeHeader = responseContentTypeHeader(response);
+    const responseType = normalizeContentType(typeHeader);
+
+    if (eligibleFeed && response.statusCode === 403 && isHtmlContentType(responseType)) {
+      const body = await decodeResponseBody(response, controller.signal, typeHeader, responseType);
+
+      if (!diagnoseExtraction(body.raw, "").botWall) assertSuccessfulResponse(response);
+      document = await documentFromDecoded(
+        target,
+        response,
+        body,
+        controller.signal,
+        extractHtml,
+        allowEmptyContent,
+      );
+    } else {
+      document = await documentFromAcquisition(
+        target,
+        response,
+        controller.signal,
+        extractHtml,
+        allowEmptyContent,
+        requestDependencies,
+        true,
+      );
+    }
+
+    const feedUrl = document.extractionDiagnostics?.botWall ? eligibleFeed : undefined;
+
+    if (feedUrl) {
       try {
         const feed = await requestFollowingRedirects(
           feedUrl,
@@ -762,13 +788,12 @@ async function fetchDocument(
           if (markdown)
             return {
               document: {
-                ...document,
+                url: document.url,
+                contentType: type,
                 markdown,
                 extractor: "raw",
-                extractionDiagnostics: undefined,
                 shellSuspected: false,
-                validators: undefined,
-                links: undefined,
+                cachedAt: Date.now(),
               },
               revalidated: false,
             };

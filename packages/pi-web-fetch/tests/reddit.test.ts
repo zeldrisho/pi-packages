@@ -20,6 +20,7 @@ describe("Reddit fallback", () => {
     expect(redditFeedUrl(url)).toBe("https://www.reddit.com/r/PiCodingAgent/comments/1vi0wjy/.rss");
     expect(redditFeedUrl("https://reddit.com.evil.test/r/a/comments/123/x/")).toBeUndefined();
     expect(redditFeedUrl("https://reddit.com/r/a/")).toBeUndefined();
+    expect(redditFeedUrl(`${url}comment123/`)).toBeUndefined();
   });
 
   it.each([200, 403, 429])("uses the feed only when it succeeds (HTTP %i)", async (status) => {
@@ -50,15 +51,97 @@ describe("Reddit fallback", () => {
     if (status === 200) {
       expect(document.markdown).toContain("Found post");
       expect(document.extractionDiagnostics?.botWall).not.toBe(true);
+      expect(document.contentType).toBe("application/atom+xml");
+      expect(document.title).toBeUndefined();
+      expect(document.fragmentOffsets).toBeUndefined();
     } else {
       expect(document.extractionDiagnostics?.botWall).toBe(true);
     }
   });
 
+  it.each([true, false])(
+    "handles 403 bot walls without hiding ordinary errors (wall=%s)",
+    async (wall) => {
+      const paths: string[] = [];
+
+      const fetch = fetchCompleteDocument(url, undefined, {
+        validateUrl: async (value) => ({
+          url: new URL(value),
+          address: "93.184.216.34",
+          family: 4,
+        }),
+        request: async (target) => {
+          paths.push(target.url.pathname);
+          const feed = target.url.pathname.endsWith("/.rss");
+
+          const body = feed
+            ? "<feed><entry><id>t3_1vi0wjy</id><title>Found post</title></entry></feed>"
+            : wall
+              ? challenge
+              : "<html><body>Access denied</body></html>";
+
+          // SAFETY: the fixture supplies the response stream and fields used by the transport.
+          const response = Readable.from([Buffer.from(body)]) as IncomingMessage;
+          response.statusCode = feed ? 200 : 403;
+          response.headers = { "content-type": feed ? "application/atom+xml" : "text/html" };
+
+          return response;
+        },
+      });
+
+      if (wall) expect((await fetch).markdown).toContain("Found post");
+      else await expect(fetch).rejects.toThrow("HTTP 403");
+      expect(paths.some((path) => path.endsWith("/.rss"))).toBe(wall);
+    },
+  );
+
+  it.each([true, false])(
+    "permits only redirects to the same Reddit post (same=%s)",
+    async (same) => {
+      const paths: string[] = [];
+      const initial = url.replace("www.reddit.com", "reddit.com");
+
+      const result = await fetchCompleteDocument(initial, undefined, {
+        validateUrl: async (value) => ({
+          url: new URL(value),
+          address: "93.184.216.34",
+          family: 4,
+        }),
+        request: async (target) => {
+          paths.push(target.url.href);
+          const redirect = target.url.hostname === "reddit.com";
+          const feed = target.url.pathname.endsWith("/.rss");
+
+          const body = feed
+            ? "<feed><entry><id>t3_1vi0wjy</id><title>Found post</title></entry></feed>"
+            : challenge;
+
+          // SAFETY: the fixture supplies the response stream and fields used by the transport.
+          const response = Readable.from([Buffer.from(body)]) as IncomingMessage;
+          response.statusCode = redirect ? 302 : 200;
+          response.headers = redirect
+            ? { location: same ? url : url.replace("1vi0wjy", "different") }
+            : { "content-type": feed ? "application/atom+xml" : "text/html" };
+
+          return response;
+        },
+      });
+
+      expect(paths.some((path) => path.endsWith("/.rss"))).toBe(same);
+      expect(result.markdown.includes("Found post")).toBe(same);
+    },
+  );
+
   it("extracts a matching post and comments but not unrelated entries", () => {
     const feed = `<feed xmlns="http://www.w3.org/2005/Atom"><entry><id>t3_1vi0wjy</id><title>Post title</title><content type="html">&lt;p&gt;Post body&lt;/p&gt;</content></entry><entry><id>t1_abc</id><content type="html">&lt;p&gt;A comment&lt;/p&gt;</content></entry></feed>`;
     const result = extractRedditFeed(feed, redditFeedUrl(url)!);
     expect(result).toContain("Post body");
+    expect(
+      extractRedditFeed(
+        feed.replace("Post body&lt;/p&gt;", "Not&lt;/p&gt;&lt;p&gt;allowed&lt;/p&gt;"),
+        redditFeedUrl(url)!,
+      ),
+    ).toContain("Not\n\nallowed");
     expect(result).toContain("A comment");
     expect(result).toContain("hierarchy is unavailable");
     expect(

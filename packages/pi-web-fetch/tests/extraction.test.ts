@@ -119,6 +119,19 @@ describe("HTML extraction", () => {
     expect(result.markdown).not.toContain("FILE LISTING");
   });
 
+  it("preserves original numeric IDs in the README fallback", async () => {
+    const { Defuddle } = await import("defuddle/node");
+    vi.mocked(Defuddle).mockRejectedValueOnce(new Error("failure"));
+
+    const result = await extractHtmlToMarkdown(
+      githubRepository.replace('id="readme-title"', 'id="1"'),
+      new URL("https://github.com/owner/repo"),
+    );
+
+    expect(result.extractor).toBe("basic");
+    expect(result.fragmentOffsets?.["1"]).toBeDefined();
+  });
+
   it("does not scope other paths or hosts, or roots without a README", async () => {
     const { Defuddle } = await import("defuddle/node");
 
