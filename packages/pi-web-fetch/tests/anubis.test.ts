@@ -57,6 +57,8 @@ let cssRequests = 0;
 
 let rejectPass = false;
 
+let authenticatedStatus = 200;
+
 let skipTestCookie = false;
 
 let missingWasm = false;
@@ -305,6 +307,7 @@ function handle(request: IncomingMessage, response: ServerResponse): void {
   if (match) {
     if (hasAuthCookie(request)) {
       authRequests += 1;
+      response.statusCode = authenticatedStatus;
       response.setHeader("content-type", "text/html; charset=utf-8");
       response.end(AUTH_PAGE);
 
@@ -351,6 +354,7 @@ beforeEach(() => {
   wasmRequests = 0;
   cssRequests = 0;
   rejectPass = false;
+  authenticatedStatus = 200;
   skipTestCookie = false;
   missingWasm = false;
   difficultyOverride = undefined;
@@ -383,6 +387,16 @@ describe("Anubis challenge solving", () => {
     expect(passes[0]?.testCookie).toBe(true);
     expect(passes[0]?.params.response).toMatch(/^00/);
     expect(challengeRequests).toBe(1);
+    expect(authRequests).toBe(1);
+  });
+
+  it("reports the page's HTTP error after solving the challenge", async () => {
+    authenticatedStatus = 404;
+
+    await expect(
+      fetchRemoteContent(protectedUrl("fast"), 0, 100_000, undefined, dependencies),
+    ).rejects.toThrow("HTTP 404. Page not found or inaccessible.");
+    expect(passRequests).toBe(1);
     expect(authRequests).toBe(1);
   });
 

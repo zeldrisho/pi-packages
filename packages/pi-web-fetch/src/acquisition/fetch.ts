@@ -477,29 +477,39 @@ async function documentFromAcquisition(
       const challenge = parseAnubisChallenge(body.raw, target.url);
 
       if (challenge) {
+        let passed: Awaited<ReturnType<typeof solveAnubisChallenge>>;
+
         try {
-          const passed = await solveAnubisChallenge({
+          passed = await solveAnubisChallenge({
             challenge,
             pageUrl: target.url,
             raw: body.raw,
             dependencies,
             signal,
           });
-
-          return await documentFromAcquisition(
-            passed.target,
-            passed.response,
-            signal,
-            extractHtml,
-            allowEmptyContent,
-            dependencies,
-            false,
-          );
         } catch (error) {
           if (signal.aborted || (error instanceof Error && error.name === "AbortError"))
             throw error;
-          // Any other failure degrades to the standard blocked output below.
+
+          return documentFromDecoded(
+            target,
+            response,
+            body,
+            signal,
+            extractHtml,
+            allowEmptyContent,
+          );
         }
+
+        return documentFromAcquisition(
+          passed.target,
+          passed.response,
+          signal,
+          extractHtml,
+          allowEmptyContent,
+          dependencies,
+          false,
+        );
       }
 
       // An unsolvable challenge, denial, or error page is returned as blocked.
