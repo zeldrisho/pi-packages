@@ -682,6 +682,25 @@ async function fetchDocument(
       ));
     }
 
+    // Some sites distinguish a documentation page from the same path with a
+    // trailing slash. Retry only once, after representation negotiation fails.
+    if (
+      retryRepresentationMiss &&
+      response.statusCode === 404 &&
+      target.url.pathname !== "/" &&
+      target.url.pathname.endsWith("/")
+    ) {
+      const alternate = new URL(target.url);
+      alternate.pathname = alternate.pathname.slice(0, -1);
+      response.destroy();
+      ({ target, response } = await requestFollowingRedirects(
+        alternate,
+        controller.signal,
+        requestDependencies,
+        { Accept: "text/html, text/plain;q=0.9, */*;q=0.1" },
+      ));
+    }
+
     if (
       response.statusCode !== undefined &&
       responseHeader(response, "cf-mitigated")?.trim().toLowerCase() === "challenge"

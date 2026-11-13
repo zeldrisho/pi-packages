@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fetch slash-sensitive pages when a trailing slash returns 404 but the page exists without it.
 - Report page errors after a solved Anubis challenge instead of incorrectly reporting a bot block.
 
 ## [0.17.0] - 2026-11-12
