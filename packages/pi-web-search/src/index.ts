@@ -45,7 +45,6 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerTool<typeof webSearchParameters, Partial<SearchDetails>>({
     name: "web_search",
-    exposure: "model-only",
     label: "Web Search",
     description: "Search the web.",
     parameters: webSearchParameters,

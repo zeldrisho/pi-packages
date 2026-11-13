@@ -99,7 +99,6 @@ export const webFetchParameters = Type.Object({
 export default function (pi: ExtensionAPI) {
   pi.registerTool<typeof webFetchParameters, Partial<WebFetchDetails>>({
     name: "web_fetch",
-    exposure: "model-only",
     label: "Web Fetch",
     description: "Read content from a public URL.",
     parameters: webFetchParameters,

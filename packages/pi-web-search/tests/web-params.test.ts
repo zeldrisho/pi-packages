@@ -28,8 +28,13 @@ async function runSearchCapturingUrl(params: SearchParameters): Promise<URL> {
 }
 
 describe("web_search web-mode parameters", () => {
-  it("registers for direct model calls only", () => {
-    expect(createSearchTool()).toMatchObject({ name: "web_search", exposure: "model-only" });
+  it("registers for direct and codemode calls", () => {
+    const tool = createSearchTool();
+    expect(tool).not.toHaveProperty("exposure");
+    expect(tool).toMatchObject({
+      name: "web_search",
+      outputSchema: expect.any(Object),
+    });
   });
 
   it("passes country, safesearch, and extra_snippets to Brave", async () => {

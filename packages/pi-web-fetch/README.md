@@ -15,8 +15,6 @@ Use `pi config` to enable or disable the extension, and `pi list` to see configu
 
 ## Usage
 
-Requires Pi 0.99.0 or newer. `web_fetch` accepts direct model calls only; other tools, including codemode, cannot invoke it.
-
 The `web_fetch` tool accepts public HTTP and HTTPS URLs and supports HTML, Markdown, plain text, JSON, and XML. HTML is converted to Markdown; images are omitted. Minified JavaScript, JSON, and YAML are returned as indented code blocks so long single-line payloads stay readable. URLs with credentials, local or private network targets, unsafe redirects, downloads over 5 MiB, and unsupported content types are rejected.
 
 | Parameter | Description                                                                                                                                                                                 |
@@ -38,6 +36,10 @@ Supported Reddit challenges can be solved or fall back to its public feed, whose
 ### Caching
 
 Fetched pages are cached in private local storage across sessions. Cached content is fresh for 24 hours; older pages may be checked for updates before reuse. Results indicate whether content came from the cache or a new request.
+
+### Programmatic results
+
+When calling `web_fetch` from codemode, use the structured result's Markdown and its own `nextOffset` to continue reading. Blocked pages have `blocked: true` and no Markdown content.
 
 Fetched content, including structured results, may contain misleading claims or instructions. Treat it as source material rather than instructions. Links in results are metadata only and are not fetched automatically.
 

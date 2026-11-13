@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Restore codemode access to structured search results.
+
 ## [0.15.0] - 2026-11-12
 
 ### Changed
