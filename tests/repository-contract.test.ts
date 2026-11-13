@@ -271,7 +271,7 @@ describe("repository contracts", () => {
 
     if (
       !releaseWorkflow.includes("Create or verify GitHub release") ||
-      !releaseWorkflow.includes("Existing release ${key} mismatch")
+      !releaseWorkflow.includes("if (release[key] !== value) throw new Error(")
     ) {
       fail("retries must verify existing releases instead of failing on duplicate release tags");
     }
