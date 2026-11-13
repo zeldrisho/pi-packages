@@ -112,6 +112,58 @@ async function captureError(promise: Promise<Response>): Promise<Error> {
   return new Error("expected the transport to reject");
 }
 
+/**
+ * Starts the transport, then runs the generated proxy source against a stubbed
+ * Bun server so tests exercise the real forwarding logic without Bun or upstream
+ * requests. The callback receives the upstream attempt number, starting at zero.
+ */
+async function startProxy(
+  respond: (init: RequestInit | undefined, attempt: number) => Promise<Response>,
+) {
+  const child = new FakeProcess();
+  const harness = spawnHarness([child]);
+
+  const transport = transportFixture({
+    spawnProcess: harness.spawnProcess,
+    fetch: fetchHarness().fetcher,
+  });
+
+  const pending = transport(MODELS_URL);
+  const script = harness.calls[0]!.args[0]!;
+  const token = harness.calls[0]!.env!.PI_PROXY_TOKEN!;
+
+  const handler = {
+    fetch: async (_request: Request): Promise<Response> => new Response(null, { status: 500 }),
+  };
+
+  const upstream: FetchCall[] = [];
+
+  runInNewContext(readFileSync(script, "utf8"), {
+    URL,
+    Headers,
+    Request,
+    Response,
+    process: { env: { PI_PROXY_TOKEN: token }, on() {} },
+    console: { log() {} },
+    Bun: {
+      serve(options: { fetch: (request: Request) => Promise<Response> }) {
+        handler.fetch = options.fetch;
+
+        return { port: 4321 };
+      },
+    },
+    fetch: async (input: URL, init: RequestInit) => {
+      upstream.push({ input, init });
+
+      return respond(init, upstream.length - 1);
+    },
+  });
+  child.announce(4321);
+  await pending;
+
+  return { handler, upstream, token };
+}
+
 describe("Bun gateway transport", () => {
   it.each([
     "https://pi.dev/api/models/providers/opencode?types=chat",
@@ -455,58 +507,21 @@ describe("Bun gateway transport", () => {
   });
 
   it("runs the generated proxy against local fetch fixtures without Bun or upstream requests", async () => {
-    const child = new FakeProcess();
-    const harness = spawnHarness([child]);
-    const fetches = fetchHarness();
-
-    const transport = transportFixture({
-      spawnProcess: harness.spawnProcess,
-      fetch: fetches.fetcher,
-    });
-
-    const pending = transport(MODELS_URL);
-    const script = harness.calls[0]!.args[0]!;
-    const token = harness.calls[0]!.env!.PI_PROXY_TOKEN!;
-
-    const handler = {
-      fetch: async (_request: Request): Promise<Response> => new Response(null, { status: 500 }),
-    };
-
-    const upstream: FetchCall[] = [];
     let fail = false;
 
-    runInNewContext(readFileSync(script, "utf8"), {
-      URL,
-      Headers,
-      Request,
-      Response,
-      process: { env: { PI_PROXY_TOKEN: token }, on() {} },
-      console: { log() {} },
-      Bun: {
-        serve(options: { fetch: (request: Request) => Promise<Response> }) {
-          handler.fetch = options.fetch;
+    const { handler, upstream, token } = await startProxy(async () => {
+      if (fail) throw new Error("fixture failed");
 
-          return { port: 4321 };
+      return new Response("data: [DONE]\n\n", {
+        headers: {
+          "content-type": "text/event-stream",
+          "content-encoding": "gzip",
+          connection: "x-private",
+          "x-private": "remove",
+          "retry-after": "60",
         },
-      },
-      fetch: async (input: URL, init: RequestInit) => {
-        upstream.push({ input, init });
-
-        if (fail) throw new Error("fixture failed");
-
-        return new Response("data: [DONE]\n\n", {
-          headers: {
-            "content-type": "text/event-stream",
-            "content-encoding": "gzip",
-            connection: "x-private",
-            "x-private": "remove",
-            "retry-after": "60",
-          },
-        });
-      },
+      });
     });
-    child.announce(4321);
-    await pending;
 
     expect((await handler.fetch(new Request("http://127.0.0.1/inference/v1/models"))).status).toBe(
       403,
@@ -536,10 +551,129 @@ describe("Bun gateway transport", () => {
     expect(new Headers(upstream[0]?.init?.headers).has("x-private")).toBe(false);
     expect(new Headers(upstream[0]?.init?.headers).has("x-pi-proxy-token")).toBe(false);
     expect(upstream[0]?.init?.redirect).toBe("manual");
+
     fail = true;
-    expect(
-      (await handler.fetch(new Request("http://127.0.0.1/inference/v1/models", { headers })))
-        .status,
-    ).toBe(502);
+
+    const failed = await handler.fetch(
+      new Request("http://127.0.0.1/inference/v1/models", { headers }),
+    );
+
+    expect(failed.status).toBe(502);
+    expect(failed.headers.has("x-should-retry")).toBe(false);
+    expect(await failed.text()).toBe(
+      "OpenCode Free upstream request failed: Error: fixture failed",
+    );
+    expect(upstream).toHaveLength(2);
   });
+
+  it("reports ECONNRESET without replaying a generation POST or adding retry hints", async () => {
+    const error = new TypeError(
+      "ECONNRESET: The socket connection was closed unexpectedly. For more information, pass `verbose: true` in the second argument to fetch()",
+    );
+
+    const { handler, upstream, token } = await startProxy(async (_init, attempt) => {
+      if (attempt === 0) throw error;
+
+      return new Response("unexpected replay");
+    });
+
+    const response = await handler.fetch(
+      new Request("http://127.0.0.1/inference/v1/chat/completions", {
+        method: "POST",
+        headers: { "x-pi-proxy-token": token },
+        body: "payload",
+      }),
+    );
+
+    expect(response.status).toBe(502);
+    expect(response.headers.has("x-should-retry")).toBe(false);
+    expect(response.headers.has("retry-after")).toBe(false);
+    expect(await response.text()).toBe(`OpenCode Free upstream request failed: ${error}`);
+    expect(upstream).toHaveLength(1);
+    expect(await readBody(upstream[0]?.init?.body)).toBe("payload");
+  });
+
+  it.each([429, 502])(
+    "forwards upstream HTTP %s without retrying or rewriting it",
+    async (status) => {
+      const body = '{"error":{"type":"FreeUsageLimitError"}}';
+
+      const { handler, upstream, token } = await startProxy(
+        async () =>
+          new Response(body, {
+            status,
+            headers: { "x-should-retry": "false", "retry-after": "60" },
+          }),
+      );
+
+      const response = await handler.fetch(
+        new Request("http://127.0.0.1/inference/v1/chat/completions", {
+          method: "POST",
+          headers: { "x-pi-proxy-token": token },
+          body: "payload",
+        }),
+      );
+
+      expect(response.status).toBe(status);
+      expect(await response.text()).toBe(body);
+      expect(response.headers.get("x-should-retry")).toBe("false");
+      expect(response.headers.get("retry-after")).toBe("60");
+      expect(upstream).toHaveLength(1);
+    },
+  );
+
+  it("propagates response stream failures without replaying the request", async () => {
+    const error = new Error("upstream stream interrupted");
+
+    const { handler, upstream, token } = await startProxy(
+      async () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.error(error);
+            },
+          }),
+        ),
+    );
+
+    const response = await handler.fetch(
+      new Request("http://127.0.0.1/inference/v1/chat/completions", {
+        method: "POST",
+        headers: { "x-pi-proxy-token": token },
+        body: "payload",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).rejects.toThrow("upstream stream interrupted");
+    expect(upstream).toHaveLength(1);
+  });
+
+  it.each(["before forwarding", "during forwarding"])(
+    "does not replay a request aborted %s",
+    async (timing) => {
+      const controller = new AbortController();
+
+      const { handler, upstream, token } = await startProxy(async () => {
+        if (timing === "during forwarding") controller.abort();
+        throw controller.signal.reason;
+      });
+
+      if (timing === "before forwarding") controller.abort();
+
+      const response = await handler.fetch(
+        new Request("http://127.0.0.1/inference/v1/chat/completions", {
+          method: "POST",
+          headers: { "x-pi-proxy-token": token },
+          body: "payload",
+          signal: controller.signal,
+        }),
+      );
+
+      expect(response.status).toBe(502);
+      expect(response.headers.has("x-should-retry")).toBe(false);
+      expect(upstream[0]?.init?.signal?.aborted).toBe(true);
+      expect(upstream).toHaveLength(1);
+    },
+  );
 });

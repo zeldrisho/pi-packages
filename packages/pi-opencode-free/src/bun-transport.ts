@@ -26,7 +26,8 @@ export const BUN_PATH_ENV = "PI_OPENCODE_FREE_BUN";
  * guarantee free-tier access from a third-party client. The proxy buffers
  * the request so the upstream connection carries a definite length and no
  * hop-by-hop headers, then streams the upstream body back unchanged. Identity
- * encoding avoids reporting a compressed body as an uncompressed one.
+ * encoding avoids reporting a compressed body as an uncompressed one. The
+ * proxy never replays requests; retry policy remains with Pi.
  */
 const PROXY_SOURCE = `
 const token = process.env.PI_PROXY_TOKEN;
@@ -70,7 +71,11 @@ const server = Bun.serve({
         signal: request.signal,
       });
     } catch (error) {
-      return new Response(String(error), { status: 502 });
+      // Even without response headers, a generation POST may have been accepted.
+      // Preserve the 502 and diagnostic text; let Pi own retries and backoff.
+      return new Response("OpenCode Free upstream request failed: " + String(error), {
+        status: 502,
+      });
     }
 
     const responseHeaders = new Headers(upstream.headers);
