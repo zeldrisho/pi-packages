@@ -283,7 +283,7 @@ export function parseAnubisChallenge(raw: string, pageUrl: URL): AnubisChallenge
     return undefined;
   }
 
-  const extensions = rawExtensions === undefined ? [] : rawExtensions;
+  const extensions = rawExtensions ?? [];
 
   if (!isStringArray(extensions) || extensions.length > MAX_EXTENSIONS) return undefined;
 

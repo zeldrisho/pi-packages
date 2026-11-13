@@ -69,6 +69,8 @@ let publicUrl = "";
 
 let extensions: string[] = [];
 
+let nullExtensions = false;
+
 let pending = new Map<string, PendingChallenge>();
 
 let passes: PassRecord[] = [];
@@ -99,7 +101,7 @@ function challengePage(challenge: PendingChallenge, id: string, extra: string): 
       method: challenge.method,
       randomData: challenge.randomData,
       difficulty: challenge.difficulty,
-      extensions,
+      extensions: nullExtensions ? null : extensions,
     },
   };
 
@@ -360,6 +362,7 @@ beforeEach(() => {
   difficultyOverride = undefined;
   publicUrl = "";
   extensions = [];
+  nullExtensions = false;
   pending = new Map();
   passes = [];
 });
@@ -387,6 +390,23 @@ describe("Anubis challenge solving", () => {
     expect(passes[0]?.testCookie).toBe(true);
     expect(passes[0]?.params.response).toMatch(/^00/);
     expect(challengeRequests).toBe(1);
+    expect(authRequests).toBe(1);
+  });
+
+  it("solves a challenge with null extensions", async () => {
+    nullExtensions = true;
+
+    const content = await fetchRemoteContent(
+      protectedUrl("fast"),
+      0,
+      100_000,
+      undefined,
+      dependencies,
+    );
+
+    expect(content.markdown).toContain("Protected content");
+    expect(passRequests).toBe(1);
+    expect(passes[0]?.testCookie).toBe(true);
     expect(authRequests).toBe(1);
   });
 

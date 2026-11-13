@@ -59,6 +59,15 @@ describe("parseAnubisChallenge", () => {
     });
   });
 
+  it("treats null extensions as an empty list", () => {
+    const challenge =
+      '{"rules":{"algorithm":"fast","difficulty":2},"challenge":{"id":"cid","method":"fast","randomData":"00","difficulty":2,"extensions":null}}';
+
+    expect(
+      parseAnubisChallenge(page({ version: "v1.28.2" }, challenge), pageUrl)?.extensions,
+    ).toEqual([]);
+  });
+
   it("parses supported extensions", () => {
     const challenge =
       '{"challenge":{"id":"cid","method":"fast","randomData":"00","difficulty":1,"extensions":["css-load"]}}';
@@ -121,6 +130,14 @@ describe("parseAnubisChallenge", () => {
   it("rejects control characters in the identifier", () => {
     const challenge = JSON.stringify({
       challenge: { id: "bad\u0000id", method: "fast", randomData: "00", difficulty: 1 },
+    });
+
+    expect(parseAnubisChallenge(page({}, challenge), pageUrl)).toBeUndefined();
+  });
+
+  it.each([false, 0, "css-load", {}])("rejects malformed extensions %j", (extensions) => {
+    const challenge = JSON.stringify({
+      challenge: { id: "cid", method: "fast", randomData: "00", difficulty: 1, extensions },
     });
 
     expect(parseAnubisChallenge(page({}, challenge), pageUrl)).toBeUndefined();
