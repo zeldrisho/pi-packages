@@ -233,6 +233,143 @@ describe("web_fetch honest-evidence details", () => {
     });
   });
 
+  it("retrieves Packit Copr jobs from their public API", async () => {
+    const requested: string[] = [];
+
+    const dependencies: FetchRemoteDependencies = {
+      validateUrl: async (value) => {
+        const url = value instanceof URL ? value : new URL(value);
+
+        return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
+      },
+      request: async (target) => {
+        requested.push(target.url.href);
+
+        return fakeTextResponse('{"status":"success"}', "application/json");
+      },
+    };
+
+    const result = await executeWebFetch(
+      { url: "https://dashboard.packit.dev/jobs/copr/4228191" },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(requested).toEqual(["https://prod.packit.dev/api/copr-builds/4228191"]);
+    expect(result.content[0]).toMatchObject({
+      text: expect.stringContaining("Packit's API response"),
+    });
+    expect(result.structuredContent).toMatchObject({
+      finalUrl: requested[0],
+      markdown: expect.stringContaining("success"),
+    });
+  });
+
+  it("retrieves an empty Swagger UI's advertised same-origin specification", async () => {
+    const dependencies: FetchRemoteDependencies = {
+      validateUrl: async (value) => {
+        const url = value instanceof URL ? value : new URL(value);
+
+        return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
+      },
+      request: async (target) => {
+        if (target.url.pathname === "/api/swagger.json")
+          return fakeTextResponse('{"swagger":"2.0","info":{},"paths":{}}', "application/json");
+
+        if (target.url.pathname === "/api/")
+          return fakeTextResponse(
+            '<html><body><div id="swagger-ui"></div><script>new SwaggerUIBundle({url: "/api/swagger.json"})</script></body></html>',
+            "text/html",
+          );
+
+        return fakeTextResponse("");
+      },
+    };
+
+    const result = await executeWebFetch(
+      { url: "https://swagger-test.example/api/" },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.content[0]).toMatchObject({
+      text: expect.stringContaining("advertised Swagger specification"),
+    });
+    expect(result.structuredContent).toMatchObject({
+      finalUrl: "https://swagger-test.example/api/swagger.json",
+      contentKind: "openapi-spec",
+    });
+  });
+
+  it("does not fetch a cross-origin Swagger advertisement", async () => {
+    const requested: string[] = [];
+
+    const dependencies: FetchRemoteDependencies = {
+      validateUrl: async (value) => {
+        const url = value instanceof URL ? value : new URL(value);
+
+        return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
+      },
+      request: async (target) => {
+        requested.push(target.url.href);
+
+        return fakeTextResponse(
+          target.url.pathname === "/api/"
+            ? '<html><body><div id="swagger-ui"></div><script>new SwaggerUIBundle({url: "https://other.example/spec.json"})</script></body></html>'
+            : "",
+          "text/html",
+        );
+      },
+    };
+
+    await expect(
+      executeWebFetch(
+        { url: "https://swagger-cross.example/api/" },
+        undefined,
+        undefined,
+        dependencies,
+      ),
+    ).rejects.toThrow("no extractable content");
+    expect(requested.every((url) => new URL(url).hostname === "swagger-cross.example")).toBe(true);
+  });
+
+  it("reports an empty JavaScript app shell in text and structured output", async () => {
+    const dependencies: FetchRemoteDependencies = {
+      validateUrl: async (value) => {
+        const url = value instanceof URL ? value : new URL(value);
+
+        return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
+      },
+      request: async (target) =>
+        fakeTextResponse(
+          target.url.pathname === "/shell"
+            ? '<html><head><title>Packit Service</title><script type="module" src="/assets/app.js"></script></head><body><noscript>You need to enable JavaScript to run this app.</noscript><div id="root"></div></body></html>'
+            : "",
+          "text/html",
+        ),
+    };
+
+    const result = await executeWebFetch(
+      { url: "https://shell-test.example/shell" },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.content[0]).toMatchObject({
+      type: "text",
+      text: expect.stringContaining("requires JavaScript; its content could not be retrieved"),
+    });
+    expect(result.structuredContent).toMatchObject({
+      markdown: "",
+      blocked: false,
+      extraction: { javascriptRequired: true },
+    });
+    expect(result.details.shellSuspected).toBe(true);
+  });
+
   it.each([
     [
       "readme",

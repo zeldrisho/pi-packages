@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Retrieve Packit Copr job data without an API key and advertised Swagger specifications from otherwise empty app pages.
+- Explain when an empty page requires JavaScript instead of reporting a generic extraction error.
 - Solve supported Anubis challenges that declare no extensions as `null`.
 - Fetch slash-sensitive pages when a trailing slash returns 404 but the page exists without it.
 - Report page errors after a solved Anubis challenge instead of incorrectly reporting a bot block.

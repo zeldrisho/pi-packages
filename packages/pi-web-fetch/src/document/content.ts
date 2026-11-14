@@ -45,6 +45,10 @@ export interface CompleteDocument {
   markdownAlternateUrl?: string;
   /** True when this document is the advertised Markdown version served instead of a low-quality page. */
   markdownAlternateFallback?: boolean;
+  /** Same-origin OpenAPI document advertised by an otherwise empty Swagger UI. */
+  swaggerSpecUrl?: string;
+  /** The returned content is an API or specification substituted for the page. */
+  representationFallback?: "packit-api" | "swagger-spec";
 }
 
 /**

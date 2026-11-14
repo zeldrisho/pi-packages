@@ -1,4 +1,5 @@
 import type { IncomingMessage } from "node:http";
+import { parseHTML } from "linkedom";
 import { acquisitionAdmission } from "./admission.ts";
 import {
   lineFragmentOffsets,
@@ -342,12 +343,45 @@ async function documentFromDecoded(
   const links = isHtml ? extractDocumentLinks(raw, target.url) : undefined;
 
   const extractionDiagnostics = isHtml ? diagnoseExtraction(raw, markdown) : undefined;
+  let swaggerSpecUrl: string | undefined;
+
+  if (isHtml && !markdown.trim()) {
+    const { document } = parseHTML(raw);
+
+    for (const script of document.querySelectorAll("script:not([src])")) {
+      const text = script.textContent ?? "";
+
+      const match = /\bnew\s+SwaggerUIBundle\s*\(\s*\{\s*url\s*:\s*["']([^"'\\\r\n]+)["']/.exec(
+        text,
+      );
+
+      if (!match) continue;
+
+      try {
+        const candidate = new URL(match[1], target.url);
+
+        if (
+          candidate.origin === target.url.origin &&
+          !candidate.username &&
+          !candidate.password &&
+          !candidate.hash
+        )
+          swaggerSpecUrl = candidate.href;
+      } catch {
+        // Ignore malformed advertisements.
+      }
+
+      break;
+    }
+  }
 
   if (
     !markdown.trim() &&
     (!links || (links.internal.length === 0 && links.external.length === 0)) &&
     !allowEmptyContent &&
-    !extractionDiagnostics?.botWall
+    !extractionDiagnostics?.botWall &&
+    !extractionDiagnostics?.javascriptRequired &&
+    !swaggerSpecUrl
   ) {
     throw new Error("web_fetch: Page has no extractable content.");
   }
@@ -380,6 +414,7 @@ async function documentFromDecoded(
     markdownAlternateUrl,
     sourceLanguage,
     openapiSpec,
+    swaggerSpecUrl,
   };
 }
 

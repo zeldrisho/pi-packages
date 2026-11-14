@@ -466,7 +466,12 @@ export async function executeWebFetch(
         let fetched: CompleteDocument;
         let acquisitionStatus: FetchAcquisition["cacheStatus"] = "miss";
 
-        if (stale?.validators && !stale.llmsTxtFallback && !stale.markdownAlternateFallback) {
+        if (
+          stale?.validators &&
+          !stale.llmsTxtFallback &&
+          !stale.markdownAlternateFallback &&
+          !stale.representationFallback
+        ) {
           const outcome = await revalidateCompleteDocument(
             sourceUrl,
             stale,
@@ -613,6 +618,12 @@ export async function executeWebFetch(
   const output = blocked
     ? "Blocked by an anti-bot challenge. Requested page content is unavailable."
     : [
+        ...(result.representationFallback
+          ? [
+              `[Showing ${result.representationFallback === "packit-api" ? "Packit's API response" : "the advertised Swagger specification"} from ${finalUrl} instead of the requested page.]`,
+              "",
+            ]
+          : []),
         ...(result.markdownAlternateFallback
           ? [
               "[Page content was sparse; showing the site's advertised Markdown version instead.]",
@@ -646,7 +657,12 @@ export async function executeWebFetch(
               "",
             ]
           : []),
-        result.markdown || (focused ? "" : "[The page contained no readable text.]"),
+        result.markdown ||
+          (focused
+            ? ""
+            : result.extractionDiagnostics?.javascriptRequired
+              ? "[This page requires JavaScript; its content could not be retrieved.]"
+              : "[The page contained no readable text.]"),
       ].join("\n");
 
   const outputTruncation = truncateHead(output, {
