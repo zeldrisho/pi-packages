@@ -257,11 +257,15 @@ describe("web_fetch honest-evidence details", () => {
     );
 
     expect(requested).toEqual(["https://prod.packit.dev/api/copr-builds/4228191"]);
-    expect(result.content[0]).toMatchObject({
-      text: expect.stringContaining("Packit's API response"),
+    expect(result.content[0].text).not.toContain("Showing Packit");
+    expect(result.details).toMatchObject({
+      requestedUrl: "https://dashboard.packit.dev/jobs/copr/4228191",
+      finalUrl: requested[0],
+      representationFallback: "packit-api",
     });
     expect(result.structuredContent).toMatchObject({
       finalUrl: requested[0],
+      representationFallback: "packit-api",
       markdown: expect.stringContaining("success"),
     });
   });
@@ -299,6 +303,7 @@ describe("web_fetch honest-evidence details", () => {
     });
     expect(result.structuredContent).toMatchObject({
       finalUrl: "https://swagger-test.example/api/swagger.json",
+      representationFallback: "swagger-spec",
       contentKind: "openapi-spec",
     });
   });

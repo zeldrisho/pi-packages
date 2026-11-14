@@ -192,6 +192,8 @@ export interface WebFetchDetails {
   llmsTxtFallback: boolean;
   /** True when the returned content is the page's advertised Markdown version served instead of a low-quality page. */
   markdownAlternateFallback: boolean;
+  /** Identifies an API or specification used instead of the page. */
+  representationFallback?: CompleteDocument["representationFallback"];
   /** The site's /llms.txt index URL when one exists and the returned content is not that index itself. */
   llmsTxtUrl?: string;
   /** True for a fresh cache hit or a successful 304 revalidation. */
@@ -230,6 +232,7 @@ export interface WebFetchStructuredOutput {
   characterCount: number;
   llmsTxtFallback: boolean;
   markdownAlternateFallback: boolean;
+  representationFallback?: CompleteDocument["representationFallback"];
   extraction?: CompleteDocument["extractionDiagnostics"];
   focus?: FocusDetails;
   outline: { totalWords: number; totalHeadings: number; omittedHeadings: number };
@@ -255,6 +258,9 @@ export const webFetchOutputSchema = Type.Object({
   characterCount: Type.Integer(),
   llmsTxtFallback: Type.Boolean(),
   markdownAlternateFallback: Type.Boolean(),
+  representationFallback: Type.Optional(
+    Type.Union([Type.Literal("packit-api"), Type.Literal("swagger-spec")]),
+  ),
   extraction: Type.Optional(
     Type.Object({
       javascriptRequired: Type.Boolean(),
@@ -618,9 +624,9 @@ export async function executeWebFetch(
   const output = blocked
     ? "Blocked by an anti-bot challenge. Requested page content is unavailable."
     : [
-        ...(result.representationFallback
+        ...(result.representationFallback === "swagger-spec"
           ? [
-              `[Showing ${result.representationFallback === "packit-api" ? "Packit's API response" : "the advertised Swagger specification"} from ${finalUrl} instead of the requested page.]`,
+              `[Showing the advertised Swagger specification from ${finalUrl} instead of the requested page.]`,
               "",
             ]
           : []),
@@ -691,6 +697,7 @@ export async function executeWebFetch(
     characterCount: 0,
     llmsTxtFallback: Boolean(result.llmsTxtFallback),
     markdownAlternateFallback: Boolean(result.markdownAlternateFallback),
+    representationFallback: result.representationFallback,
     extraction: result.extractionDiagnostics,
     focus: focused?.details,
     outline: {
@@ -751,6 +758,7 @@ export async function executeWebFetch(
       focus: focused?.details,
       llmsTxtFallback: Boolean(result.llmsTxtFallback),
       markdownAlternateFallback: Boolean(result.markdownAlternateFallback),
+      representationFallback: result.representationFallback,
       llmsTxtUrl:
         result.llmsTxtIndexUrl === undefined
           ? undefined

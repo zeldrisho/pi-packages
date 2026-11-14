@@ -31,7 +31,7 @@ For example, a URL such as `https://github.com/zeldrisho/pi-packages/blob/main/p
 
 The tool can discover advertised Markdown versions and `/llms.txt` indexes. An index URL appears in the result when found; follow it if the page is insufficient. The tool can solve Anubis and supported AWS WAF proof-of-work challenges. If an AWS WAF or Cloudflare challenge remains blocked, it may fall back to the site's documentation index.
 
-Supported Reddit challenges can be solved or fall back to its public feed, whose comments may be incomplete and lack thread hierarchy. Comment permalinks do not use the feed fallback. Packit Copr job pages can return their public API data without an API key, and empty Swagger UI pages can return an advertised same-origin specification; the result identifies the substitute URL. Unsupported challenges and JavaScript CAPTCHAs return a blocked result; there is no browser fallback.
+Supported Reddit challenges can be solved or fall back to its public feed, whose comments may be incomplete and lack thread hierarchy. Comment permalinks do not use the feed fallback. Packit Copr job pages can return their public API data without an API key, and empty Swagger UI pages can return an advertised same-origin specification; result metadata identifies the substitute and its URL. Unsupported challenges and JavaScript CAPTCHAs return a blocked result; there is no browser fallback.
 
 ### Caching
 

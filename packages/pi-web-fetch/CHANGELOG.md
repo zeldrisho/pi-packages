@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Restore codemode access to structured fetch results.
+- Return Packit Copr API data without a verbose substitution notice, while preserving the source URL and structured provenance.
 
 ### Fixed
 
