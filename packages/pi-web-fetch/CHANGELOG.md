@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Extract plain-text GitHub repository READMEs without the file-listing table.
 - Retrieve Packit Copr job data without an API key and advertised Swagger specifications from otherwise empty app pages.
 - Explain when an empty page requires JavaScript instead of reporting a generic extraction error.
 - Solve supported Anubis challenges that declare no extensions as `null`.

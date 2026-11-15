@@ -270,9 +270,22 @@ function isolateGitHubReadme(document: Document, baseUrl: URL): boolean {
   if (baseUrl.hostname !== "github.com" || baseUrl.pathname.split("/").filter(Boolean).length !== 2)
     return false;
 
-  const readme = document.querySelector(
-    "main article.markdown-body.entry-content[itemprop='text']",
-  );
+  let readme = document.querySelector("main article.markdown-body.entry-content[itemprop='text']");
+
+  if (!readme) {
+    // GitHub renders plain-text READMEs outside the markdown article. Require
+    // the active README tab immediately beside the plain content, not just a pre.
+    for (const nav of document.querySelectorAll('main nav[aria-label="Repository files"]')) {
+      const activeTab = nav.querySelector('a[aria-current="page"] [data-content="README"]');
+      const content = nav.parentElement?.nextElementSibling;
+      const plain = content?.querySelector("div.plain > pre");
+
+      if (activeTab && plain?.textContent?.trim()) {
+        readme = plain;
+        break;
+      }
+    }
+  }
 
   if (!readme || !readme.textContent?.trim()) return false;
 
