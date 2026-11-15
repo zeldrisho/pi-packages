@@ -239,6 +239,31 @@ describe("executeWebFetch llms.txt support", () => {
     expect(second.content[0]?.text).toContain("Index: https://indexed.example.com/llms.txt");
   });
 
+  it("omits the index notice when the same URL is already in the returned page", async () => {
+    const index = "https://linked-index.example.com/llms.txt";
+
+    const { dependencies } = recordingDependencies((href) =>
+      href === index
+        ? fakeResponse(200, "text/markdown", LLMS_TXT)
+        : fakeResponse(
+            200,
+            "text/plain",
+            `Documentation index: ${index}\n${"Page content. ".repeat(30)}`,
+          ),
+    );
+
+    const result = await executeWebFetch(
+      { url: "https://linked-index.example.com/page" },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.details.llmsTxtUrl).toBe(index);
+    expect(result.content[0]?.text).toContain(`Documentation index: ${index}`);
+    expect(result.content[0]?.text).not.toContain(`Index: ${index}`);
+  });
+
   it("prefers a deeper section index over the site-wide one", async () => {
     const { dependencies, requests } = recordingDependencies((href) => {
       if (href.endsWith("/llms.txt")) {

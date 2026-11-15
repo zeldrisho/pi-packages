@@ -671,10 +671,26 @@ export async function executeWebFetch(
               : "[The page contained no readable text.]"),
       ].join("\n");
 
-  const outputTruncation = truncateHead(output, {
+  let outputTruncation = truncateHead(output, {
     maxLines: DEFAULT_MAX_LINES,
     maxBytes: DEFAULT_MAX_BYTES,
   });
+
+  if (showLlmsNotice && result.llmsTxtIndexUrl) {
+    const indexUrl = redactUrlForDisplay(result.llmsTxtIndexUrl);
+    const notice = `Index: ${indexUrl}\n\n`;
+    const noticePosition = outputTruncation.content.indexOf(notice);
+
+    if (
+      noticePosition !== -1 &&
+      outputTruncation.content.slice(noticePosition + notice.length).includes(indexUrl)
+    ) {
+      outputTruncation = truncateHead(output.replace(notice, ""), {
+        maxLines: DEFAULT_MAX_LINES,
+        maxBytes: DEFAULT_MAX_BYTES,
+      });
+    }
+  }
 
   const truncated = result.truncated || outputTruncation.truncated;
   const outline = createDocumentOutline(document.markdown);
