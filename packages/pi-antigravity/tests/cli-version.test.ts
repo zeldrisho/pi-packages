@@ -1,36 +1,17 @@
-import { afterEach, describe, expect, it } from "vite-plus/test";
+import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
-import {
-  DEFAULT_CLI_VERSION,
-  parseCliVersion,
-  platformTokens,
-  resolveCliVersion,
-  userAgentFor,
-} from "../src/cli-version";
+import { DEFAULT_CLI_VERSION, platformTokens, userAgentFor } from "../src/cli-version";
+import { antigravityHeaders } from "../src/project";
 
 afterEach(() => {
-  delete process.env.PI_ANTIGRAVITY_VERSION;
+  vi.unstubAllEnvs();
 });
 
-describe("version parsing", () => {
-  it("reads a bare version", () => {
-    expect(parseCliVersion("1.5.9\n")).toBe("1.5.9");
-  });
-
-  it("reads a version with a v prefix and a trailing note", () => {
-    expect(parseCliVersion("v1.21.9 (build 42)")).toBe("1.21.9");
-  });
-
-  it("reads a prerelease version", () => {
-    expect(parseCliVersion("1.6.0-beta.2")).toBe("1.6.0-beta.2");
-  });
-
-  it("ignores output without a version", () => {
-    expect(parseCliVersion("command not found")).toBeUndefined();
-    expect(parseCliVersion("")).toBeUndefined();
-  });
-
-  it("keeps a verified default for hosts without the CLI", () => {
+describe("version defaults", () => {
+  it("keeps a verified bundled default", () => {
     expect(DEFAULT_CLI_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
   });
 });
@@ -48,7 +29,7 @@ describe("platform tokens", () => {
 });
 
 describe("user agent", () => {
-  it("advertises the probed version with the caller's platform", () => {
+  it("advertises the selected version with the caller's platform", () => {
     const agent = userAgentFor("1.5.9", "darwin", "arm64");
 
     expect(agent.value).toContain("antigravity/cli/1.5.9");
@@ -59,11 +40,28 @@ describe("user agent", () => {
   });
 });
 
-describe("live version probe", () => {
-  it("prefers the environment override", async () => {
-    process.env.PI_ANTIGRAVITY_VERSION = "9.9.9";
+describe("version resolution", () => {
+  it("uses the bundled version rather than the removed version override", async () => {
+    vi.stubEnv("PI_ANTIGRAVITY_VERSION", "9.9.9");
+    expect((await antigravityHeaders("token")).get("user-agent")).toContain(DEFAULT_CLI_VERSION);
+  });
 
-    await expect(resolveCliVersion()).resolves.toBe("9.9.9");
+  it("does not execute an installed CLI to determine its version", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "antigravity-version-"));
+    const marker = join(directory, "invoked");
+    const previous = process.env.PATH;
+    writeFileSync(join(directory, "agy"), `#!/bin/sh\necho invoked > '${marker}'\n`, {
+      mode: 0o755,
+    });
+    process.env.PATH = directory;
+
+    try {
+      await antigravityHeaders("token");
+      expect(existsSync(marker)).toBe(false);
+    } finally {
+      process.env.PATH = previous;
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it("resolves without rejecting when no CLI is installed", async () => {
@@ -72,7 +70,7 @@ describe("live version probe", () => {
     process.env.PATH = "";
 
     try {
-      await expect(resolveCliVersion()).resolves.toMatch(/^\d+\.\d+\.\d+/);
+      expect((await antigravityHeaders("token")).get("user-agent")).toContain(DEFAULT_CLI_VERSION);
     } finally {
       process.env.PATH = previous;
     }

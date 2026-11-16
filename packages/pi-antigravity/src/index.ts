@@ -7,6 +7,7 @@ import {
   storedModelsFrom,
 } from "./discovery.ts";
 import { nonEmptyText } from "./json.ts";
+import { fetchGeminiMetadata, restorePiSnapshots } from "./pi-catalog.ts";
 import {
   ANTIGRAVITY_API,
   FALLBACK_MODELS,
@@ -20,7 +21,7 @@ import { createAntigravityStream } from "./stream.ts";
 import { createThinkingMetadataResolver } from "./thinking-metadata.ts";
 
 /** Catalog freshness window; a refresh inside it reuses the stored catalog. */
-const CATALOG_TTL_MS = 6 * 60 * 60 * 1000;
+const CATALOG_TTL_MS = 4 * 60 * 60 * 1000;
 
 /**
  * Resolves the request credential carried by a refresh context.
@@ -62,10 +63,19 @@ async function refreshModels(
 ): Promise<ReturnType<typeof modelConfigs>> {
   const storedModels = modelsFromStored(context.stored?.models, PROVIDER_ID);
 
+  // SAFETY: the provider-owned field is persisted as JSON and validated before use.
+  const storedCatalog = (context.stored as typeof context.stored & { piCatalog?: JsonValue })
+    ?.piCatalog;
+
+  const snapshots = restorePiSnapshots(storedCatalog);
+
   const fresh =
     context.force !== true &&
     storedModels !== undefined &&
+    snapshots.google !== undefined &&
+    snapshots.vertex !== undefined &&
     context.stored?.checkedAt !== undefined &&
+    context.stored.checkedAt <= Date.now() &&
     Date.now() - context.stored.checkedAt < CATALOG_TTL_MS;
 
   if (fresh) return modelConfigs(storedModels);
@@ -79,17 +89,28 @@ async function refreshModels(
   if (apiKey === undefined) return fallback;
 
   const body = await fetchAvailableModels(apiKey.token, apiKey.projectId, context.signal);
-  const catalog = catalogFromAvailableModels(body);
+
+  if (body === undefined || context.signal.aborted) return fallback;
+  const metadata = await fetchGeminiMetadata(context.signal, snapshots);
+  const catalog = catalogFromAvailableModels(body, FALLBACK_MODELS, metadata.models);
 
   if (catalog === undefined || context.signal.aborted) return fallback;
 
   const configs = modelConfigs(catalog);
+
+  if (!metadata.completed) {
+    if (metadata.httpStatus !== undefined)
+      throw new Error(`Pi model catalog refresh failed (HTTP ${metadata.httpStatus}).`);
+
+    return configs;
+  }
 
   const baseUrl = context.baseUrl ?? ENDPOINTS[0];
 
   const entry = {
     models: storedModelsFrom(configs, PROVIDER_ID, baseUrl),
     checkedAt: Date.now(),
+    piCatalog: metadata.snapshots,
   };
 
   try {
@@ -97,6 +118,9 @@ async function refreshModels(
   } catch {
     // Keep the in-memory catalog when Pi cannot persist it.
   }
+
+  if (metadata.httpStatus !== undefined)
+    throw new Error(`Pi model catalog refresh failed (HTTP ${metadata.httpStatus}).`);
 
   return configs;
 }

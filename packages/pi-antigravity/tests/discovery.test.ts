@@ -12,7 +12,7 @@ import {
   resolveCatalog,
   storedModelsFrom,
 } from "../src/discovery";
-import { FALLBACK_MODELS, modelConfigs } from "../src/models";
+import { FALLBACK_MODELS, modelConfigs, resolveRuntimeModel } from "../src/models";
 import { getApiKey } from "../src/oauth";
 
 /** Metadata shaped like the backend's `fetchAvailableModels` response. */
@@ -102,6 +102,87 @@ describe("catalog grouping", () => {
     });
   });
 
+  it("exposes discovered Gemini levels to Pi and routes each selection", () => {
+    const catalog = catalogFromAvailableModels(availableModels());
+    const stored = storedModelsFrom(modelConfigs(catalog), "antigravity", "https://example.test");
+    const gemini = stored.find((model) => model.id === "gemini-3.8-flash");
+
+    expect(gemini).toBeDefined();
+
+    if (gemini === undefined) return;
+
+    expect(getSupportedThinkingLevels(gemini)).toEqual(["low", "medium", "high"]);
+
+    for (const level of ["low", "medium", "high"] as const) {
+      expect(resolveRuntimeModel(gemini, level)).toBe(`gemini-3.8-flash-${level}`);
+    }
+  });
+
+  it("exposes only the advertised levels for every current model", () => {
+    const catalog = catalogFromAvailableModels(availableModels());
+    const stored = storedModelsFrom(modelConfigs(catalog), "antigravity", "https://example.test");
+
+    const expected = {
+      "gemini-3.8-flash": {
+        low: "gemini-3.8-flash-low",
+        medium: "gemini-3.8-flash-medium",
+        high: "gemini-3.8-flash-high",
+      },
+      "claude-sonnet-4-6": { high: "claude-sonnet-4-6" },
+      "claude-opus-4-6": { high: "claude-opus-4-6-thinking" },
+      "gpt-oss-120b": { medium: "gpt-oss-120b-medium" },
+    } as const;
+
+    expect(stored).toHaveLength(Object.keys(expected).length);
+
+    for (const [id, routes] of Object.entries(expected)) {
+      const model = stored.find((entry) => entry.id === id);
+      expect(model).toBeDefined();
+
+      if (model === undefined) continue;
+      expect(getSupportedThinkingLevels(model)).toEqual(Object.keys(routes));
+
+      for (const level of getSupportedThinkingLevels(model)) {
+        const route = Object.entries(routes).find(([key]) => key === level);
+        expect(resolveRuntimeModel(model, level)).toBe(route?.[1]);
+      }
+    }
+  });
+
+  it("discovers budget controls only for a single runtime advertising a positive budget", () => {
+    const catalog = catalogFromAvailableModels({
+      models: {
+        "budget-only": metadata("Budget (Thinking)", {
+          supportsThinking: true,
+          thinkingBudget: 1024,
+        }),
+        "named-low": metadata("Named (Low)", {
+          supportsThinking: true,
+          thinkingLevel: 1,
+          thinkingBudget: 1024,
+        }),
+        "other-low": metadata("Other (Low)", { supportsThinking: true, thinkingBudget: 1024 }),
+        "other-high": metadata("Other (High)", { supportsThinking: true, thinkingBudget: 2048 }),
+        "invalid-medium": metadata("Invalid (Medium)", {
+          supportsThinking: true,
+          thinkingBudget: -1,
+        }),
+      },
+    });
+
+    expect(catalog?.find((model) => model.id === "budget-only")?.thinkingLevelMap).toMatchObject({
+      minimal: "budget-only",
+      low: "budget-only",
+      medium: "budget-only",
+      high: "budget-only",
+      xhigh: null,
+      max: null,
+    });
+    expect(catalog?.find((model) => model.id === "named")?.thinkingLevelMap.medium).toBeNull();
+    expect(catalog?.find((model) => model.id === "other")?.thinkingLevelMap.medium).toBeNull();
+    expect(catalog?.find((model) => model.id === "invalid")?.thinkingLevelMap.low).toBeNull();
+  });
+
   it("lets Pi clamp fixed-effort models to their advertised level", () => {
     const catalog = catalogFromAvailableModels(availableModels());
     const stored = storedModelsFrom(modelConfigs(catalog), "antigravity", "https://example.test");
@@ -137,6 +218,39 @@ describe("catalog grouping", () => {
     expect(gemini?.maxTokens).toBe(65_536);
     expect(gptOss?.contextWindow).toBe(131_072);
     expect(gptOss?.input).toEqual(["text"]);
+  });
+
+  it("uses matching Pi Google metadata to constrain Gemini routes and limits", () => {
+    const catalog = catalogFromAvailableModels({
+      models: {
+        "gemini-3.8-flash-minimal": metadata("Gemini 3.8 Flash (Minimal)", {
+          maxTokens: 2000000,
+          maxOutputTokens: 100000,
+        }),
+        "gemini-3.8-flash-low": metadata("Gemini 3.8 Flash (Low)", {
+          maxTokens: 2000000,
+          maxOutputTokens: 100000,
+        }),
+        "gemini-3.8-flash-high": metadata("Gemini 3.8 Flash (High)", {
+          maxTokens: 2000000,
+          maxOutputTokens: 100000,
+        }),
+        "gemini-unknown-minimal": metadata("Gemini Unknown (Minimal)"),
+      },
+    });
+
+    const gemini = catalog?.find((model) => model.id === "gemini-3.8-flash");
+    expect(gemini?.thinkingLevelMap).toMatchObject({
+      minimal: null,
+      low: "gemini-3.8-flash-low",
+      medium: null,
+      high: "gemini-3.8-flash-high",
+    });
+    expect(gemini?.contextWindow).toBe(1048576);
+    expect(gemini?.maxTokens).toBe(65536);
+    expect(catalog?.find((model) => model.id === "gemini-unknown")?.thinkingLevelMap.minimal).toBe(
+      "gemini-unknown-minimal",
+    );
   });
 
   it("advertises the smallest limit when variants disagree", () => {

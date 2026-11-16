@@ -21,7 +21,7 @@ Restart Pi after installing. Use `pi config` to enable or disable the extension,
 
 ## Configure sign-in
 
-Install the [official `agy` CLI](https://antigravity.google/docs/install/?tab=cli) and ensure it is available on your `PATH`. The extension uses the installed CLI's OAuth application client; it does not read or change `agy`'s account login. Keep `agy` available when starting Pi so token refresh can resolve the same client.
+Install the [official `agy` CLI](https://antigravity.google/docs/install/?tab=cli) and keep it available on your `PATH`. The extension discovers its OAuth application client for sign-in and token refresh. It does not use `agy` to run model requests or read or change its account login. Removing `agy` can cause token refresh to fail after the current access token expires.
 
 This uses application credentials shipped with the CLI and is not an official Google integration. If Google changes those credentials, discovery may fail until the extension is updated. Review the Google consent screen and grant access only if you trust the extension.
 
@@ -48,7 +48,19 @@ The model list is read from your account when Pi refreshes models. Availability 
 | Claude Opus 4.6 Thinking | thinking          | Text, image |
 | GPT-OSS 120B             | medium            | Text        |
 
-Pi maps its thinking levels onto the available Antigravity runtime models and reasoning budgets. Fixed-effort Claude models appear as `high` in Pi because Pi requires a level label; this does not mean their effort is adjustable. GPT-OSS appears as `medium`. Existing cached models may retain older level choices until the next catalog refresh.
+Pi maps its thinking levels onto Antigravity runtime models and reasoning settings. For matching Gemini models, the extension also fetches Pi's Google and Vertex catalogs to constrain thinking levels and limits; Antigravity still determines availability and runtime routes. If Pi's catalog is unavailable, it uses the installed Pi catalog instead. A single runtime that advertises a token budget offers Pi's minimal, low, medium, and high levels. Catalog metadata is cached for four hours and refreshed when Pi refreshes models; existing cached models may retain older metadata until then.
+
+### Optional custom token budgets
+
+For a single runtime that advertises a token budget, the extension automatically uses Pi's configured budgets. For example, add `thinkingBudgets` to Pi's `settings.json`:
+
+```json
+{
+  "thinkingBudgets": { "minimal": 1024, "low": 2048, "medium": 8192, "high": 16384 }
+}
+```
+
+For a level without a configured budget, the advertised budget is used. Overrides require live catalog metadata confirming a token budget; requests fail safely if that metadata is unavailable or the runtime uses named levels instead. The requested budget is capped to leave 1,024 output tokens for the answer. These are requests, not guarantees: Antigravity may reject, limit, or ignore a budget, and different budgets can affect quota usage. Pi's `thinkingBudgets` setting also affects other token-budget providers.
 
 If discovery fails, the extension keeps the last catalog it saw, or a small built-in list on a first run.
 

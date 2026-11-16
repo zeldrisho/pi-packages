@@ -14,6 +14,7 @@ import {
   type AntigravityModelConfig,
 } from "./models.ts";
 import { ENDPOINTS, antigravityHeaders } from "./project.ts";
+import { builtinGeminiMetadata, type GeminiMetadata } from "./pi-catalog.ts";
 
 /** Metadata lookups fail fast so the caller can fall back to a cached catalog. */
 const DISCOVERY_TIMEOUT_MS = 8_000;
@@ -52,6 +53,7 @@ interface VariantGroup {
   maxTokens?: number;
   supportsThinking?: boolean;
   supportsImages?: boolean;
+  budgetRoutes?: Set<string>;
 }
 
 /**
@@ -216,6 +218,14 @@ function groupVariants(
       if (base !== undefined && !group.names.includes(base)) group.names.push(base);
     }
 
+    if (
+      infoObject?.supportsThinking === true &&
+      infoObject.thinkingLevel === undefined &&
+      positiveLimit(infoObject.thinkingBudget) !== undefined
+    ) {
+      (group.budgetRoutes ??= new Set()).add(runtimeId);
+    }
+
     const level = levelFromDisplayName(displayName) ?? suffix?.level;
 
     if (level !== undefined) group.levels[level] = runtimeId;
@@ -286,8 +296,11 @@ const ASSUMED_MAX_TOKENS = 32_768;
 function entryFromGroup(
   group: VariantGroup,
   seed: readonly AntigravityModel[],
+  geminiMetadata: ReadonlyMap<string, GeminiMetadata>,
 ): AntigravityModel | undefined {
   const known = seed.find((model) => model.id === group.publicId);
+
+  const native = geminiMetadata.get(group.publicId);
 
   const levels = new Map<ModelThinkingLevel, string>();
 
@@ -310,6 +323,27 @@ function entryFromGroup(
 
   if (levels.size === 0) return undefined;
 
+  // One budget-based runtime can accept Pi's token-budget settings. Do not
+  // collapse distinct runtime variants or infer support from the model name.
+  const routes = new Set(levels.values());
+  const runtimeId = routes.size === 1 ? [...routes][0] : undefined;
+
+  if (runtimeId !== undefined && group.budgetRoutes?.has(runtimeId) === true) {
+    for (const level of ["minimal", "low", "medium", "high"] as const) levels.set(level, runtimeId);
+    levels.delete("xhigh");
+    levels.delete("max");
+  }
+
+  // Native Google metadata restricts Gemini levels, but never supplies a route
+  // the Antigravity account did not advertise.
+  if (native !== undefined) {
+    const supported = new Set(native.levels);
+
+    for (const level of levels.keys()) if (!supported.has(level)) levels.delete(level);
+
+    if (levels.size === 0) return undefined;
+  }
+
   // Pi treats undefined levels as supported. Explicit nulls prevent it from
   // offering effort levels for which the backend supplied no runtime variant.
   const thinkingLevelMap: ThinkingLevelMap = {
@@ -325,15 +359,23 @@ function entryFromGroup(
   for (const [level, runtimeId] of levels) thinkingLevelMap[level] = runtimeId;
 
   const inputs: ("text" | "image")[] =
-    group.supportsImages === false ? ["text"] : (known?.input ?? ["text", "image"]);
+    group.supportsImages === false || (native !== undefined && !native.input.includes("image"))
+      ? ["text"]
+      : (known?.input ?? ["text", "image"]);
 
   return {
     id: group.publicId,
     name: group.names[0] ?? known?.name ?? group.publicId,
     reasoning: group.supportsThinking !== false,
     input: inputs,
-    contextWindow: group.contextWindow ?? known?.contextWindow ?? ASSUMED_CONTEXT_WINDOW,
-    maxTokens: group.maxTokens ?? known?.maxTokens ?? ASSUMED_MAX_TOKENS,
+    contextWindow: Math.min(
+      group.contextWindow ?? known?.contextWindow ?? ASSUMED_CONTEXT_WINDOW,
+      native?.contextWindow ?? Infinity,
+    ),
+    maxTokens: Math.min(
+      group.maxTokens ?? known?.maxTokens ?? ASSUMED_MAX_TOKENS,
+      native?.maxTokens ?? Infinity,
+    ),
     thinkingLevelMap,
   };
 }
@@ -348,6 +390,7 @@ function entryFromGroup(
 export function catalogFromAvailableModels(
   body: JsonValue | undefined,
   seed: readonly AntigravityModel[] = FALLBACK_MODELS,
+  geminiMetadata: ReadonlyMap<string, GeminiMetadata> = builtinGeminiMetadata(),
 ): AntigravityModel[] | undefined {
   if (!isJsonObject(body) || !isJsonObject(body.models)) return undefined;
 
@@ -358,7 +401,7 @@ export function catalogFromAvailableModels(
     const models: AntigravityModel[] = [];
 
     for (const group of groupVariants(declared, filtered).values()) {
-      const entry = entryFromGroup(group, seed);
+      const entry = entryFromGroup(group, seed, geminiMetadata);
 
       if (entry !== undefined) models.push(entry);
     }

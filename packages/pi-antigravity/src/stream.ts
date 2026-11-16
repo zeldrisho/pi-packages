@@ -16,6 +16,7 @@ import {
 } from "@earendil-works/pi-ai";
 import type { ProviderConfig } from "@earendil-works/pi-coding-agent";
 import { resolveIdentity } from "./ids.ts";
+import { isBudgetRoute, overrideThinkingBudget } from "./budget-overrides.ts";
 import { ANTIGRAVITY_API, resolveRuntimeModel } from "./models.ts";
 import type { createThinkingMetadataResolver } from "./thinking-metadata.ts";
 import { isJsonNumber, isJsonObject, isJsonText, parseJsonValue } from "./json.ts";
@@ -793,6 +794,14 @@ export function createAntigravityStream(
                 options.signal,
               );
 
+        const selectedThinkingConfig = overrideThinkingBudget({
+          enabled: isBudgetRoute(entry.thinkingLevelMap, runtimeModel),
+          level: options?.reasoning,
+          budgets: options?.thinkingBudgets,
+          advertised: discoveredThinkingConfig,
+          maxOutputTokens: Math.min(options?.maxTokens ?? model.maxTokens, model.maxTokens),
+        });
+
         const identity = resolveIdentity(options?.sessionId);
 
         const requestIndex = context.messages.filter(
@@ -820,7 +829,7 @@ export function createAntigravityStream(
             maxTokens: options?.maxTokens,
             temperature: options?.temperature,
             thinkingLevel: options?.reasoning,
-            discoveredThinkingConfig,
+            discoveredThinkingConfig: selectedThinkingConfig,
           });
 
           const rewritten = await options?.onPayload?.(envelope, model);

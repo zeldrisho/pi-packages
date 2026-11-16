@@ -77,9 +77,47 @@ async function collect(frames: readonly string[]) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe("discovered model routing", () => {
+  it("sends a configured Pi budget instead of the advertised default", async () => {
+    let requestBody = "";
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- provider sends a serialized JSON body
+      requestBody = typeof init.body === "string" ? init.body : "";
+
+      return sse([textFrame("OK")]);
+    });
+
+    const model = {
+      ...streamModel,
+      thinkingLevelMap: {
+        minimal: "budget-runtime",
+        low: "budget-runtime",
+        medium: "budget-runtime",
+        high: "budget-runtime",
+        xhigh: null,
+        max: null,
+      },
+    };
+
+    const resolver = vi.fn(async () => ({ includeThoughts: true, thinkingBudget: 1024 }));
+
+    const result = await createAntigravityStream(resolver)(model, contextWith("Hi"), {
+      apiKey: API_KEY,
+      reasoning: "high",
+      thinkingBudgets: { high: 8192 },
+      maxTokens: 10000,
+    }).result();
+
+    expect(result.stopReason).toBe("stop");
+    expect(JSON.parse(requestBody).request.generationConfig.thinkingConfig).toEqual({
+      includeThoughts: true,
+      thinkingBudget: 8192,
+    });
+  });
+
   it("uses the selected model's runtime mapping and limits, including models absent from the seed", async () => {
     let requestBody = "";
 

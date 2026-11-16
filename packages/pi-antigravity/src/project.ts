@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { JsonValue } from "@earendil-works/pi-ai";
-import { resolveCliVersion, userAgentFor } from "./cli-version.ts";
+import { DEFAULT_CLI_VERSION, userAgentFor } from "./cli-version.ts";
 import { isJsonObject, isJsonText, nonEmptyText, parseJsonValue } from "./json.ts";
 
 /** Default endpoints, tried in order until one answers. */
@@ -39,17 +39,10 @@ const SAFE_ERROR_REASONS = new Set([
  * @returns Headers for a JSON request
  */
 export async function antigravityHeaders(token: string): Promise<Headers> {
-  const override = process.env.PI_ANTIGRAVITY_USER_AGENT?.trim();
-
-  const userAgent =
-    override === undefined || override === ""
-      ? userAgentFor(await resolveCliVersion()).value
-      : override;
-
   return new Headers({
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
-    "User-Agent": userAgent,
+    "User-Agent": userAgentFor(DEFAULT_CLI_VERSION).value,
   });
 }
 
