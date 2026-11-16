@@ -39,6 +39,8 @@ export interface CompleteDocument {
   openapiSpec?: boolean;
   /** Set when the site publishes a usable /llms.txt index and this document is not that index. */
   llmsTxtIndexUrl?: string;
+  /** Probed index URLs with identical complete content. */
+  llmsTxtIndexAliases?: string[];
   /** Absolute URL advertised via `rel="describedby"` (header or HTML link) for this page. */
   llmsTxtDescribedBy?: string;
   /** Absolute URL advertised for a Markdown version of this page (`rel="alternate" type="text/markdown"`). */

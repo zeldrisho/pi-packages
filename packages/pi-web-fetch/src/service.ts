@@ -66,6 +66,25 @@ function safeUrl(value: string): URL | undefined {
   }
 }
 
+/** Recognizes visible Markdown links to same-origin documentation indexes. */
+function hasVisibleIndexLink(text: string, pageUrl: string): boolean {
+  const page = safeUrl(pageUrl);
+
+  if (!page) return false;
+
+  for (const match of text.matchAll(/\[[^\]\n]*\]\(([^\s)]+)\)/gu)) {
+    try {
+      const target = new URL(match[1], page);
+
+      if (target.origin === page.origin && /(?:^|\/)llms\.txt$/u.test(target.pathname)) return true;
+    } catch {
+      // Ignore malformed page links.
+    }
+  }
+
+  return false;
+}
+
 /**
  * Classify the kind of content returned by a fetch operation.
  *
@@ -683,7 +702,13 @@ export async function executeWebFetch(
 
     if (
       noticePosition !== -1 &&
-      outputTruncation.content.slice(noticePosition + notice.length).includes(indexUrl)
+      ([indexUrl, ...(result.llmsTxtIndexAliases ?? []).map(redactUrlForDisplay)].some((url) =>
+        outputTruncation.content.slice(noticePosition + notice.length).includes(url),
+      ) ||
+        hasVisibleIndexLink(
+          outputTruncation.content.slice(noticePosition + notice.length),
+          rawFinalUrl,
+        ))
     ) {
       outputTruncation = truncateHead(output.replace(notice, ""), {
         maxLines: DEFAULT_MAX_LINES,

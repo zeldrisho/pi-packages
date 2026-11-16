@@ -171,7 +171,7 @@ async function ensureLlmsTxtIndex(
   candidates: URL[],
   signal: AbortSignal | undefined,
   dependencies: FetchRemoteDependencies,
-): Promise<{ url: string; document: CompleteDocument } | undefined> {
+): Promise<{ url: string; document: CompleteDocument; aliases?: string[] } | undefined> {
   const documents = await Promise.all(
     candidates.map((candidate) => probeUsableRawText(candidate, signal, dependencies)),
   );
@@ -181,7 +181,13 @@ async function ensureLlmsTxtIndex(
   for (let depth = documents.length - 1; depth >= 0; depth -= 1) {
     const document = documents[depth];
 
-    if (document) return { url: candidates[depth].href, document };
+    if (document) {
+      const aliases = documents.flatMap((other, i) =>
+        i !== depth && other && other.markdown === document.markdown ? [candidates[i].href] : [],
+      );
+
+      return { url: candidates[depth].href, document, aliases };
+    }
   }
 
   return undefined;
@@ -350,7 +356,8 @@ export async function fetchDocumentWithLlmsTxtSupport(
         ? await probeUsableRawText(describedBy, signal, dependencies)
         : undefined;
 
-    if (described && describedBy) index = { url: describedBy.href, document: described };
+    if (described && describedBy && index?.url !== describedBy.href)
+      index = { url: describedBy.href, document: described };
   }
 
   if (
@@ -391,7 +398,7 @@ export async function fetchDocumentWithLlmsTxtSupport(
 
     if (index) return { ...index.document, llmsTxtFallback: true };
   } else if (index) {
-    return { ...primary, llmsTxtIndexUrl: index.url };
+    return { ...primary, llmsTxtIndexUrl: index.url, llmsTxtIndexAliases: index.aliases };
   }
 
   if (
