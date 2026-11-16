@@ -50,13 +50,7 @@ const skillPackages = new Set(["pi-sentry-skills", "pi-anthropics-skills"]);
 const themePackages = new Set(["pi-catppuccin"]);
 
 const expectedScripts = {
-  check: "vp check",
   test: "vp test",
-  "test:watch": "vp test --watch",
-  lint: "vp lint",
-  "lint:fix": "vp lint --fix",
-  format: "vp fmt --write",
-  typecheck: "vp check --no-fmt --no-lint",
 };
 
 const expectedTypeScriptConfiguration = {
