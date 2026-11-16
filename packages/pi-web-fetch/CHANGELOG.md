@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Honor explicitly selected documentation surfaces when supported by the page, rather than mixing unrelated surface instructions.
 - Extract plain-text GitHub repository READMEs without the file-listing table.
 - Avoid redundant discovered index notices when the visible page already links to a same-site documentation index.
 - Retrieve Packit Copr job data without an API key and advertised Swagger specifications from otherwise empty app pages.

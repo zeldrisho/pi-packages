@@ -19,6 +19,13 @@ export interface CompleteDocument {
   /** Character offsets for document fragments, derived from HTML anchors/headings. */
   fragmentOffsets?: Record<string, number>;
   markdown: string;
+  /** A URL-selected surface derived from the complete extracted page. */
+  surfaceView?: {
+    selected: string;
+    omitted: number;
+    markdown: string;
+    fragmentOffsets?: Record<string, number>;
+  };
   title?: string;
   extractor: "defuddle" | "basic" | "raw";
   /** @deprecated Use extractionDiagnostics for the individual quality signals. */

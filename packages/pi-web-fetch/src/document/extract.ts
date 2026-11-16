@@ -453,7 +453,7 @@ function readAdvertisedLinks(
  * @returns The extracted Markdown, optional title, extractor used, and advertised discovery links
  * @throws When markup exceeds the safe conversion depth
  */
-export async function extractHtmlToMarkdown(
+async function extractHtmlDocument(
   html: string,
   baseUrl: URL,
 ): Promise<{
@@ -534,4 +534,125 @@ export async function extractHtmlToMarkdown(
     fragmentOffsets,
     ...advertised,
   };
+}
+
+/** Select only an explicitly requested, unambiguous surface control and sibling panes. */
+function selectSurfaceHtml(
+  html: string,
+  url: URL,
+): { html: string; selected: string; omitted: number } | undefined {
+  const values = url.searchParams.getAll("tab");
+
+  if (values.length !== 1 || !/^[a-z0-9-]{1,40}$/u.test(values[0])) return undefined;
+  const selected = values[0];
+  const { document } = parseHTML(html);
+  const candidates: Array<{ panes: Element[]; chosen: Element }> = [];
+
+  // Standard ARIA controls identify their panels by ID. The query value must
+  // match a control ID or panel ID exactly; labels are not URL identifiers.
+  for (const group of document.querySelectorAll('[role="tablist"]')) {
+    const controls = [...group.querySelectorAll('[role="tab"]')].filter(
+      (control) => control.closest('[role="tablist"]') === group,
+    );
+
+    if (controls.length < 2 || controls.length > 20) continue;
+    const ids = controls.map((control) => control.getAttribute("aria-controls") ?? "");
+
+    if (ids.some((id) => !id || /\s/u.test(id)) || new Set(ids).size !== ids.length) continue;
+
+    const panes = ids.map((id) => {
+      const matches = [...document.querySelectorAll('[role="tabpanel"][id]')].filter(
+        (pane) => pane.getAttribute("id") === id,
+      );
+
+      return matches.length === 1 ? matches[0] : undefined;
+    });
+
+    if (panes.some((pane) => !pane)) continue;
+
+    const matched = controls.flatMap((control, i) =>
+      control.id === selected || ids[i] === selected ? [i] : [],
+    );
+
+    if (matched.length !== 1) continue;
+    const resolved = panes.filter((pane): pane is Element => pane !== undefined);
+
+    if (resolved.some((pane) => pane.parentElement !== resolved[0].parentElement)) continue;
+    candidates.push({ panes: resolved, chosen: resolved[matched[0]] });
+  }
+
+  // Some sites use their own explicit surface IDs instead of ARIA references.
+  const groups = [...document.querySelectorAll("[data-surface-filter-pills]")];
+  const surfacePanes = [...document.querySelectorAll("[data-surface-pane]")];
+
+  if (groups.length === 1 && surfacePanes.length >= 2 && surfacePanes.length <= 20) {
+    const controls = [...groups[0].querySelectorAll('[role="tab"][data-surface-id]')];
+    const ids = controls.map((control) => control.getAttribute("data-surface-id"));
+    const paneIds = surfacePanes.map((pane) => pane.getAttribute("data-surface-pane"));
+    const chosen = surfacePanes.find((pane) => pane.getAttribute("data-surface-pane") === selected);
+
+    if (
+      controls.length === surfacePanes.length &&
+      new Set(ids).size === ids.length &&
+      new Set(paneIds).size === paneIds.length &&
+      ids.includes(selected) &&
+      chosen &&
+      ids.every((id) => id && paneIds.includes(id)) &&
+      surfacePanes.every((pane) => pane.parentElement === surfacePanes[0].parentElement)
+    )
+      candidates.push({ panes: surfacePanes, chosen });
+  }
+
+  if (candidates.length !== 1) return undefined;
+  const { panes, chosen } = candidates[0];
+
+  if (!chosen?.textContent?.trim()) return undefined;
+
+  for (const pane of panes) if (pane !== chosen) pane.remove();
+  // The selected pane may be hidden by the server's default inline state.
+  chosen.removeAttribute("hidden");
+  chosen.removeAttribute("aria-hidden");
+  chosen.removeAttribute("style");
+
+  return { html: document.documentElement.outerHTML, selected, omitted: panes.length - 1 };
+}
+
+/** Extract the complete page and, when explicitly requested, a separate surface view. */
+export async function extractHtmlToMarkdown(
+  html: string,
+  baseUrl: URL,
+): Promise<
+  Awaited<ReturnType<typeof extractHtmlDocument>> & {
+    surfaceView?: {
+      selected: string;
+      omitted: number;
+      markdown: string;
+      fragmentOffsets?: Record<string, number>;
+    };
+  }
+> {
+  assertConversionDepth(html);
+  const complete = await extractHtmlDocument(html, baseUrl);
+
+  try {
+    const surface = selectSurfaceHtml(html, baseUrl);
+
+    if (!surface) return complete;
+    const view = await extractHtmlDocument(surface.html, baseUrl);
+
+    if (!view.markdown.trim()) return complete;
+
+    return {
+      ...complete,
+      surfaceView: {
+        selected: surface.selected,
+        omitted: surface.omitted,
+        markdown: view.markdown,
+        fragmentOffsets: view.fragmentOffsets,
+      },
+    };
+  } catch {
+    // A derived view must never make an otherwise readable page unavailable.
+    return complete;
+  }
 }

@@ -292,6 +292,7 @@ async function documentFromDecoded(
   let markdown: string;
   let title: string | undefined;
   let fragmentOffsets: Record<string, number> | undefined;
+  let surfaceView: CompleteDocument["surfaceView"];
   let extractor: CompleteDocument["extractor"] = "raw";
   let describedBy: string | undefined = linkHints.describedBy;
   let markdownAlternateUrl: string | undefined = linkHints.markdownAlternate;
@@ -304,6 +305,7 @@ async function documentFromDecoded(
     markdown = extracted.markdown;
     title = extracted.title;
     fragmentOffsets = extracted.fragmentOffsets;
+    surfaceView = extracted.surfaceView;
     extractor = extracted.extractor;
     githubReadme = extracted.githubReadme === true;
     describedBy = describedBy ?? extracted.describedByLink;
@@ -403,6 +405,7 @@ async function documentFromDecoded(
     contentType,
     markdown,
     fragmentOffsets,
+    surfaceView,
     title,
     extractor,
     shellSuspected,
