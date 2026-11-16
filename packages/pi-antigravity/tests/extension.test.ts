@@ -6,6 +6,10 @@ import antigravityExtension, { FALLBACK_MODELS, PROVIDER_ID } from "../src/index
 import { storedModelsFrom } from "../src/discovery";
 import { modelConfigs } from "../src/models";
 
+vi.mock("../src/agy-client", () => ({
+  discoverAgyClient: vi.fn(async () => ({ id: "test-client-id", secret: "test-client-secret" })),
+}));
+
 interface Registration {
   name: string;
   config: ProviderConfig;
@@ -149,8 +153,6 @@ describe("extension registration", () => {
   });
 
   it("refreshes OAuth credentials through the registered provider", async () => {
-    vi.stubEnv("PI_ANTIGRAVITY_CLIENT_ID", "test-client-id");
-    vi.stubEnv("PI_ANTIGRAVITY_CLIENT_SECRET", "test-client-secret");
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => Response.json({ access_token: "new-token", expires_in: 3600 })),

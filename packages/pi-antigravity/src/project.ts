@@ -12,6 +12,26 @@ export const ENDPOINTS = [
 /** Metadata lookups must fail fast so the next endpoint can be tried. */
 const DISCOVERY_TIMEOUT_MS = 8_000;
 
+/** Error bodies are untrusted; inspect only a small bounded response. */
+const MAX_DIAGNOSTIC_BYTES = 16_384;
+
+/** Known Google error reasons safe to disclose without reflecting response text. */
+const SAFE_ERROR_SERVICES = new Set([
+  "cloudcode-pa.googleapis.com",
+  "cloudaicompanion.googleapis.com",
+  "serviceusage.googleapis.com",
+]);
+
+const SAFE_ERROR_REASONS = new Set([
+  "ACCESS_TOKEN_SCOPE_INSUFFICIENT",
+  "ACCESS_TOKEN_TYPE_UNSUPPORTED",
+  "API_DISABLED",
+  "CONSUMER_INVALID",
+  "IAM_PERMISSION_DENIED",
+  "SERVICE_DISABLED",
+  "USER_PROJECT_DENIED",
+]);
+
 /**
  * Builds request headers for Antigravity endpoints.
  *
@@ -142,17 +162,73 @@ async function postJson(
   return fetch(url, { method: "POST", headers, body, signal });
 }
 
+/** Reads a bounded JSON error and returns only an allowlisted Google reason. */
+async function safeErrorReason(response: Response): Promise<string | undefined> {
+  const reader = response.body?.getReader();
+
+  if (reader === undefined) return undefined;
+
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) break;
+      size += value.length;
+
+      if (size > MAX_DIAGNOSTIC_BYTES) {
+        void reader.cancel().catch(() => {});
+
+        return undefined;
+      }
+
+      chunks.push(value);
+    }
+
+    const body = parseJsonValue(Buffer.concat(chunks).toString("utf8"));
+
+    if (!isJsonObject(body) || !isJsonObject(body.error) || !Array.isArray(body.error.details)) {
+      return undefined;
+    }
+
+    for (const detail of body.error.details) {
+      if (!isJsonObject(detail) || !isJsonText(detail.reason)) continue;
+
+      if (!SAFE_ERROR_REASONS.has(detail.reason)) continue;
+
+      const metadata = isJsonObject(detail.metadata) ? detail.metadata : undefined;
+      const service = metadata?.service;
+
+      if (isJsonText(service) && SAFE_ERROR_SERVICES.has(service)) {
+        return `${detail.reason}; service=${service}`;
+      }
+
+      return detail.reason;
+    }
+  } catch {
+    // Malformed, oversized, or unreadable responses have no safe reason to report.
+  } finally {
+    reader.releaseLock();
+  }
+
+  return undefined;
+}
+
 /**
  * Lists Cloud Code companion projects as a fallback when `loadCodeAssist`
  * returns no project id.
  *
  * @param token - OAuth access token
  * @param signal - Cancellation
+ * @param diagnostics - Sanitized response statuses for a failed lookup
  * @returns The first project id the account exposes
  */
 async function listCompanionProjects(
   token: string,
   signal: AbortSignal,
+  diagnostics: string[],
 ): Promise<string | undefined> {
   for (const endpoint of ENDPOINTS) {
     const response = await postJson(
@@ -161,6 +237,8 @@ async function listCompanionProjects(
       "{}",
       signal,
     );
+
+    diagnostics.push(`listCloudAICompanionProjects: HTTP ${response.status}`);
 
     if (!response.ok) continue;
 
@@ -189,6 +267,7 @@ export async function discoverProjectId(
   signal: AbortSignal | undefined,
 ): Promise<string> {
   const deadline = discoverySignal(signal, DISCOVERY_TIMEOUT_MS * ENDPOINTS.length);
+  const diagnostics: string[] = [];
 
   for (const endpoint of ENDPOINTS) {
     try {
@@ -199,21 +278,30 @@ export async function discoverProjectId(
         deadline,
       );
 
+      const reason = response.ok ? undefined : await safeErrorReason(response);
+      diagnostics.push(
+        `loadCodeAssist: HTTP ${response.status}${reason === undefined ? "" : ` (${reason})`}`,
+      );
+
       if (response.ok) {
         const projectId = extractProjectId(parseJsonValue(await response.text()));
 
         if (projectId !== undefined) return projectId;
 
-        const listed = await listCompanionProjects(token, deadline);
+        const listed = await listCompanionProjects(token, deadline, diagnostics);
 
         if (listed !== undefined) return listed;
       }
     } catch (error) {
       if (signal?.aborted === true) throw error;
+
+      // Never include raw errors or provider bodies: they can contain credentials.
+      diagnostics.push("network or response error");
     }
   }
 
   throw new Error(
-    "Antigravity could not resolve a Cloud Code project for this account. Confirm Antigravity access for the account and retry /login antigravity.",
+    `Antigravity could not resolve a Cloud Code project. ${diagnostics.join("; ")}. ` +
+      "Confirm Antigravity access and check whether the OAuth client and scopes are accepted.",
   );
 }

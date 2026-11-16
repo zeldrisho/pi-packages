@@ -16,6 +16,7 @@ Implementation and maintenance notes for `@zeldrisho/pi-antigravity`. The packag
 | `request.ts`     | Transcript → `v1internal` envelope, tool-schema normalization           |
 | `stream.ts`      | SSE consumption, endpoint fallback, retries, Pi event emission          |
 | `cli-version.ts` | `User-Agent` version: env override, live CLI probe, verified default    |
+| `agy-client.ts`  | Bounded local OAuth client discovery from the installed CLI binary      |
 | `json.ts`        | JSON boundary helpers shared by the modules above                       |
 
 ## Wire protocol
@@ -49,22 +50,21 @@ Discovered models persist through `context.publish({ persist })` in Pi's model s
 - Model list: `agy models` prints the runtime ids and display names the backend serves. `FALLBACK_MODELS` should match it.
 - CLI version: `agy --version`, or the Homebrew cask that tracks releases: <https://github.com/Homebrew/homebrew-cask/blob/master/Casks/a/antigravity-cli.rb>. `cli-version.ts` probes `agy`/`antigravity` once per process and falls back to `DEFAULT_CLI_VERSION`; update that constant after a cask bump.
 
+OAuth application discovery scans only the `agy` executable found on PATH, never the `agy` account-token store. It matches known consumer-client fingerprints, rather than guessing a pairing when multiple clients are embedded, and fails closed if the fingerprints are missing or ambiguous. The fingerprints and approach are independently documented by [agy-auth](https://github.com/fikrilal/agy-auth/blob/main/internal/oauth/oauth.go), an MIT-licensed project. A client rotation may require an extension update. The executable must be a native binary or a recognized Homebrew wrapper.
+
 Environment overrides:
 
-| Variable                       | Effect                                 |
-| ------------------------------ | -------------------------------------- |
-| `PI_ANTIGRAVITY_VERSION`       | CLI version advertised in `User-Agent` |
-| `PI_ANTIGRAVITY_USER_AGENT`    | Complete `User-Agent` override         |
-| `PI_ANTIGRAVITY_CLIENT_ID`     | Required OAuth client ID               |
-| `PI_ANTIGRAVITY_CLIENT_SECRET` | Required OAuth client secret           |
-| `PI_ANTIGRAVITY_REDIRECT_URI`  | OAuth redirect URI                     |
+| Variable                      | Effect                                 |
+| ----------------------------- | -------------------------------------- |
+| `PI_ANTIGRAVITY_VERSION`      | CLI version advertised in `User-Agent` |
+| `PI_ANTIGRAVITY_USER_AGENT`   | Complete `User-Agent` override         |
+| `PI_ANTIGRAVITY_REDIRECT_URI` | OAuth redirect URI                     |
 
 ## Unverified against the live backend
 
 These choices are inherited from working clients and covered only by unit tests; check them first if the provider stops working:
 
-- OAuth login using a user-created client has not been validated. Google may restrict the required scopes or Antigravity backend access to specific clients.
-
+- OAuth login with the installed CLI client succeeded in a live test. Google may restrict private scopes or backend access to specific clients.
 - The `User-Agent` shape (`antigravity/cli/<version> (...)`) and the `auth_method` token.
 - The loopback redirect URI `http://localhost:51121/oauth-callback`. Installed CLI releases use a hosted `antigravity.google/oauth-callback` page with a pasted code. A rejected redirect URI may prevent login; the extension's pasted-URL option does not bypass Google's redirect validation.
 - Thinking settings beyond the traced Gemini 3.8 Flash, Claude Sonnet 4.6, Claude Opus 4.6, and GPT-OSS 120B routes. The stream resolves advertised per-runtime thinking levels and budgets from a fresh catalog, caching only validated settings in memory per credential and project for six hours. If unavailable, it uses fallback assumptions; new metadata formats require verification.

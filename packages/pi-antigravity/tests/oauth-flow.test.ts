@@ -2,19 +2,17 @@ import { createServer, get } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { OAuthLoginCallbacks } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import {
-  clientId,
-  clientSecret,
-  loginAntigravity,
-  refreshCredentials,
-  redirectUri,
-} from "../src/oauth";
+import { discoverAgyClient } from "../src/agy-client";
+import { loginAntigravity, refreshCredentials, redirectUri } from "../src/oauth";
+
+vi.mock("../src/agy-client", () => ({ discoverAgyClient: vi.fn() }));
 
 const credentials = { access: "old", refresh: "refresh", expires: 1, projectId: "project" };
 
 beforeEach(() => {
-  vi.stubEnv("PI_ANTIGRAVITY_CLIENT_ID", "test-client-id");
-  vi.stubEnv("PI_ANTIGRAVITY_CLIENT_SECRET", "test-client-secret");
+  vi.mocked(discoverAgyClient)
+    .mockReset()
+    .mockResolvedValue({ id: "test-client-id", secret: "test-client-secret" });
 });
 
 afterEach(() => {
@@ -63,15 +61,13 @@ function loginFetch(tokenResponse: Response): void {
 }
 
 describe("OAuth login", () => {
-  it("rejects missing client credentials before prompting", async () => {
+  it("rejects a missing CLI client before prompting", async () => {
     const onAuth = vi.fn();
     const onPrompt = vi.fn();
     const interaction = { ...callbacks(onPrompt), onAuth };
-    vi.stubEnv("PI_ANTIGRAVITY_CLIENT_ID", "");
-    await expect(loginAntigravity(interaction)).rejects.toThrow(/PI_ANTIGRAVITY_CLIENT_ID/);
-    vi.stubEnv("PI_ANTIGRAVITY_CLIENT_ID", "test-client-id");
-    vi.stubEnv("PI_ANTIGRAVITY_CLIENT_SECRET", " ");
-    await expect(loginAntigravity(interaction)).rejects.toThrow(/PI_ANTIGRAVITY_CLIENT_SECRET/);
+    vi.mocked(discoverAgyClient).mockResolvedValueOnce(undefined);
+
+    await expect(loginAntigravity(interaction)).rejects.toThrow(/Install or update agy on PATH/);
     expect(onAuth).not.toHaveBeenCalled();
     expect(onPrompt).not.toHaveBeenCalled();
   });
@@ -187,16 +183,24 @@ describe("OAuth login", () => {
 });
 
 describe("OAuth refresh", () => {
-  it("retains the project and rotates only supplied credentials", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => Response.json({ access_token: "new", expires_in: 3600 })),
+  it("uses the discovered client and retains the project on refresh", async () => {
+    const fetch = vi.fn(async (_url: string, _init: RequestInit) =>
+      Response.json({ access_token: "new", expires_in: 3600 }),
     );
+
+    vi.stubGlobal("fetch", fetch);
     expect(await refreshCredentials(credentials, undefined, 1000)).toEqual({
       ...credentials,
       access: "new",
       expires: 3301000,
     });
+    const rawBody = fetch.mock.calls[0]?.[1].body;
+
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the request boundary must send a form-encoded string
+    if (typeof rawBody !== "string") throw new Error("expected a form-encoded request body");
+    const body = new URLSearchParams(rawBody);
+    expect(body.get("client_id")).toBe("test-client-id");
+    expect(body.get("client_secret")).toBe("test-client-secret");
   });
   it("accepts a rotated refresh token", async () => {
     vi.stubGlobal(
@@ -221,12 +225,8 @@ describe("OAuth refresh", () => {
       /unexpected response/,
     );
   });
-  it("accepts trimmed OAuth environment overrides", () => {
-    vi.stubEnv("PI_ANTIGRAVITY_CLIENT_ID", " custom-id ");
-    vi.stubEnv("PI_ANTIGRAVITY_CLIENT_SECRET", " custom-secret ");
+  it("accepts a trimmed redirect URI override", () => {
     vi.stubEnv("PI_ANTIGRAVITY_REDIRECT_URI", " http://localhost:1234/oauth-callback ");
-    expect(clientId()).toBe("custom-id");
-    expect(clientSecret()).toBe("custom-secret");
     expect(redirectUri()).toBe("http://localhost:1234/oauth-callback");
   });
 });

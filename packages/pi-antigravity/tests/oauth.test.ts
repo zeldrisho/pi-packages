@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   buildAuthUrl,
@@ -12,26 +12,15 @@ import { extractProjectId, stableProjectId } from "../src/project";
 
 const STATE = "state-value";
 
-beforeEach(() => {
-  vi.stubEnv("PI_ANTIGRAVITY_CLIENT_ID", "test-client-id");
-  vi.stubEnv("PI_ANTIGRAVITY_CLIENT_SECRET", "test-client-secret");
-});
-
-afterEach(() => vi.unstubAllEnvs());
+const CLIENT = { id: "test-client-id", secret: "test-client-secret" };
 
 describe("PKCE and authorization URL", () => {
-  it("uses the configured OAuth client in the authorization URL", () => {
-    const url = new URL(buildAuthUrl({ verifier: "verifier", challenge: "challenge" }, STATE));
+  it("uses the discovered OAuth client in the authorization URL", () => {
+    const url = new URL(
+      buildAuthUrl({ verifier: "verifier", challenge: "challenge" }, STATE, CLIENT),
+    );
 
     expect(url.searchParams.get("client_id")).toBe("test-client-id");
-  });
-
-  it("fails clearly when no client ID is configured", () => {
-    vi.stubEnv("PI_ANTIGRAVITY_CLIENT_ID", "  ");
-
-    expect(() => buildAuthUrl({ verifier: "verifier", challenge: "challenge" }, STATE)).toThrow(
-      /PI_ANTIGRAVITY_CLIENT_ID/,
-    );
   });
 
   it("derives a deterministic challenge from fixed randomness", () => {
@@ -46,7 +35,9 @@ describe("PKCE and authorization URL", () => {
   });
 
   it("builds an offline authorization URL with the required scopes", () => {
-    const url = new URL(buildAuthUrl({ verifier: "verifier", challenge: "challenge" }, STATE));
+    const url = new URL(
+      buildAuthUrl({ verifier: "verifier", challenge: "challenge" }, STATE, CLIENT),
+    );
 
     expect(url.origin).toBe("https://accounts.google.com");
     expect(url.searchParams.get("response_type")).toBe("code");
@@ -64,7 +55,11 @@ describe("PKCE and authorization URL", () => {
   });
 
   it("keeps the code verifier out of the authorization URL", () => {
-    const url = buildAuthUrl({ verifier: "secret-verifier", challenge: "challenge" }, STATE);
+    const url = buildAuthUrl(
+      { verifier: "secret-verifier", challenge: "challenge" },
+      STATE,
+      CLIENT,
+    );
 
     expect(url).not.toContain("secret-verifier");
   });

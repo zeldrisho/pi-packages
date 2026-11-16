@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Sign in with a Google AI Pro or Ultra account through `/login` using a user-configured Google OAuth client, subject to Google's scope and client restrictions.
+- Sign in with a Google AI Pro or Ultra account through `/login`, using the installed Antigravity CLI's OAuth client. Project discovery errors report safe status information to help diagnose backend restrictions.
 - Use the Gemini, Claude, and GPT-OSS models your plan can reach, with the catalog read from your account and Pi thinking levels mapped to Antigravity runtime models and reasoning budgets.
 - Tool calling, image input, streamed reasoning, and subscription usage reporting.
 - Automatic token refresh and endpoint failover when a region is at capacity.

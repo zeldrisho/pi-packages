@@ -1,12 +1,12 @@
 # @zeldrisho/pi-antigravity
 
-Use Google Antigravity models from Pi with your Google AI Pro or Ultra subscription. The extension signs in with your Google account; it requires a separately configured Google OAuth client, but no Gemini API key or Antigravity installation.
+Use Google Antigravity models from Pi with your Google AI Pro or Ultra subscription. The extension signs in with your Google account; no Gemini API key is required.
 
 ## Requirements
 
 - An active Google AI Pro or Ultra plan with Antigravity access.
 - A web browser on the machine running Pi to finish sign-in.
-- A Google OAuth desktop client ID and client secret. **Access using a user-created client has not been verified:** Google may restrict the required scopes or reject access to Antigravity for that client.
+- The official `agy` CLI installed locally and available on `PATH`. The `agy` integration is unofficial; Google may change or restrict access.
 
 ## Install
 
@@ -19,20 +19,11 @@ pi install -l npm:@zeldrisho/pi-antigravity
 
 Restart Pi after installing. Use `pi config` to enable or disable the extension, and `pi list` to see installed packages.
 
-## Configure your OAuth client
+## Configure sign-in
 
-1. In [Google Cloud Console](https://console.cloud.google.com/), create or select a project and configure its OAuth consent screen. If the app is in testing mode, add your Google account as a test user.
-2. Create an OAuth client with application type **Desktop app**. See Google's [installed-app OAuth guide](https://developers.google.com/identity/protocols/oauth2/native-app#creatingcred).
-3. In the shell where you will start Pi, set the client ID and secret. Avoid putting the secret in shell history or committing it to a repository:
+Install the [official `agy` CLI](https://antigravity.google/docs/install/) and ensure it is available on your `PATH`. The extension uses the installed CLI's OAuth application client; it does not read or change `agy`'s account login. Keep `agy` available when starting Pi so token refresh can resolve the same client.
 
-   ```bash
-   read -r -p 'OAuth client ID: ' PI_ANTIGRAVITY_CLIENT_ID
-   read -r -s -p 'OAuth client secret: ' PI_ANTIGRAVITY_CLIENT_SECRET; echo
-   export PI_ANTIGRAVITY_CLIENT_ID PI_ANTIGRAVITY_CLIENT_SECRET
-   pi
-   ```
-
-Keep these variables available whenever Pi refreshes your login. Google may require additional scope approval or disallow the private Antigravity scopes for your client; creating a client alone does not guarantee access.
+This uses application credentials shipped with the CLI and is not an official Google integration. If Google changes those credentials, discovery may fail until the extension is updated. Review the Google consent screen and grant access only if you trust the extension.
 
 ## Sign in
 
@@ -40,9 +31,7 @@ Keep these variables available whenever Pi refreshes your login. Google may requ
 2. Choose **Antigravity (Google account)** and press Enter.
 3. Open the printed URL, approve access, and paste the callback URL back into Pi if the browser does not return to it automatically.
 
-Pi stores the resulting tokens in its credential store and refreshes them before they expire. Run `/logout` and choose the provider to remove them. If you previously signed in using different client credentials, log out and sign in again with your own client.
-
-The sign-in asks Google for Antigravity and Cloud Platform access so the extension can read your Antigravity project and send model requests on your behalf. Credentials never leave your machine except in requests to Google.
+Pi stores the resulting tokens in its credential store and refreshes them before they expire. Run `/logout` and choose the provider to remove them. If you previously signed in using a different OAuth client, log out and sign in again.
 
 ## Usage
 

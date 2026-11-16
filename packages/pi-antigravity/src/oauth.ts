@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { JsonValue, OAuthCredentials, OAuthLoginCallbacks } from "@earendil-works/pi-ai";
+import { discoverAgyClient, type OAuthClient } from "./agy-client.ts";
 import { isJsonNumber, isJsonObject, isJsonText, nonEmptyText, parseJsonValue } from "./json.ts";
 import { discoverProjectId, stableProjectId } from "./project.ts";
 
@@ -19,7 +20,7 @@ const CALLBACK_PATH = "/oauth-callback";
 /** How long the loopback listener waits for a browser redirect. */
 const CALLBACK_TIMEOUT_MS = 5 * 60 * 1000;
 
-/** Scopes the Antigravity client requests; each is required by the backend. */
+/** Scopes historically requested by Antigravity clients. */
 export const SCOPES = [
   "https://www.googleapis.com/auth/aicode",
   "https://www.googleapis.com/auth/cloud-platform",
@@ -53,24 +54,15 @@ function envOverride(name: string): string | undefined {
   return value === undefined || value.trim() === "" ? undefined : value.trim();
 }
 
-/** OAuth client ID configured by the user. */
-export function clientId(): string {
-  const value = envOverride("PI_ANTIGRAVITY_CLIENT_ID");
+/** Discovers the installed CLI's matching OAuth client pair. */
+export async function resolveOAuthClient(signal?: AbortSignal): Promise<OAuthClient> {
+  signal?.throwIfAborted();
+  const discovered = await discoverAgyClient(signal);
 
-  if (value === undefined)
-    throw new Error("Set PI_ANTIGRAVITY_CLIENT_ID before using Antigravity OAuth.");
-
-  return value;
-}
-
-/** OAuth client secret configured by the user. */
-export function clientSecret(): string {
-  const value = envOverride("PI_ANTIGRAVITY_CLIENT_SECRET");
-
-  if (value === undefined)
-    throw new Error("Set PI_ANTIGRAVITY_CLIENT_SECRET before using Antigravity OAuth.");
-
-  return value;
+  if (discovered !== undefined) return discovered;
+  throw new Error(
+    "Could not identify a supported OAuth client in the installed agy binary. Install or update agy on PATH.",
+  );
 }
 
 /** Redirect URI: environment override, otherwise the loopback callback. */
@@ -98,11 +90,12 @@ export function createPkcePair(
  *
  * @param pkce - Verifier challenge
  * @param state - Opaque state value echoed back by the callback
+ * @param client - OAuth client discovered from the installed CLI
  * @returns The authorization URL to open in a browser
  */
-export function buildAuthUrl(pkce: PkcePair, state: string): string {
+export function buildAuthUrl(pkce: PkcePair, state: string, client: OAuthClient): string {
   const params = new URLSearchParams({
-    client_id: clientId(),
+    client_id: client.id,
     response_type: "code",
     redirect_uri: redirectUri(),
     scope: SCOPES.join(" "),
@@ -186,13 +179,14 @@ async function exchangeCode(
   code: string,
   verifier: string,
   signal: AbortSignal | undefined,
+  client: OAuthClient,
 ): Promise<TokenResponse> {
   const response = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: clientId(),
-      client_secret: clientSecret(),
+      client_id: client.id,
+      client_secret: client.secret,
       code,
       grant_type: "authorization_code",
       redirect_uri: redirectUri(),
@@ -236,12 +230,14 @@ export async function refreshCredentials(
   signal: AbortSignal | undefined,
   now: number,
 ): Promise<OAuthCredentials> {
+  const client = await resolveOAuthClient(signal);
+
   const response = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: clientId(),
-      client_secret: clientSecret(),
+      client_id: client.id,
+      client_secret: client.secret,
       refresh_token: credentials.refresh,
       grant_type: "refresh_token",
     }).toString(),
@@ -602,8 +598,8 @@ export async function loginAntigravity(
   timings: LoginTimings = {},
 ): Promise<AntigravityCredentials> {
   // Fail before opening a listener or prompting when the client is not configured.
-  clientId();
-  clientSecret();
+  if (callbacks.signal?.aborted === true) throw new Error("Antigravity sign-in cancelled");
+  const client = await resolveOAuthClient(callbacks.signal);
 
   const now = timings.now ?? Date.now;
   const random = timings.randomBytes ?? randomBytes;
@@ -614,13 +610,14 @@ export async function loginAntigravity(
 
   try {
     callbacks.onAuth({
-      url: buildAuthUrl(pkce, state),
+      url: buildAuthUrl(pkce, state, client),
       instructions:
         "Open the link, complete Google sign-in, and return to Pi. If the browser cannot reach this machine, paste the callback URL when prompted.",
     });
 
     const code = await acquireCode(state, listener, callbacks);
-    const tokens = await exchangeCode(code, pkce.verifier, callbacks.signal);
+    const tokens = await exchangeCode(code, pkce.verifier, callbacks.signal, client);
+
     const projectId = await discoverProjectId(tokens.access_token, callbacks.signal);
 
     return {
