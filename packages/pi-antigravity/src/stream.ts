@@ -230,6 +230,32 @@ export function decodeChunk(text: string): StreamChunk | undefined {
  * @param body - Response body, bounded here before use
  * @returns A user-facing message
  */
+type ExhaustionKind = "quota" | "restriction" | "temporary" | "unknown";
+
+/** Classify only explicit provider signals; a generic resource exhaustion is ambiguous. */
+function exhaustionKind(body: string): ExhaustionKind {
+  const text = body.slice(0, 16_384);
+
+  if (
+    /insufficient_quota|quota[_\s-]+exceeded|usage[_\s-]+limit[_\s-]+(?:reached|exceeded)|(?:daily|weekly|monthly)\s+(?:usage\s+)?(?:quota|limit)/i.test(
+      text,
+    )
+  )
+    return "quota";
+
+  if (/account[_\s-]+(?:restricted|suspended|disabled)|permission[_\s-]+denied/i.test(text))
+    return "restriction";
+
+  if (
+    /server[_\s-]+busy|temporarily\s+unavailable|model\s+is\s+at\s+capacity|rate[_\s-]+limit(?:ed|ing)?|too\s+many\s+requests/i.test(
+      text,
+    )
+  )
+    return "temporary";
+
+  return "unknown";
+}
+
 export function describeFailure(status: number, body: string): string {
   const detail = body.replace(/\s+/g, " ").trim().slice(0, 300);
   const suffix = detail === "" ? "" : `: ${detail}`;
@@ -243,7 +269,18 @@ export function describeFailure(status: number, body: string): string {
   }
 
   if (status === 429) {
-    return `Antigravity quota or capacity is exhausted (429${suffix}). Wait for the reset time or select another model.`;
+    const kind = exhaustionKind(body);
+
+    if (kind === "quota")
+      return "Antigravity usage quota exceeded. Wait for it to reset or select another model.";
+
+    if (kind === "restriction")
+      return "Antigravity reports an account restriction. Check account access or select another model.";
+
+    if (kind === "temporary")
+      return "Antigravity is temporarily unavailable due to capacity or rate limiting. Try again later or select another model.";
+
+    return "Antigravity rejected the request: resource exhausted. The service did not specify whether this is a usage limit, temporary capacity issue, or account restriction. Try later or select another model.";
   }
 
   return `Antigravity request failed (${status}${suffix}).`;
@@ -558,7 +595,12 @@ async function handleLine(line: string, context: StreamContext): Promise<void> {
   if (chunk === undefined) return;
 
   if (chunk.error !== undefined) {
-    throw new Error(describeFailure(chunk.error.status ?? 500, chunk.error.message));
+    throw new Error(
+      describeFailure(
+        chunk.error.status ?? 500,
+        chunk.error.status === 429 ? payload : chunk.error.message,
+      ),
+    );
   }
 
   await context.options?.onProviderStreamEvent?.(chunk, context.model);
@@ -693,11 +735,11 @@ async function postToEndpoint(
 
     if (response.ok) return response;
 
-    const failure = new Error(describeFailure(response.status, await response.text()));
+    const failureBody = await response.text();
+    const failure = new Error(describeFailure(response.status, failureBody));
 
-    // Capacity rejections are worth retrying against the next endpoint; other
-    // statuses describe the account or model and would fail there too.
-    if (response.status === 429) {
+    // Only explicit transient capacity signals justify another endpoint.
+    if (response.status === 429 && exhaustionKind(failureBody) === "temporary") {
       lastError = failure;
       continue;
     }

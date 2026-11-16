@@ -17,3 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use account-advertised thinking levels and budgets when available, and limit Pi's selectable effort levels to advertised variants.
 - Rephrase two phrases in Pi's default system prompt to avoid observed provider-side 429 errors.
 - Preserve streamed thinking signatures and omit unsigned thinking from conversation history, allowing Claude follow-up messages to continue.
+
+### Fixed
+
+- Report ambiguous resource exhaustion clearly and avoid repeated automatic retries; retain failover for explicit temporary capacity errors.

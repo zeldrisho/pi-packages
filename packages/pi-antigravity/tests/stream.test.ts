@@ -4,6 +4,7 @@ import {
   type JsonObject,
   type Model,
 } from "@earendil-works/pi-ai";
+import { isRetryableAssistantError } from "@earendil-works/pi-ai/compat";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { getApiKey } from "../src/oauth";
@@ -228,8 +229,17 @@ describe("failure messages", () => {
   it("names the recovery action for each status", () => {
     expect(describeFailure(403, "")).toMatch(/Re-run \/login antigravity/);
     expect(describeFailure(404, "")).toMatch(/Select another model/);
-    expect(describeFailure(429, "")).toMatch(/quota or capacity/);
+    expect(describeFailure(429, "")).toMatch(/resource exhausted/);
     expect(describeFailure(500, "boom")).toBe("Antigravity request failed (500: boom).");
+  });
+
+  it("classifies exhaustion without echoing untrusted details", () => {
+    expect(describeFailure(429, '{"error":{"message":"Quota exceeded"}}')).toMatch(
+      /quota exceeded/,
+    );
+    expect(describeFailure(429, "account suspended")).toMatch(/account restriction/);
+    expect(describeFailure(429, "rate limit reached")).toMatch(/rate limiting/);
+    expect(describeFailure(429, "not json SECRET")).not.toContain("SECRET");
   });
 
   it("bounds the echoed provider body", () => {
@@ -325,7 +335,7 @@ describe("stream implementation", () => {
       urls.push(url);
 
       if (url.includes("daily-cloudcode-pa")) {
-        return new Response("RESOURCE_EXHAUSTED", { status: 429 });
+        return new Response("rate limit exceeded", { status: 429 });
       }
 
       return sse([textFrame("served by production")]);
@@ -345,6 +355,34 @@ describe("stream implementation", () => {
     expect(urls).toHaveLength(2);
     expect(urls[1]).toContain("cloudcode-pa.googleapis.com");
     expect(final?.content).toEqual([{ type: "text", text: "served by production" }]);
+  });
+
+  it("stops on ambiguous exhaustion without triggering Pi retries", async () => {
+    const body = JSON.stringify({
+      error: {
+        code: 429,
+        message: "Resource has been exhausted (e.g. check quota).",
+        status: "RESOURCE_EXHAUSTED",
+      },
+    });
+
+    const fetchMock = vi.fn(async () => new Response(body, { status: 429 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const stream = createAntigravityStream()(streamModel, contextWith("Bake bread"), {
+      apiKey: API_KEY,
+    });
+
+    let final: AssistantMessage | undefined;
+
+    for await (const event of stream) if (event.type === "error") final = event.error;
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(final?.errorMessage).toMatch(/did not specify/);
+    expect(final && isRetryableAssistantError(final)).toBe(false);
+
+    const streamed = await collect([body]);
+    expect(streamed.final?.errorMessage).toBe(final?.errorMessage);
+    expect(streamed.final && isRetryableAssistantError(streamed.final)).toBe(false);
   });
 
   it("reports an aborted request without retrying", async () => {
