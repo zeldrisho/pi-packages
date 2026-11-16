@@ -16,9 +16,6 @@ const TOKEN_HEADER = "x-pi-proxy-token";
 /** Upper bound for proxy startup before the request fails with guidance. */
 const START_TIMEOUT_MS = 10_000;
 
-/** Environment variable pointing at a Bun executable. */
-export const BUN_PATH_ENV = "PI_OPENCODE_FREE_BUN";
-
 /**
  * Proxy program executed by Bun.
  *
@@ -139,7 +136,7 @@ export type ProxySpawn = (
 
 /** Injectable process controls, used by tests to avoid spawning Bun. */
 export interface BunTransportOptions {
-  /** Bun executable; defaults to the environment override or `bun` on `PATH`. */
+  /** Bun executable; defaults to `bun` on `PATH`. */
   bunPath?: string;
   /** Spawn implementation; defaults to `child_process.spawn`. */
   spawnProcess?: ProxySpawn;
@@ -167,7 +164,7 @@ export class BunTransportError extends Error {
  * @returns Fetch-compatible function for the OpenCode gateway
  */
 export function createBunTransport(options: BunTransportOptions = {}): BunTransport {
-  const bunPath = options.bunPath ?? (process.env[BUN_PATH_ENV]?.trim() || "bun");
+  const bunPath = options.bunPath ?? "bun";
   const spawnProcess: ProxySpawn = options.spawnProcess ?? spawn;
   const directFetch = options.fetch ?? globalThis.fetch;
   let endpoint: ProxyEndpoint | undefined;
@@ -236,11 +233,11 @@ export function createBunTransport(options: BunTransportOptions = {}): BunTransp
       stop();
 
       if (error instanceof Error && "code" in error && error.code === "ENOENT") {
-        throw new BunTransportError(`Bun not found. Install Bun or set ${BUN_PATH_ENV}.`);
+        throw new BunTransportError("Bun not found. Install Bun and ensure it is on PATH.");
       }
 
       throw new BunTransportError(
-        `OpenCode Free could not start its Bun transport (${error instanceof Error ? error.message : String(error)}). Install Bun or set ${BUN_PATH_ENV}.`,
+        `OpenCode Free could not start its Bun transport (${error instanceof Error ? error.message : String(error)}). Install Bun and ensure it is on PATH.`,
       );
     }
   };

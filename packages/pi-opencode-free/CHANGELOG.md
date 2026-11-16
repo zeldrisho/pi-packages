@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Resolve Bun on `PATH`; the `PI_OPENCODE_FREE_BUN` override is no longer supported.
+
 ### Fixed
 
 - Identify gateway connection failures as OpenCode Free upstream request failures while preserving the original diagnostics and leaving retries to Pi.

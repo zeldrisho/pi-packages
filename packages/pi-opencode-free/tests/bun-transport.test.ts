@@ -4,7 +4,6 @@ import { runInNewContext } from "node:vm";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {
-  BUN_PATH_ENV,
   BunTransportError,
   createBunTransport,
   type BunTransport,
@@ -296,30 +295,19 @@ describe("Bun gateway transport", () => {
     expect(fetches.calls[1]?.init?.body).toBeUndefined();
   });
 
-  it("prefers the Bun environment override", async () => {
+  it("uses Bun on PATH by default", async () => {
     const child = new FakeProcess();
     const harness = spawnHarness([child]);
-    const fetches = fetchHarness();
-    const previous = process.env[BUN_PATH_ENV];
 
-    process.env[BUN_PATH_ENV] = "/custom/bun";
+    const transport = transportFixture({
+      spawnProcess: harness.spawnProcess,
+      fetch: fetchHarness().fetcher,
+    });
 
-    try {
-      const transport = transportFixture({
-        spawnProcess: harness.spawnProcess,
-        fetch: fetches.fetcher,
-      });
-
-      const pending = transport(GATEWAY_URL, { method: "GET" });
-
-      child.announce(6000);
-      await pending;
-
-      expect(harness.calls[0]?.command).toBe("/custom/bun");
-    } finally {
-      if (previous === undefined) delete process.env[BUN_PATH_ENV];
-      else process.env[BUN_PATH_ENV] = previous;
-    }
+    const pending = transport(GATEWAY_URL, { method: "GET" });
+    child.announce(6000);
+    await pending;
+    expect(harness.calls[0]?.command).toBe("bun");
   });
 
   it("reports install guidance when Bun cannot start", async () => {
@@ -340,7 +328,7 @@ describe("Bun gateway transport", () => {
 
     expect(error).toBeInstanceOf(BunTransportError);
     expect(error.message).toContain("bun: command not found");
-    expect(error.message).toContain(`Install Bun or set ${BUN_PATH_ENV}.`);
+    expect(error.message).toContain("Install Bun and ensure it is on PATH.");
     expect(child.signals).toEqual(["SIGTERM"]);
     expect(fetches.calls).toHaveLength(0);
   });
@@ -357,7 +345,7 @@ describe("Bun gateway transport", () => {
     const pending = transport(GATEWAY_URL, { method: "GET" });
     child.emit("error", Object.assign(new Error("spawn bun ENOENT"), { code: "ENOENT" }));
     expect((await captureError(pending)).message).toBe(
-      `Bun not found. Install Bun or set ${BUN_PATH_ENV}.`,
+      "Bun not found. Install Bun and ensure it is on PATH.",
     );
   });
 
