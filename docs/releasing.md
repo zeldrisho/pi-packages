@@ -42,7 +42,7 @@ The tag name and manifest version must match. Publishing is automatic: the `publ
 
 Each package owns its `CHANGELOG.md`. Use [Keep a Changelog 2.0.0](https://keepachangelog.com/en/2.0.0/): `# Changelog`, an `Unreleased` section, dated version headings, one comparison link per version, and the standard `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security` sections. Do not repeat the package name as a bullet scope.
 
-Record only user-visible features, fixes, security changes, and usage or compatibility changes. Omit internal refactors, tests, tooling updates, and maintenance-only work. Describe the effect on users rather than the implementation.
+Record only user-visible features, fixes, security changes, and usage or compatibility changes. Omit internal refactors, tests, tooling updates, and maintenance-only work. Describe the effect on users rather than the implementation. A new package targeting its first `0.1.0` release may keep all entries under `Unreleased` until release preparation; once a version heading exists, it must match the manifest.
 
 ## Recovery and bootstrap
 

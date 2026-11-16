@@ -152,7 +152,27 @@ function fail(message: string): never {
   throw new Error(`Repository contract violation: ${message}`);
 }
 
+/** Allows a new package to keep its first release notes under Unreleased. */
+function changelogMatchesVersion(changelog: string, version: string): boolean {
+  const latest = changelog.match(/^## \[(\d+\.\d+\.\d+)\]/m)?.[1];
+
+  if (latest !== undefined) return latest === version;
+
+  return version === "0.1.0" && /^## \[Unreleased\]\s*$/m.test(changelog);
+}
+
 describe("repository contracts", () => {
+  it("allows an unreleased first version but still enforces released versions", () => {
+    expect(changelogMatchesVersion("## [Unreleased]\n\n### Added\n- Feature", "0.1.0")).toBe(true);
+    expect(changelogMatchesVersion("## [Unreleased]\n", "0.2.0")).toBe(false);
+    expect(changelogMatchesVersion("# Changelog\n", "0.1.0")).toBe(false);
+    expect(changelogMatchesVersion("## [Unreleased]\n\n## [0.1.0] - 2026-01-01", "0.1.0")).toBe(
+      true,
+    );
+    expect(changelogMatchesVersion("## [Unreleased]\n\n## [0.1.0] - 2026-01-01", "0.2.0")).toBe(
+      false,
+    );
+  });
   it("validates packaged Agent Skill metadata and local reference paths", async () => {
     const names = new Set<string>();
 
@@ -538,7 +558,6 @@ describe("repository contracts", () => {
       const packagePath = join("packages", directory);
       const isContentOnly = isPromptPackage || isSkillPackage || isThemePackage;
       const changelog = await readFile(join(packageDirectory, "CHANGELOG.md"), "utf8");
-      const latestChangelogVersion = changelog.match(/^## \[(\d+\.\d+\.\d+)\]/m)?.[1];
 
       if (manifest.name !== expectedName) {
         fail(`${directory}/package.json name must be ${expectedName}, received ${manifest.name}`);
@@ -565,8 +584,10 @@ describe("repository contracts", () => {
         fail(`${manifest.name} has inconsistent publication metadata`);
       }
 
-      if (latestChangelogVersion !== manifest.version) {
-        fail(`${manifest.name} version must match its latest changelog heading`);
+      if (!changelogMatchesVersion(changelog, manifest.version)) {
+        fail(
+          `${manifest.name} version must match its latest changelog heading, or be an unreleased 0.1.0`,
+        );
       }
 
       if (["README.md", "LICENSE"].some((file) => (manifest.files ?? []).includes(file))) {
