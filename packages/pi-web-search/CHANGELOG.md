@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-11-18
+
 ### Changed
 
 - Restore codemode access to structured search results.
@@ -223,7 +225,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded Brave web search ([cbc9491](https://github.com/zeldrisho/pi-packages/commit/cbc9491dce36555ab91b6bef203ec8b380596a89))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.15.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.15.1...HEAD
+[0.15.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.15.0...pi-web-search-v0.15.1
 [0.15.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.6...pi-web-search-v0.15.0
 [0.14.6]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.5...pi-web-search-v0.14.6
 [0.14.5]: https://github.com/zeldrisho/pi-packages/compare/pi-web-search-v0.14.4...pi-web-search-v0.14.5

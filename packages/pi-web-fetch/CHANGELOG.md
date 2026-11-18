@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-11-18
+
 ### Changed
 
 - Restore codemode access to structured fetch results.
@@ -361,7 +363,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.17.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.17.1...HEAD
+[0.17.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.17.0...pi-web-fetch-v0.17.1
 [0.17.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.5...pi-web-fetch-v0.17.0
 [0.16.5]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.4...pi-web-fetch-v0.16.5
 [0.16.4]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.3...pi-web-fetch-v0.16.4

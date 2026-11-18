@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-18
+
 ### Added
 
 - Use the CLI model list as a first-run fallback when account discovery fails.
@@ -26,3 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advertise the installed CLI version when available, falling back to the bundled version.
 - Explain when a model has no available server capacity and suggest recovery options.
 - Report ambiguous resource exhaustion clearly and avoid repeated automatic retries; retain failover for explicit temporary capacity errors.
+
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-antigravity-v0.1.0...HEAD
+[0.1.0]: https://github.com/zeldrisho/pi-packages/releases/tag/pi-antigravity-v0.1.0
