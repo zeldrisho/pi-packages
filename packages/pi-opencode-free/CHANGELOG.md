@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Model requests no longer require a separate Bun installation and reuse HTTPS connections.
 - Requests no longer look up the OpenCode CLI version before inference or catalog refresh; the bundled compatibility version is advertised instead, so both work when that metadata is unavailable.
 
 ### Fixed

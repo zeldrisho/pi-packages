@@ -14,7 +14,6 @@ import {
   usageLimitMessage,
 } from "../src/quota";
 import { createFreeStream } from "../src/stream";
-import { BunTransportError } from "../src/bun-transport";
 
 const model: Model<"openai-completions"> = {
   id: "test-free",
@@ -87,16 +86,6 @@ async function requestPayload(input: string | URL | Request, init?: RequestInit)
 }
 
 describe("OpenCode provider stream boundary", () => {
-  it("preserves Bun installation guidance through native SDK connection errors", async () => {
-    const message =
-      "OpenCode Free could not start its Bun transport. Install Bun and make it available on PATH.";
-
-    const native = createFreeStream(async () => {
-      throw new BunTransportError(message);
-    }, identity);
-
-    expect((await native(model, summary, options).result()).errorMessage).toBe(message);
-  });
   it("adds a compatibility declaration to a tool-free compaction request", async () => {
     const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const payload = await requestPayload(input, init);

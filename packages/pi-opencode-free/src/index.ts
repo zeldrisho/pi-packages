@@ -1,7 +1,7 @@
 import type { RefreshModelsContext } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ProviderConfig } from "@earendil-works/pi-coding-agent";
 
-import { createBunTransport } from "./bun-transport.ts";
+import { createTransport } from "./transport.ts";
 import { registerBranchSummary, registerChunkedCompaction } from "./compaction.ts";
 import {
   buildClientHeaders,
@@ -222,7 +222,7 @@ function isRecent(timestamp: number | undefined, now: number, ttl: number): bool
  * @param pi - Extension API supplied by Pi
  */
 export default function piOpencodeFree(pi: ExtensionAPI): void {
-  const transport = createBunTransport();
+  const transport = createTransport();
 
   pi.on("session_shutdown", () => transport.dispose());
   registerOpencodeFree(pi, { randomSeed: createSessionSeed, fetcher: transport });

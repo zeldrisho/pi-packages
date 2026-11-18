@@ -4,7 +4,6 @@ import {
   type Model,
 } from "@earendil-works/pi-ai/compat";
 import type { ProviderConfig } from "@earendil-works/pi-coding-agent";
-import { BunTransportError } from "./bun-transport.ts";
 import { applyClientHeaders, buildClientHeaders } from "./client-headers.ts";
 import { isFreeUsageLimitMessage, usageLimitMessage } from "./quota.ts";
 import { isProviderRequestPayload, normalizeFreeRequestPayload } from "./request.ts";
@@ -42,7 +41,6 @@ export function createFreeStream(
         const headers = { ...options?.headers, ...buildClientHeaders(sessionId, cliVersion) };
         applyClientHeaders(headers, sessionId, cliVersion);
         let quotaMessage: string | undefined;
-        let transportMessage: string | undefined;
         let syntheticTool = false;
         // SAFETY: this adapter is registered only for the openai-completions API.
         const nativeModel = model as Model<"openai-completions">;
@@ -60,20 +58,11 @@ export function createFreeStream(
             return normalizeFreeRequestPayload(request);
           },
           fetch: async (input, init) => {
-            transportMessage = undefined;
+            const response = await (options?.fetch ?? fetcher)(input, init);
+            quotaMessage =
+              response.status === 429 ? usageLimitMessage(response.headers, Date.now()) : undefined;
 
-            try {
-              const response = await (options?.fetch ?? fetcher)(input, init);
-              quotaMessage =
-                response.status === 429
-                  ? usageLimitMessage(response.headers, Date.now())
-                  : undefined;
-
-              return response;
-            } catch (error) {
-              if (error instanceof BunTransportError) transportMessage = error.message;
-              throw error;
-            }
+            return response;
           },
         });
 
@@ -92,10 +81,6 @@ export function createFreeStream(
               },
             });
             continue;
-          }
-
-          if (event.type === "error" && event.reason !== "aborted" && transportMessage) {
-            event.error.errorMessage = transportMessage;
           }
 
           if (
