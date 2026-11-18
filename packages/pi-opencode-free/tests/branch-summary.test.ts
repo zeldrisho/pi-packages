@@ -319,7 +319,7 @@ describe("segmented branch summary", () => {
     expect(harness.notifications.join(" ")).toContain("no digests");
   });
 
-  it("discards a summary that stopped at the cap and defers to Pi", async () => {
+  it("cancels when a branch summary stops at the cap twice", async () => {
     const harness = createHarness({
       contextWindow: 40_000,
       respond: (call, index) =>
@@ -330,8 +330,28 @@ describe("segmented branch summary", () => {
 
     const result = await harness.handler(harness.event, harness.context);
 
-    expect(result).toBeUndefined();
-    expect(harness.notifications.join(" ")).toContain("no usable summary");
+    expect(result).toEqual({ cancel: true });
+    expect(harness.calls.filter(isSummaryRequest)).toHaveLength(2);
+    expect(harness.notifications.join(" ")).toContain("navigation was cancelled");
+  });
+
+  it("retries a truncated branch summary concisely", async () => {
+    let attempts = 0;
+
+    const harness = createHarness({
+      contextWindow: 40_000,
+      respond: (call) => {
+        if (!isSummaryRequest(call)) return response("DIGEST", "stop");
+        attempts += 1;
+
+        return attempts === 1 ? response("PARTIAL", "length") : response(BRANCH_SUMMARY, "stop");
+      },
+    });
+
+    const result = await harness.handler(harness.event, harness.context);
+    expect(attempts).toBe(2);
+    expect(result?.summary?.summary).toContain("## Goal");
+    expect(result?.summary?.usage?.totalTokens).toBe(USAGE.totalTokens * harness.calls.length);
   });
 
   it("re-asks once when the summary skips the template, then accepts it", async () => {

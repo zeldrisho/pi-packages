@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Requests no longer look up the OpenCode CLI version before inference or catalog refresh; the bundled compatibility version is advertised instead, so both work when that metadata is unavailable.
 
+### Fixed
+
+- Retry truncated compaction and branch summaries concisely, and preserve the session if the retry also hits the output limit.
+
 ## [0.5.0] - 2026-11-18
 
 ### Changed

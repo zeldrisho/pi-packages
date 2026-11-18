@@ -30,7 +30,7 @@ const MIN_REQUEST_INPUT_TOKENS = 4_000;
 
 const MAX_REQUEST_INPUT_TOKENS = 60_000;
 
-/** How often a truncated segment may be halved before its partial digest is accepted. */
+/** Maximum splitting depth before a truncated segment is rejected. */
 const MAX_SPLIT_DEPTH = 3;
 
 const STATUS_KEY = "opencode-free-compaction";
@@ -549,6 +549,8 @@ async function summarizeMessages(
     return { text: `${left.text}\n\n${right.text}`, usage: right.usage };
   }
 
+  if (result.truncated) throw new Error("Segment summary hit the output token cap");
+
   return { text: result.text, usage: nextUsage };
 }
 
@@ -579,7 +581,7 @@ async function reduceDigests(
   signal: AbortSignal,
   usage: Usage,
   spec: SummarySpec,
-): Promise<{ text: string; usage: Usage }> {
+): Promise<{ text: string; usage: Usage; truncated?: boolean }> {
   const focus = customInstructions ? `\n\nAdditional focus: ${customInstructions}` : "";
 
   const previous = previousSummary
@@ -612,8 +614,23 @@ async function reduceDigests(
 
   accumulated = addUsage(accumulated, result.usage);
 
+  // Retry once without discarding source digests: shortening them would silently lose context.
+  if (result.truncated) {
+    result = await finalCheckpoint(
+      context,
+      model,
+      boundedLevel,
+      previous,
+      focus,
+      signal,
+      spec,
+      "The previous response hit the output token limit. Be substantially more concise while preserving the most important facts and required format. Finish the response.",
+    );
+    accumulated = addUsage(accumulated, result.usage);
+  }
+
   // A summary that stopped at the cap carries partial text, so it is never persisted.
-  if (result.truncated) return { text: "", usage: accumulated };
+  if (result.truncated) return { text: "", usage: accumulated, truncated: true };
 
   // A model that ignores the template gets one reminder, as in OpenCode's compaction.
   if (!hasSections(result.text, spec.sections)) {
@@ -631,7 +648,7 @@ async function reduceDigests(
   }
 
   if (result.truncated || !hasSections(result.text, spec.sections)) {
-    return { text: "", usage: accumulated };
+    return { text: "", usage: accumulated, truncated: result.truncated };
   }
 
   return { text: result.text, usage: accumulated };
@@ -879,6 +896,15 @@ export function createChunkedCompactionHandler(
 
         usage = checkpoint.usage;
 
+        if (checkpoint.truncated) {
+          context.notify(
+            "Compaction summary hit the output token limit after retrying. Switch to another model and run /compact; the session is unchanged.",
+            "warning",
+          );
+
+          return { cancel: true };
+        }
+
         if (!checkpoint.text) {
           context.notify(
             "Segmented compaction produced an empty summary; using Pi's compaction",
@@ -1064,6 +1090,15 @@ export function createBranchSummaryHandler(
       );
 
       usage = reduced.usage;
+
+      if (reduced.truncated) {
+        context.notify(
+          "Branch summary hit the output token limit after retrying. Switch to another model and retry; navigation was cancelled.",
+          "warning",
+        );
+
+        return { cancel: true };
+      }
 
       if (!reduced.text) {
         context.notify(
