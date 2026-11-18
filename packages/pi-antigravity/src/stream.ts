@@ -24,7 +24,7 @@ import { parseApiKey } from "./oauth.ts";
 import { ENDPOINTS, antigravityHeaders } from "./project.ts";
 import { buildRequest, sanitizeToolCallId, type AntigravityRequestEnvelope } from "./request.ts";
 
-/** Deadline for receiving response headers before the next endpoint is tried. */
+/** Deadline for receiving response headers; transport timeouts are not replayed. */
 const HEADER_TIMEOUT_MS = 60_000;
 
 /** Silence allowed inside a stream before it is treated as stalled. */
@@ -737,7 +737,7 @@ async function postToEndpoint(
     const controller = new AbortController();
 
     const timer = setTimeout(
-      () => controller.abort(new Error("Antigravity response headers timed out")),
+      () => controller.abort(new Error("Antigravity timed out waiting for response headers")),
       HEADER_TIMEOUT_MS,
     );
 

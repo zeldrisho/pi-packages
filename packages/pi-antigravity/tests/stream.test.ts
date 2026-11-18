@@ -81,6 +81,73 @@ afterEach(() => {
 });
 
 describe("header timeout", () => {
+  it("accepts headers just before the deadline", async () => {
+    vi.useFakeTimers();
+
+    try {
+      const fetchMock = vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            setTimeout(() => resolve(sse([textFrame("OK")])), 59_000);
+          }),
+      );
+
+      vi.stubGlobal("fetch", fetchMock);
+
+      const result = createAntigravityStream()(streamModel, contextWith("Hi"), {
+        apiKey: API_KEY,
+      }).result();
+
+      await vi.advanceTimersByTimeAsync(59_000);
+      expect((await result).stopReason).toBe("stop");
+      expect(fetchMock).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("times out without replaying and honors cancellation while waiting", async () => {
+    vi.useFakeTimers();
+
+    try {
+      const fetchMock = vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () => reject(init.signal?.reason), {
+              once: true,
+            });
+          }),
+      );
+
+      vi.stubGlobal("fetch", fetchMock);
+
+      const result = createAntigravityStream()(streamModel, contextWith("Hi"), {
+        apiKey: API_KEY,
+      }).result();
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(await result).toMatchObject({
+        stopReason: "error",
+        errorMessage: "Antigravity timed out waiting for response headers",
+      });
+      expect(fetchMock).toHaveBeenCalledOnce();
+
+      const controller = new AbortController();
+
+      const aborted = createAntigravityStream()(streamModel, contextWith("Hi"), {
+        apiKey: API_KEY,
+        signal: controller.signal,
+      }).result();
+
+      await vi.advanceTimersByTimeAsync(0);
+      controller.abort();
+      expect((await aborted).stopReason).toBe("aborted");
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("clears the header deadline before consuming the response body", async () => {
     const originalSetTimeout = globalThis.setTimeout;
     const originalClearTimeout = globalThis.clearTimeout;
