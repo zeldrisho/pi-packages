@@ -17,6 +17,44 @@ describe("web_fetch caching", () => {
     await fixture.stop();
   });
 
+  it("returns a cached selected surface with stable continuation and full-page isolation", async () => {
+    const url = `${origin}/surface-guide?tab=cli`;
+
+    const first = await executeWebFetch(
+      { url, maxCharacters: 1000 },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(first.content[0].text).toContain("CLIONLY");
+    expect(first.content[0].text).not.toContain("APPONLY");
+    expect(first.details.surface).toEqual({ selected: "cli", omitted: 1 });
+    expect(first.structuredContent).toMatchObject({ surface: { selected: "cli", omitted: 1 } });
+    expect(first.details.nextOffset).toBeDefined();
+
+    const next = await executeWebFetch(
+      { url, offset: first.details.nextOffset, maxCharacters: 1000 },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(next.details.cacheStatus).toBe("hit");
+    expect(next.details.offset).toBe(first.details.nextOffset);
+
+    const full = await executeWebFetch(
+      { url: `${origin}/surface-guide` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(full.content[0].text).toContain("APPONLY");
+    expect(full.content[0].text).toContain("CLIONLY");
+    expect(full.details.surface).toBeUndefined();
+  });
+
   it("suggests a linked page with the requested fragment when the local fragment is missing", async () => {
     const result = await executeWebFetch(
       { url: `${origin}/fragment-index#trustpolicyexclude` },

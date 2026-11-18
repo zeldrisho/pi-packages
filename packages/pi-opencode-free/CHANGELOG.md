@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-18
+
+### Changed
+
+- Resolve Bun on `PATH`; the `PI_OPENCODE_FREE_BUN` override is no longer supported.
+
+### Fixed
+
+- Identify gateway connection failures as OpenCode Free upstream request failures while preserving the original diagnostics and leaving retries to Pi.
+
 ## [0.4.0] - 2026-11-10
 
 ### Added
@@ -90,7 +100,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Discover free models through Pi's native OpenCode catalog from pi.dev instead of models.dev, preserving Pi's capabilities and compatibility metadata.
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.4.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.5.0...HEAD
+[0.5.0]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.4.0...pi-opencode-free-v0.5.0
 [0.4.0]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.3...pi-opencode-free-v0.4.0
 [0.3.3]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.2...pi-opencode-free-v0.3.3
 [0.3.2]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.1...pi-opencode-free-v0.3.2

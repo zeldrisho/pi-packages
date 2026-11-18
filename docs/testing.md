@@ -4,26 +4,25 @@ Use this guide for opt-in end-to-end checks against real models, networks, and e
 
 ## Isolate the Pi process
 
-Start from the repository root so relative extension paths resolve to the local packages. Disable extension and skill discovery and load the four local extensions explicitly:
+Start from the repository root so relative paths resolve to the local packages. Disable ambient extension, skill, prompt-template, theme, context-file, and MCP discovery. Load the provider and only the extensions under test explicitly; this example tests fetch:
 
 ```bash
 cache_dir=$(mktemp -d)
 
-XDG_CACHE_HOME="$cache_dir" pi --no-session --no-extensions --no-skills --no-context-files \
+XDG_CACHE_HOME="$cache_dir" pi --no-session --no-extensions --no-skills --no-prompt-templates \
+  --no-themes --no-context-files --no-mcp \
   -e ./packages/pi-opencode-free \
   -e ./packages/pi-web-fetch \
-  -e ./packages/pi-web-search \
-  -e ./packages/pi-gate \
-  --use-theme catppuccin-mocha --model <model>
+  --theme ./packages/pi-catppuccin/themes --use-theme catppuccin-mocha --model <model>
 
 rm -rf -- "$cache_dir"
 ```
 
 This starts an interactive session. Inspect tool output and use the expand shortcut to verify rendering. For JSON event inspection, add `--mode json '<prompt>'`.
 
-Install and enable `pi-catppuccin` before testing, and select `catppuccin-mocha` with `--use-theme`, including for interactive checks. The theme affects interactive rendering, not JSON events.
+The example loads the local `pi-catppuccin` theme explicitly. The theme affects interactive rendering, not JSON events. Add other local extensions with `-e` only when they are under test.
 
-`--no-extensions` blocks globally installed extensions, while each `-e` loads the named local package. `--no-context-files` prevents repository `AGENTS.md` files and similar context from changing the test. Use the temporary `XDG_CACHE_HOME` so stale persistent cache entries cannot mask a failure. Built-in tools, prompt templates, and Gate's existing configuration remain available. Built-in MCP support is disabled unless explicitly loaded.
+`--no-extensions` blocks discovered extensions, while each `-e` loads the named local package. `--no-context-files` prevents repository `AGENTS.md` files and similar context from changing the test. Use the temporary `XDG_CACHE_HOME` so stale persistent cache entries cannot mask a failure. Built-in tools remain available. If testing Gate, its existing configuration still applies; inspect or isolate it before running.
 
 Web search requires `BRAVE_SEARCH_API_KEY` in the environment. Never put credentials in the prompt, committed files, or captured output.
 
@@ -32,8 +31,7 @@ Web search requires `BRAVE_SEARCH_API_KEY` in the environment. Never put credent
 Ask the user which model to use before running a live check. Do not assume a model name or silently fall back to a default. List the models exposed by the local provider setup:
 
 ```bash
-pi --no-extensions \
-  --use-theme catppuccin-mocha \
+pi --no-extensions --no-skills --no-prompt-templates --no-themes --no-context-files --no-mcp \
   -e ./packages/pi-opencode-free --list-models
 ```
 

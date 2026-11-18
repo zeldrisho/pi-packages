@@ -25,11 +25,15 @@ const renderTheme: RenderTheme = {
 };
 
 describe("web_fetch rendering", () => {
-  it("registers for direct model calls only", () => {
+  it("registers for direct and codemode calls", () => {
     let registered: unknown;
     // SAFETY: registration only needs registerTool; capture its definition for this test.
     registerWebFetch({ registerTool: (tool: any) => (registered = tool) } as ExtensionAPI);
-    expect(registered).toMatchObject({ name: "web_fetch", exposure: "model-only" });
+    expect(registered).not.toHaveProperty("exposure");
+    expect(registered).toMatchObject({
+      name: "web_fetch",
+      outputSchema: expect.any(Object),
+    });
   });
 
   it("omits the tool name from errors exposed to callers", async () => {

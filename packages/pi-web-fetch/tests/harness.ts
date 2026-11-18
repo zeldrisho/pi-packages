@@ -24,6 +24,15 @@ let stalledBodyReady: (() => void) | null = null;
  * slow requests, and request-counted continuation fixtures.
  */
 function fixtureResponse(request: IncomingMessage, response: ServerResponse): void {
+  if (request.url?.startsWith("/surface-guide")) {
+    response.setHeader("content-type", "text/html");
+    response.end(
+      `<html><body><main><article><h1>Guide</h1><p>Shared instructions.</p><div data-surface-filter-pills><button role="tab" data-surface-id="hub">App</button><button role="tab" data-surface-id="cli">CLI</button></div><div data-surface-pane="hub"><h2>App guide</h2><p>APPONLY</p></div><div data-surface-pane="cli"><h2 id="cli-guide">CLI guide</h2><p>CLIONLY ${"commands ".repeat(300)}</p></div></article></main></body></html>`,
+    );
+
+    return;
+  }
+
   if (request.url?.startsWith("/coalesced?")) {
     coalescedRequests += 1;
     setTimeout(() => {

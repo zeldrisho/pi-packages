@@ -66,6 +66,25 @@ function safeUrl(value: string): URL | undefined {
   }
 }
 
+/** Recognizes visible Markdown links to the discovered index or verified aliases. */
+function hasVisibleIndexLink(text: string, pageUrl: string, indexes: readonly string[]): boolean {
+  const page = safeUrl(pageUrl);
+
+  if (!page) return false;
+
+  for (const match of text.matchAll(/\[[^\]\n]*\]\(([^\s)]+)\)/gu)) {
+    try {
+      const target = new URL(match[1], page);
+
+      if (target.origin === page.origin && indexes.includes(target.href)) return true;
+    } catch {
+      // Ignore malformed page links.
+    }
+  }
+
+  return false;
+}
+
 /**
  * Classify the kind of content returned by a fetch operation.
  *
@@ -188,10 +207,13 @@ export interface WebFetchDetails {
   outline: DocumentOutline;
   /** Deterministic focused-extraction evidence when a query was supplied. */
   focus?: FocusDetails;
+  surface?: { selected: string; omitted: number };
   /** True when the returned content is the site's /llms.txt served instead of the requested page. */
   llmsTxtFallback: boolean;
   /** True when the returned content is the page's advertised Markdown version served instead of a low-quality page. */
   markdownAlternateFallback: boolean;
+  /** Identifies an API or specification used instead of the page. */
+  representationFallback?: CompleteDocument["representationFallback"];
   /** The site's /llms.txt index URL when one exists and the returned content is not that index itself. */
   llmsTxtUrl?: string;
   /** True for a fresh cache hit or a successful 304 revalidation. */
@@ -230,8 +252,10 @@ export interface WebFetchStructuredOutput {
   characterCount: number;
   llmsTxtFallback: boolean;
   markdownAlternateFallback: boolean;
+  representationFallback?: CompleteDocument["representationFallback"];
   extraction?: CompleteDocument["extractionDiagnostics"];
   focus?: FocusDetails;
+  surface?: { selected: string; omitted: number };
   outline: { totalWords: number; totalHeadings: number; omittedHeadings: number };
   fragment?: { requested: string; matched: boolean; offset?: number };
 }
@@ -255,6 +279,9 @@ export const webFetchOutputSchema = Type.Object({
   characterCount: Type.Integer(),
   llmsTxtFallback: Type.Boolean(),
   markdownAlternateFallback: Type.Boolean(),
+  representationFallback: Type.Optional(
+    Type.Union([Type.Literal("packit-api"), Type.Literal("swagger-spec")]),
+  ),
   extraction: Type.Optional(
     Type.Object({
       javascriptRequired: Type.Boolean(),
@@ -275,6 +302,7 @@ export const webFetchOutputSchema = Type.Object({
       focusedCharacters: Type.Integer(),
     }),
   ),
+  surface: Type.Optional(Type.Object({ selected: Type.String(), omitted: Type.Integer() })),
   outline: Type.Object({
     totalWords: Type.Integer(),
     totalHeadings: Type.Integer(),
@@ -294,6 +322,14 @@ const completeDocumentCacheSchema = Type.Object(
     url: Type.String(),
     contentType: Type.String(),
     markdown: Type.String(),
+    surfaceView: Type.Optional(
+      Type.Object({
+        selected: Type.String({ maxLength: 40 }),
+        omitted: Type.Integer({ minimum: 1, maximum: 19 }),
+        markdown: Type.String(),
+        fragmentOffsets: Type.Optional(Type.Record(Type.String(), Type.Number())),
+      }),
+    ),
     fragmentOffsets: Type.Optional(Type.Record(Type.String(), Type.Number())),
     extractor: Type.Union([Type.Literal("raw"), Type.Literal("basic"), Type.Literal("defuddle")]),
     shellSuspected: Type.Boolean(),
@@ -358,7 +394,9 @@ const fetchCachePersistence: CachePersistence<string, CompleteDocument> = {
 const fetchCache = new ExpiringLruCache<string, CompleteDocument>(
   CACHE_MAX_ENTRIES,
   CACHE_MAX_MARKDOWN_BYTES,
-  (document) => encoder.encode(document.markdown).byteLength,
+  (document) =>
+    encoder.encode(document.markdown).byteLength +
+    encoder.encode(document.surfaceView?.markdown ?? "").byteLength,
   undefined,
   fetchCachePersistence,
 );
@@ -431,7 +469,12 @@ export async function executeWebFetch(
 
   const displayRequestedUrl = redactUrlForDisplay(params.url);
   const sourceUrl = urlWithoutFragment(params.url);
-  const cacheKey = canonicalKey({ url: sourceUrl });
+
+  // Older persisted entries predate surface views and must not mask explicit selections.
+  const cacheKey = safeUrl(sourceUrl)?.searchParams.has("tab")
+    ? canonicalKey({ url: sourceUrl, surfaceExtraction: 1 })
+    : canonicalKey({ url: sourceUrl });
+
   let document = fetchCache.get(cacheKey);
   const now = Date.now();
 
@@ -466,7 +509,12 @@ export async function executeWebFetch(
         let fetched: CompleteDocument;
         let acquisitionStatus: FetchAcquisition["cacheStatus"] = "miss";
 
-        if (stale?.validators && !stale.llmsTxtFallback && !stale.markdownAlternateFallback) {
+        if (
+          stale?.validators &&
+          !stale.llmsTxtFallback &&
+          !stale.markdownAlternateFallback &&
+          !stale.representationFallback
+        ) {
           const outcome = await revalidateCompleteDocument(
             sourceUrl,
             stale,
@@ -506,6 +554,21 @@ export async function executeWebFetch(
       links: undefined,
       fragmentOffsets: undefined,
     };
+  const canonicalMarkdown = document.markdown;
+
+  const surface =
+    !blocked && document.surfaceView
+      ? { selected: document.surfaceView.selected, omitted: document.surfaceView.omitted }
+      : undefined;
+
+  if (surface && document.surfaceView) {
+    document = {
+      ...document,
+      markdown: document.surfaceView.markdown,
+      fragmentOffsets: document.surfaceView.fragmentOffsets,
+    };
+  }
+
   const resolvedFragment = resolveFragmentOffset(document, params.url);
   const fragmentOffset = resolvedFragment.offset;
   const fragmentMatched = resolvedFragment.fragment !== undefined && fragmentOffset !== undefined;
@@ -613,6 +676,12 @@ export async function executeWebFetch(
   const output = blocked
     ? "Blocked by an anti-bot challenge. Requested page content is unavailable."
     : [
+        ...(result.representationFallback === "swagger-spec"
+          ? [
+              `[Showing the advertised Swagger specification from ${finalUrl} instead of the requested page.]`,
+              "",
+            ]
+          : []),
         ...(result.markdownAlternateFallback
           ? [
               "[Page content was sparse; showing the site's advertised Markdown version instead.]",
@@ -637,6 +706,12 @@ export async function executeWebFetch(
               "",
             ]
           : []),
+        ...(surface
+          ? [
+              `[Showing tab "${surface.selected}"; ${surface.omitted} other tabs omitted. Continuation offsets apply to this view.]`,
+              "",
+            ]
+          : []),
         ...(fragmentMatched ? ["[Starting at the requested URL fragment.]", ""] : []),
         ...(focused
           ? [
@@ -646,16 +721,44 @@ export async function executeWebFetch(
               "",
             ]
           : []),
-        result.markdown || (focused ? "" : "[The page contained no readable text.]"),
+        result.markdown ||
+          (focused
+            ? ""
+            : result.extractionDiagnostics?.javascriptRequired
+              ? "[This page requires JavaScript; its content could not be retrieved.]"
+              : "[The page contained no readable text.]"),
       ].join("\n");
 
-  const outputTruncation = truncateHead(output, {
+  let outputTruncation = truncateHead(output, {
     maxLines: DEFAULT_MAX_LINES,
     maxBytes: DEFAULT_MAX_BYTES,
   });
 
+  if (showLlmsNotice && result.llmsTxtIndexUrl) {
+    const indexUrl = redactUrlForDisplay(result.llmsTxtIndexUrl);
+    const notice = `Index: ${indexUrl}\n\n`;
+    const noticePosition = outputTruncation.content.indexOf(notice);
+
+    if (
+      noticePosition !== -1 &&
+      ([indexUrl, ...(result.llmsTxtIndexAliases ?? []).map(redactUrlForDisplay)].some((url) =>
+        outputTruncation.content.slice(noticePosition + notice.length).includes(url),
+      ) ||
+        hasVisibleIndexLink(
+          outputTruncation.content.slice(noticePosition + notice.length),
+          rawFinalUrl,
+          [result.llmsTxtIndexUrl, ...(result.llmsTxtIndexAliases ?? [])],
+        ))
+    ) {
+      outputTruncation = truncateHead(output.replace(notice, ""), {
+        maxLines: DEFAULT_MAX_LINES,
+        maxBytes: DEFAULT_MAX_BYTES,
+      });
+    }
+  }
+
   const truncated = result.truncated || outputTruncation.truncated;
-  const outline = createDocumentOutline(document.markdown);
+  const outline = createDocumentOutline(canonicalMarkdown);
 
   const structured: WebFetchStructuredOutput = {
     requestedUrl,
@@ -675,8 +778,10 @@ export async function executeWebFetch(
     characterCount: 0,
     llmsTxtFallback: Boolean(result.llmsTxtFallback),
     markdownAlternateFallback: Boolean(result.markdownAlternateFallback),
+    representationFallback: result.representationFallback,
     extraction: result.extractionDiagnostics,
     focus: focused?.details,
+    surface,
     outline: {
       totalWords: outline.totalWords,
       totalHeadings: outline.totalHeadings,
@@ -733,8 +838,10 @@ export async function executeWebFetch(
       confidence,
       outline,
       focus: focused?.details,
+      surface,
       llmsTxtFallback: Boolean(result.llmsTxtFallback),
       markdownAlternateFallback: Boolean(result.markdownAlternateFallback),
+      representationFallback: result.representationFallback,
       llmsTxtUrl:
         result.llmsTxtIndexUrl === undefined
           ? undefined

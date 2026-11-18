@@ -7,6 +7,61 @@ const substantial =
   "Readable issue context with reproduction details and expected behavior. ".repeat(12);
 
 describe("extraction regressions", () => {
+  it("keeps fragment siblings and deduplicates equivalent tab mappings", async () => {
+    const html = `<p>Shared preface.</p><main><div data-surface-filter-pills><div role="tablist"><button role="tab" data-surface-id="hub" aria-controls="hub">App</button><button role="tab" data-surface-id="cli" aria-controls="cli">CLI</button></div></div><div role="tabpanel" id="hub" data-surface-pane="hub">APPONLY</div><div role="tabpanel" id="cli" data-surface-pane="cli">CLIONLY</div></main>`;
+
+    const result = await extractHtmlToMarkdown(
+      html,
+      new URL("https://example.com/install?tab=cli"),
+    );
+
+    expect(result.surfaceView?.markdown).toContain("CLIONLY");
+    expect(result.surfaceView?.markdown).not.toContain("APPONLY");
+  });
+
+  it("derives an explicitly requested documentation surface without changing the complete page", async () => {
+    const html = `<html><body><main><article><h1>Authenticate</h1><p>Shared introduction.</p><div data-surface-filter-pills><div role="tablist"><button role="tab" data-surface-id="hub">App</button><button role="tab" data-surface-id="cli">CLI</button></div></div><div data-surface-pane="hub"><h2>App setup</h2><p>APPONLY</p></div><div data-surface-pane="cli"><h2>CLI setup</h2><p>CLIONLY</p><div role="tabpanel"><p>Nested instructions</p></div></div></article></main></body></html>`;
+
+    const result = await extractHtmlToMarkdown(
+      html,
+      new URL("https://example.com/install?tab=cli"),
+    );
+
+    expect(result.markdown).toContain("APPONLY");
+    expect(result.markdown).toContain("CLIONLY");
+    expect(result.surfaceView).toMatchObject({ selected: "cli", omitted: 1 });
+    expect(result.surfaceView?.markdown).toContain("Shared introduction");
+    expect(result.surfaceView?.markdown).toContain("CLIONLY");
+    expect(result.surfaceView?.markdown).toContain("Nested instructions");
+    expect(result.surfaceView?.markdown).not.toContain("APPONLY");
+
+    for (const query of ["", "?tab=unknown", "?tab=cli&tab=hub"]) {
+      expect(
+        (await extractHtmlToMarkdown(html, new URL(`https://example.com/install${query}`)))
+          .surfaceView,
+      ).toBeUndefined();
+    }
+
+    const ambiguous = html.replace('data-surface-id="hub"', 'data-surface-id="cli"');
+    expect(
+      (await extractHtmlToMarkdown(ambiguous, new URL("https://example.com/install?tab=cli")))
+        .surfaceView,
+    ).toBeUndefined();
+  });
+
+  it("selects standard ARIA tabs only when their panel mapping is unambiguous", async () => {
+    const html = `<html><body><main><h1>Guide</h1><p>Shared content</p><div role="tablist"><button role="tab" id="linux" aria-controls="linux-panel">Linux</button><button role="tab" id="windows" aria-controls="windows-panel">Windows</button></div><div><section role="tabpanel" id="linux-panel"><h2>Linux setup</h2><p>LINUXCONTENT</p></section><section role="tabpanel" id="windows-panel" hidden><h2>Windows setup</h2><p>WINDOWSCONTENT</p></section></div></main></body></html>`;
+    const url = new URL("https://example.com/guide?tab=windows");
+    const result = await extractHtmlToMarkdown(html, url);
+    expect(result.surfaceView?.markdown).toContain("WINDOWSCONTENT");
+    expect(result.surfaceView?.markdown).not.toContain("LINUXCONTENT");
+    expect(result.surfaceView?.markdown).toContain("Shared content");
+    const ambiguous = html.replace('id="linux"', 'id="windows"');
+    expect((await extractHtmlToMarkdown(ambiguous, url)).surfaceView).toBeUndefined();
+    const incomplete = html.replace('aria-controls="linux-panel"', 'data-other="linux-panel"');
+    expect((await extractHtmlToMarkdown(incomplete, url)).surfaceView).toBeUndefined();
+  });
+
   it("preserves HTML tables as GFM tables", async () => {
     const html = `<html><body><main><article><h1>Compatibility</h1><table><thead><tr><th>Runtime</th><th>Supported</th></tr></thead><tbody><tr><td>Node 24</td><td>Yes</td></tr><tr><td>Node 22</td><td>No</td></tr></tbody></table><p>${substantial}</p></article></main></body></html>`;
     const result = await extractHtmlToMarkdown(html, new URL("https://example.com/table"));

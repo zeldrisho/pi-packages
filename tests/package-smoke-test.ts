@@ -285,7 +285,9 @@ for (const packageName of packageNames) {
     const registrations =
       (extension?.handlers.size ?? 0) +
       (extension?.tools.size ?? 0) +
-      (extension?.commands.size ?? 0);
+      (extension?.commands.size ?? 0) +
+      loaded.runtime.pendingProviderRegistrations.filter((entry) => entry.extensionPath === extension?.path).length +
+      loaded.runtime.pendingNativeProviderRegistrations.filter((entry) => entry.extensionPath === extension?.path).length;
     if (!extension) {
       throw new Error(\`\${packageName} did not load as a Pi extension\`);
     }

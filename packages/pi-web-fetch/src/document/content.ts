@@ -19,6 +19,13 @@ export interface CompleteDocument {
   /** Character offsets for document fragments, derived from HTML anchors/headings. */
   fragmentOffsets?: Record<string, number>;
   markdown: string;
+  /** A URL-selected surface derived from the complete extracted page. */
+  surfaceView?: {
+    selected: string;
+    omitted: number;
+    markdown: string;
+    fragmentOffsets?: Record<string, number>;
+  };
   title?: string;
   extractor: "defuddle" | "basic" | "raw";
   /** @deprecated Use extractionDiagnostics for the individual quality signals. */
@@ -39,12 +46,18 @@ export interface CompleteDocument {
   openapiSpec?: boolean;
   /** Set when the site publishes a usable /llms.txt index and this document is not that index. */
   llmsTxtIndexUrl?: string;
+  /** Probed index URLs with identical complete content. */
+  llmsTxtIndexAliases?: string[];
   /** Absolute URL advertised via `rel="describedby"` (header or HTML link) for this page. */
   llmsTxtDescribedBy?: string;
   /** Absolute URL advertised for a Markdown version of this page (`rel="alternate" type="text/markdown"`). */
   markdownAlternateUrl?: string;
   /** True when this document is the advertised Markdown version served instead of a low-quality page. */
   markdownAlternateFallback?: boolean;
+  /** Same-origin OpenAPI document advertised by an otherwise empty Swagger UI. */
+  swaggerSpecUrl?: string;
+  /** The returned content is an API or specification substituted for the page. */
+  representationFallback?: "packit-api" | "swagger-spec";
 }
 
 /**

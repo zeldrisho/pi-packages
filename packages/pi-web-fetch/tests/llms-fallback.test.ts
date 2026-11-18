@@ -239,6 +239,106 @@ describe("executeWebFetch llms.txt support", () => {
     expect(second.content[0]?.text).toContain("Index: https://indexed.example.com/llms.txt");
   });
 
+  it("omits the index notice when the same URL is already in the returned page", async () => {
+    const index = "https://linked-index.example.com/llms.txt";
+
+    const { dependencies } = recordingDependencies((href) =>
+      href === index
+        ? fakeResponse(200, "text/markdown", LLMS_TXT)
+        : fakeResponse(
+            200,
+            "text/plain",
+            `Documentation index: ${index}\n${"Page content. ".repeat(30)}`,
+          ),
+    );
+
+    const result = await executeWebFetch(
+      { url: "https://linked-index.example.com/page" },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.details.llmsTxtUrl).toBe(index);
+    expect(result.content[0]?.text).toContain(`Documentation index: ${index}`);
+    expect(result.content[0]?.text).not.toContain(`Index: ${index}`);
+  });
+
+  it.each([true, false])(
+    "suppresses only equivalent index links (identical: %s)",
+    async (identical) => {
+      const origin = `https://${identical ? "same" : "distinct"}-aliases.example.com`;
+      const root = `${origin}/llms.txt`;
+      const section = `${origin}/docs/llms.txt`;
+
+      const { dependencies } = recordingDependencies((href) => {
+        if (href === root) return fakeResponse(200, "text/markdown", LLMS_TXT);
+
+        if (href === section)
+          return fakeResponse(
+            200,
+            "text/markdown",
+            identical ? LLMS_TXT : `${LLMS_TXT}\nDistinct section`,
+          );
+
+        return fakeResponse(
+          200,
+          "text/plain",
+          `Documentation index: ${root}\n${"Page content. ".repeat(30)}`,
+        );
+      });
+
+      const result = await executeWebFetch(
+        { url: `${origin}/docs/page` },
+        undefined,
+        undefined,
+        dependencies,
+      );
+
+      expect(result.details.llmsTxtUrl).toBe(section);
+      expect(result.content[0]?.text).toContain(`Documentation index: ${root}`);
+
+      if (identical) expect(result.content[0]?.text).not.toContain(`Index: ${section}`);
+      else expect(result.content[0]?.text).toContain(`Index: ${section}`);
+    },
+  );
+
+  it.each([
+    ["[llms.txt](/llms.txt)", false],
+    ["[index](../llms.txt)", true],
+    ["[index](https://elsewhere.example/llms.txt)", false],
+    ["[index](/llms.txt-other)", false],
+    ["llms.txt", false],
+  ])("recognizes visible same-origin index links: %s", async (link, suppress) => {
+    const origin = `https://links-${suppress ? "yes" : "no"}-${link.length}.example.com`;
+    const section = `${origin}/docs/llms.txt`;
+
+    const { dependencies } = recordingDependencies((href) => {
+      if (href === section) return fakeResponse(200, "text/markdown", LLMS_TXT);
+
+      if (href.endsWith("/llms.txt")) return fakeResponse(404, "text/plain", "Not Found");
+
+      return fakeResponse(
+        200,
+        "text/plain",
+        `Documentation: ${link}\n${"Page content. ".repeat(30)}`,
+      );
+    });
+
+    const result = await executeWebFetch(
+      { url: `${origin}/docs/guides/page` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.details.llmsTxtUrl).toBe(section);
+    expect(result.content[0]?.text).toContain(link);
+
+    if (suppress) expect(result.content[0]?.text).not.toContain(`Index: ${section}`);
+    else expect(result.content[0]?.text).toContain(`Index: ${section}`);
+  });
+
   it("prefers a deeper section index over the site-wide one", async () => {
     const { dependencies, requests } = recordingDependencies((href) => {
       if (href.endsWith("/llms.txt")) {

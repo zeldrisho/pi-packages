@@ -105,6 +105,37 @@ describe("HTML extraction", () => {
     expect(result.fragmentOffsets?.["readme-title"]).toBeDefined();
   });
 
+  it("isolates GitHub plain-text READMEs in both extraction paths", async () => {
+    const html = `<main><table><tr><td colspan="2">FILE LISTING</td></tr></table><div><div><nav aria-label="Repository files"><a aria-current="page"><span data-content="README">README</span></a></nav></div><div class="js-snippet-clipboard-copy-unpositioned SharedMarkdownContent__JRRdYK"><div class="plain"><pre>Plain README content\n  Indented example</pre></div></div></div></main>`;
+
+    for (const fallback of [false, true]) {
+      if (fallback) {
+        const { Defuddle } = await import("defuddle/node");
+        vi.mocked(Defuddle).mockRejectedValueOnce(new Error("failure"));
+      }
+
+      const result = await extractHtmlToMarkdown(html, new URL("https://github.com/owner/repo"));
+      expect(result.githubReadme).toBe(true);
+      expect(result.markdown).toContain("Plain README content");
+      expect(result.markdown).not.toContain("FILE LISTING");
+    }
+  });
+
+  it("does not mistake unrelated plain content or inactive README tabs for a README", async () => {
+    const { Defuddle } = await import("defuddle/node");
+
+    for (const tab of [
+      '<a aria-current="page"><span data-content="LICENSE">LICENSE</span></a>',
+      '<a><span data-content="README">README</span></a>',
+    ]) {
+      vi.mocked(Defuddle).mockRejectedValueOnce(new Error("failure"));
+      const html = `<main><p>FILE LISTING</p><div><div><nav aria-label="Repository files">${tab}</nav></div><div><div class="plain"><pre>OTHER CONTENT</pre></div></div></div></main>`;
+      const result = await extractHtmlToMarkdown(html, new URL("https://github.com/owner/repo"));
+      expect(result.githubReadme).toBe(false);
+      expect(result.markdown).toContain("FILE LISTING");
+    }
+  });
+
   it("keeps the README scope when Defuddle fails", async () => {
     const { Defuddle } = await import("defuddle/node");
     vi.mocked(Defuddle).mockRejectedValueOnce(new Error("failure"));

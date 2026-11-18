@@ -89,7 +89,7 @@ async function requestPayload(input: string | URL | Request, init?: RequestInit)
 describe("OpenCode provider stream boundary", () => {
   it("preserves Bun installation guidance through native SDK connection errors", async () => {
     const message =
-      "OpenCode Free could not start its Bun transport. Install Bun or set PI_OPENCODE_FREE_BUN.";
+      "OpenCode Free could not start its Bun transport. Install Bun and make it available on PATH.";
 
     const native = createFreeStream(async () => {
       throw new BunTransportError(message);

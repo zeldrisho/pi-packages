@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-11-18
+
+### Changed
+
+- Restore codemode access to structured fetch results with Pi 0.99.0 or newer.
+- Return Packit Copr API data without a verbose substitution notice, while preserving the source URL and structured provenance.
+
+### Fixed
+
+- Preserve selected documentation surfaces in HTML fragments and when tab controls use multiple supported attribute mappings.
+- Recognize standard Swagger UI initializers and retain index notices when a visible link points to a different index.
+- Honor explicitly selected documentation surfaces when supported by the page, rather than mixing unrelated surface instructions.
+- Extract plain-text GitHub repository READMEs without the file-listing table.
+- Avoid redundant discovered index notices when the visible page already links to a same-site documentation index.
+- Retrieve Packit Copr job data without an API key and advertised Swagger specifications from otherwise empty app pages.
+- Explain when an empty page requires JavaScript instead of reporting a generic extraction error.
+- Solve supported Anubis challenges that declare no extensions as `null`.
+- Fetch slash-sensitive pages when a trailing slash returns 404 but the page exists without it.
+- Report page errors after a solved Anubis challenge instead of incorrectly reporting a bot block.
+
 ## [0.17.0] - 2026-11-12
 
 ### Changed
@@ -345,7 +365,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.17.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.17.1...HEAD
+[0.17.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.17.0...pi-web-fetch-v0.17.1
 [0.17.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.5...pi-web-fetch-v0.17.0
 [0.16.5]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.4...pi-web-fetch-v0.16.5
 [0.16.4]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.3...pi-web-fetch-v0.16.4

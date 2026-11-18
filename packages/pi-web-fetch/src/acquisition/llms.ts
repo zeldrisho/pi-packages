@@ -6,6 +6,28 @@ import {
   type FetchRemoteDependencies,
 } from "./fetch.ts";
 import { InflightCoalescer } from "../inflight";
+import { validateRemoteUrl } from "../network/network-policy.ts";
+
+function restrictOrigin(
+  dependencies: FetchRemoteDependencies,
+  origin: string,
+): FetchRemoteDependencies {
+  const validate = dependencies.validateUrl ?? validateRemoteUrl;
+
+  return {
+    ...dependencies,
+    solveAnubisChallenges: false,
+    solveAwsWafChallenges: false,
+    validateUrl: async (value) => {
+      const url = value instanceof URL ? value : new URL(value);
+
+      if (url.origin !== origin || url.username || url.password)
+        throw new Error("Cross-origin fallback redirect refused.");
+
+      return validate(value);
+    },
+  };
+}
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
 
@@ -149,7 +171,7 @@ async function ensureLlmsTxtIndex(
   candidates: URL[],
   signal: AbortSignal | undefined,
   dependencies: FetchRemoteDependencies,
-): Promise<{ url: string; document: CompleteDocument } | undefined> {
+): Promise<{ url: string; document: CompleteDocument; aliases?: string[] } | undefined> {
   const documents = await Promise.all(
     candidates.map((candidate) => probeUsableRawText(candidate, signal, dependencies)),
   );
@@ -159,7 +181,13 @@ async function ensureLlmsTxtIndex(
   for (let depth = documents.length - 1; depth >= 0; depth -= 1) {
     const document = documents[depth];
 
-    if (document) return { url: candidates[depth].href, document };
+    if (document) {
+      const aliases = documents.flatMap((other, i) =>
+        i !== depth && other && other.markdown === document.markdown ? [candidates[i].href] : [],
+      );
+
+      return { url: candidates[depth].href, document, aliases };
+    }
   }
 
   return undefined;
@@ -253,10 +281,41 @@ export async function fetchDocumentWithLlmsTxtSupport(
   dependencies: FetchRemoteDependencies,
 ): Promise<CompleteDocument> {
   try {
-    if (isGitHubLikeHost(new URL(rawUrl).hostname)) {
+    const url = new URL(rawUrl);
+    const match = /^\/jobs\/copr\/(\d+)\/?$/.exec(url.pathname);
+
+    if (
+      url.protocol === "https:" &&
+      url.host === "dashboard.packit.dev" &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      match
+    ) {
+      const apiUrl = `https://prod.packit.dev/api/copr-builds/${match[1]}`;
+
+      try {
+        const document = await fetchCompleteDocument(
+          apiUrl,
+          signal,
+          restrictOrigin(dependencies, "https://prod.packit.dev"),
+        );
+
+        if (
+          new URL(document.url).origin === "https://prod.packit.dev" &&
+          document.contentType === "application/json"
+        )
+          return { ...document, representationFallback: "packit-api" };
+      } catch (error) {
+        if (signal?.aborted) throw error;
+      }
+    }
+
+    if (isGitHubLikeHost(url.hostname)) {
       return fetchCompleteDocument(rawUrl, signal, dependencies);
     }
-  } catch {
+  } catch (error) {
+    if (signal?.aborted) throw error;
     // Invalid URL falls through to fetchCompleteDocument which will throw.
   }
 
@@ -297,7 +356,29 @@ export async function fetchDocumentWithLlmsTxtSupport(
         ? await probeUsableRawText(describedBy, signal, dependencies)
         : undefined;
 
-    if (described && describedBy) index = { url: describedBy.href, document: described };
+    if (described && describedBy && index?.url !== describedBy.href)
+      index = { url: describedBy.href, document: described };
+  }
+
+  if (
+    !primary.markdown.trim() &&
+    primary.swaggerSpecUrl &&
+    isSafeToProbe(toAbsoluteUrl(primary.swaggerSpecUrl), primary.url)
+  ) {
+    try {
+      const spec = await fetchCompleteDocument(
+        primary.swaggerSpecUrl,
+        signal,
+        restrictOrigin(dependencies, new URL(primary.url).origin),
+        false,
+        false,
+      );
+
+      if (isSafeToProbe(toAbsoluteUrl(spec.url), primary.url) && spec.openapiSpec)
+        return { ...spec, representationFallback: "swagger-spec" };
+    } catch (error) {
+      if (signal?.aborted) throw error;
+    }
   }
 
   if (isLowQualityDocument(primary) || !primary.markdown.trim()) {
@@ -317,16 +398,16 @@ export async function fetchDocumentWithLlmsTxtSupport(
 
     if (index) return { ...index.document, llmsTxtFallback: true };
   } else if (index) {
-    return { ...primary, llmsTxtIndexUrl: index.url };
+    return { ...primary, llmsTxtIndexUrl: index.url, llmsTxtIndexAliases: index.aliases };
   }
 
   if (
     !primary.markdown.trim() &&
     (!primary.links || (primary.links.internal.length === 0 && primary.links.external.length === 0))
   ) {
-    // A JavaScript CAPTCHA or bot wall can be text-empty. Surface it as the standard
-    // blocked document rather than a misleading "no content" error.
-    if (primary.extractionDiagnostics?.botWall) return primary;
+    // Preserve diagnostics for empty challenge pages and JavaScript app shells.
+    if (primary.extractionDiagnostics?.botWall || primary.extractionDiagnostics?.javascriptRequired)
+      return primary;
 
     throw new Error("web_fetch: Page has no extractable content.");
   }

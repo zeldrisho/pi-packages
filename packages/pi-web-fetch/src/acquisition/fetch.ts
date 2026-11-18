@@ -1,4 +1,5 @@
 import type { IncomingMessage } from "node:http";
+import { parseHTML } from "linkedom";
 import { acquisitionAdmission } from "./admission.ts";
 import {
   lineFragmentOffsets,
@@ -291,6 +292,7 @@ async function documentFromDecoded(
   let markdown: string;
   let title: string | undefined;
   let fragmentOffsets: Record<string, number> | undefined;
+  let surfaceView: CompleteDocument["surfaceView"];
   let extractor: CompleteDocument["extractor"] = "raw";
   let describedBy: string | undefined = linkHints.describedBy;
   let markdownAlternateUrl: string | undefined = linkHints.markdownAlternate;
@@ -303,6 +305,7 @@ async function documentFromDecoded(
     markdown = extracted.markdown;
     title = extracted.title;
     fragmentOffsets = extracted.fragmentOffsets;
+    surfaceView = extracted.surfaceView;
     extractor = extracted.extractor;
     githubReadme = extracted.githubReadme === true;
     describedBy = describedBy ?? extracted.describedByLink;
@@ -342,12 +345,48 @@ async function documentFromDecoded(
   const links = isHtml ? extractDocumentLinks(raw, target.url) : undefined;
 
   const extractionDiagnostics = isHtml ? diagnoseExtraction(raw, markdown) : undefined;
+  let swaggerSpecUrl: string | undefined;
+
+  if (isHtml && !markdown.trim()) {
+    const { document } = parseHTML(raw);
+
+    for (const script of document.querySelectorAll("script:not([src])")) {
+      const text = script.textContent ?? "";
+
+      const options = /\bSwaggerUIBundle\s*\(\s*\{([^{}]{0,8192})\}/.exec(text)?.[1];
+
+      const match =
+        options === undefined
+          ? undefined
+          : /(?:^|,)\s*url\s*:\s*["']([^"'\\\r\n]+)["']/.exec(options);
+
+      if (!match) continue;
+
+      try {
+        const candidate = new URL(match[1], target.url);
+
+        if (
+          candidate.origin === target.url.origin &&
+          !candidate.username &&
+          !candidate.password &&
+          !candidate.hash
+        )
+          swaggerSpecUrl = candidate.href;
+      } catch {
+        // Ignore malformed advertisements.
+      }
+
+      break;
+    }
+  }
 
   if (
     !markdown.trim() &&
     (!links || (links.internal.length === 0 && links.external.length === 0)) &&
     !allowEmptyContent &&
-    !extractionDiagnostics?.botWall
+    !extractionDiagnostics?.botWall &&
+    !extractionDiagnostics?.javascriptRequired &&
+    !swaggerSpecUrl
   ) {
     throw new Error("web_fetch: Page has no extractable content.");
   }
@@ -369,6 +408,7 @@ async function documentFromDecoded(
     contentType,
     markdown,
     fragmentOffsets,
+    surfaceView,
     title,
     extractor,
     shellSuspected,
@@ -380,6 +420,7 @@ async function documentFromDecoded(
     markdownAlternateUrl,
     sourceLanguage,
     openapiSpec,
+    swaggerSpecUrl,
   };
 }
 
@@ -477,29 +518,39 @@ async function documentFromAcquisition(
       const challenge = parseAnubisChallenge(body.raw, target.url);
 
       if (challenge) {
+        let passed: Awaited<ReturnType<typeof solveAnubisChallenge>>;
+
         try {
-          const passed = await solveAnubisChallenge({
+          passed = await solveAnubisChallenge({
             challenge,
             pageUrl: target.url,
             raw: body.raw,
             dependencies,
             signal,
           });
-
-          return await documentFromAcquisition(
-            passed.target,
-            passed.response,
-            signal,
-            extractHtml,
-            allowEmptyContent,
-            dependencies,
-            false,
-          );
         } catch (error) {
           if (signal.aborted || (error instanceof Error && error.name === "AbortError"))
             throw error;
-          // Any other failure degrades to the standard blocked output below.
+
+          return documentFromDecoded(
+            target,
+            response,
+            body,
+            signal,
+            extractHtml,
+            allowEmptyContent,
+          );
         }
+
+        return documentFromAcquisition(
+          passed.target,
+          passed.response,
+          signal,
+          extractHtml,
+          allowEmptyContent,
+          dependencies,
+          false,
+        );
       }
 
       // An unsolvable challenge, denial, or error page is returned as blocked.
@@ -666,6 +717,25 @@ async function fetchDocument(
       response.destroy();
       ({ target, response } = await requestFollowingRedirects(
         target.url,
+        controller.signal,
+        requestDependencies,
+        { Accept: "text/html, text/plain;q=0.9, */*;q=0.1" },
+      ));
+    }
+
+    // Some sites distinguish a documentation page from the same path with a
+    // trailing slash. Retry only once, after representation negotiation fails.
+    if (
+      retryRepresentationMiss &&
+      response.statusCode === 404 &&
+      target.url.pathname !== "/" &&
+      target.url.pathname.endsWith("/")
+    ) {
+      const alternate = new URL(target.url);
+      alternate.pathname = alternate.pathname.slice(0, -1);
+      response.destroy();
+      ({ target, response } = await requestFollowingRedirects(
+        alternate,
         controller.signal,
         requestDependencies,
         { Accept: "text/html, text/plain;q=0.9, */*;q=0.1" },

@@ -6,6 +6,7 @@ Monorepo for my personal Pi extensions, skills, and themes.
 
 | Package                                                            | Type      | Purpose                                                | Install                                          |
 | ------------------------------------------------------------------ | --------- | ------------------------------------------------------ | ------------------------------------------------ |
+| [`@zeldrisho/pi-antigravity`](packages/pi-antigravity)             | Extension | Use Antigravity models with a Google AI subscription   | `pi install npm:@zeldrisho/pi-antigravity`       |
 | [`@zeldrisho/pi-gate`](packages/pi-gate)                           | Extension | Block or confirm bash commands from a user JSON config | `pi install npm:@zeldrisho/pi-gate`              |
 | [`@zeldrisho/pi-opencode-free`](packages/pi-opencode-free)         | Extension | Use OpenCode's free-tier models                        | `pi install npm:@zeldrisho/pi-opencode-free`     |
 | [`@zeldrisho/pi-web-fetch`](packages/pi-web-fetch)                 | Extension | Fetch public web pages as bounded Markdown             | `pi install npm:@zeldrisho/pi-web-fetch`         |

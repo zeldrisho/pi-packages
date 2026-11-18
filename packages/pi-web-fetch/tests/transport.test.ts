@@ -427,6 +427,71 @@ describe("web_fetch transport", () => {
     ).rejects.toThrow(`blocked by an AWS WAF anti-bot challenge (HTTP ${status})`);
   });
 
+  it("retries a slash-sensitive missing page without the trailing slash and preserves its query", async () => {
+    const requests: string[] = [];
+    const validated: string[] = [];
+
+    const fallbackDependencies: FetchRemoteDependencies = {
+      validateUrl: async (value) => {
+        const url = new URL(value.toString());
+        validated.push(url.href);
+
+        return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
+      },
+      request: async (target) => {
+        requests.push(target.url.href);
+
+        return target.url.pathname.endsWith("/")
+          ? fixtureResponse(404, { "content-type": "text/plain" }, "missing")
+          : fixtureResponse(200, { "content-type": "text/plain" }, "package configuration");
+      },
+    };
+
+    const result = await fetchRemoteContent(
+      "https://slash-test.invalid/docs/?key=value",
+      0,
+      6000,
+      undefined,
+      fallbackDependencies,
+    );
+
+    expect(result.markdown).toContain("package configuration");
+    expect(requests).toEqual([
+      "https://slash-test.invalid/docs/?key=value",
+      "https://slash-test.invalid/docs/?key=value",
+      "https://slash-test.invalid/docs?key=value",
+    ]);
+    expect(validated).toEqual(requests);
+  });
+
+  it.each(["/", "/missing", "/missing/"])("bounds missing-page retries for %s", async (path) => {
+    const requests: string[] = [];
+
+    const fallbackDependencies: FetchRemoteDependencies = {
+      validateUrl: async (value) => {
+        const url = new URL(value.toString());
+
+        return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
+      },
+      request: async (target) => {
+        requests.push(target.url.pathname);
+
+        return fixtureResponse(404, { "content-type": "text/plain" }, "missing");
+      },
+    };
+
+    await expect(
+      fetchRemoteContent(
+        `https://missing-test.invalid${path}`,
+        0,
+        6000,
+        undefined,
+        fallbackDependencies,
+      ),
+    ).rejects.toThrow("HTTP 404. Page not found or inaccessible.");
+    expect(requests).toEqual(path === "/missing/" ? [path, path, "/missing"] : [path, path]);
+  });
+
   it("explains that a missing page may be inaccessible", async () => {
     await expect(
       fetchRemoteContent(`${origin}/missing`, 0, 6_000, undefined, dependencies),

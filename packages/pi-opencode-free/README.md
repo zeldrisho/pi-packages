@@ -4,7 +4,7 @@ Use OpenCode's free-tier models from Pi. This experimental extension is independ
 
 ## Requirements
 
-Install the [Bun runtime](https://bun.sh); the extension uses it to send model requests. Bun must be available as `bun` on `PATH`. Optionally, set `PI_OPENCODE_FREE_BUN` to the Bun executable's path if you need to use a different installation.
+Install the [Bun runtime](https://bun.sh); the extension uses it to send model requests. Bun must be available as `bun` on `PATH`.
 
 ## Install
 
