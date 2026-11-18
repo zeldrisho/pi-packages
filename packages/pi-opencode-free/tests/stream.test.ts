@@ -376,17 +376,17 @@ describe("OpenCode provider stream boundary", () => {
     expect(result.stopReason).toBe("aborted");
   });
 
-  it("closes the stream before inference if asynchronous version resolution fails", async () => {
+  it("closes the stream before inference if the identity callback fails", async () => {
     const fetcher = vi.fn(async () => completion());
 
     const native = createFreeStream(fetcher, async () => {
-      throw new Error("version lookup failed");
+      throw new Error("identity resolution failed");
     });
 
     const stream = native(model, summary, options);
     expect(await stream.result()).toMatchObject({
       stopReason: "error",
-      errorMessage: "version lookup failed",
+      errorMessage: "identity resolution failed",
     });
     expect(fetcher).not.toHaveBeenCalled();
     const events = [];

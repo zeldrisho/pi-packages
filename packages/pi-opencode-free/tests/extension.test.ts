@@ -13,8 +13,7 @@ import { normalizeContext } from "@earendil-works/pi-ai/compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import piOpencodeFree, { PROVIDER_ID, registerOpencodeFree } from "../src/index";
-import { CLI_NPM_URL, CLI_UPDATE_URL } from "../src/cli-version";
-import { PROVIDER_MARKER_HEADER } from "../src/client-headers";
+import { CLIENT_VERSION, PROVIDER_MARKER_HEADER } from "../src/client-headers";
 import { DEFAULT_BASE_URL, MODEL_CATALOG_URL, initialFreeModels } from "../src/models";
 import type { ProviderRequestPayload } from "../src/request";
 
@@ -224,24 +223,11 @@ const discoveryCatalog = [
   },
 ];
 
-function versionResponse(): Response {
-  return Response.json({
-    channel: "latest",
-    name: "cli",
-    distribution: "npm",
-    active: true,
-    version: "2.1.4",
-    metadata: { package: "@opencode/cli" },
-  });
-}
-
 function discoveryFetcher(calls: string[]): typeof fetch {
   return async (input) => {
     const url = input instanceof Request ? input.url : input.toString();
 
     calls.push(url);
-
-    if (url === CLI_UPDATE_URL) return versionResponse();
 
     if (url === MODEL_CATALOG_URL) {
       return new Response(JSON.stringify(discoveryCatalog), {
@@ -325,7 +311,7 @@ describe("opencode-free extension", () => {
 
     const { context } = refreshContext({ allowNetwork: true });
     await refreshModels(config, context);
-    expect(calls).toEqual([CLI_UPDATE_URL, `${DEFAULT_BASE_URL}/models`, MODEL_CATALOG_URL]);
+    expect(calls).toEqual([`${DEFAULT_BASE_URL}/models`, MODEL_CATALOG_URL]);
   });
 
   it("refreshes models through the injected fetcher and persists the catalog", async () => {
@@ -346,7 +332,7 @@ describe("opencode-free extension", () => {
     const models = await refreshModels(config, context);
 
     expect(models.map((model) => model.id)).toEqual(["beam-free", "deepseek-v4.1-flash-free"]);
-    expect(calls).toEqual([CLI_UPDATE_URL, "http://proxy.test/v1/models", MODEL_CATALOG_URL]);
+    expect(calls).toEqual(["http://proxy.test/v1/models", MODEL_CATALOG_URL]);
 
     expect(publications).toHaveLength(1);
 
@@ -418,7 +404,9 @@ describe("opencode-free extension", () => {
 
     registerOpencodeFree(
       pi,
-      dependencies({}, async () => jsonResponse("unavailable", 503)),
+      dependencies({}, async () => {
+        throw new Error("unavailable");
+      }),
     );
 
     const config = state.provider?.config;
@@ -439,19 +427,12 @@ describe("opencode-free extension", () => {
   it("reuses the persisted session identity for inference across session starts", async () => {
     const { pi, state } = createFakePi();
     const sessions: Array<string | null> = [];
-    let versionLookups = 0;
     registerOpencodeFree(
       pi,
-      dependencies({}, async (input, init) => {
-        if (input === CLI_UPDATE_URL) {
-          versionLookups += 1;
-
-          return versionResponse();
-        }
-
+      dependencies({}, async (_input, init) => {
         const headers = new Headers(init?.headers);
         sessions.push(headers.get("x-opencode-session"));
-        expect(headers.get("User-Agent")).toBe("opencode/latest/2.1.4/cli");
+        expect(headers.get("User-Agent")).toBe(`opencode/latest/${CLIENT_VERSION}/cli`);
         expect(headers.get("Authorization")).toBe("Bearer public");
         expect(headers.get(PROVIDER_MARKER_HEADER)).toBe("1");
 
@@ -482,29 +463,6 @@ describe("opencode-free extension", () => {
     await native(storedModel, context, { apiKey: "public", maxRetries: 0 }).result();
     expect(sessions[1]).toBe(sessions[0]);
     expect(sessions).toHaveLength(2);
-    expect(versionLookups).toBe(1);
-  });
-
-  it("reports a version lookup failure without sending an inference request", async () => {
-    const { pi, state } = createFakePi();
-    const calls: string[] = [];
-    registerOpencodeFree(
-      pi,
-      dependencies({}, async (input) => {
-        calls.push(new Request(input).url);
-
-        return new Response("unavailable", { status: 503 });
-      }),
-    );
-    const native = state.provider?.config.streamSimple;
-
-    if (!native) throw new Error("missing provider stream");
-
-    const context = normalizeContext({ messages: [{ role: "user", content: "Hi", timestamp: 0 }] });
-    const result = await native(storedModel, context, { apiKey: "public", maxRetries: 0 }).result();
-    expect(result.stopReason).toBe("error");
-    expect(result.errorMessage).toContain("Cannot resolve the current OpenCode CLI version");
-    expect(calls).toEqual([CLI_UPDATE_URL, CLI_NPM_URL]);
   });
 
   describe("catalog refresh caching", () => {
@@ -552,7 +510,7 @@ describe("opencode-free extension", () => {
         "beam-free",
         "deepseek-v4.1-flash-free",
       ]);
-      expect(calls).toEqual([CLI_UPDATE_URL, `${DEFAULT_BASE_URL}/models`, MODEL_CATALOG_URL]);
+      expect(calls).toEqual([`${DEFAULT_BASE_URL}/models`, MODEL_CATALOG_URL]);
       expect(publications[0]?.persist?.checkedAt).toBe(now);
     });
 
@@ -568,7 +526,7 @@ describe("opencode-free extension", () => {
         });
 
         await refreshModels(config, context);
-        expect(calls).toHaveLength(3);
+        expect(calls).toHaveLength(2);
       },
     );
 
@@ -584,7 +542,7 @@ describe("opencode-free extension", () => {
         });
 
         await refreshModels(config, context);
-        expect(calls).toHaveLength(3);
+        expect(calls).toHaveLength(2);
       },
     );
 
@@ -604,7 +562,7 @@ describe("opencode-free extension", () => {
         const models = await refreshModels(config, context);
         now += ttl - 1;
         expect(await refreshModels(config, context)).toEqual(models);
-        expect(calls).toHaveLength(3);
+        expect(calls).toHaveLength(2);
         expect(publications).toHaveLength(publicationFails ? 0 : 1);
 
         const offline = refreshContext({ allowNetwork: false });
@@ -612,7 +570,7 @@ describe("opencode-free extension", () => {
 
         now += 1;
         await refreshModels(config, context);
-        expect(calls).toHaveLength(5);
+        expect(calls).toHaveLength(4);
       },
     );
 
@@ -624,7 +582,7 @@ describe("opencode-free extension", () => {
 
       await refreshModels(config, context);
       await refreshModels(config, context);
-      expect(calls).toHaveLength(5);
+      expect(calls).toHaveLength(4);
     });
 
     it("scopes stored and in-memory catalogs to the normalized endpoint", async () => {
@@ -647,7 +605,7 @@ describe("opencode-free extension", () => {
       });
 
       await refreshModels(config, sameEndpoint.context);
-      expect(calls).toHaveLength(3);
+      expect(calls).toHaveLength(2);
 
       const otherEndpoint = refreshContext({
         allowNetwork: true,
@@ -655,12 +613,14 @@ describe("opencode-free extension", () => {
       });
 
       await refreshModels(config, otherEndpoint.context);
-      expect(calls).toHaveLength(5);
+      expect(calls).toHaveLength(4);
       expect(calls).toContain("https://other.test/v1/models");
     });
 
     it("does not use another endpoint's stored catalog as a fallback", async () => {
-      const config = provider(async () => new Response(null, { status: 503 }));
+      const config = provider(async () => {
+        throw new Error("unavailable");
+      });
 
       const { context } = refreshContext({
         allowNetwork: true,
@@ -679,7 +639,7 @@ describe("opencode-free extension", () => {
       const config = provider(async (input, init) => {
         const response = await successfulFetch(input, init);
 
-        return failed && input !== CLI_UPDATE_URL ? new Response(null, { status: 503 }) : response;
+        return failed ? new Response(null, { status: 503 }) : response;
       });
 
       const { context, publications } = refreshContext({ allowNetwork: true });
@@ -689,15 +649,15 @@ describe("opencode-free extension", () => {
       failed = true;
       await expect(refreshModels(config, context)).rejects.toThrow("HTTP 503");
       expect(publications[1]?.persist).toEqual({ ...previous, checkedAt: now });
-      expect(calls).toHaveLength(5);
+      expect(calls).toHaveLength(4);
       now += ttl - 1;
       expect(await refreshModels(config, context)).toEqual(models);
-      expect(calls).toHaveLength(5);
+      expect(calls).toHaveLength(4);
 
       failed = false;
       now += 1;
       await refreshModels(config, context);
-      expect(calls).toHaveLength(7);
+      expect(calls).toHaveLength(6);
     });
 
     it("does not throttle an initial HTTP failure without Last-Modified metadata", async () => {
@@ -715,7 +675,7 @@ describe("opencode-free extension", () => {
       await expect(refreshModels(config, context)).rejects.toThrow("HTTP 503");
       expect(publications[0]?.persist).toEqual({ models: [], checkedAt: now });
       await expect(refreshModels(config, context)).rejects.toThrow("HTTP 503");
-      expect(calls).toHaveLength(5);
+      expect(calls).toHaveLength(4);
     });
 
     it("revalidates persisted metadata after restart and applies live changes on 304", async () => {
@@ -790,7 +750,7 @@ describe("opencode-free extension", () => {
       });
 
       await refreshModels(config, context);
-      expect(calls).toHaveLength(3);
+      expect(calls).toHaveLength(2);
     });
 
     it.each([404, 501])("persists native missing-catalog markers for HTTP %s", async (status) => {
@@ -816,7 +776,7 @@ describe("opencode-free extension", () => {
       expect(publications[0]?.persist?.etag).toBeUndefined();
       now += ttl - 1;
       await refreshModels(config, context);
-      expect(calls).toHaveLength(3);
+      expect(calls).toHaveLength(2);
     });
 
     it.each(["transport", "invalid-json"])(
@@ -844,7 +804,7 @@ describe("opencode-free extension", () => {
 
         expect((await refreshModels(config, context))[0]?.id).toBe("cached-free");
         await refreshModels(config, context);
-        expect(calls).toHaveLength(5);
+        expect(calls).toHaveLength(4);
         expect(publications).toEqual([]);
       },
     );
@@ -859,24 +819,7 @@ describe("opencode-free extension", () => {
       });
 
       await refreshModels(config, context);
-      expect(calls).toHaveLength(3);
-    });
-
-    it("does not cache CLI-version lookup failures or advance freshness", async () => {
-      const calls: string[] = [];
-
-      const config = provider(async (input) => {
-        calls.push(new Request(input).url);
-
-        return new Response(null, { status: 503 });
-      });
-
-      const { context, publications } = refreshContext({ allowNetwork: true });
-
-      await refreshModels(config, context);
-      await refreshModels(config, context);
-      expect(calls).toEqual([CLI_UPDATE_URL, CLI_NPM_URL, CLI_UPDATE_URL, CLI_NPM_URL]);
-      expect(publications).toEqual([]);
+      expect(calls).toHaveLength(2);
     });
 
     it("allows force to skip successful and failed HTTP freshness checks", async () => {
@@ -887,7 +830,7 @@ describe("opencode-free extension", () => {
       const config = provider(async (input, init) => {
         const response = await successfulFetch(input, init);
 
-        return failed && input !== CLI_UPDATE_URL ? new Response(null, { status: 503 }) : response;
+        return failed ? new Response(null, { status: 503 }) : response;
       });
 
       const { context } = refreshContext({ allowNetwork: true, force: true });
@@ -895,10 +838,10 @@ describe("opencode-free extension", () => {
       await refreshModels(config, context);
       failed = true;
       await expect(refreshModels(config, context)).rejects.toThrow("HTTP 503");
-      expect(calls).toHaveLength(5);
+      expect(calls).toHaveLength(4);
       failed = false;
       await refreshModels(config, context);
-      expect(calls).toHaveLength(7);
+      expect(calls).toHaveLength(6);
     });
 
     it.each(["offline", "aborted"])("never lets force override %s mode", async (mode) => {
@@ -932,33 +875,7 @@ describe("opencode-free extension", () => {
       expect(canceled.publications).toEqual([]);
       const retry = refreshContext({ allowNetwork: true });
       await refreshModels(config, retry.context);
-      expect(calls).toHaveLength(5);
-      expect(retry.publications).toHaveLength(1);
-    });
-
-    it("does not advance freshness after caller cancellation during version resolution", async () => {
-      const calls: string[] = [];
-      const successfulFetch = discoveryFetcher(calls);
-      const controller = new AbortController();
-
-      const config = provider(async (input, init) => {
-        if (input === CLI_UPDATE_URL) controller.abort();
-
-        return successfulFetch(input, init);
-      });
-
-      const canceled = refreshContext({ allowNetwork: true, signal: controller.signal });
-
-      expect(await refreshModels(config, canceled.context)).toEqual(initialFreeModels());
-      expect(calls).toEqual([CLI_UPDATE_URL]);
-      const retry = refreshContext({ allowNetwork: true });
-      await refreshModels(config, retry.context);
-      expect(calls).toEqual([
-        CLI_UPDATE_URL,
-        CLI_UPDATE_URL,
-        `${DEFAULT_BASE_URL}/models`,
-        MODEL_CATALOG_URL,
-      ]);
+      expect(calls).toHaveLength(4);
       expect(retry.publications).toHaveLength(1);
     });
 
@@ -982,7 +899,7 @@ describe("opencode-free extension", () => {
       expect(publications).toEqual([]);
       timeout.mockRestore();
       await refreshModels(config, context);
-      expect(calls).toHaveLength(5);
+      expect(calls).toHaveLength(4);
       expect(publications).toHaveLength(1);
 
       const otherEndpoint = refreshContext({
@@ -991,7 +908,7 @@ describe("opencode-free extension", () => {
       });
 
       await refreshModels(config, otherEndpoint.context);
-      expect(calls).toHaveLength(7);
+      expect(calls).toHaveLength(6);
       expect(otherEndpoint.publications).toHaveLength(1);
     });
   });

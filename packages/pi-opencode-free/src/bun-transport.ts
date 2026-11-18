@@ -7,7 +7,7 @@ import { join } from "node:path";
 /** Origin whose inference routes need the OpenCode client's TLS stack. */
 const UPSTREAM_ORIGIN = "https://opencode.ai";
 
-/** Only gateway routes are proxied; catalog and version lookups stay direct. */
+/** Only gateway routes are proxied; catalog requests stay direct. */
 const GATEWAY_PATH_PREFIX = "/inference/";
 
 /** Loopback header carrying the per-process proxy token. */
@@ -156,7 +156,7 @@ export class BunTransportError extends Error {
  * Creates a fetch implementation that sends gateway traffic through Bun.
  *
  * Requests outside `https://opencode.ai/inference/` are passed straight to the
- * supplied fetch, so catalog discovery and version lookups are unaffected and
+ * supplied fetch, so catalog discovery is unaffected and
  * work without Bun. The Bun process starts lazily on the first gateway request
  * and is killed when the host process exits.
  *

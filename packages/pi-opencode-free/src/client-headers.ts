@@ -77,6 +77,14 @@ function createSessionSuffix(seed: Uint8Array): string {
 }
 
 /**
+ * OpenCode CLI version advertised as client identification.
+ *
+ * Reviewed manually when the upstream client changes rather than resolved over
+ * the network, so requests work without a metadata lookup.
+ */
+export const CLIENT_VERSION = "2.3.2";
+
+/**
  * Builds the OpenCode v2 CLI user agent for a client version.
  *
  * @param cliVersion - Version placed between the `latest` channel and `cli` client
