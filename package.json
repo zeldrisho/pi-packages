@@ -7,6 +7,9 @@
   "scripts": {
     "ready": "vp check && vp test --coverage && vp run test:packages",
     "format:changelog": "node scripts/format-changelog.ts",
+    "compatibility:capture": "node scripts/compatibility.ts capture",
+    "compatibility:compare": "node scripts/compatibility.ts compare",
+    "compatibility:evidence": "node scripts/request-capture.ts evidence",
     "sync:web-modules": "node scripts/sync-web-modules.ts sync --from pi-web-fetch",
     "build:anubis-worker": "vp exec tsc --ignoreConfig packages/pi-web-fetch/src/challenges/anubis-worker.ts packages/pi-web-fetch/src/challenges/anubis-solver.ts --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir packages/pi-web-fetch/workers --skipLibCheck --rewriteRelativeImportExtensions --types node",
     "build:aws-waf-worker": "vp exec tsc --ignoreConfig packages/pi-web-fetch/src/challenges/aws-waf-worker.ts packages/pi-web-fetch/src/challenges/aws-waf-solver.ts --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir packages/pi-web-fetch/workers --skipLibCheck --rewriteRelativeImportExtensions --types node",
