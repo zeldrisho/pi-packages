@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Made the AGENTS.md template the required default layout for new files while preserving existing structures during targeted edits.
+
 ## [0.1.5] - 2026-10-30
 
 ### Changed

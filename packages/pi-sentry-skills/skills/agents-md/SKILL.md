@@ -20,14 +20,15 @@ Goal: concise, actionable agent instructions. Target under 60 lines; never excee
    - closest instruction file wins; keep narrower files shorter than root files
 3. Write the smallest useful file.
 4. Verify exact paths and commands exist.
+5. Self-check the result: preserve unrelated content during targeted edits and remove placeholders.
 
 ## File Setup
 
 - Create `AGENTS.md` at the repository root for repo-wide guidance, or at the appropriate subtree root for subtree-specific guidance.
 
-## Default Sections
+## Required Layout for New Files
 
-Use only sections that add non-obvious value.
+New files must start with `# Agent Instructions`. Use applicable sections in this order: `Toolchain`, `Commands`, `Rules`, `References`. Omit empty sections.
 
 ```markdown
 # Agent Instructions
@@ -55,6 +56,8 @@ Use only sections that add non-obvious value.
 | Architecture    | `docs/architecture.md` |
 | Security policy | `SECURITY.md`          |
 ```
+
+For existing files, preserve the current structure during targeted edits unless the user requests a rewrite. Nested files should contain only subtree-specific guidance and must not repeat root instructions.
 
 ## Writing Rules
 
