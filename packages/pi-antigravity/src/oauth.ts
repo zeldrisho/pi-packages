@@ -1,8 +1,9 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { JsonValue, OAuthCredentials, OAuthLoginCallbacks } from "@earendil-works/pi-ai";
-import { discoverAgyClient, type OAuthClient } from "./agy-client.ts";
+import type { OAuthClient } from "./agy-client.ts";
 import { isJsonNumber, isJsonObject, isJsonText, nonEmptyText, parseJsonValue } from "./json.ts";
+import { resolveOAuthClient } from "./oauth-client.ts";
 import { discoverProjectId, stableProjectId } from "./project.ts";
 
 /** Google authorization endpoint for the Antigravity desktop client. */
@@ -52,17 +53,6 @@ function envOverride(name: string): string | undefined {
   const value = process.env[name];
 
   return value === undefined || value.trim() === "" ? undefined : value.trim();
-}
-
-/** Discovers the installed CLI's matching OAuth client pair. */
-export async function resolveOAuthClient(signal?: AbortSignal): Promise<OAuthClient> {
-  signal?.throwIfAborted();
-  const discovered = await discoverAgyClient(signal);
-
-  if (discovered !== undefined) return discovered;
-  throw new Error(
-    "Could not identify a supported OAuth client in the installed agy binary. Install or update agy on PATH.",
-  );
 }
 
 /** Redirect URI: environment override, otherwise the loopback callback. */
@@ -642,3 +632,5 @@ export async function loginAntigravity(
     listener.close();
   }
 }
+
+export { resolveOAuthClient };

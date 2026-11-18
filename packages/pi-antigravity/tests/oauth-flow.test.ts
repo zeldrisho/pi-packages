@@ -5,7 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 import { discoverAgyClient } from "../src/agy-client";
 import { loginAntigravity, refreshCredentials, redirectUri, TOKEN_URL } from "../src/oauth";
 
-vi.mock("../src/agy-client", () => ({ discoverAgyClient: vi.fn() }));
+vi.mock("../src/agy-client", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../src/agy-client")>();
+
+  return { ...original, discoverAgyClient: vi.fn() };
+});
 
 const credentials = { access: "old", refresh: "refresh", expires: 1, projectId: "project" };
 
@@ -61,15 +65,20 @@ function loginFetch(tokenResponse: Response): void {
 }
 
 describe("OAuth login", () => {
-  it("rejects a missing CLI client before prompting", async () => {
-    const onAuth = vi.fn();
-    const onPrompt = vi.fn();
-    const interaction = { ...callbacks(onPrompt), onAuth };
+  it("uses the bundled client when no CLI is found", async () => {
+    await redirect();
+    loginFetch(
+      Response.json({ access_token: "access", refresh_token: "refresh", expires_in: 3600 }),
+    );
     vi.mocked(discoverAgyClient).mockResolvedValueOnce(undefined);
+    const onAuth = vi.fn();
+    const onPrompt = vi.fn().mockResolvedValue("code=abc&state=state");
+    const interaction = { ...callbacks(onPrompt), onAuth };
 
-    await expect(loginAntigravity(interaction)).rejects.toThrow(/Install or update agy on PATH/);
-    expect(onAuth).not.toHaveBeenCalled();
-    expect(onPrompt).not.toHaveBeenCalled();
+    const result = await loginAntigravity(interaction, { newState: () => "state" });
+
+    expect(result.access).toBe("access");
+    expect(onAuth).toHaveBeenCalledOnce();
   });
 
   it("exchanges a pasted callback and discovers the project", async () => {

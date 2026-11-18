@@ -46,9 +46,9 @@ const FALLBACK_MAX_TOKENS = 32_768;
 
 /**
  * Models the backend served when this fallback was last verified against
- * `agy models` (CLI 1.5.9). They are registered before any refresh so a
- * first run or an offline start still offers a usable catalog; discovery
- * replaces them as soon as it succeeds.
+ * Antigravity CLI 1.5.9. They are registered before any refresh so a first
+ * run or an offline start still offers a usable catalog; discovery replaces
+ * them as soon as it succeeds.
  */
 export const FALLBACK_MODELS: readonly AntigravityModel[] = [
   {

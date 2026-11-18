@@ -1,28 +1,24 @@
-import { runAgy } from "./agy-command.ts";
-
 /**
  * Bundled Antigravity CLI version advertised in the request User-Agent.
  *
- * Verified against the Homebrew cask, which tracks each release:
- * https://github.com/Homebrew/homebrew-cask/blob/master/Casks/a/antigravity-cli.rb
+ * Sent only as client identification, never as an OAuth input. It is reviewed
+ * manually when the upstream client changes rather than resolved at runtime.
  */
 export const DEFAULT_CLI_VERSION = "1.5.9";
 
-let cachedVersion: { path: string; version: string } | undefined;
-
-/** Probe only the locally installed CLI, without a shell or automatic updates. */
-export async function installedCliVersion(signal?: AbortSignal): Promise<string> {
+/**
+ * Returns the version advertised to the backend.
+ *
+ * Requests no longer probe the installed CLI; the bundled version is stable,
+ * works without agy, and is reviewed when the upstream client changes.
+ *
+ * @param signal - Caller cancellation
+ * @returns The bundled CLI version
+ */
+export async function advertisedCliVersion(signal?: AbortSignal): Promise<string> {
   signal?.throwIfAborted();
-  const path = process.env.PATH ?? "";
 
-  if (cachedVersion?.path === path) return cachedVersion.version;
-  const output = await runAgy("--version", { timeout: 2_000, maxBuffer: 4_096, signal });
-  const version = output?.trim() ?? "";
-
-  if (!/^\d+\.\d+\.\d+$/.test(version)) return DEFAULT_CLI_VERSION;
-  cachedVersion = { path, version };
-
-  return version;
+  return DEFAULT_CLI_VERSION;
 }
 
 /** Platform and architecture tokens the CLI advertises. */

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { discoverAgyClient, scanClientBinary, type ClientFingerprints } from "../src/agy-client";
+import { BUNDLED_CLIENT } from "../src/oauth-client";
 import { resolveOAuthClient } from "../src/oauth";
 
 const id = `123456789012-${"a".repeat(32)}.apps.googleusercontent.com`;
@@ -61,7 +62,7 @@ describe("installed CLI OAuth client discovery", () => {
     expect(await scanClientBinary(path, expected)).toBeUndefined();
     vi.stubEnv("PATH", dirname(path));
     expect(await discoverAgyClient()).toBeUndefined();
-    await expect(resolveOAuthClient()).rejects.toThrow(/Could not identify/);
+    expect(await resolveOAuthClient()).toEqual(BUNDLED_CLIENT);
   });
 
   it("discovers a native binary on PATH", async () => {
