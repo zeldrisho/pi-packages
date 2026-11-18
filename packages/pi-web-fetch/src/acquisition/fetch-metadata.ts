@@ -15,6 +15,18 @@ export function normalizeGitHubRawUrl(rawUrl: string): string {
 
     if (url.protocol !== "https:") return rawUrl;
 
+    if (url.hostname === "gitlab.com" && !url.username && !url.password && !url.port) {
+      const match = /^(\/(?:[^/]+\/)+[^/]+)\/-\/blob\/(.+)$/.exec(url.pathname);
+
+      if (match && match[2].includes("/")) {
+        url.pathname = `${match[1]}/-/raw/${match[2]}`;
+
+        return url.href;
+      }
+
+      return rawUrl;
+    }
+
     if (url.hostname === "github.com") {
       if (url.pathname.includes("/blob/")) {
         return `https://raw.githubusercontent.com${url.pathname.replace("/blob/", "/")}${url.search}`;

@@ -26,6 +26,20 @@ function fakeTextResponse(body: string, contentType = "text/plain"): IncomingMes
 }
 
 describe("normalizeGitHubRawUrl", () => {
+  it("rewrites GitLab file URLs without changing other routes", () => {
+    expect(normalizeGitHubRawUrl("https://gitlab.com/a/b/c/-/blob/main/a.ts?x=1#L2")).toBe(
+      "https://gitlab.com/a/b/c/-/raw/main/a.ts?x=1#L2",
+    );
+
+    for (const url of [
+      "https://gitlab.com/a/b/-/tree/main/src",
+      "https://gitlab.com/a/b/-/blob/main",
+      "https://user@gitlab.com/a/b/-/blob/main/a.ts",
+      "https://gitlab.com.evil.test/a/b/-/blob/main/a.ts",
+      "http://gitlab.com/a/b/-/blob/main/a.ts",
+    ])
+      expect(normalizeGitHubRawUrl(url)).toBe(url);
+  });
   it("rewrites blob URLs to raw.githubusercontent.com", () => {
     expect(normalizeGitHubRawUrl("https://github.com/o/r/blob/main/src/x.ts")).toBe(
       "https://raw.githubusercontent.com/o/r/main/src/x.ts",

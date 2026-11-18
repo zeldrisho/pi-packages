@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Fetch GitLab.com file links as raw source, and prefer available Markdown versions of documentation pages.
+
 ### Fixed
 
 - Preserve section headings when a query selects a later passage from a long section.

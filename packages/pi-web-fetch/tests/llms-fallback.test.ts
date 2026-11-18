@@ -3,6 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { executeWebFetch, type FetchRemoteDependencies } from "../src/index";
 import { parseLinkHeaderForAgentHints } from "../src/acquisition/fetch.ts";
 import { buildLlmsTxtCandidateUrls } from "../src/service";
+import { documentationMarkdownUrl } from "../src/acquisition/llms.ts";
 
 /** Builds a minimal HTTP response for offline fetch testing. */
 function fakeResponse(
@@ -65,6 +66,84 @@ function recordingDependencies(respond: (href: string) => IncomingMessage) {
 
   return { dependencies, requests };
 }
+
+describe("documentation Markdown", () => {
+  it("limits documented endpoints to known HTTPS documentation routes", () => {
+    expect(documentationMarkdownUrl("https://nextjs.org/docs/app/x?tab=one#heading")?.href).toBe(
+      "https://nextjs.org/docs/app/x.md?tab=one",
+    );
+    expect(documentationMarkdownUrl("https://vercel.com/docs/functions/")?.href).toBe(
+      "https://vercel.com/docs/functions.md",
+    );
+
+    for (const url of [
+      "https://nextjs.org/blog/x",
+      "https://nextjs.org.evil/docs/x",
+      "https://user@nextjs.org/docs/x",
+      "https://nextjs.org/docs/x.md",
+    ]) {
+      expect(documentationMarkdownUrl(url)).toBeUndefined();
+    }
+  });
+
+  it("refuses cross-origin redirects from documented Markdown endpoints", async () => {
+    const html = `<html><body><main><p>${"Original documentation. ".repeat(30)}</p></main></body></html>`;
+
+    const { dependencies, requests } = recordingDependencies((href) => {
+      if (href === "https://vercel.com/docs/redirect-test")
+        return fakeResponse(200, "text/html", html);
+
+      if (href === "https://vercel.com/docs/redirect-test.md")
+        return fakeResponse(302, "text/plain", "", { location: "https://other.example/secret" });
+
+      return fakeResponse(404, "text/plain", "missing");
+    });
+
+    const result = await executeWebFetch(
+      { url: "https://vercel.com/docs/redirect-test" },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(requests).not.toContain("https://other.example/secret");
+    expect(result.content[0]?.text).toContain("Original documentation");
+  });
+
+  it("prefers documented Markdown but keeps HTML when the endpoint fails", async () => {
+    const html = `<html><body><main><h1>HTML page</h1><p>${"Useful documentation. ".repeat(30)}</p></main></body></html>`;
+
+    for (const [path, succeeds] of [
+      ["success", true],
+      ["failure", false],
+    ] as const) {
+      const { dependencies, requests } = recordingDependencies((href) => {
+        if (href.endsWith(`/docs/${path}`)) return fakeResponse(200, "text/html", html);
+
+        if (href.endsWith(`/docs/${path}.md`) && succeeds)
+          return fakeResponse(
+            200,
+            "text/markdown",
+            `# Markdown page\n${"Useful source content. ".repeat(20)}`,
+          );
+
+        return fakeResponse(404, "text/plain", "missing");
+      });
+
+      const result = await executeWebFetch(
+        { url: `https://nextjs.org/docs/${path}` },
+        undefined,
+        undefined,
+        dependencies,
+      );
+
+      expect(requests).toContain(`https://nextjs.org/docs/${path}.md`);
+      expect(result.content[0]?.text).toContain(
+        succeeds ? "Markdown page" : "Useful documentation",
+      );
+    }
+  });
+});
 
 describe("buildLlmsTxtCandidateUrls", () => {
   it("maps any page path to the root index plus ancestor directory indexes", () => {
