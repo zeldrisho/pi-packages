@@ -716,8 +716,8 @@ export async function executeWebFetch(
         ...(focused
           ? [
               focused.details.matchedSections > 0
-                ? `[Query matched ${focused.details.matchedSections}/${focused.details.totalSections} sections. Offsets apply to this view; omit query for the full page.]`
-                : "[No sections matched. Omit query for the full page.]",
+                ? `[Query selected ${focused.details.matchedSections}/${focused.details.totalSections} sections; relevant content may be omitted. Offsets apply to this view; omit query for the full page.]`
+                : "[No sections selected. The query may miss relevant content; omit query for the full page.]",
               "",
             ]
           : []),

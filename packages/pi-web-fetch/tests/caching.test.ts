@@ -237,7 +237,7 @@ describe("web_fetch caching", () => {
     const complete = await executeWebFetch({ url }, undefined, undefined, dependencies);
 
     expect(focused.content[0].text).toContain(
-      "[Query matched 1/3 sections. Offsets apply to this view; omit query for the full page.]",
+      "[Query selected 1/3 sections; relevant content may be omitted. Offsets apply to this view; omit query for the full page.]",
     );
     expect(focused.content[0].text).toContain("Caching stores complete pages.");
     expect(focused.content[0].text).not.toContain("Installation uses Vite+.");
@@ -261,7 +261,9 @@ describe("web_fetch caching", () => {
       dependencies,
     );
 
-    expect(result.content[0].text).toContain("No sections matched. Omit query for the full page.");
+    expect(result.content[0].text).toContain(
+      "No sections selected. The query may miss relevant content; omit query for the full page.",
+    );
     expect(result.content[0].text).not.toContain("page contained no readable text");
     expect(result.details.focus?.matchedSections).toBe(0);
   });

@@ -25,7 +25,7 @@ The `web_fetch` tool accepts public HTTP and HTTPS URLs and supports HTML, Markd
 
 When a documentation page exposes a supported tab selector and the URL explicitly selects one (for example, `?tab=cli`), output shows that tab and shared content, with a notice that other tabs were omitted. Remove the parameter to see the full extracted page. Continuation offsets apply to the selected view.
 
-Output is bounded to 6,000 characters by default. For long pages, use the returned `nextOffset` with the same URL and query to continue. Queries use approximate word matching and relevance selection; dotted or hyphenated identifiers and flags are matched literally. Focus can omit relevant content, so omit the query when completeness matters. Pi's preview is collapsed by default; press `Ctrl+O` to expand it.
+Output is bounded to 6,000 characters by default. For long pages, use the returned `nextOffset` with the same URL and query to continue. Queries use approximate word matching and relevance selection; dotted identifiers in longer queries, and standalone dotted or hyphenated identifiers and flags, are matched literally. Focus can omit relevant content, so omit the query when completeness matters. Pi's preview is collapsed by default; press `Ctrl+O` to expand it.
 
 For example, a URL such as `https://github.com/zeldrisho/pi-packages/blob/main/packages/pi-web-fetch/README.md#usage` starts at the matching heading. GitHub `blob` links and bare gists are converted to raw source URLs; repository roots use their README. GitHub directory listings are not supported.
 

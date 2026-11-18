@@ -124,6 +124,37 @@ describe("query-focused Markdown", () => {
     expect(result.markdown).not.toContain("# Other");
   });
 
+  it("retains the heading when only a later chunk of a long section matches", () => {
+    const markdown =
+      `# Cache policy\n\n${"Background text. ".repeat(600)}\n\n` +
+      "```text\nneedle\n\ncode\n```\n\n# Other\n\nNothing relevant.";
+
+    const result = focusMarkdown(markdown, "needle");
+
+    expect(result.markdown).toBe("# Cache policy\n\n```text\nneedle\n\ncode\n```");
+    expect(result.markdown).not.toContain("Background text");
+    expect(result.details.focusedCharacters).toBe(result.markdown.length);
+  });
+
+  it("does not repeat an oversized heading as context", () => {
+    const heading = `# ${"background ".repeat(600)}`;
+    const result = focusMarkdown(`${heading}\n\nneedle`, "needle");
+
+    expect(result.markdown).toBe("needle");
+  });
+
+  it("does not repeat a heading when multiple chunks of a section match", () => {
+    const markdown =
+      `# Cache needle\n\n${"needle background. ".repeat(300)}\n\n` +
+      `${"needle details. ".repeat(300)}\n\n# Other\n\nNothing relevant.`;
+
+    const result = focusMarkdown(markdown, "needle");
+
+    expect(result.details.matchedSections).toBeGreaterThan(1);
+    expect(result.markdown.match(/# Cache needle/g)).toHaveLength(1);
+    expect(result.markdown.indexOf("background")).toBeLessThan(result.markdown.indexOf("details"));
+  });
+
   it("matches single-character identifiers", () => {
     expect(
       focusMarkdown("# R\n\nR language.\n\n# Python\n\nPython language.", "R").markdown,
@@ -164,6 +195,28 @@ describe("query-focused Markdown", () => {
     expect(focusMarkdown(markdown, "error-startup").markdown).toContain("# C");
     expect(focusMarkdown(markdown, "--").markdown).toContain("# C");
     expect(focusMarkdown("Use morphe.keystore.", "morphe.keystore").markdown).toContain("keystore");
+  });
+
+  it("matches dotted identifiers literally inside natural-language queries", () => {
+    const markdown = [
+      "# Unrelated\n\nHow to prepare the database in your environment.",
+      "# API\n\nCall `env.DB.prepare` to create a statement.",
+      "# Similar\n\nCall `env.DB.prepareBatch` for many statements.",
+    ].join("\n\n");
+
+    const result = focusMarkdown(markdown, "how to use env.DB.prepare");
+    expect(result.markdown).toContain("# API");
+    expect(result.markdown).not.toContain("# Unrelated");
+    expect(result.markdown).not.toContain("# Similar");
+    expect(focusMarkdown("# Other\nUse env.DB.prepareBatch.", "use env.DB.prepare").markdown).toBe(
+      "",
+    );
+  });
+
+  it("does not treat ordinary abbreviations in questions as API identifiers", () => {
+    expect(
+      focusMarkdown("# Cache\nCache expiration policy.", "cache expiration e.g. policy").markdown,
+    ).toContain("Cache expiration");
   });
 
   it("finds common word inflections", () => {

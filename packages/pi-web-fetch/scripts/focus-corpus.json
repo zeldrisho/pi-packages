@@ -14,6 +14,38 @@
     "expectedMarker": "Honor Retry-After"
   },
   {
+    "name": "exact identifier",
+    "dimension": "identifier",
+    "query": "env.DB.prepare",
+    "markdown": "# Database\n\nUse `env.DB.prepare` for queries.\n\n# Other\n\nUse the environment to prepare data.",
+    "expectedMarker": "env.DB.prepare",
+    "excludedMarker": "prepare data"
+  },
+  {
+    "name": "identifier in a natural-language query",
+    "dimension": "identifier",
+    "query": "how to use env.DB.prepare",
+    "markdown": "# Introduction\n\nHow to prepare the database in your environment.\n\n# API\n\nCall `env.DB.prepare` to create a statement.\n\n# Batch\n\nCall `env.DB.prepareBatch` for many statements.",
+    "expectedMarker": "Call `env.DB.prepare`",
+    "excludedMarker": "prepareBatch"
+  },
+  {
+    "name": "code example",
+    "dimension": "code",
+    "query": "cancel a task",
+    "markdown": "# Cancellation\n\nCancel a task with:\n\n```python\ntask.cancel()\n```\n\n# Creation\n\nCreate a task with `create_task()`.",
+    "expectedMarker": "```python\ntask.cancel()\n```",
+    "excludedMarker": "create_task()"
+  },
+  {
+    "name": "table context",
+    "dimension": "table",
+    "query": "maximum timeout",
+    "markdown": "# Limits\n\n| Setting | Maximum |\n| --- | --- |\n| Timeout | 30 seconds |\n\n# Errors\n\nErrors are reported separately.",
+    "expectedMarker": "| Setting | Maximum |\n| --- | --- |\n| Timeout | 30 seconds |",
+    "excludedMarker": "reported separately"
+  },
+  {
     "name": "inflection",
     "dimension": "stemming",
     "query": "validated redirects",
