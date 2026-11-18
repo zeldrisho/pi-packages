@@ -269,6 +269,13 @@ export function describeFailure(status: number, body: string): string {
     return `Antigravity does not offer this model to the signed-in account (404${suffix}). Select another model with /model.`;
   }
 
+  if (
+    status === 503 &&
+    /\bMODEL_CAPACITY_EXHAUSTED\b|\bno capacity available for model\b/i.test(body.slice(0, 16_384))
+  ) {
+    return "Antigravity has no capacity available for the selected model. Try another model or thinking level, or wait and retry.";
+  }
+
   if (status === 429) {
     const kind = exhaustionKind(body);
 
@@ -710,7 +717,7 @@ async function postToEndpoint(
   const body = JSON.stringify(envelope);
   let lastError: Error | undefined;
 
-  const headers = await antigravityHeaders(token);
+  const headers = await antigravityHeaders(token, signal);
 
   for (const endpoint of ENDPOINTS) {
     const timeout = AbortSignal.timeout(HEADER_TIMEOUT_MS);

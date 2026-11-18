@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
@@ -46,22 +46,40 @@ describe("version resolution", () => {
     expect((await antigravityHeaders("token")).get("user-agent")).toContain(DEFAULT_CLI_VERSION);
   });
 
-  it("does not execute an installed CLI to determine its version", async () => {
+  it("uses the installed CLI version", async () => {
     const directory = mkdtempSync(join(tmpdir(), "antigravity-version-"));
-    const marker = join(directory, "invoked");
     const previous = process.env.PATH;
-    writeFileSync(join(directory, "agy"), `#!/bin/sh\necho invoked > '${marker}'\n`, {
+    writeFileSync(join(directory, "agy"), "#!/bin/sh\nprintf '2.3.4\\n'\n", { mode: 0o755 });
+    process.env.PATH = directory;
+
+    try {
+      expect((await antigravityHeaders("token")).get("user-agent")).toContain("2.3.4");
+    } finally {
+      process.env.PATH = previous;
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("falls back for malformed CLI output", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "antigravity-version-"));
+    const previous = process.env.PATH;
+    writeFileSync(join(directory, "agy"), "#!/bin/sh\nprintf 'not a version\\n'\n", {
       mode: 0o755,
     });
     process.env.PATH = directory;
 
     try {
-      await antigravityHeaders("token");
-      expect(existsSync(marker)).toBe(false);
+      expect((await antigravityHeaders("token")).get("user-agent")).toContain(DEFAULT_CLI_VERSION);
     } finally {
       process.env.PATH = previous;
       rmSync(directory, { recursive: true, force: true });
     }
+  });
+
+  it("honors cancellation before executing the CLI", async () => {
+    const controller = new AbortController();
+    controller.abort(new Error("cancelled"));
+    await expect(antigravityHeaders("token", controller.signal)).rejects.toThrow("cancelled");
   });
 
   it("resolves without rejecting when no CLI is installed", async () => {

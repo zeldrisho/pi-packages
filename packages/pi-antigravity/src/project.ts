@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { JsonValue } from "@earendil-works/pi-ai";
-import { DEFAULT_CLI_VERSION, userAgentFor } from "./cli-version.ts";
+import { installedCliVersion, userAgentFor } from "./cli-version.ts";
 import { isJsonObject, isJsonText, nonEmptyText, parseJsonValue } from "./json.ts";
 
 /** Default endpoints, tried in order until one answers. */
@@ -38,11 +38,13 @@ const SAFE_ERROR_REASONS = new Set([
  * @param token - OAuth access token
  * @returns Headers for a JSON request
  */
-export async function antigravityHeaders(token: string): Promise<Headers> {
+export async function antigravityHeaders(token: string, signal?: AbortSignal): Promise<Headers> {
+  const version = await installedCliVersion(signal);
+
   return new Headers({
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
-    "User-Agent": userAgentFor(DEFAULT_CLI_VERSION).value,
+    "User-Agent": userAgentFor(version).value,
   });
 }
 
@@ -150,7 +152,7 @@ async function postJson(
   body: string,
   signal: AbortSignal,
 ): Promise<Response> {
-  const headers = await antigravityHeaders(token);
+  const headers = await antigravityHeaders(token, signal);
 
   return fetch(url, { method: "POST", headers, body, signal });
 }

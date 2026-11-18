@@ -176,7 +176,8 @@ describe("project discovery", () => {
         throw new Error("cancelled");
       }),
     );
-    await expect(discoverProjectId("access", controller.signal)).rejects.toThrow("cancelled");
+    await expect(discoverProjectId("access", controller.signal)).rejects.toThrow();
+    expect(fetch).not.toHaveBeenCalled();
   });
   it("reads lists and ignores unusable entries", () => {
     expect(extractProjectId({ projects: [null, {}, { id: "ok" }] })).toBe("ok");

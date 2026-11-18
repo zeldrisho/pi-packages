@@ -432,7 +432,7 @@ export async function fetchAvailableModels(
     AbortSignal.timeout(DISCOVERY_TIMEOUT_MS * ENDPOINTS.length),
   ]);
 
-  const headers = await antigravityHeaders(token);
+  const headers = await antigravityHeaders(token, signal);
 
   for (const endpoint of ENDPOINTS) {
     try {

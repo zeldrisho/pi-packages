@@ -5,6 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import antigravityExtension, { FALLBACK_MODELS, PROVIDER_ID } from "../src/index";
 import { storedModelsFrom } from "../src/discovery";
 import { modelConfigs } from "../src/models";
+import { fetchAgyModels } from "../src/agy-models";
+
+vi.mock("../src/agy-models", () => ({ fetchAgyModels: vi.fn(async () => undefined) }));
 
 vi.mock("../src/agy-client", () => ({
   discoverAgyClient: vi.fn(async () => ({ id: "test-client-id", secret: "test-client-secret" })),
@@ -33,11 +36,34 @@ function register(): Registration {
 }
 
 afterEach(() => {
+  vi.mocked(fetchAgyModels).mockReset();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
 
 describe("extension registration", () => {
+  it("uses CLI models when online discovery fails without a stored catalog", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("offline");
+      }),
+    );
+    vi.mocked(fetchAgyModels).mockResolvedValue([FALLBACK_MODELS[0]]);
+
+    const models = await register().config.refreshModels?.({
+      credential: {
+        type: "api_key",
+        key: JSON.stringify({ token: "token", projectId: "project" }),
+      },
+      allowNetwork: true,
+      signal: new AbortController().signal,
+      publish: vi.fn(async () => true),
+    });
+
+    expect(models?.map((model) => model.id)).toEqual([FALLBACK_MODELS[0].id]);
+    expect(fetchAgyModels).toHaveBeenCalledOnce();
+  });
   it("refreshes and publishes a discovered catalog", async () => {
     vi.stubGlobal(
       "fetch",

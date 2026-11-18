@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Use the CLI model list as a first-run fallback when account discovery fails.
 - Automatically use Pi's configured thinking budgets for discovered single-route token-budget models.
 - Refresh Pi's Google and Vertex metadata for matching Gemini thinking choices and limits, with four-hour caching, conditional requests, and an offline fallback.
 - Sign in with a Google AI Pro or Ultra account through `/login`, using the installed Antigravity CLI's OAuth client. Project discovery errors report safe status information to help diagnose backend restrictions.
@@ -22,4 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Advertise the installed CLI version when available, falling back to the bundled version.
+- Explain when a model has no available server capacity and suggest recovery options.
 - Report ambiguous resource exhaustion clearly and avoid repeated automatic retries; retain failover for explicit temporary capacity errors.

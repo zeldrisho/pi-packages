@@ -1,3 +1,5 @@
+import { runAgy } from "./agy-command.ts";
+
 /**
  * Bundled Antigravity CLI version advertised in the request User-Agent.
  *
@@ -5,6 +7,14 @@
  * https://github.com/Homebrew/homebrew-cask/blob/master/Casks/a/antigravity-cli.rb
  */
 export const DEFAULT_CLI_VERSION = "1.5.9";
+
+/** Probe only the locally installed CLI, without a shell or automatic updates. */
+export async function installedCliVersion(signal?: AbortSignal): Promise<string> {
+  const output = await runAgy("--version", { timeout: 2_000, maxBuffer: 4_096, signal });
+  const version = output?.trim() ?? "";
+
+  return /^\d+\.\d+\.\d+$/.test(version) ? version : DEFAULT_CLI_VERSION;
+}
 
 /** Platform and architecture tokens the CLI advertises. */
 export interface PlatformTokens {

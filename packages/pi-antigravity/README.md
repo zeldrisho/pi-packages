@@ -21,7 +21,7 @@ Restart Pi after installing. Use `pi config` to enable or disable the extension,
 
 ## Configure sign-in
 
-Install the [official `agy` CLI](https://antigravity.google/docs/install/?tab=cli) and keep it available on your `PATH`. The extension discovers its OAuth application client for sign-in and token refresh. It does not use `agy` to run model requests or read or change its account login. Removing `agy` can cause token refresh to fail after the current access token expires.
+Install the [official `agy` CLI](https://antigravity.google/docs/install/?tab=cli) and keep it available on your `PATH`. The extension discovers its OAuth application client for sign-in and token refresh. It does not use `agy` to run model requests or read or change its account login. The extension also runs `agy --version` to identify the installed CLI when making requests. Removing `agy` can cause token refresh to fail after the current access token expires.
 
 This uses application credentials shipped with the CLI and is not an official Google integration. If Google changes those credentials, discovery may fail until the extension is updated. Review the Google consent screen and grant access only if you trust the extension.
 
@@ -62,7 +62,7 @@ For a single runtime that advertises a token budget, the extension automatically
 
 For a level without a configured budget, the advertised budget is used. Overrides require live catalog metadata confirming a token budget; requests fail safely if that metadata is unavailable or the runtime uses named levels instead. The requested budget is capped to leave 1,024 output tokens for the answer. These are requests, not guarantees: Antigravity may reject, limit, or ignore a budget, and different budgets can affect quota usage. Pi's `thinkingBudgets` setting also affects other token-budget providers.
 
-If discovery fails, the extension keeps the last catalog it saw, or a small built-in list on a first run.
+If account discovery fails, the extension keeps the last catalog it saw. On a first run it tries `agy models`, then a small built-in list. The CLI fallback uses `agy`'s separately signed-in account, which may differ from Pi's account; listed models are not guaranteed to be available in Pi. Because the CLI list does not include image capabilities, its fallback models accept text only.
 
 ## Subscription limits
 

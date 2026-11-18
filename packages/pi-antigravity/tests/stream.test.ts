@@ -280,6 +280,33 @@ describe("failure messages", () => {
     expect(describeFailure(429, "not json SECRET")).not.toContain("SECRET");
   });
 
+  it.each([
+    JSON.stringify({
+      error: {
+        code: 503,
+        message: "No capacity available for model gemini-3.8-flash-medium on the server",
+        status: "UNAVAILABLE",
+        details: [{ reason: "MODEL_CAPACITY_EXHAUSTED" }],
+      },
+    }),
+    "MODEL_CAPACITY_EXHAUSTED SECRET",
+    "No capacity available for model gemini-3.8-flash-medium SECRET",
+  ])("explains explicit 503 model capacity failures without echoing details", (body) => {
+    expect(describeFailure(503, body)).toBe(
+      "Antigravity has no capacity available for the selected model. Try another model or thinking level, or wait and retry.",
+    );
+  });
+
+  it("does not infer model capacity from a generic 503 or an unbounded body", () => {
+    expect(describeFailure(503, "Service unavailable")).toBe(
+      "Antigravity request failed (503: Service unavailable).",
+    );
+    expect(describeFailure(503, "x".repeat(16_384) + "MODEL_CAPACITY_EXHAUSTED")).toMatch(
+      /^Antigravity request failed/,
+    );
+    expect(describeFailure(500, "MODEL_CAPACITY_EXHAUSTED")).toMatch(/^Antigravity request failed/);
+  });
+
   it("bounds the echoed provider body", () => {
     const message = describeFailure(500, "x".repeat(5000));
 
@@ -393,6 +420,35 @@ describe("stream implementation", () => {
     expect(urls).toHaveLength(2);
     expect(urls[1]).toContain("cloudcode-pa.googleapis.com");
     expect(final?.content).toEqual([{ type: "text", text: "served by production" }]);
+  });
+
+  it("stops on explicit model capacity exhaustion without triggering Pi retries", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              code: 503,
+              message: "No capacity available for model gemini-3.8-flash-medium on the server",
+              details: [{ reason: "MODEL_CAPACITY_EXHAUSTED" }],
+            },
+          }),
+          { status: 503 },
+        ),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const stream = createAntigravityStream()(streamModel, contextWith("Bake bread"), {
+      apiKey: API_KEY,
+    });
+
+    let final: AssistantMessage | undefined;
+
+    for await (const event of stream) if (event.type === "error") final = event.error;
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(final?.errorMessage).toMatch(/no capacity available/);
+    expect(final && isRetryableAssistantError(final)).toBe(false);
   });
 
   it("stops on ambiguous exhaustion without triggering Pi retries", async () => {
