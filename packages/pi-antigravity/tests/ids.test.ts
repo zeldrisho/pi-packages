@@ -17,8 +17,9 @@ describe("stable uuid", () => {
     expect(stableUuid("session-1")).not.toBe(stableUuid("session-2"));
   });
 
-  it("produces a version 4 shaped identifier", () => {
+  it("produces a version 8 UUID-shaped identifier", () => {
     expect(stableUuid("anything")).toMatch(UUID_PATTERN);
+    expect(stableUuid("anything")[14]).toBe("8");
   });
 });
 

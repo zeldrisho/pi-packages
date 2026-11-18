@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 import type { OAuthLoginCallbacks } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { discoverAgyClient } from "../src/agy-client";
-import { loginAntigravity, refreshCredentials, redirectUri } from "../src/oauth";
+import { loginAntigravity, refreshCredentials, redirectUri, TOKEN_URL } from "../src/oauth";
 
 vi.mock("../src/agy-client", () => ({ discoverAgyClient: vi.fn() }));
 
@@ -53,7 +53,7 @@ function loginFetch(tokenResponse: Response): void {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) =>
-      url.includes("oauth2.googleapis.com")
+      url === TOKEN_URL
         ? tokenResponse
         : Response.json({ cloudaicompanionProject: "project-live" }),
     ),

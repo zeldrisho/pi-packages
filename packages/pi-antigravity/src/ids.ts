@@ -14,8 +14,8 @@ export interface RequestIdentity {
  * @returns A UUID-shaped identifier
  */
 export function stableUuid(seed: string): string {
-  const bytes = createHash("sha1").update(seed).digest().subarray(0, 16);
-  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  const bytes = createHash("sha256").update(seed).digest().subarray(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x80;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
 
   const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
