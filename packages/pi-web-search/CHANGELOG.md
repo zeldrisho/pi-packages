@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Restore codemode access to structured search results.
+- Restore codemode access to structured search results with Pi 0.99.0 or newer.
 
 ## [0.15.0] - 2026-11-12
 

@@ -8,12 +8,21 @@ import { runAgy } from "./agy-command.ts";
  */
 export const DEFAULT_CLI_VERSION = "1.5.9";
 
+let cachedVersion: { path: string; version: string } | undefined;
+
 /** Probe only the locally installed CLI, without a shell or automatic updates. */
 export async function installedCliVersion(signal?: AbortSignal): Promise<string> {
+  signal?.throwIfAborted();
+  const path = process.env.PATH ?? "";
+
+  if (cachedVersion?.path === path) return cachedVersion.version;
   const output = await runAgy("--version", { timeout: 2_000, maxBuffer: 4_096, signal });
   const version = output?.trim() ?? "";
 
-  return /^\d+\.\d+\.\d+$/.test(version) ? version : DEFAULT_CLI_VERSION;
+  if (!/^\d+\.\d+\.\d+$/.test(version)) return DEFAULT_CLI_VERSION;
+  cachedVersion = { path, version };
+
+  return version;
 }
 
 /** Platform and architecture tokens the CLI advertises. */

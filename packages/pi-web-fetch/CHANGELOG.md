@@ -11,11 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Restore codemode access to structured fetch results.
+- Restore codemode access to structured fetch results with Pi 0.99.0 or newer.
 - Return Packit Copr API data without a verbose substitution notice, while preserving the source URL and structured provenance.
 
 ### Fixed
 
+- Preserve selected documentation surfaces in HTML fragments and when tab controls use multiple supported attribute mappings.
+- Recognize standard Swagger UI initializers and retain index notices when a visible link points to a different index.
 - Honor explicitly selected documentation surfaces when supported by the page, rather than mixing unrelated surface instructions.
 - Extract plain-text GitHub repository READMEs without the file-listing table.
 - Avoid redundant discovered index notices when the visible page already links to a same-site documentation index.

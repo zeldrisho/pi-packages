@@ -75,6 +75,39 @@ afterEach(() => {
 });
 
 describe("catalog grouping", () => {
+  it("uses advertised numeric thinking levels and preserves image restrictions", () => {
+    const catalog = catalogFromAvailableModels({
+      models: {
+        "example-low": metadata("Example", {
+          thinkingLevel: 1,
+          supportsThinking: true,
+          supportsImages: false,
+        }),
+        "example-high": metadata("Example", {
+          thinkingLevel: 3,
+          supportsThinking: true,
+          supportsImages: true,
+        }),
+      },
+    });
+
+    expect(catalog?.[0]?.thinkingLevelMap).toMatchObject({
+      low: "example-low",
+      high: "example-high",
+      medium: null,
+    });
+    expect(catalog?.[0]?.input).not.toContain("image");
+  });
+
+  it("uses an advertised route when standard levels are unavailable", () => {
+    expect(
+      resolveRuntimeModel({ id: "example", thinkingLevelMap: { minimal: "example-minimal" } }),
+    ).toBe("example-minimal");
+    expect(
+      resolveRuntimeModel({ id: "example", thinkingLevelMap: { xhigh: "example-xhigh" } }, "low"),
+    ).toBe("example-xhigh");
+  });
+
   it("collapses the runtime variants the CLI lists into public models", () => {
     const catalog = catalogFromAvailableModels(availableModels());
 

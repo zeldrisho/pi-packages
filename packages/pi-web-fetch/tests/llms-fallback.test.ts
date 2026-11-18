@@ -304,7 +304,7 @@ describe("executeWebFetch llms.txt support", () => {
   );
 
   it.each([
-    ["[llms.txt](/llms.txt)", true],
+    ["[llms.txt](/llms.txt)", false],
     ["[index](../llms.txt)", true],
     ["[index](https://elsewhere.example/llms.txt)", false],
     ["[index](/llms.txt-other)", false],

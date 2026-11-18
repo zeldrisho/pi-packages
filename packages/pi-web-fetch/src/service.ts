@@ -66,8 +66,8 @@ function safeUrl(value: string): URL | undefined {
   }
 }
 
-/** Recognizes visible Markdown links to same-origin documentation indexes. */
-function hasVisibleIndexLink(text: string, pageUrl: string): boolean {
+/** Recognizes visible Markdown links to the discovered index or verified aliases. */
+function hasVisibleIndexLink(text: string, pageUrl: string, indexes: readonly string[]): boolean {
   const page = safeUrl(pageUrl);
 
   if (!page) return false;
@@ -76,7 +76,7 @@ function hasVisibleIndexLink(text: string, pageUrl: string): boolean {
     try {
       const target = new URL(match[1], page);
 
-      if (target.origin === page.origin && /(?:^|\/)llms\.txt$/u.test(target.pathname)) return true;
+      if (target.origin === page.origin && indexes.includes(target.href)) return true;
     } catch {
       // Ignore malformed page links.
     }
@@ -747,6 +747,7 @@ export async function executeWebFetch(
         hasVisibleIndexLink(
           outputTruncation.content.slice(noticePosition + notice.length),
           rawFinalUrl,
+          [result.llmsTxtIndexUrl, ...(result.llmsTxtIndexAliases ?? [])],
         ))
     ) {
       outputTruncation = truncateHead(output.replace(notice, ""), {

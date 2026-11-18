@@ -43,6 +43,7 @@ describe("user agent", () => {
 describe("version resolution", () => {
   it("uses the bundled version rather than the removed version override", async () => {
     vi.stubEnv("PI_ANTIGRAVITY_VERSION", "9.9.9");
+    vi.stubEnv("PATH", "");
     expect((await antigravityHeaders("token")).get("user-agent")).toContain(DEFAULT_CLI_VERSION);
   });
 
@@ -53,6 +54,23 @@ describe("version resolution", () => {
     process.env.PATH = directory;
 
     try {
+      expect((await antigravityHeaders("token")).get("user-agent")).toContain("2.3.4");
+    } finally {
+      process.env.PATH = previous;
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("caches a successful CLI version for the same PATH", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "antigravity-version-cache-"));
+    const previous = process.env.PATH;
+    const binary = join(directory, "agy");
+    writeFileSync(binary, "#!/bin/sh\nprintf '2.3.4\\n'\n", { mode: 0o755 });
+    process.env.PATH = directory;
+
+    try {
+      expect((await antigravityHeaders("token")).get("user-agent")).toContain("2.3.4");
+      writeFileSync(binary, "#!/bin/sh\nprintf '3.4.5\\n'\n", { mode: 0o755 });
       expect((await antigravityHeaders("token")).get("user-agent")).toContain("2.3.4");
     } finally {
       process.env.PATH = previous;

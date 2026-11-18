@@ -80,7 +80,90 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
+describe("header timeout", () => {
+  it("clears the header deadline before consuming the response body", async () => {
+    const originalSetTimeout = globalThis.setTimeout;
+    const originalClearTimeout = globalThis.clearTimeout;
+    let headerTimer: ReturnType<typeof setTimeout> | undefined;
+    let cleared = false;
+
+    // SAFETY: production timers in this test pass only a callback and delay.
+    const setSpy = vi.spyOn(globalThis, "setTimeout").mockImplementation(((
+      callback: () => void,
+      delay?: number,
+    ) => {
+      const timer = originalSetTimeout(callback, delay);
+
+      if (delay === 60_000) headerTimer = timer;
+
+      return timer;
+    }) as typeof setTimeout);
+
+    // SAFETY: this forwards the timer handles returned by the original implementation.
+    const clearSpy = vi.spyOn(globalThis, "clearTimeout").mockImplementation(((
+      timer: ReturnType<typeof setTimeout>,
+    ) => {
+      if (timer === headerTimer && headerTimer !== undefined) cleared = true;
+
+      return originalClearTimeout(timer);
+    }) as typeof clearTimeout);
+
+    try {
+      vi.stubGlobal(
+        "fetch",
+        async () =>
+          new Response(
+            new ReadableStream(
+              {
+                pull(controller) {
+                  expect(cleared).toBe(true);
+                  controller.enqueue(new TextEncoder().encode(`data: ${textFrame("OK")}\n\n`));
+                  controller.close();
+                },
+              },
+              { highWaterMark: 0 },
+            ),
+          ),
+      );
+
+      const result = await createAntigravityStream()(streamModel, contextWith("Hi"), {
+        apiKey: API_KEY,
+      }).result();
+
+      expect(result.stopReason).toBe("stop");
+      expect(headerTimer).toBeDefined();
+      expect(cleared).toBe(true);
+    } finally {
+      setSpy.mockRestore();
+      clearSpy.mockRestore();
+    }
+  });
+});
+
 describe("discovered model routing", () => {
+  it("does not resolve or enable thinking for an explicit off value", async () => {
+    let body = "";
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+      // SAFETY: the provider sends JSON as a string body.
+      body = init.body as string;
+
+      return sse([textFrame("OK")]);
+    });
+    const resolver = vi.fn(async () => ({ includeThoughts: true, thinkingBudget: 1024 }));
+    const stream = createAntigravityStream(resolver);
+
+    // Simulate an untyped caller passing an off level that the current host type omits.
+    const options: NonNullable<Parameters<typeof stream>[2]> = { apiKey: API_KEY };
+    Object.defineProperty(options, "reasoning", { value: "off", enumerable: true });
+
+    const result = await stream(streamModel, contextWith("Hi"), options).result();
+    expect(result.stopReason).toBe("stop");
+    expect(resolver).not.toHaveBeenCalled();
+    expect(JSON.parse(body).request.generationConfig.thinkingConfig?.includeThoughts).not.toBe(
+      true,
+    );
+  });
+
   it("sends a configured Pi budget instead of the advertised default", async () => {
     let requestBody = "";
     vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
@@ -341,6 +424,42 @@ describe("stream implementation", () => {
     expect(final?.usage.output).toBe(5);
     expect(final?.usage.reasoning).toBe(1);
     expect(final?.usage.totalTokens).toBe(15);
+  });
+
+  it("assigns distinct ids to id-less and colliding sanitized tool calls", async () => {
+    const frame = JSON.stringify({
+      candidates: [
+        {
+          content: {
+            parts: [
+              { functionCall: { name: "bake_bread", args: { loaves: 1 } } },
+              { functionCall: { name: "bake_bread", args: { loaves: 2 } } },
+              { functionCall: { id: "a.b", name: "bake_bread", args: {} } },
+              { functionCall: { id: "a_b", name: "bake_bread", args: {} } },
+            ],
+          },
+          finishReason: "STOP",
+        },
+      ],
+    });
+
+    const { final } = await collect([frame]);
+    const ids = final?.content.flatMap((part) => (part.type === "toolCall" ? [part.id] : [])) ?? [];
+    expect(ids).toHaveLength(4);
+    expect(new Set(ids).size).toBe(4);
+    expect(ids).toEqual(["bake_bread_call", "bake_bread_call_2", "a_b", "a_b_2"]);
+  });
+
+  it("does not replay a generation after a transport failure", async () => {
+    const fetch = vi.fn().mockRejectedValue(new Error("connection lost"));
+    vi.stubGlobal("fetch", fetch);
+
+    const result = await createAntigravityStream()(streamModel, contextWith("Hi"), {
+      apiKey: API_KEY,
+    }).result();
+
+    expect(result.stopReason).toBe("error");
+    expect(fetch).toHaveBeenCalledOnce();
   });
 
   it("reports a tool call as the stop reason", async () => {

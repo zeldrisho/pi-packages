@@ -226,20 +226,24 @@ async function listCompanionProjects(
   diagnostics: string[],
 ): Promise<string | undefined> {
   for (const endpoint of ENDPOINTS) {
-    const response = await postJson(
-      `${endpoint}/v1internal:listCloudAICompanionProjects`,
-      token,
-      "{}",
-      signal,
-    );
+    try {
+      const response = await postJson(
+        `${endpoint}/v1internal:listCloudAICompanionProjects`,
+        token,
+        "{}",
+        discoverySignal(signal, DISCOVERY_TIMEOUT_MS),
+      );
 
-    diagnostics.push(`listCloudAICompanionProjects: HTTP ${response.status}`);
+      diagnostics.push(`listCloudAICompanionProjects: HTTP ${response.status}`);
 
-    if (!response.ok) continue;
+      if (!response.ok) continue;
+      const projectId = extractProjectId(parseJsonValue(await response.text()));
 
-    const projectId = extractProjectId(parseJsonValue(await response.text()));
-
-    if (projectId !== undefined) return projectId;
+      if (projectId !== undefined) return projectId;
+    } catch (error) {
+      if (signal.aborted) throw error;
+      diagnostics.push("network or response error");
+    }
   }
 
   return undefined;
@@ -270,7 +274,7 @@ export async function discoverProjectId(
         `${endpoint}/v1internal:loadCodeAssist`,
         token,
         JSON.stringify({ metadata: { ideType: "ANTIGRAVITY" } }),
-        deadline,
+        discoverySignal(deadline, DISCOVERY_TIMEOUT_MS),
       );
 
       const reason = response.ok ? undefined : await safeErrorReason(response);

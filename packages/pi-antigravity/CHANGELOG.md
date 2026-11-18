@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep long-running streams alive after response headers arrive, avoid replaying generations after transport errors, and continue project discovery after an endpoint failure.
+- Preserve distinct tool-call IDs and advertise only supported model routes and image inputs.
+- Ignore unrelated loopback callbacks and require the sign-in state when pasting a callback.
 - Advertise the installed CLI version when available, falling back to the bundled version.
 - Explain when a model has no available server capacity and suggest recovery options.
 - Report ambiguous resource exhaustion clearly and avoid repeated automatic retries; retain failover for explicit temporary capacity errors.

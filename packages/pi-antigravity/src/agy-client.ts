@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { access, open, realpath } from "node:fs/promises";
+import { access, open, realpath, stat } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { basename, delimiter, dirname, isAbsolute, join, relative } from "node:path";
 
@@ -35,6 +35,8 @@ const MAX_WRAPPER_BYTES = 16 * 1024;
 
 /** Bound work on malformed or deliberately adversarial executables. */
 const MAX_CANDIDATES = 2_048;
+
+let cachedClient: { key: string; client: OAuthClient } | undefined;
 
 /** Hashes a candidate without logging it or persisting it. */
 function fingerprint(value: string): string {
@@ -179,9 +181,18 @@ export async function discoverAgyClient(
       const binary = await binaryPath(path);
 
       if (binary === undefined) continue;
+      const stats = await stat(binary);
+      const key = `${binary}:${stats.dev}:${stats.ino}:${stats.size}:${stats.mtimeMs}:${stats.ctimeMs}`;
+      signal?.throwIfAborted();
+
+      if (expected === CONSUMER_CLIENT && cachedClient?.key === key) return cachedClient.client;
       const client = await scanClientBinary(binary, expected, signal);
 
-      if (client !== undefined) return client;
+      if (client !== undefined) {
+        if (expected === CONSUMER_CLIENT) cachedClient = { key, client };
+
+        return client;
+      }
     } catch {
       signal?.throwIfAborted();
       // Do not surface untrusted paths or filesystem error messages.

@@ -353,9 +353,12 @@ async function documentFromDecoded(
     for (const script of document.querySelectorAll("script:not([src])")) {
       const text = script.textContent ?? "";
 
-      const match = /\bnew\s+SwaggerUIBundle\s*\(\s*\{\s*url\s*:\s*["']([^"'\\\r\n]+)["']/.exec(
-        text,
-      );
+      const options = /\bSwaggerUIBundle\s*\(\s*\{([^{}]{0,8192})\}/.exec(text)?.[1];
+
+      const match =
+        options === undefined
+          ? undefined
+          : /(?:^|,)\s*url\s*:\s*["']([^"'\\\r\n]+)["']/.exec(options);
 
       if (!match) continue;
 

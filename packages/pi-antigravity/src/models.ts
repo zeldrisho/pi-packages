@@ -156,7 +156,13 @@ export function resolveRuntimeModel(model: RoutableModel, level?: ModelThinkingL
     if (mapped !== undefined && mapped !== null) return mapped;
   }
 
-  return map.medium ?? map.high ?? map.low ?? model.id;
+  const fallback =
+    map.medium ?? map.high ?? map.low ?? map.off ?? map.minimal ?? map.xhigh ?? map.max;
+
+  if (fallback !== undefined && fallback !== null) return fallback;
+
+  if (Object.keys(map).length === 0) return model.id;
+  throw new Error(`No advertised Antigravity runtime route for ${model.id}`);
 }
 
 /**

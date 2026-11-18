@@ -23,7 +23,7 @@ Restart Pi after installing. Use `pi config` to enable or disable the extension,
 
 Install the [official `agy` CLI](https://antigravity.google/docs/install/?tab=cli) and keep it available on your `PATH`. The extension discovers its OAuth application client for sign-in and token refresh. It does not use `agy` to run model requests or read or change its account login. The extension also runs `agy --version` to identify the installed CLI when making requests. Removing `agy` can cause token refresh to fail after the current access token expires.
 
-This uses application credentials shipped with the CLI and is not an official Google integration. If Google changes those credentials, discovery may fail until the extension is updated. Review the Google consent screen and grant access only if you trust the extension.
+This unofficial integration uses application credentials shipped with the CLI, identifies requests as the Antigravity client, and rephrases a few phrases in Pi's default system prompt for provider compatibility. Google may restrict this use or your account; check its terms and decide whether to accept that risk. If Google changes the credentials, discovery may fail until the extension is updated. Review the Google consent screen and grant access only if you trust the extension.
 
 ## Sign in
 

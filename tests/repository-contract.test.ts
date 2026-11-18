@@ -148,7 +148,9 @@ function fail(message: string): never {
 
 /** Allows a new package to keep its first release notes under Unreleased. */
 function changelogMatchesVersion(changelog: string, version: string): boolean {
-  const latest = changelog.match(/^## \[(\d+\.\d+\.\d+)\]/m)?.[1];
+  const latest = changelog.match(
+    /^## \[(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)\]/m,
+  )?.[1];
 
   if (latest !== undefined) return latest === version;
 
@@ -159,6 +161,10 @@ describe("repository contracts", () => {
   it("allows an unreleased first version but still enforces released versions", () => {
     expect(changelogMatchesVersion("## [Unreleased]\n\n### Added\n- Feature", "0.1.0")).toBe(true);
     expect(changelogMatchesVersion("## [Unreleased]\n", "0.2.0")).toBe(false);
+    expect(
+      changelogMatchesVersion("## [Unreleased]\n\n## [0.1.0-rc.1] - 2026-01-01", "0.1.0"),
+    ).toBe(false);
+    expect(changelogMatchesVersion("## [0.1.0+build.1] - 2026-01-01", "0.1.0")).toBe(false);
     expect(changelogMatchesVersion("# Changelog\n", "0.1.0")).toBe(false);
     expect(changelogMatchesVersion("## [Unreleased]\n\n## [0.1.0] - 2026-01-01", "0.1.0")).toBe(
       true,

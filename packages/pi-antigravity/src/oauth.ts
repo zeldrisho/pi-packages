@@ -374,6 +374,9 @@ async function startCallbackListener(expectedState: string): Promise<CallbackLis
     fail = reject;
   });
 
+  // Startup can fail before acquireCode attaches a handler.
+  void codePromise.catch(() => {});
+
   const finish = (action: () => void): void => {
     if (settled) return;
     settled = true;
@@ -383,11 +386,29 @@ async function startCallbackListener(expectedState: string): Promise<CallbackLis
   };
 
   const handler = (request: IncomingMessage, response: ServerResponse): void => {
-    const url = new URL(request.url ?? "/", redirectUri());
+    let url: URL;
+
+    try {
+      url = new URL(request.url ?? "/", redirectUri());
+    } catch {
+      response.writeHead(400, CALLBACK_HEADERS);
+      response.end("Invalid callback URL.");
+
+      return;
+    }
 
     if (url.pathname !== CALLBACK_PATH) {
       response.writeHead(404, CALLBACK_HEADERS);
       response.end("Antigravity OAuth callback route not found.");
+
+      return;
+    }
+
+    const state = url.searchParams.get("state");
+
+    if (state !== expectedState) {
+      response.writeHead(400, CALLBACK_HEADERS);
+      response.end("Antigravity sign-in failed: state mismatch.");
 
       return;
     }
@@ -403,20 +424,10 @@ async function startCallbackListener(expectedState: string): Promise<CallbackLis
     }
 
     const code = url.searchParams.get("code");
-    const state = url.searchParams.get("state");
 
-    if (code === null || state === null) {
+    if (!code) {
       response.writeHead(400, CALLBACK_HEADERS);
-      response.end("Antigravity sign-in failed: missing code or state.");
-      finish(() => fail?.(new Error("OAuth callback was missing the code or state")));
-
-      return;
-    }
-
-    if (state !== expectedState) {
-      response.writeHead(400, CALLBACK_HEADERS);
-      response.end("Antigravity sign-in failed: state mismatch.");
-      finish(() => fail?.(new Error("OAuth state mismatch")));
+      response.end("Antigravity sign-in failed: missing code.");
 
       return;
     }
@@ -493,21 +504,22 @@ export function parsePastedCallback(text: string, expectedState: string): string
     url = new URL(`${redirectUri().split("?")[0]}?${query}`);
   }
 
+  const state = url.searchParams.get("state");
+
+  if (state !== expectedState) {
+    throw new Error(
+      "The pasted callback belongs to a different sign-in. Run /login antigravity again.",
+    );
+  }
+
   const error = url.searchParams.get("error");
 
   if (error !== null) throw new Error(`Sign-in failed: ${error.slice(0, 200)}`);
 
   const code = url.searchParams.get("code");
-  const state = url.searchParams.get("state");
 
   if (code === null || code === "") {
     throw new Error("The pasted URL is missing `code`. Paste the complete callback URL.");
-  }
-
-  if (state !== null && state !== expectedState) {
-    throw new Error(
-      "The pasted callback belongs to a different sign-in. Run /login antigravity again.",
-    );
   }
 
   return code;

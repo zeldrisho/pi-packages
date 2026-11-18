@@ -7,6 +7,18 @@ const substantial =
   "Readable issue context with reproduction details and expected behavior. ".repeat(12);
 
 describe("extraction regressions", () => {
+  it("keeps fragment siblings and deduplicates equivalent tab mappings", async () => {
+    const html = `<p>Shared preface.</p><main><div data-surface-filter-pills><div role="tablist"><button role="tab" data-surface-id="hub" aria-controls="hub">App</button><button role="tab" data-surface-id="cli" aria-controls="cli">CLI</button></div></div><div role="tabpanel" id="hub" data-surface-pane="hub">APPONLY</div><div role="tabpanel" id="cli" data-surface-pane="cli">CLIONLY</div></main>`;
+
+    const result = await extractHtmlToMarkdown(
+      html,
+      new URL("https://example.com/install?tab=cli"),
+    );
+
+    expect(result.surfaceView?.markdown).toContain("CLIONLY");
+    expect(result.surfaceView?.markdown).not.toContain("APPONLY");
+  });
+
   it("derives an explicitly requested documentation surface without changing the complete page", async () => {
     const html = `<html><body><main><article><h1>Authenticate</h1><p>Shared introduction.</p><div data-surface-filter-pills><div role="tablist"><button role="tab" data-surface-id="hub">App</button><button role="tab" data-surface-id="cli">CLI</button></div></div><div data-surface-pane="hub"><h2>App setup</h2><p>APPONLY</p></div><div data-surface-pane="cli"><h2>CLI setup</h2><p>CLIONLY</p><div role="tabpanel"><p>Nested instructions</p></div></div></article></main></body></html>`;
 

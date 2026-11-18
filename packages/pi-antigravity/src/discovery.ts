@@ -226,7 +226,18 @@ function groupVariants(
       (group.budgetRoutes ??= new Set()).add(runtimeId);
     }
 
-    const level = levelFromDisplayName(displayName) ?? suffix?.level;
+    const numericLevel = infoObject?.thinkingLevel;
+
+    const level =
+      (numericLevel === 1
+        ? "low"
+        : numericLevel === 2
+          ? "medium"
+          : numericLevel === 3
+            ? "high"
+            : undefined) ??
+      levelFromDisplayName(displayName) ??
+      suffix?.level;
 
     if (level !== undefined) group.levels[level] = runtimeId;
     else if (group.unsuffixed === undefined) group.unsuffixed = runtimeId;
@@ -266,7 +277,7 @@ function absorbLimits(group: VariantGroup, info: JsonValue | undefined): void {
   }
 
   if (info.supportsImages === false) group.supportsImages = false;
-  else if (info.supportsImages === true && group.supportsImages !== true) {
+  else if (info.supportsImages === true && group.supportsImages === undefined) {
     group.supportsImages = true;
   }
 }

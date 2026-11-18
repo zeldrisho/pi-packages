@@ -79,6 +79,10 @@ describe("pasted callback parsing", () => {
     expect(parsePastedCallback("code=4/abc&state=state-value", STATE)).toBe("4/abc");
   });
 
+  it("rejects a pasted code without state", () => {
+    expect(() => parsePastedCallback("code=4/abc", STATE)).toThrow(/different sign-in/);
+  });
+
   it("rejects a callback from another sign-in", () => {
     expect(() =>
       parsePastedCallback("http://localhost:51121/oauth-callback?state=other&code=4/abc", STATE),
@@ -93,7 +97,10 @@ describe("pasted callback parsing", () => {
 
   it("reports an OAuth error delivered through the callback", () => {
     expect(() =>
-      parsePastedCallback("http://localhost:51121/oauth-callback?error=access_denied", STATE),
+      parsePastedCallback(
+        "http://localhost:51121/oauth-callback?error=access_denied&state=state-value",
+        STATE,
+      ),
     ).toThrow(/access_denied/);
   });
 

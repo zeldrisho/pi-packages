@@ -132,6 +132,27 @@ describe("OAuth login", () => {
     ).rejects.toThrow(expected);
   });
 
+  it("fails cleanly when the callback port is occupied", async () => {
+    const server = createServer();
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    // SAFETY: the listening TCP server has an address with a numeric port.
+    const port = (server.address() as AddressInfo).port;
+    vi.stubEnv("PI_ANTIGRAVITY_REDIRECT_URI", `http://localhost:${port}/oauth-callback`);
+
+    try {
+      await expect(
+        loginAntigravity(
+          callbacks(() => new Promise(() => {})),
+          { newState: () => "state" },
+        ),
+      ).rejects.toThrow();
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
+  });
+
   it("accepts a loopback callback without returning its code in HTML", async () => {
     const uri = await redirect();
     loginFetch(
@@ -154,17 +175,22 @@ describe("OAuth login", () => {
     expect(html).not.toContain("secret-code");
   });
 
-  it("rejects a loopback state mismatch", async () => {
-    const uri = await redirect();
+  it("ignores an invalid callback and accepts a subsequent valid callback", async () => {
+    const uri = (await redirect()).replace("localhost", "127.0.0.1");
+    loginFetch(
+      Response.json({ access_token: "access", refresh_token: "refresh", expires_in: 3600 }),
+    );
     const interaction = callbacks(() => new Promise(() => {}));
     interaction.onAuth = () => {
-      get(uri.replace("localhost", "127.0.0.1") + "?code=secret&state=other", (response) =>
-        response.resume(),
-      );
+      get(uri + "?error=denied&state=other", (response) => {
+        expect(response.statusCode).toBe(400);
+        response.resume();
+        get(uri + "?code=secret&state=state", (valid) => valid.resume());
+      });
     };
 
-    await expect(loginAntigravity(interaction, { newState: () => "state" })).rejects.toThrow(
-      /state mismatch/,
+    await expect(loginAntigravity(interaction, { newState: () => "state" })).resolves.toMatchObject(
+      { access: "access" },
     );
   });
 

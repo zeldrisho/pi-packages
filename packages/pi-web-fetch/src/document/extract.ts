@@ -546,6 +546,7 @@ function selectSurfaceHtml(
   if (values.length !== 1 || !/^[a-z0-9-]{1,40}$/u.test(values[0])) return undefined;
   const selected = values[0];
   const { document } = parseHTML(html);
+  normalizeFragmentDocument(document);
   const candidates: Array<{ panes: Element[]; chosen: Element }> = [];
 
   // Standard ARIA controls identify their panels by ID. The query value must
@@ -603,8 +604,20 @@ function selectSurfaceHtml(
       candidates.push({ panes: surfacePanes, chosen });
   }
 
-  if (candidates.length !== 1) return undefined;
-  const { panes, chosen } = candidates[0];
+  const unique = candidates.filter(
+    (candidate, index) =>
+      !candidates
+        .slice(0, index)
+        .some(
+          (previous) =>
+            previous.chosen === candidate.chosen &&
+            previous.panes.length === candidate.panes.length &&
+            previous.panes.every((pane) => candidate.panes.includes(pane)),
+        ),
+  );
+
+  if (unique.length !== 1) return undefined;
+  const { panes, chosen } = unique[0];
 
   if (!chosen?.textContent?.trim()) return undefined;
 

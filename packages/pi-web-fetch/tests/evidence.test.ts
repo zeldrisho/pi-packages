@@ -270,7 +270,10 @@ describe("web_fetch honest-evidence details", () => {
     });
   });
 
-  it("retrieves an empty Swagger UI's advertised same-origin specification", async () => {
+  it.each([
+    'new SwaggerUIBundle({url: "/api/swagger.json"})',
+    'SwaggerUIBundle({dom_id: "#swagger-ui", url: "/api/swagger.json"})',
+  ])("retrieves a same-origin Swagger specification from %s", async (initializer) => {
     const dependencies: FetchRemoteDependencies = {
       validateUrl: async (value) => {
         const url = value instanceof URL ? value : new URL(value);
@@ -283,7 +286,7 @@ describe("web_fetch honest-evidence details", () => {
 
         if (target.url.pathname === "/api/")
           return fakeTextResponse(
-            '<html><body><div id="swagger-ui"></div><script>new SwaggerUIBundle({url: "/api/swagger.json"})</script></body></html>',
+            `<html><body><div id="swagger-ui"></div><script>${initializer}</script></body></html>`,
             "text/html",
           );
 

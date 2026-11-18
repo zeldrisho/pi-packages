@@ -28,6 +28,24 @@ describe("project discovery", () => {
     await expect(discoverProjectId("access", undefined)).resolves.toBe("fallback");
     expect(fetch).toHaveBeenCalledTimes(2);
   });
+  it("uses a separate deadline for each load endpoint", async () => {
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockRejectedValueOnce(new Error("timeout"))
+        .mockResolvedValueOnce(Response.json({ projectId: "fallback" })),
+    );
+
+    try {
+      await expect(discoverProjectId("access", undefined)).resolves.toBe("fallback");
+      expect(timeout.mock.calls.filter(([ms]) => ms === 8_000)).toHaveLength(2);
+      expect(timeout).toHaveBeenCalledWith(16_000);
+    } finally {
+      timeout.mockRestore();
+    }
+  });
   it("lists companion projects when loadCodeAssist omits the id", async () => {
     const fetch = vi
       .fn()
@@ -38,6 +56,24 @@ describe("project discovery", () => {
     vi.stubGlobal("fetch", fetch);
     await expect(discoverProjectId("access", undefined)).resolves.toBe("listed");
   });
+  it.each(["network", "invalid JSON"])(
+    "tries the next project list endpoint after %s",
+    async (failure) => {
+      const fetch = vi
+        .fn()
+        .mockResolvedValueOnce(Response.json({}))
+        .mockImplementationOnce(async () => {
+          if (failure === "network") throw new Error("network");
+
+          return new Response("invalid JSON");
+        })
+        .mockResolvedValueOnce(Response.json({ projects: [{ id: "listed" }] }));
+
+      vi.stubGlobal("fetch", fetch);
+      await expect(discoverProjectId("access", undefined)).resolves.toBe("listed");
+      expect(fetch).toHaveBeenCalledTimes(3);
+    },
+  );
   it("rejects if no endpoint returns a usable project", async () => {
     vi.stubGlobal(
       "fetch",

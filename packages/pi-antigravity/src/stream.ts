@@ -454,9 +454,22 @@ function appendPart(
     // call inherits it; a replay without any signature is rejected upstream.
     const signature = part.signature ?? state.lastSignature;
 
+    const baseId = sanitizeToolCallId(sanitizeToolCallId(part.id ?? "", part.name), "tool");
+
+    const usedIds = new Set(
+      output.content.flatMap((item) => (item.type === "toolCall" ? [item.id] : [])),
+    );
+
+    let id = baseId;
+
+    for (let index = 2; usedIds.has(id); index += 1) {
+      const suffix = `_${index}`;
+      id = `${baseId.slice(0, 64 - suffix.length)}${suffix}`;
+    }
+
     const toolCall: ToolCall = {
       type: "toolCall",
-      id: sanitizeToolCallId(part.id ?? "", part.name),
+      id,
       name: part.name,
       arguments: part.args,
     };
@@ -642,12 +655,13 @@ async function consumeStream(response: Response, context: StreamContext): Promis
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  const cancel = new AbortController();
   let buffer = "";
 
   try {
     while (true) {
-      const result = await withStallDeadline(reader.read(), STALL_TIMEOUT_MS, () => cancel.abort());
+      const result = await withStallDeadline(reader.read(), STALL_TIMEOUT_MS, () => {
+        void reader.cancel().catch(() => {});
+      });
 
       if (result.done === true) break;
 
@@ -674,7 +688,7 @@ async function consumeStream(response: Response, context: StreamContext): Promis
       await handleLine(rest, context);
     }
   } finally {
-    cancel.abort();
+    void reader.cancel().catch(() => {});
     reader.releaseLock();
   }
 
@@ -697,8 +711,8 @@ function headerRecord(headers: Headers): ProviderResponse["headers"] {
 }
 
 /**
- * Sends one request, falling back to the next endpoint on transport failures and
- * on capacity rejections.
+ * Sends one request, falling back to the next endpoint only on explicit
+ * temporary capacity rejections.
  *
  * @param envelope - Request body to send
  * @param token - OAuth access token
@@ -720,8 +734,15 @@ async function postToEndpoint(
   const headers = await antigravityHeaders(token, signal);
 
   for (const endpoint of ENDPOINTS) {
-    const timeout = AbortSignal.timeout(HEADER_TIMEOUT_MS);
-    const combined = signal === undefined ? timeout : AbortSignal.any([signal, timeout]);
+    const controller = new AbortController();
+
+    const timer = setTimeout(
+      () => controller.abort(new Error("Antigravity response headers timed out")),
+      HEADER_TIMEOUT_MS,
+    );
+
+    const combined =
+      signal === undefined ? controller.signal : AbortSignal.any([signal, controller.signal]);
 
     let response: Response;
 
@@ -732,11 +753,8 @@ async function postToEndpoint(
         body,
         signal: combined,
       });
-    } catch (error) {
-      if (signal?.aborted === true) throw error;
-
-      lastError = error instanceof Error ? error : new Error(String(error));
-      continue;
+    } finally {
+      clearTimeout(timer);
     }
 
     await onResponse?.({ status: response.status, headers: headerRecord(response.headers) }, model);
@@ -792,7 +810,7 @@ export function createAntigravityStream(
         const runtimeModel = resolveRuntimeModel(entry, options?.reasoning);
 
         const discoveredThinkingConfig =
-          options?.reasoning === undefined
+          options?.reasoning === undefined || String(options.reasoning) === "off"
             ? undefined
             : await resolveThinking?.(
                 credentials.token,
