@@ -93,6 +93,7 @@ export default function (pi: ExtensionAPI) {
               ? (overflowNotice ??
                   `[${result.details?.truncation?.truncated ? "Output truncated. " : "Structured payload omitted. "}Full output: ${path}]`)
               : undefined,
+            context?.keyHint("app.tools.expand", "to expand"),
           )
         : new Text(theme.fg("dim", "No results"), 0, 0);
     },

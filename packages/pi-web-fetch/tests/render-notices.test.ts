@@ -24,7 +24,14 @@ describe("web output notices", () => {
 
     const output = ["```", ...Array.from({ length: 12 }, (_, i) => `line ${i}`)].join("\n");
 
-    const rendered = renderCollapsibleOutput(output, false, theme, false, "[Continue]")
+    const rendered = renderCollapsibleOutput(
+      output,
+      false,
+      theme,
+      false,
+      "[Continue]",
+      "Alt+E to expand",
+    )
       .render(80)
       .join("\n");
 
@@ -35,10 +42,12 @@ describe("web output notices", () => {
     expect(styled).toContain("muted");
     expect(styled).toContain("warning");
     expect(
-      renderCollapsibleOutput(output, true, theme, false, "[Continue]").render(80).join("\n"),
+      renderCollapsibleOutput(output, true, theme, false, "[Continue]", "Alt+E to expand")
+        .render(80)
+        .join("\n"),
     ).toContain("[Continue]");
     expect(
-      renderCollapsibleOutput("short output", false, theme, false, "[Continue]")
+      renderCollapsibleOutput("short output", false, theme, false, "[Continue]", "Alt+E to expand")
         .render(80)
         .join("\n"),
     ).toContain("[Continue]");

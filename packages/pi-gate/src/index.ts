@@ -95,6 +95,12 @@ async function selectApproval(
 
           return createApprovalPrompt(tui, theme, keybindings, done, command, rule, deadline);
         },
+        {
+          blocked: {
+            kind: "permission",
+            message: HERDR_BLOCKED_LABEL,
+          },
+        },
       );
 
       uiPromise
