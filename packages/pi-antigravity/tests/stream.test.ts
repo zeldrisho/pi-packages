@@ -75,6 +75,31 @@ async function collect(frames: readonly string[]) {
   return { types, final };
 }
 
+describe("request transport", () => {
+  it("uses the caller fetch override for inference", async () => {
+    vi.stubGlobal("fetch", async () => {
+      throw new Error("global fetch must not be used");
+    });
+
+    const fetcher = vi.fn(async () => sse([textFrame("custom transport")]));
+
+    const stream = createAntigravityStream()(streamModel, contextWith("Hi"), {
+      apiKey: API_KEY,
+      sessionId: "custom-fetch-session",
+      fetch: fetcher,
+    });
+
+    let text = "";
+
+    for await (const event of stream) {
+      if (event.type === "text_delta") text += event.delta;
+    }
+
+    expect(text).toBe("custom transport");
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();

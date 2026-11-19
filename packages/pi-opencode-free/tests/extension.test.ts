@@ -171,7 +171,7 @@ const storedModel: Model<"openai-completions"> = {
   name: "Cached Free",
   provider: PROVIDER_ID,
   api: "openai-completions",
-  baseUrl: "https://opencode.ai/inference/v1",
+  baseUrl: "https://opencode.ai/inference/openai/v1",
   input: ["text"],
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
   contextWindow: 64_000,
@@ -185,7 +185,7 @@ const discoveryCatalog = [
     name: "Beam Free",
     provider: "opencode",
     api: "openai-completions",
-    baseUrl: "https://opencode.ai/inference/v1",
+    baseUrl: "https://opencode.ai/inference/openai/v1",
     reasoning: true,
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -197,7 +197,7 @@ const discoveryCatalog = [
     name: "DeepSeek V4.1 Flash Free",
     provider: "opencode",
     api: "openai-completions",
-    baseUrl: "https://opencode.ai/inference/v1",
+    baseUrl: "https://opencode.ai/inference/openai/v1",
     reasoning: true,
     input: ["text"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -271,7 +271,7 @@ describe("opencode-free extension", () => {
     expect(config?.api).toBe("openai-completions");
     expect(config?.apiKey).toBe("public");
     expect(config?.authHeader).toBe(true);
-    expect(config?.baseUrl).toBe("https://opencode.ai/inference/v1");
+    expect(config?.baseUrl).toBe("https://opencode.ai/inference/openai/v1");
     expect(config?.headers).toBeUndefined();
 
     const ids = config?.models?.map((model) => model.id) ?? [];

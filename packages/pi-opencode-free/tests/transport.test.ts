@@ -39,11 +39,14 @@ describe("inference transport", () => {
       return outgoing;
     });
 
-    const pending = createTransport(undefined, send)("https://opencode.ai/inference/v1/chat?x=1", {
-      method: "POST",
-      headers: { connection: "x-remove", "x-remove": "bad" },
-      body: "hello",
-    });
+    const pending = createTransport(undefined, send)(
+      "https://opencode.ai/inference/openai/v1/chat?x=1",
+      {
+        method: "POST",
+        headers: { connection: "x-remove", "x-remove": "bad" },
+        body: "hello",
+      },
+    );
 
     const response = await pending;
     incoming.end("refused");
@@ -51,7 +54,7 @@ describe("inference transport", () => {
     expect(response.status).toBe(429);
     expect(response.headers.get("retry-after")).toBe("42");
     const [url, options] = https.request.mock.calls[0]!;
-    expect(String(url)).toBe("https://opencode.ai/inference/v1/chat?x=1");
+    expect(String(url)).toBe("https://opencode.ai/inference/openai/v1/chat?x=1");
     expect(options.ciphers).toBe(OPENCODE_CIPHERS);
     expect(options.headers["x-remove"]).toBeUndefined();
     expect(options.headers["accept-encoding"]).toBe("identity");
@@ -78,7 +81,7 @@ describe("inference transport", () => {
     const transport = createTransport(undefined, send);
 
     for (let index = 0; index < 2; index++) {
-      const response = await transport("https://opencode.ai/inference/v1");
+      const response = await transport("https://opencode.ai/inference/openai/v1");
       expect(await response.text()).toBe("ok");
     }
 
@@ -107,9 +110,12 @@ describe("inference transport", () => {
     });
     const controller = new AbortController();
 
-    const response = await createTransport(undefined, send)("https://opencode.ai/inference/v1", {
-      signal: controller.signal,
-    });
+    const response = await createTransport(undefined, send)(
+      "https://opencode.ai/inference/openai/v1",
+      {
+        signal: controller.signal,
+      },
+    );
 
     const options = https.request.mock.calls[0]![1];
     expect(options.signal.aborted).toBe(false);
@@ -123,7 +129,7 @@ describe("inference transport", () => {
     const abort = new AbortController();
     abort.abort();
     await expect(
-      createTransport(undefined, send)("https://opencode.ai/inference/v1", {
+      createTransport(undefined, send)("https://opencode.ai/inference/openai/v1", {
         signal: abort.signal,
       }),
     ).rejects.toThrow();
@@ -135,7 +141,7 @@ describe("inference transport", () => {
       return outgoing;
     });
     await expect(
-      createTransport(undefined, send)("https://opencode.ai/inference/v1"),
+      createTransport(undefined, send)("https://opencode.ai/inference/openai/v1"),
     ).rejects.toThrow("connection lost");
     expect(https.request).toHaveBeenCalledTimes(1);
   });

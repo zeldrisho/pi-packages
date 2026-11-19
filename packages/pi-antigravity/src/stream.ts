@@ -727,6 +727,7 @@ async function postToEndpoint(
   signal: AbortSignal | undefined,
   onResponse: ResponseObserver | undefined,
   model: Model<Api>,
+  fetcher: typeof fetch = globalThis.fetch,
 ): Promise<Response> {
   const body = JSON.stringify(envelope);
   let lastError: Error | undefined;
@@ -747,7 +748,7 @@ async function postToEndpoint(
     let response: Response;
 
     try {
-      response = await fetch(`${endpoint}/v1internal:streamGenerateContent?alt=sse`, {
+      response = await fetcher(`${endpoint}/v1internal:streamGenerateContent?alt=sse`, {
         method: "POST",
         headers,
         body,
@@ -817,6 +818,7 @@ export function createAntigravityStream(
                 credentials.projectId,
                 runtimeModel,
                 options.signal,
+                options.fetch,
               );
 
         const selectedThinkingConfig = overrideThinkingBudget({
@@ -866,6 +868,7 @@ export function createAntigravityStream(
             options?.signal,
             options?.onResponse,
             model,
+            options?.fetch,
           );
 
           output.content = [];

@@ -437,6 +437,7 @@ export async function fetchAvailableModels(
   token: string,
   projectId: string,
   signal: AbortSignal | undefined,
+  fetcher: typeof fetch = globalThis.fetch,
 ): Promise<JsonValue | undefined> {
   const deadline = AbortSignal.any([
     ...(signal === undefined ? [] : [signal]),
@@ -447,7 +448,7 @@ export async function fetchAvailableModels(
 
   for (const endpoint of ENDPOINTS) {
     try {
-      const response = await fetch(`${endpoint}/v1internal:fetchAvailableModels`, {
+      const response = await fetcher(`${endpoint}/v1internal:fetchAvailableModels`, {
         method: "POST",
         headers,
         body: JSON.stringify({ project: projectId }),

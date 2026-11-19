@@ -44,6 +44,7 @@ export function createThinkingMetadataResolver() {
     projectId: string,
     runtimeId: string,
     signal: AbortSignal | undefined,
+    fetcher: typeof fetch = globalThis.fetch,
   ): Promise<ThinkingConfig | undefined> => {
     const key = createHash("sha256")
       .update(JSON.stringify([token, projectId]))
@@ -53,7 +54,7 @@ export function createThinkingMetadataResolver() {
       return cache.configs.get(runtimeId);
     }
 
-    const body = await fetchAvailableModels(token, projectId, signal);
+    const body = await fetchAvailableModels(token, projectId, signal, fetcher);
 
     if (!isJsonObject(body) || !isJsonObject(body.models)) return undefined;
     const configs = new Map<string, ThinkingConfig>();

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Use OpenCode's current `/inference/openai/v1` endpoint for free-model discovery and inference.
 - Retry truncated compaction and branch summaries concisely, and preserve the session if the retry also hits the output limit.
 
 ## [0.5.0] - 2026-11-18
