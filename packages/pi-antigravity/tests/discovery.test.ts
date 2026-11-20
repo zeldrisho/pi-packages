@@ -461,7 +461,7 @@ describe("catalog refresh", () => {
     });
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(catalog).toHaveLength(4);
+    expect(catalog).toHaveLength(0);
   });
 
   it("falls through the endpoints until one answers", async () => {
@@ -491,7 +491,7 @@ describe("catalog refresh", () => {
     vi.stubGlobal("fetch", async () => new Response("denied", { status: 403 }));
 
     const stored = storedModelsFrom(
-      modelConfigs([FALLBACK_MODELS[1]!]),
+      modelConfigs(catalogFromAvailableModels(availableModels()) ?? []),
       "antigravity",
       "https://daily-cloudcode-pa.googleapis.com",
     );
@@ -504,7 +504,12 @@ describe("catalog refresh", () => {
       signal: undefined,
     });
 
-    expect(catalog.map((model) => model.id)).toEqual(["claude-sonnet-4-6"]);
+    expect(catalog.map((model) => model.id)).toEqual([
+      "gemini-3.8-flash",
+      "claude-sonnet-4-6",
+      "claude-opus-4-6",
+      "gpt-oss-120b",
+    ]);
   });
 
   it("round-trips a catalog through Pi's stored model shape", () => {
@@ -512,10 +517,8 @@ describe("catalog refresh", () => {
     const stored = storedModelsFrom(configs, "antigravity", "https://example.test");
     const restored = modelsFromStored(stored, "antigravity");
 
-    expect(restored?.map((model) => model.id)).toEqual(configs.map((config) => config.id));
-    expect(restored?.[0]?.thinkingLevelMap).toEqual(configs[0]?.thinkingLevelMap);
-    expect(stored[0]?.baseUrl).toBe("https://example.test");
-    expect(stored[0]?.provider).toBe("antigravity");
+    expect(restored).toBeUndefined();
+    expect(stored).toEqual([]);
   });
 
   it("ignores stored models owned by another provider or API", () => {
@@ -543,7 +546,7 @@ describe("catalog refresh", () => {
       signal: undefined,
     });
 
-    expect(catalog).toHaveLength(4);
+    expect(catalog).toHaveLength(0);
     expect(API_KEY).toContain("access-token");
   });
 });

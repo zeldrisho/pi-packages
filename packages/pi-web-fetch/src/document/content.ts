@@ -55,7 +55,7 @@ export interface CompleteDocument {
   /** True when this document is a Markdown representation substituted for the requested page. */
   markdownAlternateFallback?: boolean;
   /** Why the Markdown representation was selected. */
-  markdownAlternateReason?: "advertised" | "derived";
+  markdownAlternateReason?: "advertised" | "preferred";
   /** Same-origin OpenAPI document advertised by an otherwise empty Swagger UI. */
   swaggerSpecUrl?: string;
   /** The returned content is an API or specification substituted for the page. */

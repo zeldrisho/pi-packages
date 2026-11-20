@@ -434,7 +434,7 @@ export async function fetchDocumentWithLlmsTxtSupport(
           return {
             ...alternate,
             markdownAlternateFallback: true,
-            markdownAlternateReason: advertised ? "advertised" : "derived",
+            markdownAlternateReason: advertised ? "advertised" : "preferred",
             llmsTxtIndexUrl: index?.url,
             llmsTxtIndexAliases: index?.aliases,
           };

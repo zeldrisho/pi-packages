@@ -32,7 +32,7 @@ describe("request capture", () => {
     const capture = createCaptureFetch(upstream);
 
     const request = new Request(
-      "https://example.test/v1?access_token=private&refresh_token=private&api_key=private&client_secret=private&q=visible",
+      "https://example.test/v1?access_token=private&refresh_token=private&api_key=private&client_secret=private&apiKey=private&clientSecret=private&Access_Token=private&q=visible",
       { method: "POST", body: "prompt text" },
     );
 

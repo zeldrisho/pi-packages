@@ -164,7 +164,7 @@ const META_SCHEMA_KEYWORDS = new Set([
   "definitions",
 ]);
 
-/** Schema keywords the Claude and GPT-OSS custom-tool bridge accepts. */
+/** Schema keywords accepted by the compatibility tool bridge. */
 const LEGACY_SCHEMA_KEYWORDS = new Set([
   "type",
   "description",
@@ -210,7 +210,7 @@ export function sanitizeToolCallId(id: string, fallbackName: string): string {
  * Reports whether tool-call ids must be sent for a runtime model.
  *
  * @param runtimeModel - Backend request model id
- * @returns True for Claude and GPT-OSS runtime models
+ * @returns Whether the runtime model needs the compatibility schema
  */
 export function needsToolCallIds(runtimeModel: string): boolean {
   return usesLegacyToolSchema(runtimeModel);
@@ -358,9 +358,8 @@ function thinkingParts(block: ThinkingContent, sameModel: boolean): GeminiPart[]
 
   if (!sameModel) return [];
 
-  // Claude also rejects replayed thinking without a signature. Older stored
-  // sessions may contain unsigned blocks, so omit them rather than breaking
-  // the conversation's subsequent turns.
+  // Older stored sessions may contain unsigned blocks, so omit them rather
+  // than breaking the conversation's subsequent turns.
   if (!isValidThoughtSignature(block.thinkingSignature)) return [];
 
   return [{ thought: true, text: block.thinking, thoughtSignature: block.thinkingSignature }];
@@ -777,7 +776,7 @@ function stripMetaKeyword(key: string, value: JsonValue): JsonValue {
 }
 
 /**
- * Reduces a schema to the subset the Claude and GPT-OSS tool bridge accepts.
+ * Reduces a schema to the subset the compatibility tool bridge accepts.
  *
  * @param schema - Normalized schema
  * @returns A schema with only allowlisted keywords
@@ -974,8 +973,6 @@ export interface RequestLabels {
   last_step_index: string;
   request_id: string;
   trajectory_id: string;
-  used_claude: string;
-  used_claude_conservative: string;
   used_non_gemini_model: string;
 }
 
@@ -994,15 +991,12 @@ export function labelsFor(
   requestIndex: number,
   runtimeModel: string,
 ): RequestLabels {
-  const claude = runtimeModel.startsWith("claude-");
-  const nonGemini = claude || runtimeModel.startsWith("gpt-oss-");
+  const nonGemini = !runtimeModel.startsWith("gemini-");
 
   return {
     last_step_index: String(Math.max(0, step - 1)),
     request_id: `${trajectoryId}-${requestIndex}`,
     trajectory_id: trajectoryId,
-    used_claude: claude ? "true" : "false",
-    used_claude_conservative: claude ? "true" : "false",
     used_non_gemini_model: nonGemini ? "true" : "false",
   };
 }

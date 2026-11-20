@@ -248,11 +248,7 @@ describe("extension registration", () => {
     const publish = vi.fn(async () => true);
 
     const stored = {
-      models: storedModelsFrom(
-        modelConfigs(FALLBACK_MODELS.slice(0, 1)),
-        PROVIDER_ID,
-        "https://example.test",
-      ),
+      models: [],
       checkedAt: Date.now(),
       piCatalog: {
         google: { entries: [], lastModified: 0 },
@@ -267,7 +263,7 @@ describe("extension registration", () => {
       publish,
     };
 
-    expect(await register().config.refreshModels?.(context)).toHaveLength(1);
+    expect(await register().config.refreshModels?.(context)).toHaveLength(0);
     expect(fetch).not.toHaveBeenCalled();
     expect(publish).not.toHaveBeenCalled();
   });

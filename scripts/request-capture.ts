@@ -202,7 +202,7 @@ function targetOf(input: RequestInfo | URL): string {
     const url = new URL(raw);
 
     for (const key of url.searchParams.keys()) {
-      if (OPAQUE_QUERY_KEYS.has(key)) url.searchParams.set(key, "[redacted]");
+      if (OPAQUE_QUERY_KEYS.has(key.toLowerCase())) url.searchParams.set(key, "[redacted]");
     }
 
     return `${url.origin}${url.pathname}${url.search}`;

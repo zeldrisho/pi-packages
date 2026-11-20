@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Use the account-advertised Gemini catalog without maintaining a stale static model list.
 - Sign-in, token refresh, and requests no longer require the `agy` CLI. The public installed-application OAuth client and the compatibility version are bundled, and a matching client found in an installed CLI is preferred when available.
 
 ### Removed
