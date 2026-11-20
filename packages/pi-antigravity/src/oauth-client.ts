@@ -16,8 +16,9 @@ export const BUNDLED_CLIENT: OAuthClient = {
 /**
  * Resolves the OAuth client used for sign-in and refresh.
  *
- * A matching client in an installed agy is preferred, so an upstream rotation
- * keeps working before an extension update ships; otherwise the bundled public
+ * A matching, already-recognized client in an installed agy is preferred, so a
+ * known upstream rotation keeps working before an extension update ships. An
+ * unknown rotation requires an extension update; otherwise the bundled public
  * client is used. No account token store is read.
  *
  * @param signal - Caller cancellation

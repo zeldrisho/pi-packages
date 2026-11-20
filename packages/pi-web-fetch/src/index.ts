@@ -150,7 +150,7 @@ export default function (pi: ExtensionAPI) {
             result.details?.truncated && result.details.nextOffset !== undefined
               ? `[Content truncated. Continue with offset=${result.details.nextOffset} to read the next chunk.]`
               : undefined,
-            context?.keyHint("app.tools.expand", "to expand"),
+            context?.keyHint?.("app.tools.expand", "to expand") ?? "Ctrl+O to expand",
           )
         : new Text(theme.fg("dim", "No content"), 0, 0);
     },

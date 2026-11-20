@@ -40,6 +40,12 @@ describe("normalizeGitHubRawUrl", () => {
     ])
       expect(normalizeGitHubRawUrl(url)).toBe(url);
   });
+  it("preserves nested /-/blob/ path segments after the first repository delimiter", () => {
+    expect(
+      normalizeGitHubRawUrl("https://gitlab.com/a/b/-/blob/main/docs/-/blob/examples/file.ts"),
+    ).toBe("https://gitlab.com/a/b/-/raw/main/docs/-/blob/examples/file.ts");
+  });
+
   it("rewrites blob URLs to raw.githubusercontent.com", () => {
     expect(normalizeGitHubRawUrl("https://github.com/o/r/blob/main/src/x.ts")).toBe(
       "https://raw.githubusercontent.com/o/r/main/src/x.ts",

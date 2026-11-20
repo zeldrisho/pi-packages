@@ -684,7 +684,9 @@ export async function executeWebFetch(
           : []),
         ...(result.markdownAlternateFallback
           ? [
-              "[Page content was sparse; showing the site's advertised Markdown version instead.]",
+              result.markdownAlternateReason === "advertised"
+                ? "[Page content was sparse; showing the site's advertised Markdown version instead.]"
+                : "[Showing a Markdown representation instead of the requested page.]",
               "",
             ]
           : []),

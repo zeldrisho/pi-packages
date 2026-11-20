@@ -22,6 +22,29 @@ describe("request capture", () => {
     expect(upstream).toHaveBeenCalledTimes(1);
   });
 
+  it("redacts credential query values and forwards Request bodies without reading them", async () => {
+    const upstream = vi.fn(async (input: RequestInfo | URL) => {
+      expect(input).toBeInstanceOf(Request);
+
+      return new Response(null, { status: 204 });
+    });
+
+    const capture = createCaptureFetch(upstream);
+
+    const request = new Request(
+      "https://example.test/v1?access_token=private&refresh_token=private&api_key=private&client_secret=private&q=visible",
+      { method: "POST", body: "prompt text" },
+    );
+
+    await capture.fetch(request);
+
+    const snapshot = JSON.stringify(capture.snapshot());
+    expect(snapshot).not.toContain("private");
+    expect(snapshot).toContain("q=visible");
+    expect(snapshot).toContain('"sample":"stream"');
+    expect(upstream).toHaveBeenCalledOnce();
+  });
+
   it("records failures, handles header forms and clears snapshots", async () => {
     const capture = createCaptureFetch(async () => {
       throw new Error("private network error");

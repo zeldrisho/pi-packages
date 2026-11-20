@@ -1,6 +1,6 @@
 /**
- * Rewrites GitHub source URLs to their raw counterparts so file contents are fetched as
- * clean plain text instead of Defuddle's noisy rendered view:
+ * Rewrites GitHub and GitLab source URLs to their raw counterparts so file contents are
+ * fetched as clean plain text instead of Defuddle's noisy rendered view:
  *
  * - `github.com` `blob` URLs become their `raw.githubusercontent.com` counterpart.
  * - Bare gist pages (`gist.github.com/<user>/<id>`) get `/raw` appended; the redirect to
@@ -16,10 +16,12 @@ export function normalizeGitHubRawUrl(rawUrl: string): string {
     if (url.protocol !== "https:") return rawUrl;
 
     if (url.hostname === "gitlab.com" && !url.username && !url.password && !url.port) {
-      const match = /^(\/(?:[^/]+\/)+[^/]+)\/-\/blob\/(.+)$/.exec(url.pathname);
+      const delimiter = url.pathname.indexOf("/-/blob/");
+      const repository = delimiter > 0 ? url.pathname.slice(0, delimiter) : "";
+      const file = delimiter > 0 ? url.pathname.slice(delimiter + "/-/blob/".length) : "";
 
-      if (match && match[2].includes("/")) {
-        url.pathname = `${match[1]}/-/raw/${match[2]}`;
+      if (repository.split("/").filter(Boolean).length >= 2 && file.includes("/")) {
+        url.pathname = `${repository}/-/raw/${file}`;
 
         return url.href;
       }

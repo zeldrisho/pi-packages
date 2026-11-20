@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Require Pi 1.5.0 or newer for permission-block status reporting.
 - Use Pi's configured agent directory for gate configuration and report blocked commands through Pi's permission UI.
 
 ## [0.7.4] - 2026-11-01

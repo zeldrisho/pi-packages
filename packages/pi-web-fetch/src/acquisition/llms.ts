@@ -405,6 +405,7 @@ export async function fetchDocumentWithLlmsTxtSupport(
   // Prefer a page-specific Markdown representation even when HTML extraction succeeded.
   // Restrict the entire redirect chain, and never substitute HTML or arbitrary text.
   if (
+    !primary.surfaceView &&
     primary.extractor !== "raw" &&
     (!primary.markdownAlternateUrl || (!isLowQualityDocument(primary) && primary.markdown.trim()))
   ) {
@@ -433,6 +434,7 @@ export async function fetchDocumentWithLlmsTxtSupport(
           return {
             ...alternate,
             markdownAlternateFallback: true,
+            markdownAlternateReason: advertised ? "advertised" : "derived",
             llmsTxtIndexUrl: index?.url,
             llmsTxtIndexAliases: index?.aliases,
           };
@@ -449,12 +451,16 @@ export async function fetchDocumentWithLlmsTxtSupport(
       : undefined;
 
     const alternate =
-      markdownAlternate && isSafeToProbe(markdownAlternate, primary.url)
+      !primary.surfaceView && markdownAlternate && isSafeToProbe(markdownAlternate, primary.url)
         ? await probeUsableRawText(markdownAlternate, signal, dependencies)
         : undefined;
 
     if (alternate && markdownAlternate) {
-      return { ...alternate, markdownAlternateFallback: true };
+      return {
+        ...alternate,
+        markdownAlternateFallback: true,
+        markdownAlternateReason: "advertised",
+      };
     }
 
     if (index) return { ...index.document, llmsTxtFallback: true };

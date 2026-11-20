@@ -16,11 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Use Pi's configured expand-key hint when displaying collapsed fetch output.
+- Preserve selected tab views when a Markdown representation is unavailable for tab-scoped pages, and use accurate notices for derived Markdown substitutions.
 
 ### Fixed
 
 - Preserve section headings when a query selects a later passage from a long section.
 - Match dotted API identifiers literally within longer queries, and clarify that focused results can omit relevant content.
+- Preserve nested `/-/blob/` path segments when normalizing GitLab file URLs.
+- Match hyphenated dotted filenames such as `package-lock.json` in focused queries.
 
 ## [0.17.1] - 2026-11-18
 

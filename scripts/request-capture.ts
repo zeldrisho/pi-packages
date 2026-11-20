@@ -34,7 +34,20 @@ const SENSITIVE_BODY_KEYS = new Set([
   "clientSecret",
 ]);
 
-const OPAQUE_QUERY_KEYS = new Set(["code", "state", "key", "token", "signature", "sig"]);
+const OPAQUE_QUERY_KEYS = new Set([
+  "code",
+  "state",
+  "key",
+  "token",
+  "access_token",
+  "refresh_token",
+  "api_key",
+  "apikey",
+  "client_secret",
+  "clientsecret",
+  "signature",
+  "sig",
+]);
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
@@ -241,9 +254,12 @@ export function createCaptureFetch(
 
     for (const name of headerNames(supplied)) headerRecord[name] = headerValue(headers, name);
 
-    const body = await describeBody(
-      init?.body ?? (input instanceof Request ? await input.clone().text() : null),
-    );
+    const body =
+      init?.body !== undefined
+        ? await describeBody(init.body)
+        : input instanceof Request
+          ? { fields: [], sample: "stream", truncated: false }
+          : await describeBody(null);
 
     if (events.length < MAX_EVENTS)
       events.push({

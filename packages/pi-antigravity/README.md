@@ -24,7 +24,7 @@ Restart Pi after installing. Use `pi config` to enable or disable the extension,
 
 Run `/login` and choose **Antigravity (Google account)**; no other setup is required.
 
-The extension bundles the public installed-application OAuth client that the official CLI ships, so sign-in and token refresh work without installing `agy`. It never reads the CLI's account login or token store. If you have `agy` installed and Google rotates its client, the extension prefers the matching client found in the installed binary; otherwise the bundled client is used.
+The extension bundles the public installed-application OAuth client that the official CLI ships, so sign-in and token refresh work without installing `agy`. It never reads the CLI's account login or token store. If you have `agy` installed and Google rotates to a client pair already recognized by the extension, it prefers that matching pair from the installed binary; an unknown rotation requires an extension update. Otherwise the bundled client is used.
 
 This unofficial integration identifies requests as the Antigravity client, advertises a bundled CLI version, and rephrases a few phrases in Pi's default system prompt for provider compatibility. Google may restrict this use or your account; check its terms and decide whether to accept that risk. Review the Google consent screen and grant access only if you trust the extension.
 

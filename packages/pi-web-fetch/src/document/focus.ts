@@ -396,7 +396,7 @@ export function focusMarkdown(markdown: string, query: string): FocusResult {
     : [
         ...new Set(
           (
-            normalizedQuery.toLowerCase().match(/\b[a-z_$][\w$]*(?:\.[a-z_$][\w$]*)+\b/g) ?? []
+            normalizedQuery.toLowerCase().match(/\b[a-z_$][\w$-]*(?:\.[a-z_$][\w$-]*)+\b/g) ?? []
           ).filter((identifier) => identifier.split(".").some((part) => part.length > 1)),
         ),
       ];
