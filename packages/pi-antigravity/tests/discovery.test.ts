@@ -529,13 +529,46 @@ describe("catalog refresh", () => {
     ]);
   });
 
-  it("round-trips a catalog through Pi's stored model shape", () => {
-    const configs = modelConfigs();
+  it("round-trips a discovered catalog through Pi's stored model shape", () => {
+    const catalog = catalogFromAvailableModels(availableModels()) ?? [];
+    const configs = modelConfigs(catalog);
     const stored = storedModelsFrom(configs, "antigravity", "https://example.test");
     const restored = modelsFromStored(stored, "antigravity");
 
-    expect(restored).toBeUndefined();
-    expect(stored).toEqual([]);
+    expect(stored).toEqual(
+      expect.arrayContaining(
+        catalog.map((model) =>
+          expect.objectContaining({
+            id: model.id,
+            provider: "antigravity",
+            api: "antigravity",
+            baseUrl: "https://example.test",
+            thinkingLevelMap: model.thinkingLevelMap,
+          }),
+        ),
+      ),
+    );
+    expect(restored?.map((model) => model.id)).toEqual(catalog.map((model) => model.id));
+  });
+
+  it("returns no catalog for empty stored input", () => {
+    expect(modelsFromStored([], "antigravity")).toBeUndefined();
+  });
+
+  it("filters legacy non-Gemini entries from stored catalogs", () => {
+    const stored = storedModelsFrom(
+      modelConfigs(catalogFromAvailableModels(availableModels()) ?? []),
+      "antigravity",
+      "https://example.test",
+    );
+
+    const legacy = { ...stored[0]!, id: "claude-opus-4-6" };
+
+    expect(
+      modelsFromStored([...stored, legacy], "antigravity")?.every((model) =>
+        model.id.startsWith("gemini-"),
+      ),
+    ).toBe(true);
   });
 
   it("ignores stored models owned by another provider or API", () => {

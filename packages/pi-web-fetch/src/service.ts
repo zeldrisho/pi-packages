@@ -509,8 +509,16 @@ export async function executeWebFetch(
         let fetched: CompleteDocument;
         let acquisitionStatus: FetchAcquisition["cacheStatus"] = "miss";
 
+        const staleCanUseMarkdownPolicy =
+          stale !== undefined &&
+          stale.extractor !== "raw" &&
+          !stale.surfaceView &&
+          !stale.llmsTxtFallback &&
+          !stale.representationFallback;
+
         if (
           stale?.validators &&
+          !staleCanUseMarkdownPolicy &&
           !stale.llmsTxtFallback &&
           !stale.markdownAlternateFallback &&
           !stale.representationFallback

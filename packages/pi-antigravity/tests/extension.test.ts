@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import antigravityExtension, { FALLBACK_MODELS, PROVIDER_ID } from "../src/index";
 import { storedModelsFrom } from "../src/discovery";
-import { modelConfigs } from "../src/models";
+import { modelConfigs, type AntigravityModel } from "../src/models";
 
 vi.mock("../src/agy-client", async (importOriginal) => {
   const original = await importOriginal<typeof import("../src/agy-client")>();
@@ -18,6 +18,20 @@ vi.mock("../src/agy-client", async (importOriginal) => {
 interface Registration {
   name: string;
   config: ProviderConfig;
+}
+
+function storedGeminiModels() {
+  const model: AntigravityModel = {
+    id: "gemini-stored",
+    name: "Stored Gemini",
+    reasoning: true,
+    input: ["text"],
+    contextWindow: 128_000,
+    maxTokens: 32_768,
+    thinkingLevelMap: { off: "gemini-stored" },
+  };
+
+  return storedModelsFrom(modelConfigs([model]), PROVIDER_ID, "https://example.test");
 }
 
 function register(): Registration {
@@ -248,7 +262,7 @@ describe("extension registration", () => {
     const publish = vi.fn(async () => true);
 
     const stored = {
-      models: [],
+      models: storedGeminiModels(),
       checkedAt: Date.now(),
       piCatalog: {
         google: { entries: [], lastModified: 0 },
@@ -258,23 +272,28 @@ describe("extension registration", () => {
 
     const context: RefreshModelsContext = {
       stored,
+      credential: {
+        type: "oauth",
+        access: "token",
+        refresh: "refresh",
+        expires: 9999999999999,
+        projectId: "project",
+      },
       allowNetwork: true,
       signal: new AbortController().signal,
       publish,
     };
 
-    expect(await register().config.refreshModels?.(context)).toHaveLength(0);
+    expect(await register().config.refreshModels?.(context)).toMatchObject([
+      expect.objectContaining({ id: "gemini-stored" }),
+    ]);
     expect(fetch).not.toHaveBeenCalled();
     expect(publish).not.toHaveBeenCalled();
   });
 
   it("refreshes a four-hour-old catalog and bypasses freshness on force, but never offline", async () => {
     const stored = {
-      models: storedModelsFrom(
-        modelConfigs(FALLBACK_MODELS.slice(0, 1)),
-        PROVIDER_ID,
-        "https://example.test",
-      ),
+      models: storedGeminiModels(),
       checkedAt: Date.now() - 4 * 60 * 60 * 1000,
       piCatalog: {
         google: { entries: [], lastModified: 0 },
@@ -350,7 +369,7 @@ describe("extension registration", () => {
 
   it("retains cached snapshots and reports HTTP refresh failures", async () => {
     const stored = {
-      models: storedModelsFrom(modelConfigs(FALLBACK_MODELS), PROVIDER_ID, "https://example.test"),
+      models: storedGeminiModels(),
       checkedAt: 1,
       piCatalog: {
         google: { entries: [], lastModified: 0 },

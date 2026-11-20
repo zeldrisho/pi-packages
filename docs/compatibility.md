@@ -30,7 +30,7 @@ registerOpencodeFree(pi, { fetcher: capture.fetch, randomSeed, sessionStore });
 await writeFile("/private/path/capture.json", JSON.stringify(capture.snapshot()));
 ```
 
-It records method, sanitized target, explicitly supplied header names and non-sensitive values, a bounded request-body sample, status and error occurrence. Short JSON samples may retain message text, including prompts and other private data; streaming Request bodies are recorded without reading them. It omits response bodies and error text. Known authorization, cookie, API-key, secret fields, and credential-bearing query keys are redacted, but query redaction is limited to recognized exact names. Review and manually redact every snapshot before sharing it, and keep it outside the worktree. A captured `200` establishes a response status, not model entitlement or correctness.
+It records method, sanitized target, explicitly supplied header names and values, a request-body sample, status and error occurrence. Large JSON bodies can retain message text, including prompts and other private data; the sample has no overall size cap. Streaming Request bodies are recorded without reading them. It omits response bodies and error text. Known authorization, cookie, API-key, secret fields, and credential-bearing query keys are redacted, but header redaction covers only recognized names: unrecognized header names may retain credentials, and recorded header values must not be assumed non-sensitive. Review and manually redact every snapshot before sharing it, and keep it outside the worktree. A captured `200` establishes a response status, not model entitlement or correctness.
 
 Create an explicit evidence record from sanitized findings:
 

@@ -881,6 +881,8 @@ export interface RequestLabels {
   last_step_index: string;
   request_id: string;
   trajectory_id: string;
+  used_claude: string;
+  used_claude_conservative: string;
   used_non_gemini_model: string;
 }
 
@@ -905,6 +907,8 @@ export function labelsFor(
     last_step_index: String(Math.max(0, step - 1)),
     request_id: `${trajectoryId}-${requestIndex}`,
     trajectory_id: trajectoryId,
+    used_claude: "false",
+    used_claude_conservative: "false",
     used_non_gemini_model: nonGemini ? "true" : "false",
   };
 }

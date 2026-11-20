@@ -489,6 +489,9 @@ export function modelsFromStored(
 
     if (model.api !== ANTIGRAVITY_API) continue;
 
+    // Older releases persisted non-Gemini routes; never restore them after the Gemini-only migration.
+    if (!model.id.startsWith("gemini-")) continue;
+
     models.push({
       id: model.id,
       name: model.name,

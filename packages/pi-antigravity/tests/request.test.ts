@@ -441,6 +441,8 @@ describe("envelope assembly", () => {
     expect(envelope.request.sessionId).toBe(identity.sessionId);
     expect(envelope.request.labels.last_step_index).toBe(String(step - 1));
     expect(envelope.request.labels.request_id).toBe(`${identity.trajectoryId}-0`);
+    expect(envelope.request.labels.used_claude).toBe("false");
+    expect(envelope.request.labels.used_claude_conservative).toBe("false");
     expect(envelope.request.labels.used_non_gemini_model).toBe("false");
   });
 
