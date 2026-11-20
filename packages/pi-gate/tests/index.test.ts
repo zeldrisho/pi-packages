@@ -496,8 +496,15 @@ describe("piGate extension", () => {
           keybindings: KeybindingsManager,
           done: (result: T) => void,
         ) => Component | Promise<Component>,
-      ) =>
-        new Promise<T>((resolve) => {
+        options?: {
+          blocked?: { kind: "permission"; message: string };
+        },
+      ) => {
+        expect(options).toEqual({
+          blocked: { kind: "permission", message: "pi-gate: approval required" },
+        });
+
+        return new Promise<T>((resolve) => {
           // SAFETY: The custom approval only calls requestRender() on the TUI.
           const tui = Object.assign(Object.create(null), { requestRender() {} }) as TUI;
 
@@ -520,6 +527,7 @@ describe("piGate extension", () => {
             () => undefined,
           );
         });
+      };
 
       expect(await handlers.toolCall!(bashEvent("sudo true"), ctx)).toBeUndefined();
     });

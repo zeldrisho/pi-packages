@@ -15,7 +15,7 @@ allowBuilds:
 
 catalog:
   "@earendil-works/pi-ai": "^1.4.0"
-  "@earendil-works/pi-coding-agent": "^1.4.0"
+  "@earendil-works/pi-coding-agent": "^1.5.0"
   "@earendil-works/pi-tui": "^1.4.0"
   # Keep Node types aligned with the current LTS major used in CI.
   "@types/node": "^26.6.6"

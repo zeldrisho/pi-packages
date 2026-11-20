@@ -48,6 +48,20 @@ describe("catalog thinking metadata", () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it("uses an explicit fetch override for live metadata", async () => {
+    vi.stubGlobal("fetch", async () => {
+      throw new Error("global fetch must not be used");
+    });
+    const fetcher = vi.fn(async () => Response.json(body));
+    const resolve = createThinkingMetadataResolver();
+
+    await expect(resolve("token", "project", "future-high", undefined, fetcher)).resolves.toEqual({
+      includeThoughts: true,
+      thinkingLevel: "HIGH",
+    });
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
   it("does not cache a failed discovery", async () => {
     const fetch = vi.fn(async () => new Response("unavailable", { status: 503 }));
     vi.stubGlobal("fetch", fetch);

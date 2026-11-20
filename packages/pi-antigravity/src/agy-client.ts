@@ -17,7 +17,7 @@ export interface ClientFingerprints {
 
 // Consumer-client fingerprints, independently reported by agy-auth. These do
 // not pin a CLI version; a rotated or unrecognized client fails closed.
-const CONSUMER_CLIENT: ClientFingerprints = {
+export const CONSUMER_CLIENT: ClientFingerprints = {
   id: "bf00c418024ba6bf606ccdc37120976e41bc429dd1d46ecf16a729aa532626ea",
   secrets: [
     "1d2f041093fd95aa8995a038c711d50a7960da09a505381c09a745d6ad0ecc60",

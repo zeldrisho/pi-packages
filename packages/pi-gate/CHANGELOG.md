@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-20
+
+### Changed
+
+- Require Pi 1.5.0 or newer for permission-block status reporting.
+- Use Pi's configured agent directory for gate configuration and report blocked commands through Pi's permission UI.
+
 ## [0.7.4] - 2026-11-01
 
 ### Changed
@@ -125,7 +132,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - support `prompt`, `block`, and `allow` actions, with longest-pattern-wins resolution
 - block rather than auto-approve in non-UI modes
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.7.4...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.8.0...HEAD
+[0.8.0]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.7.4...pi-gate-v0.8.0
 [0.7.4]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.7.3...pi-gate-v0.7.4
 [0.7.3]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.7.2...pi-gate-v0.7.3
 [0.7.2]: https://github.com/zeldrisho/pi-packages/compare/pi-gate-v0.7.1...pi-gate-v0.7.2

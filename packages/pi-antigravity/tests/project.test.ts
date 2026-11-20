@@ -230,7 +230,6 @@ describe("project discovery", () => {
     expect(discoverySignal(undefined, 10000).aborted).toBe(false);
   });
   it("uses the bundled user agent without affecting authorization", async () => {
-    vi.stubEnv("PI_ANTIGRAVITY_USER_AGENT", "example-client");
     const headers = await antigravityHeaders("token");
     expect(headers.get("User-Agent")).toContain("antigravity/cli/");
     expect(headers.get("User-Agent")).not.toBe("example-client");

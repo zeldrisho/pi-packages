@@ -1,4 +1,4 @@
-import { getMarkdownTheme, keyHint } from "@earendil-works/pi-coding-agent";
+import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 
 const COLLAPSED_LINES = 10;
@@ -10,6 +10,7 @@ export function renderCollapsibleOutput(
   theme: { fg(color: "toolOutput" | "muted" | "warning", text: string): string },
   isError = false,
   warning?: string,
+  expandHint = "Ctrl+O to expand",
 ): Container {
   const lines = output.replace(/\r\n/g, "\n").split("\n");
 
@@ -30,7 +31,7 @@ export function renderCollapsibleOutput(
   if (remaining > 0) {
     component.addChild(
       new Text(
-        `${theme.fg("muted", `... (${remaining} more lines, ${lines.length} total,`)} ${keyHint("app.tools.expand", "to expand")}${theme.fg("muted", ")")}`,
+        `${theme.fg("muted", `... (${remaining} more lines, ${lines.length} total,`)} ${expandHint}${theme.fg("muted", ")")}`,
         0,
         0,
       ),

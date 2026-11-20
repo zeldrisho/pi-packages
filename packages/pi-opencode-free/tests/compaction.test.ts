@@ -379,7 +379,7 @@ describe("segmented compaction", () => {
     });
   });
 
-  it("keeps a partial digest when a single message cannot be split", async () => {
+  it("does not use a partial digest when a single message cannot be split", async () => {
     const harness = createHarness({
       contextWindow: 6_000,
       messageList: messages(1, 2_000),
@@ -391,8 +391,8 @@ describe("segmented compaction", () => {
 
     const result = await harness.handler(harness.event, harness.context);
 
-    expect(result?.compaction?.summary).toContain("## Goal");
-    expect(harness.calls.at(-1)?.prompt).toContain("PARTIAL-ONLY");
+    expect(result).toBeUndefined();
+    expect(harness.notifications.join(" ")).toContain("output token cap");
   });
 
   it("omits file sections when nothing was read or modified", async () => {
@@ -458,7 +458,7 @@ describe("segmented compaction", () => {
     expect(result?.compaction?.summary).toContain("## Goal");
   });
 
-  it("falls back when a checkpoint that cannot be reduced stops at the cap", async () => {
+  it("cancels when a checkpoint still stops at the cap after retrying", async () => {
     const harness = createHarness({
       contextWindow: 6_000,
       messageList: messages(1, 2_000),
@@ -466,8 +466,57 @@ describe("segmented compaction", () => {
         isCheckpointRequest(call) ? response("PARTIAL", "length") : response("DIGEST", "stop"),
     });
 
-    await expect(harness.handler(harness.event, harness.context)).resolves.toBeUndefined();
-    expect(harness.notifications.join(" ")).toContain("Pi's compaction");
+    await expect(harness.handler(harness.event, harness.context)).resolves.toEqual({
+      cancel: true,
+    });
+    expect(harness.calls.filter(isCheckpointRequest)).toHaveLength(2);
+    expect(harness.notifications.join(" ")).toContain("Switch to another model");
+  });
+
+  it("recovers a large session after switching to a smaller model", async () => {
+    let checkpoints = 0;
+
+    const harness = createHarness({
+      contextWindow: 200_000,
+      messageList: messages(900, 2_100),
+      respond: (call) => {
+        if (!isCheckpointRequest(call)) return response("DIGEST", "stop");
+        checkpoints += 1;
+
+        return checkpoints === 1 ? response("PARTIAL", "length") : response(CHECKPOINT, "stop");
+      },
+    });
+
+    const result = await harness.handler(harness.event, harness.context);
+    const requests = harness.calls.filter(isCheckpointRequest);
+    expect(requests).toHaveLength(2);
+    expect(requests[1].prompt).toContain("substantially more concise");
+    expect(result?.compaction?.summary).toContain("## Goal");
+    expect(result?.compaction?.usage?.totalTokens).toBe(USAGE.totalTokens * harness.calls.length);
+  });
+
+  it("cancels if the concise checkpoint retry is aborted", async () => {
+    const controller = new AbortController();
+    let checkpoints = 0;
+
+    const harness = createHarness({
+      contextWindow: 40_000,
+      signal: controller.signal,
+      respond: (call) => {
+        if (!isCheckpointRequest(call)) return response("DIGEST", "stop");
+        checkpoints += 1;
+
+        if (checkpoints === 1) return response("PARTIAL", "length");
+        controller.abort();
+
+        return response("", "aborted");
+      },
+    });
+
+    await expect(harness.handler(harness.event, harness.context)).resolves.toEqual({
+      cancel: true,
+    });
+    expect(checkpoints).toBe(2);
   });
 
   it("reminds the model when the checkpoint skips the template", async () => {

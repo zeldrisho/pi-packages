@@ -25,13 +25,13 @@ The `web_fetch` tool accepts public HTTP and HTTPS URLs and supports HTML, Markd
 
 When a documentation page exposes a supported tab selector and the URL explicitly selects one (for example, `?tab=cli`), output shows that tab and shared content, with a notice that other tabs were omitted. Remove the parameter to see the full extracted page. Continuation offsets apply to the selected view.
 
-Output is bounded to 6,000 characters by default. For long pages, use the returned `nextOffset` with the same URL and query to continue. Queries use approximate word matching and relevance selection; dotted or hyphenated identifiers and flags are matched literally. Focus can omit relevant content, so omit the query when completeness matters. Pi's preview is collapsed by default; press `Ctrl+O` to expand it.
+Output is bounded to 6,000 characters by default. For long pages, use the returned `nextOffset` with the same URL and query to continue. Queries use approximate word matching and relevance selection; dotted identifiers in longer queries, and standalone dotted or hyphenated identifiers and flags, are matched literally. Focus can omit relevant content, so omit the query when completeness matters. Pi's preview is collapsed by default; press `Ctrl+O` to expand it.
 
-For example, a URL such as `https://github.com/zeldrisho/pi-packages/blob/main/packages/pi-web-fetch/README.md#usage` starts at the matching heading. GitHub `blob` links and bare gists are converted to raw source URLs; repository roots use their README. GitHub directory listings are not supported.
+For example, a URL such as `https://github.com/zeldrisho/pi-packages/blob/main/packages/pi-web-fetch/README.md#usage` starts at the matching heading. GitHub `blob` links, GitLab.com file links, and bare gists are converted to raw source URLs; GitHub repository roots use their README. GitHub directory listings are not supported.
 
 ### Page alternatives and bot challenges
 
-The tool can discover advertised Markdown versions and `/llms.txt` indexes. An index URL appears in the result when found; follow it if the page is insufficient. The tool can solve Anubis and supported AWS WAF proof-of-work challenges. If an AWS WAF or Cloudflare challenge remains blocked, it may fall back to the site's documentation index.
+The tool prefers Markdown when sites offer it, including advertised alternatives and documented Next.js and Vercel documentation endpoints, and can discover `/llms.txt` indexes. An index URL appears in the result when found; follow it if the page is insufficient. The tool can solve Anubis and supported AWS WAF proof-of-work challenges. If an AWS WAF or Cloudflare challenge remains blocked, it may fall back to the site's documentation index.
 
 Supported Reddit challenges can be solved or fall back to its public feed, whose comments may be incomplete and lack thread hierarchy. Comment permalinks do not use the feed fallback. Packit Copr job pages can return their public API data without an API key, and empty Swagger UI pages can return an advertised same-origin specification; result metadata identifies the substitute and its URL. Unsupported challenges and JavaScript CAPTCHAs return a blocked result; there is no browser fallback.
 

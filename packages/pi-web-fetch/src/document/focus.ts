@@ -20,6 +20,8 @@ export interface FocusResult {
 interface Section {
   markdown: string;
   tokens: string[];
+  /** Original heading for a continuation chunk of an oversized section. */
+  context?: { group: number; heading: string; continuation: boolean };
 }
 
 interface SplitSections {
@@ -284,8 +286,9 @@ function splitSections(markdown: string): SplitSections {
 
   // Split oversized sections at blank lines outside fences, so matches do not pull
   // in an entire chapter. Keep the heading with its first content block.
-  const bounded = sections.flatMap((section) => {
-    if (section.length <= WINDOW_MIN_CHARACTERS) return [section];
+  const bounded = sections.flatMap((section, group) => {
+    if (section.length <= WINDOW_MIN_CHARACTERS)
+      return [{ markdown: section, tokens: tokens(section) }];
     const chunks: string[] = [];
     let current: string[] = [];
     let size = 0;
@@ -326,13 +329,19 @@ function splitSections(markdown: string): SplitSections {
 
     if (chunk) chunks.push(chunk);
 
-    return chunks;
+    const heading = section.split("\n", 1)[0];
+
+    return chunks.map((chunk, index) => {
+      const result: Section = { markdown: chunk, tokens: tokens(chunk) };
+
+      if (heading.length <= 500 && HEADING_PATTERN.test(heading))
+        result.context = { group, heading, continuation: index > 0 };
+
+      return result;
+    });
   });
 
-  return {
-    sections: bounded.map((section) => ({ markdown: section, tokens: tokens(section) })),
-    separator: "\n\n",
-  };
+  return { sections: bounded, separator: "\n\n" };
 }
 
 /**
@@ -380,8 +389,23 @@ export function focusMarkdown(markdown: string, query: string): FocusResult {
       ? normalizedQuery.toLowerCase()
       : undefined;
 
+  // A dotted API name inside a natural-language query must still match as one
+  // identifier; otherwise its common components can select unrelated sections.
+  const embeddedIdentifiers = literalIdentifier
+    ? []
+    : [
+        ...new Set(
+          (
+            normalizedQuery.toLowerCase().match(/\b[a-z_$][\w$-]*(?:\.[a-z_$][\w$-]*)+\b/g) ?? []
+          ).filter((identifier) => identifier.split(".").some((part) => part.length > 1)),
+        ),
+      ];
+
   const scores = sections.map((section) => {
     if (literalIdentifier) return containsIdentifier(section.markdown, literalIdentifier) ? 1 : 0;
+
+    if (embeddedIdentifiers.some((identifier) => !containsIdentifier(section.markdown, identifier)))
+      return 0;
     const frequencies = new Map<string, number>();
 
     for (const token of section.tokens) frequencies.set(token, (frequencies.get(token) ?? 0) + 1);
@@ -412,7 +436,18 @@ export function focusMarkdown(markdown: string, query: string): FocusResult {
     (_, index) => scores[index] > 0 && scores[index] >= highestScore * 0.5,
   );
 
-  const focused = selected.map((section) => section.markdown).join(separator);
+  const seenGroups = new Set<number>();
+
+  const focused = selected
+    .map((section) => {
+      const context = section.context;
+      const needsHeading = context?.continuation && !seenGroups.has(context.group);
+
+      if (context) seenGroups.add(context.group);
+
+      return needsHeading ? `${context.heading}\n\n${section.markdown}` : section.markdown;
+    })
+    .join(separator);
 
   return {
     markdown: focused,

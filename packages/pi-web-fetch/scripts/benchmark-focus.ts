@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/// <reference types="node" />
 
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
@@ -7,10 +8,11 @@ import { focusMarkdown } from "../src/document/focus.ts";
 
 interface FocusCase {
   name: string;
-  dimension: "heading" | "phrase" | "stemming";
+  dimension: "heading" | "phrase" | "stemming" | "identifier" | "code" | "table";
   query: string;
   markdown: string;
   expectedMarker: string;
+  excludedMarker?: string;
 }
 
 const corpusPath = resolve(dirname(fileURLToPath(import.meta.url)), "focus-corpus.json");
@@ -24,14 +26,16 @@ const results = corpus.map((entry) => {
   return {
     name: entry.name,
     dimension: entry.dimension,
-    matched: result.markdown.includes(entry.expectedMarker),
+    matched:
+      result.markdown.includes(entry.expectedMarker) &&
+      (!entry.excludedMarker || !result.markdown.includes(entry.excludedMarker)),
     selectedSections: result.details.matchedSections,
     totalSections: result.details.totalSections,
   };
 });
 
 const summary = Object.fromEntries(
-  (["heading", "phrase", "stemming"] as const).map((dimension) => {
+  (["heading", "phrase", "stemming", "identifier", "code", "table"] as const).map((dimension) => {
     const cases = results.filter((result) => result.dimension === dimension);
 
     return [

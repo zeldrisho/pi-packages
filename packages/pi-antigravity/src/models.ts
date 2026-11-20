@@ -36,103 +36,13 @@ export interface AntigravityModel {
 }
 
 /**
- * Limits used when the backend advertises none and no cached catalog exists.
- * They are deliberately conservative: Pi allocates context from these numbers,
- * and the backend rejects a request that asks for more than it allows.
+ * No static model list is maintained. Antigravity's account catalog is the
+ * source of truth and is refreshed through the provider API.
  */
-const FALLBACK_CONTEXT_WINDOW = 128_000;
-
-const FALLBACK_MAX_TOKENS = 32_768;
-
-/**
- * Models the backend served when this fallback was last verified against
- * `agy models` (CLI 1.5.9). They are registered before any refresh so a
- * first run or an offline start still offers a usable catalog; discovery
- * replaces them as soon as it succeeds.
- */
-export const FALLBACK_MODELS: readonly AntigravityModel[] = [
-  {
-    id: "gemini-3.8-flash",
-    name: "Gemini 3.8 Flash",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: FALLBACK_CONTEXT_WINDOW,
-    maxTokens: FALLBACK_MAX_TOKENS,
-    thinkingLevelMap: {
-      off: null,
-      minimal: null,
-      low: "gemini-3.8-flash-low",
-      medium: "gemini-3.8-flash-medium",
-      high: "gemini-3.8-flash-high",
-      xhigh: null,
-      max: null,
-    },
-  },
-  {
-    id: "claude-sonnet-4-6",
-    name: "Claude Sonnet 4.6",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: FALLBACK_CONTEXT_WINDOW,
-    maxTokens: FALLBACK_MAX_TOKENS,
-    thinkingLevelMap: {
-      off: null,
-      minimal: null,
-      low: null,
-      medium: null,
-      high: "claude-sonnet-4-6",
-      xhigh: null,
-      max: null,
-    },
-  },
-  {
-    id: "claude-opus-4-6",
-    name: "Claude Opus 4.6",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: FALLBACK_CONTEXT_WINDOW,
-    maxTokens: FALLBACK_MAX_TOKENS,
-    thinkingLevelMap: {
-      off: null,
-      minimal: null,
-      low: null,
-      medium: null,
-      high: "claude-opus-4-6-thinking",
-      xhigh: null,
-      max: null,
-    },
-  },
-  {
-    id: "gpt-oss-120b",
-    name: "GPT-OSS 120B",
-    reasoning: true,
-    input: ["text"],
-    contextWindow: FALLBACK_CONTEXT_WINDOW,
-    maxTokens: FALLBACK_MAX_TOKENS,
-    thinkingLevelMap: {
-      off: null,
-      minimal: null,
-      low: null,
-      medium: "gpt-oss-120b-medium",
-      high: null,
-      xhigh: null,
-      max: null,
-    },
-  },
-];
+export const FALLBACK_MODELS: readonly AntigravityModel[] = [];
 
 /** Zeroed rates: access is quota-backed by the account, so Pi never bills these models. */
 const SUBSCRIPTION_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
-
-/**
- * Finds a fallback catalog entry by public model id.
- *
- * @param modelId - Public model id from Pi
- * @returns The catalog entry, or undefined when the id is not in the catalog
- */
-export function findModel(modelId: string): AntigravityModel | undefined {
-  return FALLBACK_MODELS.find((model) => model.id === modelId);
-}
 
 /** The routing Pi exposes for a model: its id plus per-level runtime ids. */
 export interface RoutableModel {
@@ -163,16 +73,6 @@ export function resolveRuntimeModel(model: RoutableModel, level?: ModelThinkingL
 
   if (Object.keys(map).length === 0) return model.id;
   throw new Error(`No advertised Antigravity runtime route for ${model.id}`);
-}
-
-/**
- * Reports whether a runtime model needs the Claude/GPT tool-schema subset.
- *
- * @param runtimeModel - Backend request model id
- * @returns True for Claude and GPT-OSS runtime models
- */
-export function usesLegacyToolSchema(runtimeModel: string): boolean {
-  return runtimeModel.startsWith("claude-") || runtimeModel.startsWith("gpt-oss-");
 }
 
 /**
@@ -211,28 +111,12 @@ export function thinkingConfig(
   runtimeModel: string,
   level: ModelThinkingLevel | undefined,
 ): ThinkingConfig | undefined {
-  const family = runtimeModel.startsWith("claude-")
-    ? "claude"
-    : runtimeModel.startsWith("gpt-oss-")
-      ? "gpt-oss"
-      : runtimeModel.startsWith("gemini-")
-        ? "gemini"
-        : undefined;
+  const family = runtimeModel.startsWith("gemini-") ? "gemini" : undefined;
 
   if (family === undefined) return undefined;
 
   if (level === undefined || level === "off") {
     return { includeThoughts: false, thinkingBudget: 0 };
-  }
-
-  // These routes were verified against agy wire traffic; do not assume other
-  // models in the same family accept the same fixed budgets.
-  if (runtimeModel === "claude-sonnet-4-6" || runtimeModel === "claude-opus-4-6-thinking") {
-    return { includeThoughts: true, thinkingBudget: 1_024 };
-  }
-
-  if (runtimeModel === "gpt-oss-120b-medium") {
-    return { includeThoughts: true, thinkingBudget: 8_192 };
   }
 
   if (runtimeModel.startsWith("gemini-3.8-flash-")) {
@@ -243,10 +127,6 @@ export function thinkingConfig(
     if (suffix === "medium") return { includeThoughts: true, thinkingLevel: "MEDIUM" };
 
     if (suffix === "high") return { includeThoughts: true, thinkingLevel: "HIGH" };
-  }
-
-  if (family !== "gemini") {
-    return { includeThoughts: true, thinkingBudget: THINKING_BUDGETS.medium ?? 4_000 };
   }
 
   return {

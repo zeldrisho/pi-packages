@@ -104,6 +104,27 @@ export function buildLlmsTxtCandidateUrls(rawUrl: string): URL[] {
   }
 }
 
+/** Returns documented Markdown endpoints only for known documentation routes. */
+export function documentationMarkdownUrl(value: string): URL | undefined {
+  const url = safeUrl(value);
+
+  if (!url || url.protocol !== "https:" || url.username || url.password || url.port) return;
+
+  if (
+    !(
+      (url.hostname === "nextjs.org" || url.hostname === "vercel.com") &&
+      (url.pathname === "/docs" || url.pathname.startsWith("/docs/"))
+    )
+  )
+    return;
+
+  if (url.pathname.endsWith(".md")) return;
+  url.pathname = `${url.pathname.replace(/\/$/, "")}.md`;
+  url.hash = "";
+
+  return url;
+}
+
 function isLowQualityDocument(document: CompleteDocument): boolean {
   // Sparse extraction alone is not proof of an empty app shell: server-rendered pages
   // may include useful content in streaming/framework markup that article extraction
@@ -381,6 +402,48 @@ export async function fetchDocumentWithLlmsTxtSupport(
     }
   }
 
+  // Prefer a page-specific Markdown representation even when HTML extraction succeeded.
+  // Restrict the entire redirect chain, and never substitute HTML or arbitrary text.
+  if (
+    !primary.surfaceView &&
+    primary.extractor !== "raw" &&
+    (!primary.markdownAlternateUrl || (!isLowQualityDocument(primary) && primary.markdown.trim()))
+  ) {
+    const advertised = primary.markdownAlternateUrl
+      ? toAbsoluteUrl(primary.markdownAlternateUrl)
+      : undefined;
+
+    const candidate = advertised ?? documentationMarkdownUrl(primary.url);
+
+    if (candidate && isSafeToProbe(candidate, primary.url) && candidate.href !== primary.url) {
+      try {
+        const alternate = await fetchCompleteDocument(
+          candidate.href,
+          signal,
+          restrictOrigin(dependencies, new URL(primary.url).origin),
+          false,
+          false,
+        );
+
+        if (
+          alternate.extractor === "raw" &&
+          /^(text\/markdown|text\/x-markdown)(?:;|$)/i.test(alternate.contentType) &&
+          alternate.markdown.trim().length >= LLMS_TXT_MIN_MARKDOWN_CHARACTERS &&
+          !alternate.shellSuspected
+        )
+          return {
+            ...alternate,
+            markdownAlternateFallback: true,
+            markdownAlternateReason: advertised ? "advertised" : "preferred",
+            llmsTxtIndexUrl: index?.url,
+            llmsTxtIndexAliases: index?.aliases,
+          };
+      } catch (error) {
+        if (signal?.aborted) throw error;
+      }
+    }
+  }
+
   if (isLowQualityDocument(primary) || !primary.markdown.trim()) {
     // The page's own advertised Markdown version is strictly better than an index.
     const markdownAlternate = primary.markdownAlternateUrl
@@ -388,12 +451,16 @@ export async function fetchDocumentWithLlmsTxtSupport(
       : undefined;
 
     const alternate =
-      markdownAlternate && isSafeToProbe(markdownAlternate, primary.url)
+      !primary.surfaceView && markdownAlternate && isSafeToProbe(markdownAlternate, primary.url)
         ? await probeUsableRawText(markdownAlternate, signal, dependencies)
         : undefined;
 
     if (alternate && markdownAlternate) {
-      return { ...alternate, markdownAlternateFallback: true };
+      return {
+        ...alternate,
+        markdownAlternateFallback: true,
+        markdownAlternateReason: "advertised",
+      };
     }
 
     if (index) return { ...index.document, llmsTxtFallback: true };

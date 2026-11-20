@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 
 export type Action = "prompt" | "block" | "allow";
 
@@ -50,7 +50,7 @@ const DEFAULT_CONFIG: GateConfig = {
  * @returns The absolute path to the agent configuration directory
  */
 function agentDir(): string {
-  return process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent");
+  return getAgentDir();
 }
 
 /**

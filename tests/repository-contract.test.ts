@@ -45,7 +45,7 @@ const packageSpecificFiles = new Map([
 
 const promptPackages = new Set<string>();
 
-const skillPackages = new Set(["pi-sentry-skills", "pi-anthropics-skills"]);
+const skillPackages = new Set(["pi-sentry-skills"]);
 
 const themePackages = new Set(["pi-catppuccin"]);
 

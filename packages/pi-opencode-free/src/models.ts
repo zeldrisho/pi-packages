@@ -14,13 +14,26 @@ import type { ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 import { isStringArray } from "./values.ts";
 
 /** Default OpenAI-compatible OpenCode inference endpoint. */
-export const DEFAULT_BASE_URL = "https://opencode.ai/inference/v1";
+export const DEFAULT_BASE_URL = "https://opencode.ai/inference/openai/v1";
 
 /** Pi's native OpenCode catalog overlay, as served by pi.dev. */
 export const MODEL_CATALOG_URL = "https://pi.dev/api/models/providers/opencode?types=chat";
 
 /** Chat model configuration accepted by `ProviderConfig.models`. */
 export type FreeChatModelConfig = Extract<ProviderModelConfig, { reasoning: boolean }>;
+
+/**
+ * APIs Pi can safely translate through this provider's OpenAI chat adapter.
+ * Other free catalog entries remain excluded rather than being advertised with
+ * an incompatible wire protocol.
+ */
+const SUPPORTED_FREE_APIS = ["openai-completions", "openai-responses"] as const;
+
+type SupportedFreeApi = (typeof SUPPORTED_FREE_APIS)[number];
+
+function isSupportedFreeApi(value: string | undefined): value is SupportedFreeApi {
+  return value !== undefined && SUPPORTED_FREE_APIS.some((api) => api === value);
+}
 
 /** Complete free metadata projection backing a pi.dev catalog validator. */
 export interface ModelCatalogSnapshot {
@@ -292,7 +305,7 @@ function freeBuiltinModels(): Map<string, FreeChatModelConfig> {
   const models = new Map<string, FreeChatModelConfig>();
 
   for (const model of getBuiltinModels("opencode")) {
-    if (model.api !== "openai-completions" && model.api !== "openai-responses") continue;
+    if (!isSupportedFreeApi(model.api)) continue;
 
     if (model.cost.input !== 0 || model.cost.output !== 0) continue;
 
@@ -348,7 +361,7 @@ function fromModel(model: Model<Api>): FreeChatModelConfig {
 function configFromRemote(entry: RemoteCatalogEntry): FreeChatModelConfig | undefined {
   if (entry.type !== undefined && entry.type !== "chat") return undefined;
 
-  if (entry.api !== "openai-completions" && entry.api !== "openai-responses") return undefined;
+  if (!isSupportedFreeApi(entry.api)) return undefined;
 
   if (entry.cost?.input !== 0 || entry.cost.output !== 0) return undefined;
 

@@ -1,6 +1,5 @@
 import type { Credential, JsonValue, RefreshModelsContext } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { fetchAgyModels } from "./agy-models.ts";
 import {
   catalogFromAvailableModels,
   fetchAvailableModels,
@@ -89,21 +88,13 @@ async function refreshModels(
 
   if (apiKey === undefined) return fallback;
 
-  const cliFallback = async (): Promise<ReturnType<typeof modelConfigs>> => {
-    if (storedModels !== undefined || context.signal.aborted) return fallback;
-
-    const models = await fetchAgyModels(context.signal);
-
-    return models === undefined ? fallback : modelConfigs(models);
-  };
-
   const body = await fetchAvailableModels(apiKey.token, apiKey.projectId, context.signal);
 
-  if (body === undefined || context.signal.aborted) return cliFallback();
+  if (body === undefined || context.signal.aborted) return fallback;
   const metadata = await fetchGeminiMetadata(context.signal, snapshots);
   const catalog = catalogFromAvailableModels(body, FALLBACK_MODELS, metadata.models);
 
-  if (catalog === undefined || context.signal.aborted) return cliFallback();
+  if (catalog === undefined || context.signal.aborted) return fallback;
 
   const configs = modelConfigs(catalog);
 
@@ -162,7 +153,7 @@ export { FALLBACK_MODELS, PROVIDER_ID, PROVIDER_NAME, resolveRuntimeModel } from
 
 export { catalogFromAvailableModels, resolveCatalog } from "./discovery.ts";
 
-export { buildRequest, buildContents, normalizeSchema, legacySchema } from "./request.ts";
+export { buildRequest, buildContents, normalizeSchema } from "./request.ts";
 
 export { decodeChunk, describeFailure } from "./stream.ts";
 

@@ -21,7 +21,7 @@ The current Node.js LTS release is recommended and used in CI and release workfl
 
 Set `BRAVE_SEARCH_API_KEY` only for manually exercising `pi-web-search`; never commit credentials. Use `vp` built-in commands directly rather than adding manifest wrappers. Package `test` tasks remain available for scoped workspace runs. Inspect `package.json` and `vite.config.ts` before choosing or changing tasks.
 
-Package READMEs are user guides. Keep implementation and maintenance notes in the shared guides under `docs/`; package-specific architecture and protocol details belong in [architecture.md](architecture.md).
+Package READMEs are user guides. Keep implementation and maintenance notes in the shared guides under `docs/`; package-specific architecture and protocol details belong in [architecture.md](architecture.md). For provider artifact comparisons, see [compatibility.md](compatibility.md).
 
 ## Package conventions
 

@@ -509,8 +509,16 @@ export async function executeWebFetch(
         let fetched: CompleteDocument;
         let acquisitionStatus: FetchAcquisition["cacheStatus"] = "miss";
 
+        const staleCanUseMarkdownPolicy =
+          stale !== undefined &&
+          stale.extractor !== "raw" &&
+          !stale.surfaceView &&
+          !stale.llmsTxtFallback &&
+          !stale.representationFallback;
+
         if (
           stale?.validators &&
+          !staleCanUseMarkdownPolicy &&
           !stale.llmsTxtFallback &&
           !stale.markdownAlternateFallback &&
           !stale.representationFallback
@@ -684,7 +692,11 @@ export async function executeWebFetch(
           : []),
         ...(result.markdownAlternateFallback
           ? [
-              "[Page content was sparse; showing the site's advertised Markdown version instead.]",
+              result.markdownAlternateReason === "advertised"
+                ? "[Showing the site's advertised Markdown version instead.]"
+                : result.markdownAlternateReason === "preferred"
+                  ? "[Showing the site's preferred Markdown representation instead.]"
+                  : "[Showing a Markdown representation instead of the requested page.]",
               "",
             ]
           : []),
@@ -716,8 +728,8 @@ export async function executeWebFetch(
         ...(focused
           ? [
               focused.details.matchedSections > 0
-                ? `[Query matched ${focused.details.matchedSections}/${focused.details.totalSections} sections. Offsets apply to this view; omit query for the full page.]`
-                : "[No sections matched. Omit query for the full page.]",
+                ? `[Query selected ${focused.details.matchedSections}/${focused.details.totalSections} sections; relevant content may be omitted. Offsets apply to this view; omit query for the full page.]`
+                : "[No sections selected. The query may miss relevant content; omit query for the full page.]",
               "",
             ]
           : []),

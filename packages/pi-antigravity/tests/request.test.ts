@@ -2,13 +2,12 @@ import type { AssistantMessage, Message, Tool, ToolCall } from "@earendil-works/
 import { describe, expect, it } from "vite-plus/test";
 
 import { resolveIdentity } from "../src/ids";
-import { findModel } from "../src/models";
+import type { AntigravityModel } from "../src/models";
 import {
   buildContents,
   buildRequest,
   buildTools,
   compatibleSystemPrompt,
-  legacySchema,
   normalizeSchema,
   parseImageData,
   sanitizeToolCallId,
@@ -17,15 +16,29 @@ import {
 
 const identity = resolveIdentity("session-under-test");
 
-const gemini = findModel("gemini-3.8-flash");
+const gemini: AntigravityModel = {
+  id: "gemini-3.8-flash",
+  name: "Gemini 3.8 Flash",
+  reasoning: true,
+  input: ["text", "image"],
+  contextWindow: 128_000,
+  maxTokens: 32_768,
+  thinkingLevelMap: {
+    off: null,
+    minimal: null,
+    low: "gemini-3.8-flash-low",
+    medium: "gemini-3.8-flash-medium",
+    high: "gemini-3.8-flash-high",
+    xhigh: null,
+    max: null,
+  },
+};
 
-const claude = findModel("claude-opus-4-6");
+const claude = gemini;
 
-const gptOssModel = findModel("gpt-oss-120b");
+const gptOssModel = gemini;
 
-function requireModel(model: typeof gemini): NonNullable<typeof gemini> {
-  if (model === undefined) throw new Error("model catalog entry missing");
-
+function requireModel(model: AntigravityModel): AntigravityModel {
   return model;
 }
 
@@ -137,7 +150,7 @@ describe("content conversion", () => {
     expect(contents).toHaveLength(3);
     expect(contents[1]?.role).toBe("model");
     expect(contents[1]?.parts[0]).toEqual({
-      functionCall: { name: "bake_bread", args: { loaves: "2" }, id: "call-1" },
+      functionCall: { name: "bake_bread", args: { loaves: "2" } },
     });
     expect(contents[2]).toEqual({
       role: "user",
@@ -146,14 +159,13 @@ describe("content conversion", () => {
           functionResponse: {
             name: "bake_bread",
             response: { output: "Two loaves are ready" },
-            id: "call-1",
           },
         },
       ],
     });
   });
 
-  it("adds tool-call ids for Claude runtime models", () => {
+  it("keeps Gemini tool calls in the native schema", () => {
     const contents = buildContents(
       input({
         model: requireModel(claude),
@@ -167,13 +179,12 @@ describe("content conversion", () => {
     );
 
     expect(contents[1]?.parts[0]).toEqual({
-      functionCall: { name: "bake_bread", args: { loaves: "2" }, id: "call_1" },
+      functionCall: { name: "bake_bread", args: { loaves: "2" } },
     });
     expect(contents[2]?.parts[0]).toEqual({
       functionResponse: {
         name: "bake_bread",
         response: { output: "Two loaves are ready" },
-        id: "call_1",
       },
     });
   });
@@ -256,32 +267,6 @@ describe("content conversion", () => {
       { role: "model", parts: [{ text: "A coding assistant." }] },
       { role: "user", parts: [{ text: "Not in Pi?" }] },
     ]);
-  });
-
-  it("keeps signed Claude thinking on follow-up", () => {
-    const contents = buildContents(
-      input({
-        model: requireModel(claude),
-        runtimeModel: "claude-opus-4-6-thinking",
-        messages: [
-          userMessage("Hello"),
-          assistantMessage(
-            [
-              { type: "thinking", thinking: "Reasoning", thinkingSignature: "c2lnbmF0dXJl" },
-              { type: "text", text: "Hello" },
-            ],
-            "claude-opus-4-6",
-          ),
-          userMessage("Continue"),
-        ],
-      }),
-    );
-
-    expect(contents[1]?.parts[0]).toEqual({
-      thought: true,
-      text: "Reasoning",
-      thoughtSignature: "c2lnbmF0dXJl",
-    });
   });
 
   it("keeps text history from another provider but drops its reasoning", () => {
@@ -390,40 +375,12 @@ describe("schema normalization", () => {
     });
   });
 
-  it("reduces Claude and GPT-OSS schemas to the supported subset", () => {
-    const legacy = legacySchema(
-      normalizeSchema({
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          loaves: { type: ["number", "null"], minimum: 1, description: "Loaves" },
-          size: { type: "string", enum: ["small", "large"], format: "none" },
-          sizes: { type: "array", items: { type: "string" }, uniqueItems: true },
-          mode: { type: "string", enum: [1, 2] },
-        },
-        required: ["loaves"],
-      }),
-    );
+  it("builds Gemini declarations with a JSON schema", () => {
+    const tools = buildTools([BAKE_BREAD]);
 
-    expect(legacy).toEqual({
-      type: "object",
-      properties: {
-        loaves: { type: "number", description: "Loaves" },
-        size: { type: "string", enum: ["small", "large"] },
-        sizes: { type: "array", items: { type: "string" } },
-        mode: { type: "string" },
-      },
-      required: ["loaves"],
-    });
-  });
-
-  it("builds Gemini declarations with a JSON schema and Claude declarations with parameters", () => {
-    const geminiTools = buildTools([BAKE_BREAD], false);
-    const claudeTools = buildTools([BAKE_BREAD], true);
-
-    expect(geminiTools?.[0]?.functionDeclarations[0]?.parametersJsonSchema).toBeDefined();
-    expect(claudeTools?.[0]?.functionDeclarations[0]?.parameters).toBeDefined();
-    expect(buildTools([], false)).toBeUndefined();
+    expect(tools?.[0]?.functionDeclarations[0]?.parametersJsonSchema).toBeDefined();
+    expect(tools?.[0]?.functionDeclarations[0]?.parameters).toBeUndefined();
+    expect(buildTools([])).toBeUndefined();
   });
 });
 
@@ -485,6 +442,8 @@ describe("envelope assembly", () => {
     expect(envelope.request.labels.last_step_index).toBe(String(step - 1));
     expect(envelope.request.labels.request_id).toBe(`${identity.trajectoryId}-0`);
     expect(envelope.request.labels.used_claude).toBe("false");
+    expect(envelope.request.labels.used_claude_conservative).toBe("false");
+    expect(envelope.request.labels.used_non_gemini_model).toBe("false");
   });
 
   it("sets the system instruction and thinking budget", () => {
@@ -508,12 +467,11 @@ describe("envelope assembly", () => {
     expect(envelope.request.generationConfig?.maxOutputTokens).toBe(1_024);
   });
 
-  it("marks Claude requests through labels", () => {
+  it("marks non-Gemini requests through labels", () => {
     const envelope = buildRequest(
       input({ model: requireModel(claude), runtimeModel: "claude-opus-4-6-thinking" }),
     );
 
-    expect(envelope.request.labels.used_claude).toBe("true");
     expect(envelope.request.labels.used_non_gemini_model).toBe("true");
   });
 });

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-20
+
+### Added
+
+- Fetch GitLab.com file links as raw source, and prefer available Markdown versions of documentation pages.
+
+### Changed
+
+- Use Pi's configured expand-key hint when displaying collapsed fetch output.
+- Preserve selected tab views when a Markdown representation is unavailable for tab-scoped pages, and use accurate notices for derived Markdown substitutions.
+
+### Fixed
+
+- Preserve section headings when a query selects a later passage from a long section.
+- Match dotted API identifiers literally within longer queries, and clarify that focused results can omit relevant content.
+- Preserve nested `/-/blob/` path segments when normalizing GitLab file URLs.
+- Match hyphenated dotted filenames such as `package-lock.json` in focused queries.
+
 ## [0.17.1] - 2026-11-18
 
 ### Changed
@@ -365,7 +383,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.17.1...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.18.0...HEAD
+[0.18.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.17.1...pi-web-fetch-v0.18.0
 [0.17.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.17.0...pi-web-fetch-v0.17.1
 [0.17.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.5...pi-web-fetch-v0.17.0
 [0.16.5]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.4...pi-web-fetch-v0.16.5

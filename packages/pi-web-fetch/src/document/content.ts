@@ -52,8 +52,10 @@ export interface CompleteDocument {
   llmsTxtDescribedBy?: string;
   /** Absolute URL advertised for a Markdown version of this page (`rel="alternate" type="text/markdown"`). */
   markdownAlternateUrl?: string;
-  /** True when this document is the advertised Markdown version served instead of a low-quality page. */
+  /** True when this document is a Markdown representation substituted for the requested page. */
   markdownAlternateFallback?: boolean;
+  /** Why the Markdown representation was selected. */
+  markdownAlternateReason?: "advertised" | "preferred";
   /** Same-origin OpenAPI document advertised by an otherwise empty Swagger UI. */
   swaggerSpecUrl?: string;
   /** The returned content is an API or specification substituted for the page. */

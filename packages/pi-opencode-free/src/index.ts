@@ -1,11 +1,11 @@
 import type { RefreshModelsContext } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ProviderConfig } from "@earendil-works/pi-coding-agent";
 
-import { createBunTransport } from "./bun-transport.ts";
-import { createCliVersionResolver } from "./cli-version.ts";
+import { createTransport } from "./transport.ts";
 import { registerBranchSummary, registerChunkedCompaction } from "./compaction.ts";
 import {
   buildClientHeaders,
+  CLIENT_VERSION,
   createCanonicalSessionId,
   createSessionSeed,
 } from "./client-headers.ts";
@@ -78,7 +78,6 @@ export function registerOpencodeFree(
 
   let sessionId = resolveCurrentSessionId();
 
-  const resolveVersion = createCliVersionResolver(dependencies.fetcher);
   const initialModels = initialFreeModels();
   const refreshState: CatalogRefreshState = {};
 
@@ -93,13 +92,11 @@ export function registerOpencodeFree(
     api: "openai-completions",
     authHeader: true,
     models: initialModels,
-    streamSimple: createFreeStream(dependencies.fetcher, async (signal) => {
-      const cliVersion = await resolveVersion(signal);
-
-      return { sessionId, cliVersion };
-    }),
-    refreshModels: async (context) =>
-      refreshModels(context, dependencies, sessionId, resolveVersion, refreshState),
+    streamSimple: createFreeStream(dependencies.fetcher, () => ({
+      sessionId,
+      cliVersion: CLIENT_VERSION,
+    })),
+    refreshModels: async (context) => refreshModels(context, dependencies, sessionId, refreshState),
   };
 
   pi.registerProvider(PROVIDER_ID, config);
@@ -109,16 +106,16 @@ export function registerOpencodeFree(
 
 /**
  * Refreshes the catalog, falling back to stored models or bundled models when
- * offline, canceled, version resolution fails, or discovery returns no usable
- * models. Version resolution and discovery share an eight-second abort deadline.
- * Like native Pi, catalogs with lastModified (including zero) and a valid checkedAt
- * stay fresh for four hours after checkedAt. Force skips freshness checks, never
- * offline mode or cancellation. HTTP failures
- * retain the body and validators while advancing checkedAt; first failures without
- * Last-Modified remain immediately retryable. Transport, parsing, version lookup,
- * and cancellation failures do not advance freshness. Snapshots are endpoint-scoped.
- * Publication errors are ignored and the snapshot is retained in memory unless
- * the caller canceled; a refused publication does not update the in-memory cache.
+ * offline, canceled, or discovery returns no usable models. Discovery has an
+ * eight-second abort deadline. Like native Pi, catalogs with lastModified
+ * (including zero) and a valid checkedAt stay fresh for four hours after
+ * checkedAt. Force skips freshness checks, never offline mode or cancellation.
+ * HTTP failures retain the body and validators while advancing checkedAt; first
+ * failures without Last-Modified remain immediately retryable. Transport,
+ * parsing, and cancellation failures do not advance freshness. Snapshots are
+ * endpoint-scoped. Publication errors are ignored and the snapshot is retained
+ * in memory unless the caller canceled; a refused publication does not update
+ * the in-memory cache.
  *
  * @throws {Error} If discovery reports an HTTP failure, after attempting to publish the
  *   updated checkedAt with any existing body and validators
@@ -127,7 +124,6 @@ async function refreshModels(
   context: RefreshModelsContext,
   dependencies: OpencodeFreeDependencies,
   sessionId: string,
-  resolveVersion: (signal?: AbortSignal) => Promise<string>,
   state: CatalogRefreshState,
 ): Promise<FreeChatModelConfig[]> {
   const baseUrl = stripTrailingSlashes(context.baseUrl ?? DEFAULT_BASE_URL);
@@ -174,17 +170,10 @@ async function refreshModels(
   };
 
   const signal = AbortSignal.any([context.signal, AbortSignal.timeout(DISCOVERY_TIMEOUT_MS)]);
-  let cliVersion: string;
-
-  try {
-    cliVersion = await resolveVersion(signal);
-  } catch {
-    return fallbackModels;
-  }
 
   const outcome = await discoverFreeModelsWithStatus({
     baseUrl,
-    headers: buildClientHeaders(sessionId, cliVersion),
+    headers: buildClientHeaders(sessionId, CLIENT_VERSION),
     signal,
     fetcher: dependencies.fetcher,
     allowNetwork: context.allowNetwork,
@@ -233,7 +222,7 @@ function isRecent(timestamp: number | undefined, now: number, ttl: number): bool
  * @param pi - Extension API supplied by Pi
  */
 export default function piOpencodeFree(pi: ExtensionAPI): void {
-  const transport = createBunTransport();
+  const transport = createTransport();
 
   pi.on("session_shutdown", () => transport.dispose());
   registerOpencodeFree(pi, { randomSeed: createSessionSeed, fetcher: transport });

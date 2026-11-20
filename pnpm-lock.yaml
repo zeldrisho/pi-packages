@@ -168,7 +168,7 @@ catalogs:
       specifier: ^1.4.0
       version: 1.5.0
     '@earendil-works/pi-coding-agent':
-      specifier: ^1.4.0
+      specifier: ^1.5.0
       version: 1.5.0
     '@earendil-works/pi-tui':
       specifier: ^1.4.0
@@ -218,8 +218,6 @@ importers:
       vitest:
         specifier: 5.1.0
         version: 5.1.0(@opentelemetry/api@1.9.0)(@types/node@26.6.6)(@vitest/browser-preview@5.1.0)(@vitest/browser@5.1.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(@voidzero-dev/vite-plus-core@1.5.0(@types/node@26.6.6)(esbuild@0.28.1)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))
-
-  packages/pi-anthropics-skills: {}
 
   packages/pi-antigravity:
     devDependencies:

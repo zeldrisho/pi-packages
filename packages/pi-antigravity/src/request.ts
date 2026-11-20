@@ -16,7 +16,6 @@ import {
   type ThinkingConfig,
   requiresThoughtSignature,
   thinkingConfig,
-  usesLegacyToolSchema,
 } from "./models.ts";
 
 /** Gemini content roles accepted by the Cloud Code Assist backend. */
@@ -164,16 +163,6 @@ const META_SCHEMA_KEYWORDS = new Set([
   "definitions",
 ]);
 
-/** Schema keywords the Claude and GPT-OSS custom-tool bridge accepts. */
-const LEGACY_SCHEMA_KEYWORDS = new Set([
-  "type",
-  "description",
-  "properties",
-  "required",
-  "items",
-  "enum",
-]);
-
 /** Bounds on `$ref` inlining so an adversarial schema cannot exhaust memory. */
 const MAX_SCHEMA_DEPTH = 32;
 
@@ -204,16 +193,6 @@ export function sanitizeToolCallId(id: string, fallbackName: string): string {
   const cleaned = id.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
 
   return cleaned.length > 0 ? cleaned : `${fallbackName}_call`;
-}
-
-/**
- * Reports whether tool-call ids must be sent for a runtime model.
- *
- * @param runtimeModel - Backend request model id
- * @returns True for Claude and GPT-OSS runtime models
- */
-export function needsToolCallIds(runtimeModel: string): boolean {
-  return usesLegacyToolSchema(runtimeModel);
 }
 
 /**
@@ -358,9 +337,8 @@ function thinkingParts(block: ThinkingContent, sameModel: boolean): GeminiPart[]
 
   if (!sameModel) return [];
 
-  // Claude also rejects replayed thinking without a signature. Older stored
-  // sessions may contain unsigned blocks, so omit them rather than breaking
-  // the conversation's subsequent turns.
+  // Older stored sessions may contain unsigned blocks, so omit them rather
+  // than breaking the conversation's subsequent turns.
   if (!isValidThoughtSignature(block.thinkingSignature)) return [];
 
   return [{ thought: true, text: block.thinking, thoughtSignature: block.thinkingSignature }];
@@ -396,12 +374,8 @@ function toolCallParts(call: ToolCall, context: ToolCallContext): GeminiPart[] {
     return [];
   }
 
-  const id = needsToolCallIds(context.runtimeModel)
-    ? { id: sanitizeToolCallId(call.id, call.name) }
-    : {};
-
   const part: GeminiFunctionCallPart = {
-    functionCall: { name: call.name, args: call.arguments ?? {}, ...id },
+    functionCall: { name: call.name, args: call.arguments ?? {} },
   };
 
   if (call.thoughtSignature !== undefined) part.thoughtSignature = call.thoughtSignature;
@@ -445,16 +419,11 @@ function toolResultParts(
     ];
   }
 
-  const id = needsToolCallIds(context.runtimeModel)
-    ? { id: sanitizeToolCallId(message.toolCallId, message.toolName) }
-    : {};
-
   return [
     {
       functionResponse: {
         name: message.toolName,
         response: message.isError ? { error: summary } : { output: summary },
-        ...id,
       },
     },
     ...images,
@@ -777,75 +746,13 @@ function stripMetaKeyword(key: string, value: JsonValue): JsonValue {
 }
 
 /**
- * Reduces a schema to the subset the Claude and GPT-OSS tool bridge accepts.
- *
- * @param schema - Normalized schema
- * @returns A schema with only allowlisted keywords
- */
-export function legacySchema(schema: JsonObject): JsonObject {
-  const out: JsonObject = {};
-
-  for (const [key, value] of Object.entries(schema)) {
-    if (!LEGACY_SCHEMA_KEYWORDS.has(key)) continue;
-
-    if (key === "type") {
-      const type = legacyType(value);
-
-      if (type !== undefined) out.type = type;
-      continue;
-    }
-
-    if (key === "properties" && isJsonObject(value)) {
-      const properties: JsonObject = {};
-
-      for (const [name, entry] of Object.entries(value)) {
-        properties[name] = isJsonObject(entry) ? legacySchema(stripMeta(entry)) : entry;
-      }
-
-      out.properties = properties;
-      continue;
-    }
-
-    if (key === "items") {
-      out.items = isJsonObject(value) ? legacySchema(stripMeta(value)) : value;
-      continue;
-    }
-
-    if (key === "enum") {
-      if (Array.isArray(value) && value.every(isJsonText)) out.enum = value;
-      continue;
-    }
-
-    out[key] = value;
-  }
-
-  return out;
-}
-
-/**
- * Reduces a JSON Schema `type` to the single scalar the legacy bridge accepts.
- *
- * @param value - `type` keyword value
- * @returns A scalar type name, or undefined when none applies
- */
-function legacyType(value: JsonValue): string | undefined {
-  if (isJsonText(value)) return value;
-
-  if (!Array.isArray(value)) return undefined;
-
-  return value.find((entry): entry is string => isJsonText(entry) && entry !== "null");
-}
-
-/**
  * Builds tool declarations in the schema form the runtime model accepts.
  *
  * @param tools - Tools declared by Pi
- * @param legacy - Whether the runtime model needs the legacy schema subset
  * @returns Tool declarations, or undefined when no tool has a usable schema
  */
 export function buildTools(
   tools: readonly Tool[],
-  legacy: boolean,
 ): { functionDeclarations: GeminiFunctionDeclaration[] }[] | undefined {
   const declarations: GeminiFunctionDeclaration[] = [];
 
@@ -853,11 +760,11 @@ export function buildTools(
     // SAFETY: Pi declares tool parameters as an object that is serialized into the request as JSON.
     const schema = normalizeSchema(tool.parameters as JsonValue);
 
-    declarations.push(
-      legacy
-        ? { name: tool.name, description: tool.description, parameters: legacySchema(schema) }
-        : { name: tool.name, description: tool.description, parametersJsonSchema: schema },
-    );
+    declarations.push({
+      name: tool.name,
+      description: tool.description,
+      parametersJsonSchema: schema,
+    });
   }
 
   return declarations.length === 0 ? undefined : [{ functionDeclarations: declarations }];
@@ -908,7 +815,7 @@ export function buildRequest(input: RequestInput): AntigravityRequestEnvelope {
 
   if (generationConfig !== undefined) request.generationConfig = generationConfig;
 
-  const tools = buildTools(input.tools, usesLegacyToolSchema(input.runtimeModel));
+  const tools = buildTools(input.tools);
 
   if (tools !== undefined) request.tools = tools;
 
@@ -994,15 +901,14 @@ export function labelsFor(
   requestIndex: number,
   runtimeModel: string,
 ): RequestLabels {
-  const claude = runtimeModel.startsWith("claude-");
-  const nonGemini = claude || runtimeModel.startsWith("gpt-oss-");
+  const nonGemini = !runtimeModel.startsWith("gemini-");
 
   return {
     last_step_index: String(Math.max(0, step - 1)),
     request_id: `${trajectoryId}-${requestIndex}`,
     trajectory_id: trajectoryId,
-    used_claude: claude ? "true" : "false",
-    used_claude_conservative: claude ? "true" : "false",
+    used_claude: "false",
+    used_claude_conservative: "false",
     used_non_gemini_model: nonGemini ? "true" : "false",
   };
 }

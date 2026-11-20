@@ -195,6 +195,8 @@ function groupVariants(
   const groups = new Map<string, VariantGroup>();
 
   for (const [runtimeId, info] of Object.entries(models)) {
+    if (!runtimeId.startsWith("gemini-")) continue;
+
     if (!isSelectable(runtimeId, info)) continue;
 
     if (recommended !== undefined && !recommended.has(runtimeId)) continue;
@@ -396,6 +398,7 @@ function entryFromGroup(
  *
  * @param body - Parsed response body
  * @param seed - Fallback entries consulted when the payload omits metadata
+ * @param geminiMetadata - Metadata overlay for exact Gemini runtime ids
  * @returns Catalog entries, or undefined when the payload lists no usable model
  */
 export function catalogFromAvailableModels(
@@ -437,6 +440,7 @@ export async function fetchAvailableModels(
   token: string,
   projectId: string,
   signal: AbortSignal | undefined,
+  fetcher: typeof fetch = globalThis.fetch,
 ): Promise<JsonValue | undefined> {
   const deadline = AbortSignal.any([
     ...(signal === undefined ? [] : [signal]),
@@ -447,7 +451,7 @@ export async function fetchAvailableModels(
 
   for (const endpoint of ENDPOINTS) {
     try {
-      const response = await fetch(`${endpoint}/v1internal:fetchAvailableModels`, {
+      const response = await fetcher(`${endpoint}/v1internal:fetchAvailableModels`, {
         method: "POST",
         headers,
         body: JSON.stringify({ project: projectId }),
@@ -484,6 +488,9 @@ export function modelsFromStored(
     if (model.provider !== providerId) continue;
 
     if (model.api !== ANTIGRAVITY_API) continue;
+
+    // Older releases persisted non-Gemini routes; never restore them after the Gemini-only migration.
+    if (!model.id.startsWith("gemini-")) continue;
 
     models.push({
       id: model.id,

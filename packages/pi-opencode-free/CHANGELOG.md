@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-20
+
+### Changed
+
+- Model requests no longer require a separate Bun installation and reuse HTTPS connections.
+- Requests no longer look up the OpenCode CLI version before inference or catalog refresh; the bundled compatibility version is advertised instead, so both work when that metadata is unavailable.
+
+### Fixed
+
+- Use OpenCode's current `/inference/openai/v1` endpoint for free-model discovery and inference.
+- Retry truncated compaction and branch summaries concisely, and preserve the session if the retry also hits the output limit.
+
 ## [0.5.0] - 2026-11-18
 
 ### Changed
@@ -100,7 +112,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Discover free models through Pi's native OpenCode catalog from pi.dev instead of models.dev, preserving Pi's capabilities and compatibility metadata.
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.5.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.6.0...HEAD
+[0.6.0]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.5.0...pi-opencode-free-v0.6.0
 [0.5.0]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.4.0...pi-opencode-free-v0.5.0
 [0.4.0]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.3...pi-opencode-free-v0.4.0
 [0.3.3]: https://github.com/zeldrisho/pi-packages/compare/pi-opencode-free-v0.3.2...pi-opencode-free-v0.3.3
