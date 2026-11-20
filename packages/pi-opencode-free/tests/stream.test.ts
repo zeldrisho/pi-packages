@@ -142,7 +142,7 @@ describe("OpenCode provider stream boundary", () => {
       expect(payload.tools.map((tool) => tool.function.name)).toEqual(["bash"]);
       const headers = new Headers(init?.headers);
       expect(headers.get("x-custom")).toBe("preserved");
-      expect(headers.has("x-opencode-request")).toBe(false);
+      expect(headers.get("x-opencode-request")).toBe("obsolete");
 
       return completion();
     });

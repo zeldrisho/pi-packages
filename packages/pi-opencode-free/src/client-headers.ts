@@ -201,8 +201,8 @@ export function buildClientHeaders(sessionId: string, cliVersion: string) {
  *
  * The marker header keeps the mutation from leaking into built-in providers
  * that share the OpenCode endpoint but do not use the free-tier client headers.
- * Matching header names are replaced case-insensitively, and the legacy
- * `x-opencode-request` header is removed. Unmarked requests are left unchanged.
+ * Matching header names are replaced case-insensitively. Unmarked requests are
+ * left unchanged.
  *
  * @param headers - Mutable request headers supplied by Pi
  * @param sessionId - Canonical session identifier for the active Pi session
@@ -222,10 +222,6 @@ export function applyClientHeaders(
 
   for (const name of SESSION_HEADER_NAMES) {
     setHeader(headers, name, sessionId);
-  }
-
-  for (const name of Object.keys(headers)) {
-    if (name.toLowerCase() === "x-opencode-request") delete headers[name];
   }
 
   return true;

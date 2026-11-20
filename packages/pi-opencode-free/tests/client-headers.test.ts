@@ -136,7 +136,7 @@ describe("opencode session identity", () => {
     }
   });
 
-  it("updates marked request headers and removes the v1 request header", () => {
+  it("updates marked request headers and preserves the request header", () => {
     const sessionId = createCanonicalSessionId(deterministicSeed(1));
 
     const headers = {
@@ -154,7 +154,7 @@ describe("opencode session identity", () => {
     expect(applyClientHeaders(headers, sessionId, CLI_VERSION)).toBe(true);
     expect(headers["User-Agent"]).toBe(buildUserAgent(CLI_VERSION));
     expect(headers["user-agent"]).toBeUndefined();
-    expect(headers["X-Opencode-Request"]).toBeUndefined();
+    expect(headers["X-Opencode-Request"]).toBe("legacy");
     expect(headers["x-other"]).toBe("keep");
 
     for (const name of SESSION_HEADER_NAMES) {
