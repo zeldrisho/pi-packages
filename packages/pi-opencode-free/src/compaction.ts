@@ -614,7 +614,8 @@ async function reduceDigests(
 
   accumulated = addUsage(accumulated, result.usage);
 
-  const retryConcise = async () => {
+  // Retry once without discarding source digests: shortening them would silently lose context.
+  if (result.truncated) {
     result = await finalCheckpoint(
       context,
       model,
@@ -626,13 +627,13 @@ async function reduceDigests(
       "The previous response hit the output token limit. Be substantially more concise while preserving the most important facts and required format. Finish the response.",
     );
     accumulated = addUsage(accumulated, result.usage);
-  };
+  }
 
-  // Retry once without discarding source digests: shortening them would silently lose context.
-  if (result.truncated) await retryConcise();
+  // A summary that stopped at the cap carries partial text, so it is never persisted.
+  if (result.truncated) return { text: "", usage: accumulated, truncated: true };
 
   // A model that ignores the template gets one reminder, as in OpenCode's compaction.
-  if (!result.truncated && !hasSections(result.text, spec.sections)) {
+  if (!hasSections(result.text, spec.sections)) {
     result = await finalCheckpoint(
       context,
       model,
@@ -644,12 +645,8 @@ async function reduceDigests(
       CHECKPOINT_NUDGE,
     );
     accumulated = addUsage(accumulated, result.usage);
-
-    // The reminder is still subject to the same single concise retry.
-    if (result.truncated) await retryConcise();
   }
 
-  // A summary that stopped at the cap carries partial text, so it is never persisted.
   if (result.truncated || !hasSections(result.text, spec.sections)) {
     return { text: "", usage: accumulated, truncated: result.truncated };
   }
