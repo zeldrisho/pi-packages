@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-20
+
 ### Changed
 
 - Sign-in, token refresh, and requests no longer require the `agy` CLI. The public installed-application OAuth client and the compatibility version are bundled, and a matching client found in an installed CLI is preferred when available.
@@ -40,5 +42,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Explain when a model has no available server capacity and suggest recovery options.
 - Report ambiguous resource exhaustion clearly and avoid repeated automatic retries; retain failover for explicit temporary capacity errors.
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-antigravity-v0.1.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-antigravity-v0.2.0...HEAD
+[0.2.0]: https://github.com/zeldrisho/pi-packages/compare/pi-antigravity-v0.1.0...pi-antigravity-v0.2.0
 [0.1.0]: https://github.com/zeldrisho/pi-packages/releases/tag/pi-antigravity-v0.1.0
