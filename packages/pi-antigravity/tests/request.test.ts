@@ -8,7 +8,6 @@ import {
   buildRequest,
   buildTools,
   compatibleSystemPrompt,
-  legacySchema,
   normalizeSchema,
   parseImageData,
   sanitizeToolCallId,
@@ -376,40 +375,12 @@ describe("schema normalization", () => {
     });
   });
 
-  it("reduces Claude and GPT-OSS schemas to the supported subset", () => {
-    const legacy = legacySchema(
-      normalizeSchema({
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          loaves: { type: ["number", "null"], minimum: 1, description: "Loaves" },
-          size: { type: "string", enum: ["small", "large"], format: "none" },
-          sizes: { type: "array", items: { type: "string" }, uniqueItems: true },
-          mode: { type: "string", enum: [1, 2] },
-        },
-        required: ["loaves"],
-      }),
-    );
+  it("builds Gemini declarations with a JSON schema", () => {
+    const tools = buildTools([BAKE_BREAD]);
 
-    expect(legacy).toEqual({
-      type: "object",
-      properties: {
-        loaves: { type: "number", description: "Loaves" },
-        size: { type: "string", enum: ["small", "large"] },
-        sizes: { type: "array", items: { type: "string" } },
-        mode: { type: "string" },
-      },
-      required: ["loaves"],
-    });
-  });
-
-  it("builds Gemini declarations with a JSON schema and Claude declarations with parameters", () => {
-    const geminiTools = buildTools([BAKE_BREAD], false);
-    const claudeTools = buildTools([BAKE_BREAD], true);
-
-    expect(geminiTools?.[0]?.functionDeclarations[0]?.parametersJsonSchema).toBeDefined();
-    expect(claudeTools?.[0]?.functionDeclarations[0]?.parameters).toBeDefined();
-    expect(buildTools([], false)).toBeUndefined();
+    expect(tools?.[0]?.functionDeclarations[0]?.parametersJsonSchema).toBeDefined();
+    expect(tools?.[0]?.functionDeclarations[0]?.parameters).toBeUndefined();
+    expect(buildTools([])).toBeUndefined();
   });
 });
 

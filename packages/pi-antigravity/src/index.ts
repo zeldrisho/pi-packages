@@ -153,7 +153,7 @@ export { FALLBACK_MODELS, PROVIDER_ID, PROVIDER_NAME, resolveRuntimeModel } from
 
 export { catalogFromAvailableModels, resolveCatalog } from "./discovery.ts";
 
-export { buildRequest, buildContents, normalizeSchema, legacySchema } from "./request.ts";
+export { buildRequest, buildContents, normalizeSchema } from "./request.ts";
 
 export { decodeChunk, describeFailure } from "./stream.ts";
 

@@ -70,7 +70,7 @@ describe("extension registration", () => {
         url.startsWith("https://pi.dev/")
           ? Response.json([])
           : Response.json({
-              models: { "example-low": { displayName: "Example (Low)", maxTokens: 120000 } },
+              models: { "gemini-example-low": { displayName: "Example (Low)", maxTokens: 120000 } },
             }),
       ),
     );
@@ -91,7 +91,7 @@ describe("extension registration", () => {
 
     const models = await register().config.refreshModels?.(context);
 
-    expect(models?.map((model) => model.id)).toEqual(["example"]);
+    expect(models?.map((model) => model.id)).toEqual(["gemini-example"]);
     expect(publish).toHaveBeenCalledOnce();
     expect(publish).toHaveBeenCalledWith({
       persist: expect.objectContaining({ checkedAt: expect.any(Number) }),
@@ -176,7 +176,7 @@ describe("extension registration", () => {
           ? Response.json([])
           : Response.json({
               models: {
-                "claude-sonnet-4-6": {
+                "gemini-claude-sonnet-4-6": {
                   displayName: "Claude Sonnet 4.6 (Thinking)",
                   supportsThinking: true,
                   thinkingBudget: 1024,
@@ -201,12 +201,12 @@ describe("extension registration", () => {
     };
 
     const models = await register().config.refreshModels?.(context);
-    expect(models?.[0]).toMatchObject({ thinkingLevelMap: { low: "claude-sonnet-4-6" } });
+    expect(models?.[0]).toMatchObject({ thinkingLevelMap: { low: "gemini-claude-sonnet-4-6" } });
     expect(publish).toHaveBeenCalledWith({
       persist: expect.objectContaining({
         models: [
           expect.objectContaining({
-            thinkingLevelMap: expect.objectContaining({ low: "claude-sonnet-4-6" }),
+            thinkingLevelMap: expect.objectContaining({ low: "gemini-claude-sonnet-4-6" }),
           }),
         ],
       }),
@@ -285,7 +285,7 @@ describe("extension registration", () => {
     const fetch = vi.fn(async (url: string) =>
       url.startsWith("https://pi.dev/")
         ? Response.json([])
-        : Response.json({ models: { "example-low": { displayName: "Example (Low)" } } }),
+        : Response.json({ models: { "gemini-example-low": { displayName: "Example (Low)" } } }),
     );
 
     vi.stubGlobal("fetch", fetch);
@@ -326,7 +326,7 @@ describe("extension registration", () => {
       vi.fn(async (url: string) =>
         url.startsWith("https://pi.dev/")
           ? Promise.reject(new Error("offline"))
-          : Response.json({ models: { "example-low": { displayName: "Example (Low)" } } }),
+          : Response.json({ models: { "gemini-example-low": { displayName: "Example (Low)" } } }),
       ),
     );
     const publish = vi.fn(async () => true);
@@ -344,7 +344,7 @@ describe("extension registration", () => {
       publish,
     });
 
-    expect(models?.map((model) => model.id)).toEqual(["example"]);
+    expect(models?.map((model) => model.id)).toEqual(["gemini-example"]);
     expect(publish).not.toHaveBeenCalled();
   });
 
@@ -363,7 +363,7 @@ describe("extension registration", () => {
       vi.fn(async (url: string) =>
         url.startsWith("https://pi.dev/")
           ? new Response(null, { status: 503 })
-          : Response.json({ models: { "example-low": { displayName: "Example (Low)" } } }),
+          : Response.json({ models: { "gemini-example-low": { displayName: "Example (Low)" } } }),
       ),
     );
     const publish = vi.fn(async () => true);

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Claude and GPT-OSS model routes are no longer advertised; only account-advertised Gemini routes are supported.
 - First-run model discovery no longer runs `agy models`; the stored catalog and bundled models are used instead.
 
 ## [0.1.0] - 2026-11-18

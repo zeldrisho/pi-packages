@@ -36,11 +36,6 @@ export interface AntigravityModel {
 }
 
 /**
- * Limits used when the backend advertises none and no cached catalog exists.
- * They are deliberately conservative: Pi allocates context from these numbers,
- * and the backend rejects a request that asks for more than it allows.
- */
-/**
  * No static model list is maintained. Antigravity's account catalog is the
  * source of truth and is refreshed through the provider API.
  */
@@ -48,16 +43,6 @@ export const FALLBACK_MODELS: readonly AntigravityModel[] = [];
 
 /** Zeroed rates: access is quota-backed by the account, so Pi never bills these models. */
 const SUBSCRIPTION_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
-
-/**
- * Finds a fallback catalog entry by public model id.
- *
- * @param modelId - Public model id from Pi
- * @returns The catalog entry, or undefined when the id is not in the catalog
- */
-export function findModel(modelId: string): AntigravityModel | undefined {
-  return FALLBACK_MODELS.find((model) => model.id === modelId);
-}
 
 /** The routing Pi exposes for a model: its id plus per-level runtime ids. */
 export interface RoutableModel {
@@ -88,17 +73,6 @@ export function resolveRuntimeModel(model: RoutableModel, level?: ModelThinkingL
 
   if (Object.keys(map).length === 0) return model.id;
   throw new Error(`No advertised Antigravity runtime route for ${model.id}`);
-}
-
-/**
-/**
- * Reports whether a runtime model needs the compatibility tool-schema subset.
- *
- * @param runtimeModel - Backend request model id
- * @returns False because Antigravity exposes Gemini models only
- */
-export function usesLegacyToolSchema(_runtimeModel: string): boolean {
-  return false;
 }
 
 /**

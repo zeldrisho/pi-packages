@@ -42,7 +42,7 @@ Pi stores the resulting tokens in its credential store and refreshes them before
 2. Type `antigravity` to filter the list.
 3. Select a model tagged `[antigravity]`.
 
-The model list is account-specific and is refreshed from Antigravity; the extension intentionally keeps no stale static model list. Pi maps the advertised thinking levels onto Antigravity runtime models and reasoning settings. For matching Gemini models, the extension also fetches Pi's Google and Vertex catalogs to constrain thinking levels and limits; Antigravity still determines availability and runtime routes. Catalog metadata is cached for four hours and refreshed when Pi refreshes models.
+The model list is account-specific and is refreshed from Antigravity; only account-advertised Gemini routes are supported, and the extension intentionally keeps no stale static model list. Pi maps the advertised thinking levels onto Antigravity runtime models and reasoning settings. For matching Gemini models, the extension also fetches Pi's Google and Vertex catalogs to constrain thinking levels and limits; Antigravity still determines availability and runtime routes. Catalog metadata is cached for four hours and refreshed when Pi refreshes models.
 
 ### Optional custom token budgets
 

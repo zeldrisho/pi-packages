@@ -195,6 +195,8 @@ function groupVariants(
   const groups = new Map<string, VariantGroup>();
 
   for (const [runtimeId, info] of Object.entries(models)) {
+    if (!runtimeId.startsWith("gemini-")) continue;
+
     if (!isSelectable(runtimeId, info)) continue;
 
     if (recommended !== undefined && !recommended.has(runtimeId)) continue;
@@ -396,6 +398,7 @@ function entryFromGroup(
  *
  * @param body - Parsed response body
  * @param seed - Fallback entries consulted when the payload omits metadata
+ * @param geminiMetadata - Metadata overlay for exact Gemini runtime ids
  * @returns Catalog entries, or undefined when the payload lists no usable model
  */
 export function catalogFromAvailableModels(

@@ -7,7 +7,6 @@ import {
   requiresThoughtSignature,
   resolveRuntimeModel,
   thinkingConfig,
-  usesLegacyToolSchema,
 } from "../src/models";
 
 describe("model catalog", () => {
@@ -52,10 +51,6 @@ describe("request capabilities", () => {
   it("requires thought signatures only for Gemini 3 and newer", () => {
     expect(requiresThoughtSignature("gemini-3.8-flash-high")).toBe(true);
     expect(requiresThoughtSignature("gemini-2.5-pro")).toBe(false);
-  });
-
-  it("uses the native tool schema for Gemini models", () => {
-    expect(usesLegacyToolSchema("gemini-3.8-flash-low")).toBe(false);
   });
 
   it("builds Gemini thinking settings", () => {

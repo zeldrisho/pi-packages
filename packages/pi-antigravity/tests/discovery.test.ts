@@ -41,19 +41,19 @@ function availableModels(): JsonObject {
         supportsThinking: true,
         supportsImages: true,
       }),
-      "claude-sonnet-4-6": metadata("Claude Sonnet 4.6 (Thinking)", {
+      "gemini-claude-sonnet-4-6": metadata("Claude Sonnet 4.6 (Thinking)", {
         maxTokens: 200_000,
         maxOutputTokens: 64_000,
         supportsThinking: true,
         supportsImages: true,
       }),
-      "claude-opus-4-6-thinking": metadata("Claude Opus 4.6 (Thinking)", {
+      "gemini-claude-opus-4-6-thinking": metadata("Claude Opus 4.6 (Thinking)", {
         maxTokens: 250_000,
         maxOutputTokens: 64_000,
         supportsThinking: true,
         supportsImages: true,
       }),
-      "gpt-oss-120b-medium": metadata("GPT-OSS 120B (Medium)", {
+      "gemini-gpt-oss-120b-medium": metadata("GPT-OSS 120B (Medium)", {
         maxTokens: 131_072,
         maxOutputTokens: 32_768,
         supportsThinking: true,
@@ -78,12 +78,12 @@ describe("catalog grouping", () => {
   it("uses advertised numeric thinking levels and preserves image restrictions", () => {
     const catalog = catalogFromAvailableModels({
       models: {
-        "example-low": metadata("Example", {
+        "gemini-example-low": metadata("Example", {
           thinkingLevel: 1,
           supportsThinking: true,
           supportsImages: false,
         }),
-        "example-high": metadata("Example", {
+        "gemini-example-high": metadata("Example", {
           thinkingLevel: 3,
           supportsThinking: true,
           supportsImages: true,
@@ -92,8 +92,8 @@ describe("catalog grouping", () => {
     });
 
     expect(catalog?.[0]?.thinkingLevelMap).toMatchObject({
-      low: "example-low",
-      high: "example-high",
+      low: "gemini-example-low",
+      high: "gemini-example-high",
       medium: null,
     });
     expect(catalog?.[0]?.input).not.toContain("image");
@@ -113,9 +113,9 @@ describe("catalog grouping", () => {
 
     expect(catalog?.map((model) => model.id)).toEqual([
       "gemini-3.8-flash",
-      "claude-sonnet-4-6",
-      "claude-opus-4-6",
-      "gpt-oss-120b",
+      "gemini-claude-sonnet-4-6",
+      "gemini-claude-opus-4-6",
+      "gemini-gpt-oss-120b",
     ]);
   });
 
@@ -161,9 +161,9 @@ describe("catalog grouping", () => {
         medium: "gemini-3.8-flash-medium",
         high: "gemini-3.8-flash-high",
       },
-      "claude-sonnet-4-6": { high: "claude-sonnet-4-6" },
-      "claude-opus-4-6": { high: "claude-opus-4-6-thinking" },
-      "gpt-oss-120b": { medium: "gpt-oss-120b-medium" },
+      "gemini-claude-sonnet-4-6": { high: "gemini-claude-sonnet-4-6" },
+      "gemini-claude-opus-4-6": { high: "gemini-claude-opus-4-6-thinking" },
+      "gemini-gpt-oss-120b": { medium: "gemini-gpt-oss-120b-medium" },
     } as const;
 
     expect(stored).toHaveLength(Object.keys(expected).length);
@@ -185,42 +185,56 @@ describe("catalog grouping", () => {
   it("discovers budget controls only for a single runtime advertising a positive budget", () => {
     const catalog = catalogFromAvailableModels({
       models: {
-        "budget-only": metadata("Budget (Thinking)", {
+        "gemini-budget-only": metadata("Budget (Thinking)", {
           supportsThinking: true,
           thinkingBudget: 1024,
         }),
-        "named-low": metadata("Named (Low)", {
+        "gemini-named-low": metadata("Named (Low)", {
           supportsThinking: true,
           thinkingLevel: 1,
           thinkingBudget: 1024,
         }),
-        "other-low": metadata("Other (Low)", { supportsThinking: true, thinkingBudget: 1024 }),
-        "other-high": metadata("Other (High)", { supportsThinking: true, thinkingBudget: 2048 }),
-        "invalid-medium": metadata("Invalid (Medium)", {
+        "gemini-other-low": metadata("Other (Low)", {
+          supportsThinking: true,
+          thinkingBudget: 1024,
+        }),
+        "gemini-other-high": metadata("Other (High)", {
+          supportsThinking: true,
+          thinkingBudget: 2048,
+        }),
+        "gemini-invalid-medium": metadata("Invalid (Medium)", {
           supportsThinking: true,
           thinkingBudget: -1,
         }),
       },
     });
 
-    expect(catalog?.find((model) => model.id === "budget-only")?.thinkingLevelMap).toMatchObject({
-      minimal: "budget-only",
-      low: "budget-only",
-      medium: "budget-only",
-      high: "budget-only",
+    expect(
+      catalog?.find((model) => model.id === "gemini-budget-only")?.thinkingLevelMap,
+    ).toMatchObject({
+      minimal: "gemini-budget-only",
+      low: "gemini-budget-only",
+      medium: "gemini-budget-only",
+      high: "gemini-budget-only",
       xhigh: null,
       max: null,
     });
-    expect(catalog?.find((model) => model.id === "named")?.thinkingLevelMap.medium).toBeNull();
-    expect(catalog?.find((model) => model.id === "other")?.thinkingLevelMap.medium).toBeNull();
-    expect(catalog?.find((model) => model.id === "invalid")?.thinkingLevelMap.low).toBeNull();
+    expect(
+      catalog?.find((model) => model.id === "gemini-named")?.thinkingLevelMap.medium,
+    ).toBeNull();
+    expect(
+      catalog?.find((model) => model.id === "gemini-other")?.thinkingLevelMap.medium,
+    ).toBeNull();
+    expect(
+      catalog?.find((model) => model.id === "gemini-invalid")?.thinkingLevelMap.low,
+    ).toBeNull();
   });
 
   it("lets Pi clamp fixed-effort models to their advertised level", () => {
     const catalog = catalogFromAvailableModels(availableModels());
     const stored = storedModelsFrom(modelConfigs(catalog), "antigravity", "https://example.test");
-    const opus = stored.find((model) => model.id === "claude-opus-4-6");
-    const gpt = stored.find((model) => model.id === "gpt-oss-120b");
+    const opus = stored.find((model) => model.id === "gemini-claude-opus-4-6");
+    const gpt = stored.find((model) => model.id === "gemini-gpt-oss-120b");
 
     expect(opus).toBeDefined();
     expect(gpt).toBeDefined();
@@ -245,7 +259,7 @@ describe("catalog grouping", () => {
   it("uses the limits the backend advertises", () => {
     const catalog = catalogFromAvailableModels(availableModels());
     const gemini = catalog?.find((model) => model.id === "gemini-3.8-flash");
-    const gptOss = catalog?.find((model) => model.id === "gpt-oss-120b");
+    const gptOss = catalog?.find((model) => model.id === "gemini-gpt-oss-120b");
 
     expect(gemini?.contextWindow).toBe(1_048_576);
     expect(gemini?.maxTokens).toBe(65_536);
@@ -343,13 +357,16 @@ describe("catalog grouping", () => {
         {
           groups: [
             { modelIds: ["gemini-3.8-flash-high", "gemini-3.8-flash-low"] },
-            { modelIds: ["claude-sonnet-4-6"] },
+            { modelIds: ["gemini-claude-sonnet-4-6"] },
           ],
         },
       ],
     });
 
-    expect(catalog?.map((model) => model.id)).toEqual(["gemini-3.8-flash", "claude-sonnet-4-6"]);
+    expect(catalog?.map((model) => model.id)).toEqual([
+      "gemini-3.8-flash",
+      "gemini-claude-sonnet-4-6",
+    ]);
   });
 
   it("does not expose unrecommended models when recommendations match nothing usable", () => {
@@ -389,7 +406,7 @@ describe("catalog grouping", () => {
 
   it("falls back to the seed catalog for unknown models without metadata", () => {
     const catalog = catalogFromAvailableModels({
-      models: { "claude-opus-4-9": metadata("Claude Opus 4.9 (Thinking)") },
+      models: { "gemini-claude-opus-4-9": metadata("Claude Opus 4.9 (Thinking)") },
     });
 
     expect(catalog?.[0]?.contextWindow).toBe(128_000);
@@ -506,9 +523,9 @@ describe("catalog refresh", () => {
 
     expect(catalog.map((model) => model.id)).toEqual([
       "gemini-3.8-flash",
-      "claude-sonnet-4-6",
-      "claude-opus-4-6",
-      "gpt-oss-120b",
+      "gemini-claude-sonnet-4-6",
+      "gemini-claude-opus-4-6",
+      "gemini-gpt-oss-120b",
     ]);
   });
 
