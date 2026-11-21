@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve conditional revalidation for stale pages cached under the current Markdown-preference policy while migrating older entries once.
+
 ## [0.18.0] - 2026-11-20
 
 ### Added

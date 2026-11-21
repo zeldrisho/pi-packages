@@ -36,6 +36,8 @@ export interface CompleteDocument {
   links?: ExtractedLinks;
   /** HTTP validators retained for stale-cache revalidation. */
   validators?: { etag?: string; lastModified?: string };
+  /** Version of the Markdown-preference cache policy that produced this entry. */
+  markdownPolicyVersion?: 1;
   /** Time at which this representation was fetched or successfully revalidated. */
   cachedAt?: number;
   /** True when this document is the site's /llms.txt served instead of a low-quality page. */

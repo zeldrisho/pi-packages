@@ -415,6 +415,7 @@ async function documentFromDecoded(
     extractionDiagnostics,
     links,
     validators: etag || lastModified ? { etag, lastModified } : undefined,
+    markdownPolicyVersion: 1,
     cachedAt: Date.now(),
     llmsTxtDescribedBy: describedBy,
     markdownAlternateUrl,

@@ -369,6 +369,7 @@ const completeDocumentCacheSchema = Type.Object(
         lastModified: Type.Optional(Type.String()),
       }),
     ),
+    markdownPolicyVersion: Type.Optional(Type.Literal(1)),
     llmsTxtFallback: Type.Optional(Type.Boolean()),
     llmsTxtIndexUrl: Type.Optional(Type.String()),
     llmsTxtDescribedBy: Type.Optional(Type.String()),
@@ -407,6 +408,17 @@ interface FetchAcquisition {
 }
 
 const inflightFetches = new InflightCoalescer<string, FetchAcquisition>(MAX_INFLIGHT_REQUESTS);
+
+/** Returns whether a stale entry predates the Markdown-preference cache policy. */
+export function staleCacheNeedsMarkdownPolicy(document: CompleteDocument): boolean {
+  return (
+    document.markdownPolicyVersion !== 1 &&
+    document.extractor !== "raw" &&
+    !document.surfaceView &&
+    !document.llmsTxtFallback &&
+    !document.representationFallback
+  );
+}
 
 /**
  * Executes a validated web fetch, including caching, focusing, and bounded pagination.
@@ -509,16 +521,12 @@ export async function executeWebFetch(
         let fetched: CompleteDocument;
         let acquisitionStatus: FetchAcquisition["cacheStatus"] = "miss";
 
-        const staleCanUseMarkdownPolicy =
-          stale !== undefined &&
-          stale.extractor !== "raw" &&
-          !stale.surfaceView &&
-          !stale.llmsTxtFallback &&
-          !stale.representationFallback;
+        const staleNeedsMarkdownPolicy =
+          stale !== undefined && staleCacheNeedsMarkdownPolicy(stale);
 
         if (
           stale?.validators &&
-          !staleCanUseMarkdownPolicy &&
+          !staleNeedsMarkdownPolicy &&
           !stale.llmsTxtFallback &&
           !stale.markdownAlternateFallback &&
           !stale.representationFallback
