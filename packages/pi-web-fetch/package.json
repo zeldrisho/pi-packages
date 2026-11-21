@@ -30,7 +30,7 @@
     "access": "public"
   },
   "scripts": {
-    "test": "vp test"
+    "test": "vp test --root ../.. packages/pi-web-fetch/tests"
   },
   "dependencies": {
     "acorn": "^8.19.0",

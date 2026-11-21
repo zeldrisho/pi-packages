@@ -32,7 +32,7 @@
     "access": "public"
   },
   "scripts": {
-    "test": "vp test"
+    "test": "vp test --root ../.. packages/pi-gate/tests"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "catalog:",

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Parse structured Antigravity error reasons for more accurate quota, rate-limit, capacity, and account-suspension guidance, and accept multiline SSE events.
+
 ## [0.2.0] - 2026-11-20
 
 ### Changed

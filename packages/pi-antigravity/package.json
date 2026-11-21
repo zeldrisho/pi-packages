@@ -33,7 +33,7 @@
     "access": "public"
   },
   "scripts": {
-    "test": "vp test"
+    "test": "vp test --root ../.. packages/pi-antigravity/tests"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "catalog:",

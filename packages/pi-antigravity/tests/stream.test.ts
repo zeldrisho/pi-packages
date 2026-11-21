@@ -446,6 +446,32 @@ describe("failure messages", () => {
     expect(describeFailure(500, "boom")).toBe("Antigravity request failed (500: boom).");
   });
 
+  it("uses structured Google error reasons before message text", () => {
+    const tos = JSON.stringify({
+      error: {
+        code: 403,
+        details: [
+          {
+            "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+            reason: "TOS_VIOLATION",
+          },
+        ],
+      },
+    });
+
+    expect(describeFailure(403, tos)).toMatch(/Terms of Service violation/);
+    expect(describeFailure(403, tos)).not.toMatch(/Re-run \/login/);
+
+    const rateLimit = JSON.stringify({
+      error: {
+        code: 429,
+        details: [{ reason: "RATE_LIMIT_EXCEEDED" }],
+      },
+    });
+
+    expect(describeFailure(429, rateLimit)).toMatch(/rate limiting/);
+  });
+
   it("classifies exhaustion without echoing untrusted details", () => {
     expect(describeFailure(429, '{"error":{"message":"Quota exceeded"}}')).toMatch(
       /quota exceeded/,
@@ -490,6 +516,20 @@ describe("failure messages", () => {
 });
 
 describe("stream implementation", () => {
+  it("accepts multiline SSE data events", async () => {
+    const frame = JSON.stringify({
+      response: {
+        candidates: [{ content: { parts: [{ text: "multiline" }] }, finishReason: "STOP" }],
+      },
+    });
+
+    const split = Math.floor(frame.length / 2);
+    const { final } = await collect([`${frame.slice(0, split)}\ndata: ${frame.slice(split)}`]);
+
+    expect(final?.stopReason).toBe("stop");
+    expect(final?.content).toEqual([{ type: "text", text: "multiline" }]);
+  });
+
   it("emits text deltas and a completed message", async () => {
     const { types, final } = await collect([textFrame("Two "), textFrame("loaves")]);
 
