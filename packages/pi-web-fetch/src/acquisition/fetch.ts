@@ -665,6 +665,7 @@ async function fetchDocument(
   cached?: CompleteDocument,
   allowEmptyContent = false,
   retryRepresentationMiss = true,
+  preferHtml = false,
 ): Promise<{ document: CompleteDocument; revalidated: boolean }> {
   assertAbsoluteHttpUrlForFetch(normalizeGitHubRawUrl(rawUrl));
   const controller = new AbortController();
@@ -705,7 +706,9 @@ async function fetchDocument(
       requestUrl,
       controller.signal,
       requestDependencies,
-      conditionalHeaders,
+      preferHtml
+        ? { ...conditionalHeaders, Accept: "text/html, text/plain;q=0.9, */*;q=0.1" }
+        : conditionalHeaders,
     );
 
     // Some servers route Markdown negotiation to a missing representation even
@@ -908,6 +911,7 @@ export async function fetchCompleteDocument(
   dependencies: FetchRemoteDependencies,
   allowEmptyContent = false,
   retryRepresentationMiss = true,
+  preferHtml = false,
 ): Promise<CompleteDocument> {
   return (
     await fetchDocument(
@@ -917,6 +921,7 @@ export async function fetchCompleteDocument(
       undefined,
       allowEmptyContent,
       retryRepresentationMiss,
+      preferHtml,
     )
   ).document;
 }

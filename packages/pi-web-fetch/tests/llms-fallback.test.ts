@@ -165,7 +165,14 @@ describe("buildLlmsTxtCandidateUrls", () => {
       buildLlmsTxtCandidateUrls("https://example.com/en/docs/catalog/pay/api/rest-api").map(
         (u) => u.pathname,
       ),
-    ).toEqual(["/llms.txt", "/en/llms.txt", "/en/docs/llms.txt"]);
+    ).toEqual([
+      "/llms.txt",
+      "/en/llms.txt",
+      "/en/docs/llms.txt",
+      "/en/docs/catalog/llms.txt",
+      "/en/docs/catalog/pay/llms.txt",
+      "/en/docs/catalog/pay/api/llms.txt",
+    ]);
   });
 
   it("treats a trailing slash as a directory and never probes the page itself", () => {
@@ -486,8 +493,8 @@ describe("executeWebFetch llms.txt support", () => {
       solveAwsWafChallenges: false,
     });
 
-    // Page + probes for root, /en/, and /en/docs/; the section index is the deepest one.
-    expect(requests).toHaveLength(4);
+    // Page plus the nearest ancestor batch; the section index is the deepest usable one.
+    expect(requests).toHaveLength(5);
     expect(result.details.llmsTxtFallback).toBe(true);
     expect(result.details.requestedUrl).toBe(requested);
     expect(result.details.finalUrl).toBe("https://waf.example.com/en/docs/llms.txt");

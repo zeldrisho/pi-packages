@@ -1,12 +1,30 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vite-plus/test";
 import { diagnoseExtraction } from "../src/document/evidence.ts";
-import { extractHtmlToMarkdown, htmlToMarkdownFallback } from "../src/document/extract.ts";
+import {
+  extractHtmlToMarkdown,
+  filterAndroidBomHtml,
+  htmlToMarkdownFallback,
+} from "../src/document/extract.ts";
 
 const substantial =
   "Readable issue context with reproduction details and expected behavior. ".repeat(12);
 
 describe("extraction regressions", () => {
+  it("filters Android BOM rows by the origin's filter-value metadata", () => {
+    const html =
+      "<table><thead><tr><th>Library</th></tr></thead><tbody>" +
+      '<tr filter-value="2026.08.00"><td>1.12.0</td></tr>' +
+      '<tr filter-value="2026.06.01"><td>1.11.0</td></tr>' +
+      "</tbody></table>";
+
+    const filtered = filterAndroidBomHtml(html, "2026.08.00");
+
+    expect(filtered).toContain("1.12.0");
+    expect(filtered).not.toContain("1.11.0");
+    expect(filterAndroidBomHtml(html, "2026.99.99")).toBeUndefined();
+  });
+
   it("keeps fragment siblings and deduplicates equivalent tab mappings", async () => {
     const html = `<p>Shared preface.</p><main><div data-surface-filter-pills><div role="tablist"><button role="tab" data-surface-id="hub" aria-controls="hub">App</button><button role="tab" data-surface-id="cli" aria-controls="cli">CLI</button></div></div><div role="tabpanel" id="hub" data-surface-pane="hub">APPONLY</div><div role="tabpanel" id="cli" data-surface-pane="cli">CLIONLY</div></main>`;
 

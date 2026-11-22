@@ -12,6 +12,7 @@ import { ExpiringLruCache, stableKeyHash, canonicalKey, type CachePersistence } 
 import { sliceCompleteDocument, type CompleteDocument } from "./document/content.ts";
 import { revalidateCompleteDocument, type FetchRemoteDependencies } from "./acquisition/fetch.ts";
 import { fetchDocumentWithLlmsTxtSupport } from "./acquisition/llms.ts";
+import { extractHtmlToMarkdown, filterAndroidBomHtml } from "./document/extract.ts";
 import { focusMarkdown, type FocusDetails } from "./document/focus.ts";
 import { isCachedOpenapi } from "./document/openapi.ts";
 import { resolveFragmentOffset, urlWithoutFragment } from "./document/fragments.ts";
@@ -36,6 +37,22 @@ const CACHE_MAX_ENTRIES = 100;
 const CACHE_MAX_MARKDOWN_BYTES = 20 * 1_024 * 1_024;
 
 const MAX_INFLIGHT_REQUESTS = 100;
+
+function androidBomVersionQuery(url: string, query: string | undefined): string | undefined {
+  if (query === undefined || !/^\d{4}\.\d{2}\.\d{2}$/.test(query.trim())) return undefined;
+
+  try {
+    const parsed = new URL(url);
+
+    return parsed.protocol === "https:" &&
+      parsed.hostname === "developer.android.com" &&
+      parsed.pathname === "/develop/ui/compose/bom/bom-mapping"
+      ? query.trim()
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** Minimum extracted length for both the low-quality trigger and llms.txt acceptance. */
 const encoder = new TextEncoder();
@@ -481,11 +498,14 @@ export async function executeWebFetch(
 
   const displayRequestedUrl = redactUrlForDisplay(params.url);
   const sourceUrl = urlWithoutFragment(params.url);
+  const bomVersion = androidBomVersionQuery(sourceUrl, params.query);
 
   // Older persisted entries predate surface views and must not mask explicit selections.
   const cacheKey = safeUrl(sourceUrl)?.searchParams.has("tab")
     ? canonicalKey({ url: sourceUrl, surfaceExtraction: 1 })
-    : canonicalKey({ url: sourceUrl });
+    : bomVersion
+      ? canonicalKey({ url: sourceUrl, androidBomVersion: bomVersion })
+      : canonicalKey({ url: sourceUrl });
 
   let document = fetchCache.get(cacheKey);
   const now = Date.now();
@@ -529,7 +549,8 @@ export async function executeWebFetch(
           !staleNeedsMarkdownPolicy &&
           !stale.llmsTxtFallback &&
           !stale.markdownAlternateFallback &&
-          !stale.representationFallback
+          !stale.representationFallback &&
+          !bomVersion
         ) {
           const outcome = await revalidateCompleteDocument(
             sourceUrl,
@@ -541,7 +562,20 @@ export async function executeWebFetch(
           fetched = outcome.document;
           acquisitionStatus = outcome.revalidated ? "revalidated" : "miss";
         } else {
-          fetched = await fetchDocumentWithLlmsTxtSupport(sourceUrl, sharedSignal, dependencies);
+          const acquisitionDependencies = bomVersion
+            ? {
+                ...dependencies,
+                extractHtml: async (html: string, url: URL) =>
+                  extractHtmlToMarkdown(filterAndroidBomHtml(html, bomVersion) ?? html, url),
+              }
+            : dependencies;
+
+          fetched = await fetchDocumentWithLlmsTxtSupport(
+            sourceUrl,
+            sharedSignal,
+            acquisitionDependencies,
+            Boolean(bomVersion),
+          );
         }
 
         if (!fetched.extractionDiagnostics?.botWall) {

@@ -630,6 +630,21 @@ function selectSurfaceHtml(
   return { html: document.documentElement.outerHTML, selected, omitted: panes.length - 1 };
 }
 
+/** Removes non-selected Android Compose BOM rows from the HTML table. */
+export function filterAndroidBomHtml(html: string, version: string): string | undefined {
+  const { document } = parseHTML(html);
+  const rows = [...document.querySelectorAll<HTMLElement>("tr[filter-value]")];
+  const matching = rows.filter((row) => row.getAttribute("filter-value") === version);
+
+  if (matching.length === 0) return undefined;
+
+  for (const row of rows) {
+    if (row.getAttribute("filter-value") !== version) row.remove();
+  }
+
+  return document.documentElement.outerHTML;
+}
+
 /** Extract the complete page and, when explicitly requested, a separate surface view. */
 export async function extractHtmlToMarkdown(
   html: string,
