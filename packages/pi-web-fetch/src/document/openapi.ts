@@ -1,8 +1,24 @@
-import { parse } from "acorn";
-import { simple } from "acorn-walk";
-import { parseDocument } from "yaml";
+import { createRequire } from "node:module";
 import { Type } from "typebox";
 import { Check } from "typebox/value";
+
+const require = createRequire(import.meta.url);
+
+let parserModules:
+  | {
+      parse: typeof import("acorn").parse;
+      simple: typeof import("acorn-walk").simple;
+      parseDocument: typeof import("yaml").parseDocument;
+    }
+  | undefined;
+
+function getParserModules(): NonNullable<typeof parserModules> {
+  return (parserModules ??= {
+    parse: require("acorn").parse,
+    simple: require("acorn-walk").simple,
+    parseDocument: require("yaml").parseDocument,
+  });
+}
 
 const schema = Type.Union([
   Type.Object({
@@ -24,12 +40,13 @@ export function isOpenapiSource(raw: string, contentType: string): boolean {
     if (contentType === "application/json") return Check(schema, JSON.parse(raw));
 
     if (contentType === "text/yaml") {
-      const document = parseDocument(raw, { uniqueKeys: true });
+      const document = getParserModules().parseDocument(raw, { uniqueKeys: true });
 
       return document.errors.length === 0 && Check(schema, document.toJS({ maxAliasCount: 0 }));
     }
 
     if (contentType !== "text/javascript") return false;
+    const { parse, simple } = getParserModules();
     const ast = parse(raw, { ecmaVersion: "latest", sourceType: "module" });
     let found = false;
     simple(ast, {

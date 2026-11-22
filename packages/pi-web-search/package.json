@@ -30,7 +30,7 @@
     "access": "public"
   },
   "scripts": {
-    "test": "vp test --root ../.. packages/pi-web-search/tests"
+    "test": "vp test"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "catalog:",

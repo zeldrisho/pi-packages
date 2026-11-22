@@ -30,7 +30,7 @@
     "access": "public"
   },
   "scripts": {
-    "test": "vp test --root ../.. packages/pi-opencode-free/tests"
+    "test": "vp test"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "catalog:",
