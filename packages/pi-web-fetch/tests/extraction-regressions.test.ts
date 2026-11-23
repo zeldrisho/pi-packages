@@ -43,6 +43,29 @@ describe("extraction regressions", () => {
     expect(filterAndroidBomHtml(html, "2026.99.99")).toBeUndefined();
   });
 
+  it("reports an unavailable Android BOM version instead of returning all rows", async () => {
+    const html = '<table><tr filter-value="2026.08.00"><td>1.12.0</td></tr></table>';
+
+    await expect(
+      executeWebFetch(
+        {
+          url: "https://developer.android.com/develop/ui/compose/bom/bom-mapping",
+          query: "2026.99.99",
+        },
+        undefined,
+        undefined,
+        {
+          validateUrl: async (value) => ({
+            url: value instanceof URL ? value : new URL(value),
+            address: "203.0.113.10",
+            family: 4,
+          }),
+          request: async () => htmlResponse(html),
+        },
+      ),
+    ).rejects.toThrow("Android BOM version 2026.99.99 was not found");
+  });
+
   it("keeps fragment siblings and deduplicates equivalent tab mappings", async () => {
     const html = `<p>Shared preface.</p><main><div data-surface-filter-pills><div role="tablist"><button role="tab" data-surface-id="hub" aria-controls="hub">App</button><button role="tab" data-surface-id="cli" aria-controls="cli">CLI</button></div></div><div role="tabpanel" id="hub" data-surface-pane="hub">APPONLY</div><div role="tabpanel" id="cli" data-surface-pane="cli">CLIONLY</div></main>`;
 

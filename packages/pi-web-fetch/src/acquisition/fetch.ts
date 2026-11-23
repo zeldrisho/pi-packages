@@ -816,6 +816,7 @@ async function fetchDocument(
               target.url,
               controller.signal,
               retryDependencies,
+              preferHtml ? { Accept: "text/html, text/plain;q=0.9, */*;q=0.1" } : {},
             ));
           }
         }

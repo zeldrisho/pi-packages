@@ -310,6 +310,7 @@ export async function fetchDocumentWithLlmsTxtSupport(
   signal: AbortSignal | undefined,
   dependencies: FetchRemoteDependencies,
   preferHtml = false,
+  allowMarkdownAlternates = true,
 ): Promise<CompleteDocument> {
   try {
     const url = new URL(rawUrl);
@@ -415,6 +416,7 @@ export async function fetchDocumentWithLlmsTxtSupport(
   // Prefer a page-specific Markdown representation even when HTML extraction succeeded.
   // Restrict the entire redirect chain, and never substitute HTML or arbitrary text.
   if (
+    allowMarkdownAlternates &&
     !primary.surfaceView &&
     primary.extractor !== "raw" &&
     (!primary.markdownAlternateUrl || (!isLowQualityDocument(primary) && primary.markdown.trim()))
@@ -461,7 +463,10 @@ export async function fetchDocumentWithLlmsTxtSupport(
       : undefined;
 
     const alternate =
-      !primary.surfaceView && markdownAlternate && isSafeToProbe(markdownAlternate, primary.url)
+      allowMarkdownAlternates &&
+      !primary.surfaceView &&
+      markdownAlternate &&
+      isSafeToProbe(markdownAlternate, primary.url)
         ? await probeUsableRawText(markdownAlternate, signal, dependencies)
         : undefined;
 

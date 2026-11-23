@@ -83,7 +83,7 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
         run: |
           mkdir -p /tmp/assets
-          gh issue view "$ISSUE_NUMBER" --json body,comments,state,labels,assignees,stateReason > /tmp/issue.json
+          gh issue view "$ISSUE_NUMBER" --json title,body,comments,state,labels,assignees,stateReason > /tmp/issue.json
           jq -r '.body, (.comments[] | select(.author.login != "github-actions") | .body)' /tmp/issue.json > /tmp/thread.txt
           grep -oE 'https://(github\.com/user-attachments/assets/[A-Za-z0-9-]+|user-images\.githubusercontent\.com/[A-Za-z0-9/._-]+)' /tmp/thread.txt \
             | tac | awk '!seen[$0]++' | head -5 > /tmp/urls.txt || true
@@ -151,6 +151,9 @@ jobs:
         run: echo "TRIAGE_STARTED_AT=$(date -u +%s)" >> "$GITHUB_ENV"
 
       - name: Run Pi analysis without GitHub credentials or shell tools
+        env:
+          BRAVE_SEARCH_API_KEY: ${{ secrets.BRAVE_SEARCH_API_KEY }}
+          BRAVE_ANSWERS_API_KEY: ${{ secrets.BRAVE_ANSWERS_API_KEY }}
         run: |
           set -a
           # shellcheck disable=SC1091
@@ -163,7 +166,7 @@ jobs:
             -e ./packages/pi-web-search \
             -e ./packages/pi-web-fetch \
             --model "$PI_MODEL" \
-            "$(cat /tmp/prompt.md)" > /tmp/triage-output.txt
+            @/tmp/prompt.md > /tmp/triage-output.txt
 
       - name: Execute validated triage mutations
         env:

@@ -577,8 +577,14 @@ export async function executeWebFetch(
           const acquisitionDependencies = bomVersion
             ? {
                 ...dependencies,
-                extractHtml: async (html: string, url: URL) =>
-                  extractHtmlToMarkdown(filterAndroidBomHtml(html, bomVersion) ?? html, url),
+                extractHtml: async (html: string, url: URL) => {
+                  const filtered = filterAndroidBomHtml(html, bomVersion);
+
+                  if (filtered === undefined)
+                    throw new Error(`web_fetch: Android BOM version ${bomVersion} was not found.`);
+
+                  return extractHtmlToMarkdown(filtered, url);
+                },
               }
             : dependencies;
 
@@ -587,6 +593,7 @@ export async function executeWebFetch(
             sharedSignal,
             acquisitionDependencies,
             Boolean(bomVersion),
+            !bomVersion,
           );
         }
 

@@ -877,32 +877,8 @@ export function createAntigravityStream(
         // advertised token budget. Named thinking levels are already encoded in
         // the runtime model, and the normal budget defaults are local too. Avoid
         // delaying every cold first request on an unnecessary metadata fetch.
-        const budgetOverrideRequested =
-          options?.reasoning !== undefined &&
-          (options.reasoning === "minimal" ||
-            options.reasoning === "low" ||
-            options.reasoning === "medium" ||
-            options.reasoning === "high") &&
-          options.thinkingBudgets?.[options.reasoning] !== undefined;
-
-        const standardReasoning =
-          options?.reasoning === "minimal" ||
-          options?.reasoning === "low" ||
-          options?.reasoning === "medium" ||
-          options?.reasoning === "high";
-
-        const thinkingBudget =
-          options?.reasoning === "minimal" ||
-          options?.reasoning === "low" ||
-          options?.reasoning === "medium" ||
-          options?.reasoning === "high"
-            ? options.thinkingBudgets?.[options.reasoning]
-            : undefined;
-
         const liveThinkingMetadataNeeded =
-          options?.reasoning !== undefined &&
-          String(options.reasoning) !== "off" &&
-          (budgetOverrideRequested || !standardReasoning || thinkingBudget === undefined);
+          options?.reasoning !== undefined && String(options.reasoning) !== "off";
 
         const discoveredThinkingConfig = liveThinkingMetadataNeeded
           ? await resolveThinking?.(
