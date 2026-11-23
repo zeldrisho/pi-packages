@@ -229,6 +229,8 @@ export interface WebFetchDetails {
   llmsTxtFallback: boolean;
   /** True when the returned content is the page's advertised Markdown version served instead of a low-quality page. */
   markdownAlternateFallback: boolean;
+  /** True when the returned content is the page's authored no-JavaScript fallback. */
+  noscriptFallback: boolean;
   /** Identifies an API or specification used instead of the page. */
   representationFallback?: CompleteDocument["representationFallback"];
   /** The site's /llms.txt index URL when one exists and the returned content is not that index itself. */
@@ -269,6 +271,7 @@ export interface WebFetchStructuredOutput {
   characterCount: number;
   llmsTxtFallback: boolean;
   markdownAlternateFallback: boolean;
+  noscriptFallback: boolean;
   representationFallback?: CompleteDocument["representationFallback"];
   extraction?: CompleteDocument["extractionDiagnostics"];
   focus?: FocusDetails;
@@ -296,6 +299,7 @@ export const webFetchOutputSchema = Type.Object({
   characterCount: Type.Integer(),
   llmsTxtFallback: Type.Boolean(),
   markdownAlternateFallback: Type.Boolean(),
+  noscriptFallback: Type.Boolean(),
   representationFallback: Type.Optional(
     Type.Union([Type.Literal("packit-api"), Type.Literal("swagger-spec")]),
   ),
@@ -386,7 +390,8 @@ const completeDocumentCacheSchema = Type.Object(
         lastModified: Type.Optional(Type.String()),
       }),
     ),
-    markdownPolicyVersion: Type.Optional(Type.Literal(1)),
+    markdownPolicyVersion: Type.Optional(Type.Literal(2)),
+    noscriptFallback: Type.Optional(Type.Boolean()),
     llmsTxtFallback: Type.Optional(Type.Boolean()),
     llmsTxtIndexUrl: Type.Optional(Type.String()),
     llmsTxtDescribedBy: Type.Optional(Type.String()),
@@ -429,7 +434,7 @@ const inflightFetches = new InflightCoalescer<string, FetchAcquisition>(MAX_INFL
 /** Returns whether a stale entry predates the Markdown-preference cache policy. */
 export function staleCacheNeedsMarkdownPolicy(document: CompleteDocument): boolean {
   return (
-    document.markdownPolicyVersion !== 1 &&
+    document.markdownPolicyVersion !== 2 &&
     document.extractor !== "raw" &&
     !document.surfaceView &&
     !document.llmsTxtFallback &&
@@ -742,6 +747,12 @@ export async function executeWebFetch(
               "",
             ]
           : []),
+        ...(result.noscriptFallback
+          ? [
+              "[Showing the page's no-JavaScript fallback; script-rendered content is unavailable.]",
+              "",
+            ]
+          : []),
         ...(result.llmsTxtFallback
           ? [
               "[Showing the site index instead of the requested page. Follow a link for details.]",
@@ -832,6 +843,7 @@ export async function executeWebFetch(
     characterCount: 0,
     llmsTxtFallback: Boolean(result.llmsTxtFallback),
     markdownAlternateFallback: Boolean(result.markdownAlternateFallback),
+    noscriptFallback: Boolean(result.noscriptFallback),
     representationFallback: result.representationFallback,
     extraction: result.extractionDiagnostics,
     focus: focused?.details,
@@ -895,6 +907,7 @@ export async function executeWebFetch(
       surface,
       llmsTxtFallback: Boolean(result.llmsTxtFallback),
       markdownAlternateFallback: Boolean(result.markdownAlternateFallback),
+      noscriptFallback: Boolean(result.noscriptFallback),
       representationFallback: result.representationFallback,
       llmsTxtUrl:
         result.llmsTxtIndexUrl === undefined

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Read a page's authored no-JavaScript fallback when script-only markup leaves the extraction empty or sparse, instead of returning stray interface text.
 - Preserve conditional revalidation for stale pages cached under the current Markdown-preference policy while migrating older entries once.
 
 ## [0.18.0] - 2026-11-20

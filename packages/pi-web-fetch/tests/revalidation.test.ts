@@ -117,7 +117,7 @@ describe("stale cache revalidation", () => {
       extractor: "defuddle" as const,
     };
 
-    const current = { ...legacy, markdownPolicyVersion: 1 as const };
+    const current = { ...legacy, markdownPolicyVersion: 2 as const };
 
     expect(staleCacheNeedsMarkdownPolicy(legacy)).toBe(true);
     expect(staleCacheNeedsMarkdownPolicy(current)).toBe(false);

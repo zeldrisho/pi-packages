@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises";
+import type { IncomingMessage } from "node:http";
 import { describe, expect, it } from "vite-plus/test";
+import { executeWebFetch } from "../src/index";
 import { diagnoseExtraction } from "../src/document/evidence.ts";
 import {
   extractHtmlToMarkdown,
@@ -9,6 +11,22 @@ import {
 
 const substantial =
   "Readable issue context with reproduction details and expected behavior. ".repeat(12);
+
+/** Builds a minimal HTML response for offline service-level fetch testing. */
+function htmlResponse(body: string): IncomingMessage {
+  const buffer = Buffer.from(body);
+
+  // SAFETY: the literal satisfies IncomingMessage's stream contract; the fetch path
+  // reads only statusCode, headers, and the async body iterator.
+  return {
+    statusCode: 200,
+    headers: { "content-type": "text/html; charset=utf-8" },
+    destroy() {},
+    async *[Symbol.asyncIterator]() {
+      yield buffer;
+    },
+  } as IncomingMessage;
+}
 
 describe("extraction regressions", () => {
   it("filters Android BOM rows by the origin's filter-value metadata", () => {
@@ -179,5 +197,69 @@ describe("extraction regressions", () => {
     expect(result.markdown).toContain("Application documentation");
     expect(diagnostics.sparseExtraction).toBe(false);
     expect(diagnostics.javascriptRequired).toBe(false);
+  });
+
+  it("recovers the authored no-JavaScript fallback of a script-only page", async () => {
+    const html = await readFile(
+      new URL("./fixtures/frontierharness-issue-127.html", import.meta.url),
+      "utf8",
+    );
+
+    const result = await extractHtmlToMarkdown(html, new URL("https://frontierharness.org/"));
+
+    expect(result.noscriptFallback).toBe(true);
+    expect(result.title).toContain("FrontierHarness Eval");
+    expect(result.markdown).toContain("open benchmark of AI coding agent harnesses");
+    expect(result.markdown).toContain("How the benchmark is scored");
+    expect(result.markdown).not.toContain("reconnecting");
+  });
+
+  it("keeps readable content instead of replacing it with no-JavaScript navigation", async () => {
+    const html = `<html><body><main><article><h1>Release notes</h1><p>${substantial}</p></article></main><noscript><nav><a href="/one">One</a><a href="/two">Two</a><a href="/three">Three</a></nav><p>${"Fallback navigation link text. ".repeat(20)}</p></noscript></body></html>`;
+
+    const result = await extractHtmlToMarkdown(html, new URL("https://example.com/releases"));
+
+    expect(result.noscriptFallback).toBeUndefined();
+    expect(result.markdown).toContain("Readable issue context");
+    expect(result.markdown).not.toContain("Fallback navigation link text");
+  });
+
+  it("ignores a short no-JavaScript notice on an empty page", async () => {
+    const html = `<html><body><main></main><script>${"x".repeat(5_000)}</script><noscript><p>Please enable JavaScript to view this site.</p></noscript></body></html>`;
+
+    const result = await extractHtmlToMarkdown(html, new URL("https://example.com/empty"));
+
+    expect(result.noscriptFallback).toBeUndefined();
+    expect(result.markdown).not.toContain("enable JavaScript");
+  });
+
+  it("reports a no-JavaScript fallback without flagging the page as sparse", async () => {
+    const html = await readFile(
+      new URL("./fixtures/frontierharness-issue-127.html", import.meta.url),
+      "utf8",
+    );
+
+    const result = await executeWebFetch(
+      { url: `https://example.test/issue-127-${process.pid}` },
+      undefined,
+      undefined,
+      {
+        validateUrl: async (value) => ({
+          url: value instanceof URL ? value : new URL(value),
+          address: "203.0.113.10",
+          family: 4,
+        }),
+        request: async () => htmlResponse(html),
+      },
+    );
+
+    const text = result.content.find((item) => item.type === "text")?.text ?? "";
+
+    expect(text).toContain("[Showing the page's no-JavaScript fallback");
+    expect(text).toContain("open benchmark of AI coding agent harnesses");
+    expect(text).not.toContain("reconnecting");
+    expect(result.details.noscriptFallback).toBe(true);
+    expect(result.details.extractionDiagnostics?.sparseExtraction).toBe(false);
+    expect(result.details.contentKind).not.toBe("markup-shell");
   });
 });

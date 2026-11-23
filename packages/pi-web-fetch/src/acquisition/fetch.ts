@@ -298,6 +298,7 @@ async function documentFromDecoded(
   let markdownAlternateUrl: string | undefined = linkHints.markdownAlternate;
   let sourceLanguage: string | undefined;
   let githubReadme = false;
+  let noscriptFallback = false;
   const openapiSpec = isOpenapiSource(raw, contentType);
 
   if (isHtmlContentType(contentType)) {
@@ -308,6 +309,7 @@ async function documentFromDecoded(
     surfaceView = extracted.surfaceView;
     extractor = extracted.extractor;
     githubReadme = extracted.githubReadme === true;
+    noscriptFallback = extracted.noscriptFallback === true;
     describedBy = describedBy ?? extracted.describedByLink;
     markdownAlternateUrl = markdownAlternateUrl ?? extracted.markdownAlternateLink;
   } else if (contentType === "application/json") {
@@ -396,6 +398,11 @@ async function documentFromDecoded(
     extractionDiagnostics.sparseExtraction = false;
   }
 
+  // An authored no-JavaScript fallback is readable content, not a shell artifact.
+  if (extractionDiagnostics && noscriptFallback && markdown.trim()) {
+    extractionDiagnostics.sparseExtraction = false;
+  }
+
   const shellSuspected = extractionDiagnostics
     ? hasExtractionWarning(extractionDiagnostics)
     : false;
@@ -415,10 +422,11 @@ async function documentFromDecoded(
     extractionDiagnostics,
     links,
     validators: etag || lastModified ? { etag, lastModified } : undefined,
-    markdownPolicyVersion: 1,
+    markdownPolicyVersion: 2,
     cachedAt: Date.now(),
     llmsTxtDescribedBy: describedBy,
     markdownAlternateUrl,
+    noscriptFallback,
     sourceLanguage,
     openapiSpec,
     swaggerSpecUrl,

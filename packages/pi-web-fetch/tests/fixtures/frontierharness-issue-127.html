@@ -1,0 +1,215 @@
+<!-- Regression fixture for issue #127. Snapshot of https://frontierharness.org/ fetched 2026-11-23. The page renders every view with JavaScript, leaves <main> empty, and ships this authored no-JavaScript overview. Tests only; markup is untrusted third-party content. -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <script>
+      /* A final-results link carries its token in the address bar (?final=<token>): with it the page shows the final
+     results, without it the live run. The analytics tag reports the page's full URL, so a page opened with ?final
+     loads no analytics at all, which keeps the token out of it. */
+      var FHE_PARAMS = new URLSearchParams(location.search);
+      window.FHE_FINAL = FHE_PARAMS.get("final") || null;
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      if (!FHE_PARAMS.has("final")) {
+        // Google tag (gtag.js)
+        var tag = document.createElement("script");
+        tag.async = true;
+        tag.src = "https://www.googletagmanager.com/gtag/js?id=G-1ML00Q8PZV";
+        document.head.appendChild(tag);
+        gtag("js", new Date());
+        gtag("config", "G-1ML00Q8PZV");
+      }
+    </script>
+    <!-- The part before the colon is the name js/skeleton.js shows as the overview heading while data loads. -->
+    <title>FrontierHarness Eval: AI coding agent harness benchmark</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Benchmark of 21 AI coding agent harnesses, including Claude Code, Codex CLI and OpenCode, on 5 models and 62 tasks. Leaderboard of pass rate, cost and speed."
+    />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://frontierharness.org/" />
+    <!-- Link previews (X, Discord, Slack, LinkedIn). Crawlers need absolute URLs. One card covers every view; worker.js gives
+     /live/, /participate/, /sponsor/ and /about/ their own title, description and address. og.png is rendered from ../og-card.html and shows no scores; these sites cache it by URL, so
+     raise ?v= whenever it is re-rendered. Discord reads the og: tags and twitter:card; X prefers the twitter: ones. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:site_name" content="FrontierHarness Eval" />
+    <meta property="og:title" content="FrontierHarness Eval: AI coding agent harness benchmark" />
+    <meta
+      property="og:description"
+      content="Benchmark of 21 AI coding agent harnesses, including Claude Code, Codex CLI and OpenCode, on 5 models and 62 tasks. Leaderboard of pass rate, cost and speed."
+    />
+    <meta property="og:url" content="https://frontierharness.org/" />
+    <meta property="og:image" content="https://frontierharness.org/og.png?v=4" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="FrontierHarness Eval: an open benchmark to measure frontier agent harnesses."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@runta" />
+    <meta name="twitter:title" content="FrontierHarness Eval: AI coding agent harness benchmark" />
+    <meta
+      name="twitter:description"
+      content="Benchmark of 21 AI coding agent harnesses, including Claude Code, Codex CLI and OpenCode, on 5 models and 62 tasks. Leaderboard of pass rate, cost and speed."
+    />
+    <meta name="twitter:image" content="https://frontierharness.org/og.png?v=4" />
+    <meta
+      name="twitter:image:alt"
+      content="FrontierHarness Eval: an open benchmark to measure frontier agent harnesses."
+    />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://frontierharness.org/#website",
+            "name": "FrontierHarness Eval",
+            "alternateName": "FrontierHarness Eval benchmark",
+            "url": "https://frontierharness.org/",
+            "description": "Benchmark of 21 AI coding agent harnesses, including Claude Code, Codex CLI and OpenCode, on 5 models and 62 tasks in software engineering, science, data, systems, ML and security. Live leaderboard of pass rate, cost and speed.",
+            "publisher": { "@id": "https://frontierharness.org/#publisher" }
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://frontierharness.org/#publisher",
+            "name": "Runta",
+            "url": "https://runta.com/",
+            "sameAs": ["https://x.com/runta"]
+          },
+          {
+            "@type": "Dataset",
+            "@id": "https://frontierharness.org/#dataset",
+            "name": "FrontierHarness Eval",
+            "url": "https://frontierharness.org/",
+            "description": "Results of FrontierHarness Eval, a benchmark of 21 AI coding agent harnesses, including Claude Code, Codex CLI and OpenCode, on 5 models and 62 tasks in software engineering, science, data, systems, ML and security: pass rate, cost and time for each harness and model.",
+            "keywords": [
+              "AI coding agents",
+              "agent harness",
+              "benchmark",
+              "leaderboard",
+              "Claude Code",
+              "Codex CLI",
+              "OpenCode"
+            ],
+            "isAccessibleForFree": true,
+            "creator": { "@id": "https://frontierharness.org/#publisher" },
+            "sameAs": "https://github.com/frontier-harness-eval/eval"
+          }
+        ]
+      }
+    </script>
+    <meta name="color-scheme" content="dark light" />
+    <link rel="icon" href="/logo.png" type="image/png" />
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/js/theme.js"></script>
+    <script src="/js/route.js"></script>
+    <script src="/js/analytics.js"></script>
+  </head>
+  <body>
+    <header class="nav">
+      <div class="wrap nav-inner">
+        <a class="brand" href="/" id="brand"
+          ><img class="brand-logo" src="/logo.png" alt="" />FrontierHarness Eval<span
+            class="sample-badge hidden"
+            id="sample-badge"
+            >sample data</span
+          ></a
+        >
+        <nav class="tabs" id="tabs">
+          <a data-view="leaderboard" href="/">leaderboard</a>
+          <a data-view="live" href="/live/">latest run</a>
+          <a data-view="efficiency" href="/efficiency/" hidden>efficiency</a>
+          <a class="hidden" data-view="trials" href="/trials/" hidden>trials</a>
+          <a class="hidden" data-view="runtime" href="/runtime/" hidden>runtime</a>
+          <a data-view="about" href="/about/" hidden>about</a>
+          <a data-view="participate" href="/participate/">participate</a>
+          <a data-view="sponsor" href="/sponsor/">sponsor</a>
+          <span class="tab-ink" id="tab-ink"></span>
+        </nav>
+        <div class="nav-right">
+          <button class="icon-btn" id="theme-toggle" aria-label="Toggle theme" title="Toggle theme">
+            &#9680;
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="wrap" id="main"></main>
+    <script src="/js/skeleton.js"></script>
+    <!-- Every view is drawn by js/app.js, so this is all a reader without JavaScript gets, crawlers that run no scripts
+     among them. It stays outside <main>, which js/skeleton.js fills only while it is empty. Keep the figures in step
+     with the description above. -->
+    <noscript>
+      <div class="wrap prose">
+        <h1>FrontierHarness Eval</h1>
+        <p>
+          FrontierHarness Eval is an open benchmark of AI coding agent harnesses. It runs 21 harness
+          configurations, including Claude Code, Codex CLI and OpenCode, on 5 models and 62 tasks in
+          software engineering, science, data, systems, ML and security, and compares their pass
+          rate, cost and speed.
+        </p>
+        <p>
+          Every harness runs the same 62 pinned tasks with each model, 4 scored attempts per task.
+          Only verifier passes count; model failures score 0. Trials that hit the time limit are
+          still graded, and the grader's result counts. Infrastructure failures are excluded from
+          scores and tracked separately.
+        </p>
+        <ul>
+          <li><a href="/">Leaderboard</a></li>
+          <li><a href="/live/">Latest run</a></li>
+          <li><a href="/about/">How the benchmark is scored</a></li>
+          <li><a href="/participate/">Submit your harness</a></li>
+          <li><a href="/sponsor/">Sponsors: Runta, Baseten and Z.ai</a></li>
+          <li>
+            <a href="https://runta.com/blog/introducing-frontierharness-eval"
+              >Introducing FrontierHarness Eval</a
+            >
+          </li>
+          <li><a href="https://github.com/frontier-harness-eval/eval">Source on GitHub</a></li>
+          <li>
+            <a href="https://runta.com/blog/introducing-frontierharness-eval-v1-1/"
+              >Introducing FrontierHarness Eval v1.1</a
+            >
+          </li>
+          <li>
+            <a href="https://github.com/frontier-harness-eval/eval/tree/release/v1.1"
+              >v1.1 source on GitHub</a
+            >
+          </li>
+        </ul>
+        <p>The leaderboard and its charts need JavaScript.</p>
+      </div>
+    </noscript>
+
+    <div class="modal hidden" id="modal">
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-card" role="dialog" aria-modal="true">
+        <div class="modal-head">
+          <div>
+            <div class="modal-title" id="modal-title"></div>
+            <div class="modal-desc" id="modal-desc"></div>
+          </div>
+          <button class="icon-btn" data-close aria-label="Close">&#10005;</button>
+        </div>
+        <div class="modal-chart" id="modal-chart"></div>
+        <div class="modal-stats" id="modal-stats"></div>
+      </div>
+    </div>
+
+    <div class="status-pill hidden" id="status-pill">reconnecting&hellip;</div>
+
+    <script src="/js/format.js"></script>
+    <script src="/js/charts.js"></script>
+    <script src="/js/leaderboard.js"></script>
+    <script src="/js/live.js"></script>
+    <script src="/js/app.js"></script>
+  </body>
+</html>
