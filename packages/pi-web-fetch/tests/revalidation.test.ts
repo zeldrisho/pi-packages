@@ -1,6 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { executeWebFetch, type FetchRemoteDependencies, type ValidatedTarget } from "../src/index";
+import { staleCacheNeedsMarkdownPolicy } from "../src/service";
 
 /** Creates a response stub that streams the optional body as UTF-8 bytes for revalidation tests. */
 function response(
@@ -66,6 +67,60 @@ describe("stale cache revalidation", () => {
       "If-None-Match": '"version-1"',
       "If-Modified-Since": "Wed, 31 Dec 2025 12:00:00 GMT",
     });
+  });
+
+  it("revalidates new Markdown-policy entries instead of refetching them", async () => {
+    const startedAt = Date.now();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(startedAt);
+    const url = `https://example.com/markdown-policy-${process.pid}-${Math.random()}`;
+    let requests = 0;
+
+    const dependencies: FetchRemoteDependencies = {
+      validateUrl: async (value): Promise<ValidatedTarget> => ({
+        url: value instanceof URL ? value : new URL(value),
+        address: "203.0.113.10",
+        family: 4,
+      }),
+      request: async (_target, _signal, headers) => {
+        requests += 1;
+
+        if (requests === 1) {
+          expect(headers).toEqual({});
+
+          return response(200, "<html><body><article><p>cached page</p></article></body></html>", {
+            "content-type": "text/html",
+            etag: '"version-1"',
+          });
+        }
+
+        expect(headers).toMatchObject({ "If-None-Match": '"version-1"' });
+
+        return response(304, "", { etag: '"version-1"' });
+      },
+    };
+
+    await executeWebFetch({ url }, undefined, undefined, dependencies);
+    vi.setSystemTime(startedAt + 24 * 60 * 60 * 1_000 + 1);
+    const result = await executeWebFetch({ url }, undefined, undefined, dependencies);
+
+    expect(result.details.cacheStatus).toBe("revalidated");
+    expect(requests).toBeGreaterThanOrEqual(2);
+  });
+
+  it("only migrates stale HTML entries without a Markdown-policy marker", () => {
+    const legacy = {
+      url: "https://example.com/legacy",
+      contentType: "text/html",
+      markdown: "legacy",
+      shellSuspected: false,
+      extractor: "defuddle" as const,
+    };
+
+    const current = { ...legacy, markdownPolicyVersion: 2 as const };
+
+    expect(staleCacheNeedsMarkdownPolicy(legacy)).toBe(true);
+    expect(staleCacheNeedsMarkdownPolicy(current)).toBe(false);
   });
 
   it("distinguishes fresh hits from cache misses", async () => {

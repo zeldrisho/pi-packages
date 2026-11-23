@@ -233,9 +233,45 @@ export function decodeChunk(text: string): StreamChunk | undefined {
  */
 type ExhaustionKind = "quota" | "restriction" | "temporary" | "unknown";
 
+type ProviderReason = "quota" | "rateLimit" | "capacity" | "tos" | "restriction";
+
+/** Reads Google RPC ErrorInfo reasons without trusting arbitrary provider text. */
+function providerReasons(body: string): Set<ProviderReason> {
+  const reasons = new Set<ProviderReason>();
+
+  try {
+    const parsed = parseJsonValue(body.slice(0, 16_384));
+    const error = isJsonObject(parsed) ? parsed.error : undefined;
+    const details = isJsonObject(error) && Array.isArray(error.details) ? error.details : [];
+
+    for (const detail of details) {
+      if (!isJsonObject(detail) || !isJsonText(detail.reason)) continue;
+      const reason = detail.reason.toUpperCase();
+
+      if (reason === "QUOTA_EXHAUSTED" || reason === "INSUFFICIENT_G1_CREDITS_BALANCE")
+        reasons.add("quota");
+      else if (reason === "RATE_LIMIT_EXCEEDED") reasons.add("rateLimit");
+      else if (reason === "MODEL_CAPACITY_EXHAUSTED") reasons.add("capacity");
+      else if (reason === "TOS_VIOLATION") reasons.add("tos");
+      else if (reason === "PERMISSION_DENIED") reasons.add("restriction");
+    }
+  } catch {
+    // Text matching below remains a bounded fallback for non-JSON responses.
+  }
+
+  return reasons;
+}
+
 /** Classify only explicit provider signals; a generic resource exhaustion is ambiguous. */
 function exhaustionKind(body: string): ExhaustionKind {
+  const reasons = providerReasons(body);
   const text = body.slice(0, 16_384);
+
+  if (reasons.has("quota")) return "quota";
+
+  if (reasons.has("tos") || reasons.has("restriction")) return "restriction";
+
+  if (reasons.has("rateLimit") || reasons.has("capacity")) return "temporary";
 
   if (
     /insufficient_quota|quota[_\s-]+exceeded|usage[_\s-]+limit[_\s-]+(?:reached|exceeded)|(?:daily|weekly|monthly)\s+(?:usage\s+)?(?:quota|limit)/i.test(
@@ -258,6 +294,19 @@ function exhaustionKind(body: string): ExhaustionKind {
 }
 
 export function describeFailure(status: number, body: string): string {
+  const reasons = providerReasons(body);
+
+  if (status === 403 && reasons.has("tos"))
+    return "Antigravity suspended this account for a Terms of Service violation. Review the provider notice or appeal; signing in again will not resolve the suspension.";
+
+  if (status === 429 && reasons.has("quota"))
+    return "Antigravity usage quota exceeded. Wait for it to reset or select another model.";
+
+  if ((status === 429 || status === 503) && reasons.has("capacity"))
+    return "Antigravity has no capacity available for the selected model. Try another model or thinking level, or wait and retry.";
+
+  if (status === 429 && reasons.has("rateLimit"))
+    return "Antigravity is rate limiting this account. Wait and retry, or select another model.";
   const detail = body.replace(/\s+/g, " ").trim().slice(0, 300);
   const suffix = detail === "" ? "" : `: ${detail}`;
 
@@ -271,7 +320,10 @@ export function describeFailure(status: number, body: string): string {
 
   if (
     status === 503 &&
-    /\bMODEL_CAPACITY_EXHAUSTED\b|\bno capacity available for model\b/i.test(body.slice(0, 16_384))
+    (reasons.has("capacity") ||
+      /\bMODEL_CAPACITY_EXHAUSTED\b|\bno capacity available for model\b/i.test(
+        body.slice(0, 16_384),
+      ))
   ) {
     return "Antigravity has no capacity available for the selected model. Try another model or thinking level, or wait and retry.";
   }
@@ -604,10 +656,10 @@ interface StreamContext {
  * @param context - Stream context
  * @throws If the provider reports an error chunk
  */
-async function handleLine(line: string, context: StreamContext): Promise<void> {
-  if (!line.startsWith("data:")) return;
+async function handleEvent(dataLines: readonly string[], context: StreamContext): Promise<void> {
+  if (dataLines.length === 0) return;
 
-  const payload = line.slice("data:".length).trim();
+  const payload = dataLines.join("\n").trim();
 
   if (payload === "" || payload === "[DONE]") return;
 
@@ -619,7 +671,9 @@ async function handleLine(line: string, context: StreamContext): Promise<void> {
     throw new Error(
       describeFailure(
         chunk.error.status ?? 500,
-        chunk.error.status === 429 ? payload : chunk.error.message,
+        chunk.error.status === 403 || chunk.error.status === 429 || chunk.error.status === 503
+          ? payload
+          : chunk.error.message,
       ),
     );
   }
@@ -656,6 +710,18 @@ async function consumeStream(response: Response, context: StreamContext): Promis
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let dataLines: string[] = [];
+
+  const consumeLine = async (line: string): Promise<void> => {
+    if (line === "") {
+      await handleEvent(dataLines, context);
+      dataLines = [];
+
+      return;
+    }
+
+    if (line.startsWith("data:")) dataLines.push(line.slice("data:".length).replace(/^ /, ""));
+  };
 
   try {
     while (true) {
@@ -675,18 +741,15 @@ async function consumeStream(response: Response, context: StreamContext): Promis
         const line = buffer.slice(0, newline).replace(/\r$/, "");
 
         buffer = buffer.slice(newline + 1);
-        await handleLine(line, context);
+        await consumeLine(line);
         newline = buffer.indexOf("\n");
       }
     }
 
     buffer += decoder.decode();
 
-    if (buffer !== "") {
-      const rest = buffer.replace(/\r$/, "");
-
-      await handleLine(rest, context);
-    }
+    if (buffer !== "") await consumeLine(buffer.replace(/\r$/, ""));
+    await handleEvent(dataLines, context);
   } finally {
     void reader.cancel().catch(() => {});
     reader.releaseLock();
@@ -810,16 +873,20 @@ export function createAntigravityStream(
         const entry = { ...model, thinkingLevelMap: model.thinkingLevelMap ?? {} };
         const runtimeModel = resolveRuntimeModel(entry, options?.reasoning);
 
-        const discoveredThinkingConfig =
-          options?.reasoning === undefined || String(options.reasoning) === "off"
-            ? undefined
-            : await resolveThinking?.(
-                credentials.token,
-                credentials.projectId,
-                runtimeModel,
-                options.signal,
-                options.fetch,
-              );
+        // Resolve account-advertised thinking metadata whenever reasoning is requested;
+        // the local route configuration remains the fallback when discovery is unavailable.
+        const liveThinkingMetadataNeeded =
+          options?.reasoning !== undefined && String(options.reasoning) !== "off";
+
+        const discoveredThinkingConfig = liveThinkingMetadataNeeded
+          ? await resolveThinking?.(
+              credentials.token,
+              credentials.projectId,
+              runtimeModel,
+              options.signal,
+              options.fetch,
+            )
+          : undefined;
 
         const selectedThinkingConfig = overrideThinkingBudget({
           enabled: isBudgetRoute(entry.thinkingLevelMap, runtimeModel),

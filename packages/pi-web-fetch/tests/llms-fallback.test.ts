@@ -165,7 +165,14 @@ describe("buildLlmsTxtCandidateUrls", () => {
       buildLlmsTxtCandidateUrls("https://example.com/en/docs/catalog/pay/api/rest-api").map(
         (u) => u.pathname,
       ),
-    ).toEqual(["/llms.txt", "/en/llms.txt", "/en/docs/llms.txt"]);
+    ).toEqual([
+      "/llms.txt",
+      "/en/llms.txt",
+      "/en/docs/llms.txt",
+      "/en/docs/catalog/llms.txt",
+      "/en/docs/catalog/pay/llms.txt",
+      "/en/docs/catalog/pay/api/llms.txt",
+    ]);
   });
 
   it("treats a trailing slash as a directory and never probes the page itself", () => {
@@ -256,6 +263,36 @@ describe("executeWebFetch llms.txt support", () => {
     expect(result.content[0]?.text).toContain("Showing the site index instead");
     expect(result.content[0]?.text).not.toContain("also publishes");
     expect(result.content[0]?.text).toContain("# Example site");
+  });
+
+  it("keeps an authored no-JavaScript fallback instead of replacing it with /llms.txt", async () => {
+    const fallback = "Published report details remain readable without scripts. ".repeat(6);
+
+    const html =
+      "<!doctype html><html><head><title>Report</title></head><body>" +
+      '<main class="wrap" id="main"></main>' +
+      '<div class="status-pill hidden" id="status-pill">reconnecting&hellip;</div>' +
+      `<noscript><div class="wrap prose"><h1>Quarterly report</h1><p>${fallback}</p></div></noscript>` +
+      "<script>// JavaScript is required for the interactive view.</script>" +
+      "</body></html>";
+
+    const { dependencies } = recordingDependencies((href) =>
+      href.endsWith("/llms.txt")
+        ? fakeResponse(200, "text/markdown", LLMS_TXT)
+        : fakeResponse(200, "text/html", html),
+    );
+
+    const result = await executeWebFetch(
+      { url: `https://fallback.example.com/report-${process.pid}` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(result.details.noscriptFallback).toBe(true);
+    expect(result.details.llmsTxtFallback).toBe(false);
+    expect(result.content[0]?.text).toContain("Published report details remain readable");
+    expect(result.content[0]?.text).not.toContain("Showing the site index instead");
   });
 
   it("keeps short intentional page content instead of replacing it with /llms.txt", async () => {
@@ -486,8 +523,8 @@ describe("executeWebFetch llms.txt support", () => {
       solveAwsWafChallenges: false,
     });
 
-    // Page + probes for root, /en/, and /en/docs/; the section index is the deepest one.
-    expect(requests).toHaveLength(4);
+    // Page plus the nearest ancestor batch; the section index is the deepest usable one.
+    expect(requests).toHaveLength(5);
     expect(result.details.llmsTxtFallback).toBe(true);
     expect(result.details.requestedUrl).toBe(requested);
     expect(result.details.finalUrl).toBe("https://waf.example.com/en/docs/llms.txt");

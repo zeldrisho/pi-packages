@@ -5,6 +5,13 @@ const MAX_LINKS = 16;
 
 const MAX_ANCHOR_CHARACTERS = 120;
 
+/** Raw and extracted sizes below which an HTML page counts as sparsely extracted. */
+const SPARSE_MIN_RAW_CHARACTERS = 4_000;
+
+const SPARSE_MAX_MARKDOWN_CHARACTERS = 1_024;
+
+const SPARSE_MAX_MARKDOWN_RATIO = 0.008;
+
 /** Bounded, machine-readable reasons that an HTML extraction may be incomplete. */
 export interface ExtractionDiagnostics {
   javascriptRequired: boolean;
@@ -78,6 +85,26 @@ const CONSENT_MARKERS = [
   /we\s+use\s+cookies/i,
 ];
 
+/**
+ * Reports whether an extraction is too small for the markup it came from.
+ *
+ * @param rawCharacters - UTF-16 length of the fetched HTML
+ * @param markdownCharacters - UTF-16 length of the extracted Markdown
+ * @returns True when the extraction looks sparse for a page of this size
+ */
+export function isSparseExtraction(rawCharacters: number, markdownCharacters: number): boolean {
+  return (
+    rawCharacters > SPARSE_MIN_RAW_CHARACTERS &&
+    markdownCharacters < SPARSE_MAX_MARKDOWN_CHARACTERS &&
+    markdownCharacters < rawCharacters * SPARSE_MAX_MARKDOWN_RATIO
+  );
+}
+
+/** Reports whether the HTML advertises that JavaScript is required to render the page. */
+export function hasJavaScriptMarkers(raw: string): boolean {
+  return JAVASCRIPT_MARKERS.some((marker) => marker.test(raw));
+}
+
 /** Produces explicit, bounded extraction-quality signals instead of one opaque shell flag. */
 export function diagnoseExtraction(raw: string, markdown: string): ExtractionDiagnostics {
   const { document } = parseHTML(raw);
@@ -96,7 +123,7 @@ export function diagnoseExtraction(raw: string, markdown: string): ExtractionDia
       CAPTCHA_WIDGET_MARKERS.some((marker) => marker.test(raw)));
 
   return {
-    javascriptRequired: JAVASCRIPT_MARKERS.some((marker) => marker.test(raw)),
+    javascriptRequired: hasJavaScriptMarkers(raw),
     botWall:
       hasAnubisMarkers(raw) ||
       BOT_MARKERS.some((marker) => marker.test(raw)) ||
@@ -105,8 +132,7 @@ export function diagnoseExtraction(raw: string, markdown: string): ExtractionDia
         ANUBIS_PROTECTION_MARKERS.some((marker) => marker.test(anubisText)) &&
         PROOF_OF_WORK_MARKER.test(anubisText)),
     consentInterstitial: CONSENT_MARKERS.some((marker) => marker.test(raw)),
-    sparseExtraction:
-      raw.length > 4_000 && markdown.length < 1_024 && markdown.length < raw.length * 0.008,
+    sparseExtraction: isSparseExtraction(raw.length, markdown.length),
     rawCharacters: raw.length,
     extractedCharacters: markdown.length,
   };

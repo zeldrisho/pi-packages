@@ -12,6 +12,7 @@ import { ExpiringLruCache, stableKeyHash, canonicalKey, type CachePersistence } 
 import { sliceCompleteDocument, type CompleteDocument } from "./document/content.ts";
 import { revalidateCompleteDocument, type FetchRemoteDependencies } from "./acquisition/fetch.ts";
 import { fetchDocumentWithLlmsTxtSupport } from "./acquisition/llms.ts";
+import { extractHtmlToMarkdown, filterAndroidBomHtml } from "./document/extract.ts";
 import { focusMarkdown, type FocusDetails } from "./document/focus.ts";
 import { isCachedOpenapi } from "./document/openapi.ts";
 import { resolveFragmentOffset, urlWithoutFragment } from "./document/fragments.ts";
@@ -36,6 +37,27 @@ const CACHE_MAX_ENTRIES = 100;
 const CACHE_MAX_MARKDOWN_BYTES = 20 * 1_024 * 1_024;
 
 const MAX_INFLIGHT_REQUESTS = 100;
+
+interface CacheDimensions {
+  surfaceExtraction?: number;
+  androidBomVersion?: string;
+}
+
+function androidBomVersionQuery(url: string, query: string | undefined): string | undefined {
+  if (query === undefined || !/^\d{4}\.\d{2}\.\d{2}$/.test(query.trim())) return undefined;
+
+  try {
+    const parsed = new URL(url);
+
+    return parsed.protocol === "https:" &&
+      parsed.hostname === "developer.android.com" &&
+      parsed.pathname === "/develop/ui/compose/bom/bom-mapping"
+      ? query.trim()
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** Minimum extracted length for both the low-quality trigger and llms.txt acceptance. */
 const encoder = new TextEncoder();
@@ -212,6 +234,8 @@ export interface WebFetchDetails {
   llmsTxtFallback: boolean;
   /** True when the returned content is the page's advertised Markdown version served instead of a low-quality page. */
   markdownAlternateFallback: boolean;
+  /** True when the returned content is the page's authored no-JavaScript fallback. */
+  noscriptFallback: boolean;
   /** Identifies an API or specification used instead of the page. */
   representationFallback?: CompleteDocument["representationFallback"];
   /** The site's /llms.txt index URL when one exists and the returned content is not that index itself. */
@@ -252,6 +276,7 @@ export interface WebFetchStructuredOutput {
   characterCount: number;
   llmsTxtFallback: boolean;
   markdownAlternateFallback: boolean;
+  noscriptFallback: boolean;
   representationFallback?: CompleteDocument["representationFallback"];
   extraction?: CompleteDocument["extractionDiagnostics"];
   focus?: FocusDetails;
@@ -279,6 +304,7 @@ export const webFetchOutputSchema = Type.Object({
   characterCount: Type.Integer(),
   llmsTxtFallback: Type.Boolean(),
   markdownAlternateFallback: Type.Boolean(),
+  noscriptFallback: Type.Boolean(),
   representationFallback: Type.Optional(
     Type.Union([Type.Literal("packit-api"), Type.Literal("swagger-spec")]),
   ),
@@ -369,6 +395,8 @@ const completeDocumentCacheSchema = Type.Object(
         lastModified: Type.Optional(Type.String()),
       }),
     ),
+    markdownPolicyVersion: Type.Optional(Type.Literal(2)),
+    noscriptFallback: Type.Optional(Type.Boolean()),
     llmsTxtFallback: Type.Optional(Type.Boolean()),
     llmsTxtIndexUrl: Type.Optional(Type.String()),
     llmsTxtDescribedBy: Type.Optional(Type.String()),
@@ -407,6 +435,17 @@ interface FetchAcquisition {
 }
 
 const inflightFetches = new InflightCoalescer<string, FetchAcquisition>(MAX_INFLIGHT_REQUESTS);
+
+/** Returns whether a stale entry predates the Markdown-preference cache policy. */
+export function staleCacheNeedsMarkdownPolicy(document: CompleteDocument): boolean {
+  return (
+    document.markdownPolicyVersion !== 2 &&
+    document.extractor !== "raw" &&
+    !document.surfaceView &&
+    !document.llmsTxtFallback &&
+    !document.representationFallback
+  );
+}
 
 /**
  * Executes a validated web fetch, including caching, focusing, and bounded pagination.
@@ -469,11 +508,16 @@ export async function executeWebFetch(
 
   const displayRequestedUrl = redactUrlForDisplay(params.url);
   const sourceUrl = urlWithoutFragment(params.url);
+  const bomVersion = androidBomVersionQuery(sourceUrl, params.query);
 
   // Older persisted entries predate surface views and must not mask explicit selections.
-  const cacheKey = safeUrl(sourceUrl)?.searchParams.has("tab")
-    ? canonicalKey({ url: sourceUrl, surfaceExtraction: 1 })
-    : canonicalKey({ url: sourceUrl });
+  const cacheDimensions: CacheDimensions = {};
+
+  if (safeUrl(sourceUrl)?.searchParams.has("tab")) cacheDimensions.surfaceExtraction = 1;
+
+  if (bomVersion) cacheDimensions.androidBomVersion = bomVersion;
+
+  const cacheKey = canonicalKey({ url: sourceUrl, ...cacheDimensions });
 
   let document = fetchCache.get(cacheKey);
   const now = Date.now();
@@ -509,19 +553,16 @@ export async function executeWebFetch(
         let fetched: CompleteDocument;
         let acquisitionStatus: FetchAcquisition["cacheStatus"] = "miss";
 
-        const staleCanUseMarkdownPolicy =
-          stale !== undefined &&
-          stale.extractor !== "raw" &&
-          !stale.surfaceView &&
-          !stale.llmsTxtFallback &&
-          !stale.representationFallback;
+        const staleNeedsMarkdownPolicy =
+          stale !== undefined && staleCacheNeedsMarkdownPolicy(stale);
 
         if (
           stale?.validators &&
-          !staleCanUseMarkdownPolicy &&
+          !staleNeedsMarkdownPolicy &&
           !stale.llmsTxtFallback &&
           !stale.markdownAlternateFallback &&
-          !stale.representationFallback
+          !stale.representationFallback &&
+          !bomVersion
         ) {
           const outcome = await revalidateCompleteDocument(
             sourceUrl,
@@ -533,7 +574,27 @@ export async function executeWebFetch(
           fetched = outcome.document;
           acquisitionStatus = outcome.revalidated ? "revalidated" : "miss";
         } else {
-          fetched = await fetchDocumentWithLlmsTxtSupport(sourceUrl, sharedSignal, dependencies);
+          const acquisitionDependencies = bomVersion
+            ? {
+                ...dependencies,
+                extractHtml: async (html: string, url: URL) => {
+                  const filtered = filterAndroidBomHtml(html, bomVersion);
+
+                  if (filtered === undefined)
+                    throw new Error(`web_fetch: Android BOM version ${bomVersion} was not found.`);
+
+                  return extractHtmlToMarkdown(filtered, url);
+                },
+              }
+            : dependencies;
+
+          fetched = await fetchDocumentWithLlmsTxtSupport(
+            sourceUrl,
+            sharedSignal,
+            acquisitionDependencies,
+            Boolean(bomVersion),
+            !bomVersion,
+          );
         }
 
         if (!fetched.extractionDiagnostics?.botWall) {
@@ -627,7 +688,7 @@ export async function executeWebFetch(
       : document;
 
   const focused =
-    blocked || params.query === undefined
+    blocked || params.query === undefined || bomVersion
       ? undefined
       : focusMarkdown(fragmentDocument.markdown, params.query);
 
@@ -697,6 +758,12 @@ export async function executeWebFetch(
                 : result.markdownAlternateReason === "preferred"
                   ? "[Showing the site's preferred Markdown representation instead.]"
                   : "[Showing a Markdown representation instead of the requested page.]",
+              "",
+            ]
+          : []),
+        ...(result.noscriptFallback
+          ? [
+              "[Showing the page's no-JavaScript fallback; script-rendered content is unavailable.]",
               "",
             ]
           : []),
@@ -790,6 +857,7 @@ export async function executeWebFetch(
     characterCount: 0,
     llmsTxtFallback: Boolean(result.llmsTxtFallback),
     markdownAlternateFallback: Boolean(result.markdownAlternateFallback),
+    noscriptFallback: Boolean(result.noscriptFallback),
     representationFallback: result.representationFallback,
     extraction: result.extractionDiagnostics,
     focus: focused?.details,
@@ -853,6 +921,7 @@ export async function executeWebFetch(
       surface,
       llmsTxtFallback: Boolean(result.llmsTxtFallback),
       markdownAlternateFallback: Boolean(result.markdownAlternateFallback),
+      noscriptFallback: Boolean(result.noscriptFallback),
       representationFallback: result.representationFallback,
       llmsTxtUrl:
         result.llmsTxtIndexUrl === undefined

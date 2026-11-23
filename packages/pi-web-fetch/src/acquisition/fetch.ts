@@ -298,6 +298,7 @@ async function documentFromDecoded(
   let markdownAlternateUrl: string | undefined = linkHints.markdownAlternate;
   let sourceLanguage: string | undefined;
   let githubReadme = false;
+  let noscriptFallback = false;
   const openapiSpec = isOpenapiSource(raw, contentType);
 
   if (isHtmlContentType(contentType)) {
@@ -308,6 +309,7 @@ async function documentFromDecoded(
     surfaceView = extracted.surfaceView;
     extractor = extracted.extractor;
     githubReadme = extracted.githubReadme === true;
+    noscriptFallback = extracted.noscriptFallback === true;
     describedBy = describedBy ?? extracted.describedByLink;
     markdownAlternateUrl = markdownAlternateUrl ?? extracted.markdownAlternateLink;
   } else if (contentType === "application/json") {
@@ -396,8 +398,17 @@ async function documentFromDecoded(
     extractionDiagnostics.sparseExtraction = false;
   }
 
+  // An authored no-JavaScript fallback is readable content, not a shell artifact.
+  if (extractionDiagnostics && noscriptFallback && markdown.trim()) {
+    extractionDiagnostics.sparseExtraction = false;
+  }
+
   const shellSuspected = extractionDiagnostics
-    ? hasExtractionWarning(extractionDiagnostics)
+    ? hasExtractionWarning(
+        noscriptFallback
+          ? { ...extractionDiagnostics, javascriptRequired: false }
+          : extractionDiagnostics,
+      )
     : false;
 
   const etag = responseHeader(response, "etag");
@@ -415,9 +426,11 @@ async function documentFromDecoded(
     extractionDiagnostics,
     links,
     validators: etag || lastModified ? { etag, lastModified } : undefined,
+    markdownPolicyVersion: 2,
     cachedAt: Date.now(),
     llmsTxtDescribedBy: describedBy,
     markdownAlternateUrl,
+    noscriptFallback,
     sourceLanguage,
     openapiSpec,
     swaggerSpecUrl,
@@ -664,6 +677,7 @@ async function fetchDocument(
   cached?: CompleteDocument,
   allowEmptyContent = false,
   retryRepresentationMiss = true,
+  preferHtml = false,
 ): Promise<{ document: CompleteDocument; revalidated: boolean }> {
   assertAbsoluteHttpUrlForFetch(normalizeGitHubRawUrl(rawUrl));
   const controller = new AbortController();
@@ -694,6 +708,12 @@ async function fetchDocument(
   const requestDependencies: FetchRemoteDependencies = {
     ...dependencies,
     cookies: dependencies.cookies ?? new CookieJar(),
+    persistentHeaders: preferHtml
+      ? {
+          ...dependencies.persistentHeaders,
+          Accept: "text/html, text/plain;q=0.9, */*;q=0.1",
+        }
+      : dependencies.persistentHeaders,
   };
 
   try {
@@ -704,7 +724,9 @@ async function fetchDocument(
       requestUrl,
       controller.signal,
       requestDependencies,
-      conditionalHeaders,
+      preferHtml
+        ? { ...conditionalHeaders, Accept: "text/html, text/plain;q=0.9, */*;q=0.1" }
+        : conditionalHeaders,
     );
 
     // Some servers route Markdown negotiation to a missing representation even
@@ -794,6 +816,7 @@ async function fetchDocument(
               target.url,
               controller.signal,
               retryDependencies,
+              preferHtml ? { Accept: "text/html, text/plain;q=0.9, */*;q=0.1" } : {},
             ));
           }
         }
@@ -907,6 +930,7 @@ export async function fetchCompleteDocument(
   dependencies: FetchRemoteDependencies,
   allowEmptyContent = false,
   retryRepresentationMiss = true,
+  preferHtml = false,
 ): Promise<CompleteDocument> {
   return (
     await fetchDocument(
@@ -916,6 +940,7 @@ export async function fetchCompleteDocument(
       undefined,
       allowEmptyContent,
       retryRepresentationMiss,
+      preferHtml,
     )
   ).document;
 }

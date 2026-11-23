@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-11-23
+
+### Fixed
+
+- Read a page's authored no-JavaScript fallback when script-only markup leaves the extraction empty or sparse, instead of returning stray interface text.
+- Preserve conditional revalidation for stale pages cached under the current Markdown-preference policy while migrating older entries once.
+- Discover documentation indexes from deeper URL ancestors and filter Android BOM pages to the requested version.
+- Preserve HTML representation preferences across redirects, keep Android BOM selections isolated in the cache, and avoid treating readable fallback content as a markup shell.
+
 ## [0.18.0] - 2026-11-20
 
 ### Added
@@ -383,7 +392,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded public page fetching ([b979496](https://github.com/zeldrisho/pi-packages/commit/b979496b32de1cead172ba570307e4a4a7b3421d))
 
-[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.18.0...HEAD
+[Unreleased]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.18.1...HEAD
+[0.18.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.18.0...pi-web-fetch-v0.18.1
 [0.18.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.17.1...pi-web-fetch-v0.18.0
 [0.17.1]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.17.0...pi-web-fetch-v0.17.1
 [0.17.0]: https://github.com/zeldrisho/pi-packages/compare/pi-web-fetch-v0.16.5...pi-web-fetch-v0.17.0

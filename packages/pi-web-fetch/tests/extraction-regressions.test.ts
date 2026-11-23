@@ -1,12 +1,71 @@
 import { readFile } from "node:fs/promises";
+import type { IncomingMessage } from "node:http";
 import { describe, expect, it } from "vite-plus/test";
+import { executeWebFetch } from "../src/index";
 import { diagnoseExtraction } from "../src/document/evidence.ts";
-import { extractHtmlToMarkdown, htmlToMarkdownFallback } from "../src/document/extract.ts";
+import {
+  extractHtmlToMarkdown,
+  filterAndroidBomHtml,
+  htmlToMarkdownFallback,
+} from "../src/document/extract.ts";
 
 const substantial =
   "Readable issue context with reproduction details and expected behavior. ".repeat(12);
 
+/** Builds a minimal HTML response for offline service-level fetch testing. */
+function htmlResponse(body: string): IncomingMessage {
+  const buffer = Buffer.from(body);
+
+  // SAFETY: the literal satisfies IncomingMessage's stream contract; the fetch path
+  // reads only statusCode, headers, and the async body iterator.
+  return {
+    statusCode: 200,
+    headers: { "content-type": "text/html; charset=utf-8" },
+    destroy() {},
+    async *[Symbol.asyncIterator]() {
+      yield buffer;
+    },
+  } as IncomingMessage;
+}
+
 describe("extraction regressions", () => {
+  it("filters Android BOM rows by the origin's filter-value metadata", () => {
+    const html =
+      "<table><thead><tr><th>Library</th></tr></thead><tbody>" +
+      '<tr filter-value="2026.08.00"><td>1.12.0</td></tr>' +
+      '<tr filter-value="2026.06.01"><td>1.11.0</td></tr>' +
+      "</tbody></table>";
+
+    const filtered = filterAndroidBomHtml(html, "2026.08.00");
+
+    expect(filtered).toContain("1.12.0");
+    expect(filtered).not.toContain("1.11.0");
+    expect(filterAndroidBomHtml(html, "2026.99.99")).toBeUndefined();
+  });
+
+  it("reports an unavailable Android BOM version instead of returning all rows", async () => {
+    const html = '<table><tr filter-value="2026.08.00"><td>1.12.0</td></tr></table>';
+
+    await expect(
+      executeWebFetch(
+        {
+          url: "https://developer.android.com/develop/ui/compose/bom/bom-mapping",
+          query: "2026.99.99",
+        },
+        undefined,
+        undefined,
+        {
+          validateUrl: async (value) => ({
+            url: value instanceof URL ? value : new URL(value),
+            address: "203.0.113.10",
+            family: 4,
+          }),
+          request: async () => htmlResponse(html),
+        },
+      ),
+    ).rejects.toThrow("Android BOM version 2026.99.99 was not found");
+  });
+
   it("keeps fragment siblings and deduplicates equivalent tab mappings", async () => {
     const html = `<p>Shared preface.</p><main><div data-surface-filter-pills><div role="tablist"><button role="tab" data-surface-id="hub" aria-controls="hub">App</button><button role="tab" data-surface-id="cli" aria-controls="cli">CLI</button></div></div><div role="tabpanel" id="hub" data-surface-pane="hub">APPONLY</div><div role="tabpanel" id="cli" data-surface-pane="cli">CLIONLY</div></main>`;
 
@@ -161,5 +220,80 @@ describe("extraction regressions", () => {
     expect(result.markdown).toContain("Application documentation");
     expect(diagnostics.sparseExtraction).toBe(false);
     expect(diagnostics.javascriptRequired).toBe(false);
+  });
+
+  it("recovers the authored no-JavaScript fallback of a script-only page", async () => {
+    const html = await readFile(
+      new URL("./fixtures/frontierharness-issue-127.html", import.meta.url),
+      "utf8",
+    );
+
+    const result = await extractHtmlToMarkdown(html, new URL("https://frontierharness.org/"));
+
+    expect(result.noscriptFallback).toBe(true);
+    expect(result.title).toContain("FrontierHarness Eval");
+    expect(result.markdown).toContain("open benchmark of AI coding agent harnesses");
+    expect(result.markdown).toContain("How the benchmark is scored");
+    expect(result.markdown).not.toContain("reconnecting");
+  });
+
+  it("keeps substantive article content when scripts make the extraction sparse", async () => {
+    const article = "Readable article content survives script-heavy pages. ".repeat(8);
+    const html = `<html><body><main><article><h1>Article</h1><p>${article}</p></article></main><noscript><nav>${'<a href="/section">Section</a>'.repeat(20)}</nav></noscript><script>${"x".repeat(100_000)}</script></body></html>`;
+
+    const result = await extractHtmlToMarkdown(html, new URL("https://example.com/article"));
+
+    expect(result.noscriptFallback).toBeUndefined();
+    expect(result.markdown).toContain("Readable article content survives");
+    expect(result.markdown).not.toContain("Section");
+  });
+
+  it("keeps readable content instead of replacing it with no-JavaScript navigation", async () => {
+    const html = `<html><body><main><article><h1>Release notes</h1><p>${substantial}</p></article></main><noscript><nav><a href="/one">One</a><a href="/two">Two</a><a href="/three">Three</a></nav><p>${"Fallback navigation link text. ".repeat(20)}</p></noscript></body></html>`;
+
+    const result = await extractHtmlToMarkdown(html, new URL("https://example.com/releases"));
+
+    expect(result.noscriptFallback).toBeUndefined();
+    expect(result.markdown).toContain("Readable issue context");
+    expect(result.markdown).not.toContain("Fallback navigation link text");
+  });
+
+  it("ignores a short no-JavaScript notice on an empty page", async () => {
+    const html = `<html><body><main></main><script>${"x".repeat(5_000)}</script><noscript><p>Please enable JavaScript to view this site.</p></noscript></body></html>`;
+
+    const result = await extractHtmlToMarkdown(html, new URL("https://example.com/empty"));
+
+    expect(result.noscriptFallback).toBeUndefined();
+    expect(result.markdown).not.toContain("enable JavaScript");
+  });
+
+  it("reports a no-JavaScript fallback without flagging the page as sparse", async () => {
+    const html = await readFile(
+      new URL("./fixtures/frontierharness-issue-127.html", import.meta.url),
+      "utf8",
+    );
+
+    const result = await executeWebFetch(
+      { url: `https://example.test/issue-127-${process.pid}` },
+      undefined,
+      undefined,
+      {
+        validateUrl: async (value) => ({
+          url: value instanceof URL ? value : new URL(value),
+          address: "203.0.113.10",
+          family: 4,
+        }),
+        request: async () => htmlResponse(html),
+      },
+    );
+
+    const text = result.content.find((item) => item.type === "text")?.text ?? "";
+
+    expect(text).toContain("[Showing the page's no-JavaScript fallback");
+    expect(text).toContain("open benchmark of AI coding agent harnesses");
+    expect(text).not.toContain("reconnecting");
+    expect(result.details.noscriptFallback).toBe(true);
+    expect(result.details.extractionDiagnostics?.sparseExtraction).toBe(false);
+    expect(result.details.contentKind).not.toBe("markup-shell");
   });
 });

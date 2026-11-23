@@ -215,7 +215,7 @@ export async function requestFollowingRedirects(
       throw new Error("web_fetch followed too many redirects.");
     target = await awaitWithAbort(validateUrl(new URL(location, target.url)), signal);
     // Validators describe the originally cached resource and must not leak to a redirect target.
-    // Challenge handshakes opt into a fixed browser identity instead.
+    // Representation preferences and challenge identities are safe to retain.
     requestHeaders = dependencies.persistentHeaders ?? {};
   }
 

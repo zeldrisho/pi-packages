@@ -3,10 +3,17 @@ import type { DefuddleResponse } from "defuddle/node";
 import { stripExtractedCssCruft } from "./markdown-cleanup.ts";
 import { buildFragmentOffsets } from "./fragment-index.ts";
 import { assertConversionDepth } from "./complexity.ts";
+import { hasJavaScriptMarkers, isSparseExtraction } from "./evidence.ts";
 
 export { stripExtractedCssCruft } from "./markdown-cleanup.ts";
 
 const RAW_ID_SELECTOR_SAFE = /^-?[_a-zA-Z][-_a-zA-Z0-9]*$/;
+
+/** Minimum authored no-JavaScript fallback length worth showing instead of a shell. */
+const NOSCRIPT_FALLBACK_MIN_CHARACTERS = 200;
+
+/** Primary extraction length below which a JavaScript-required page counts as a shell. */
+const NOSCRIPT_PRIMARY_MAX_CHARACTERS = 1_024;
 
 /** Removes schema.org scripts that Defuddle would report directly to the process console. */
 function removeMalformedSchemaOrgData(document: Document): void {
@@ -464,6 +471,7 @@ async function extractHtmlDocument(
   describedByLink?: string;
   markdownAlternateLink?: string;
   githubReadme?: boolean;
+  noscriptFallback?: boolean;
 }> {
   // Keep refusal outside the catch: the fallback also constructs a DOM.
   assertConversionDepth(html);
@@ -630,6 +638,103 @@ function selectSurfaceHtml(
   return { html: document.documentElement.outerHTML, selected, omitted: panes.length - 1 };
 }
 
+/** Removes non-selected Android Compose BOM rows from the HTML table. */
+export function filterAndroidBomHtml(html: string, version: string): string | undefined {
+  const { document } = parseHTML(html);
+  const rows = [...document.querySelectorAll<HTMLElement>("tr[filter-value]")];
+  const matching = rows.filter((row) => row.getAttribute("filter-value") === version);
+
+  if (matching.length === 0) return undefined;
+
+  for (const row of rows) {
+    if (row.getAttribute("filter-value") !== version) row.remove();
+  }
+
+  return document.documentElement.outerHTML;
+}
+
+/**
+ * Builds a standalone document from the page's no-JavaScript fallback blocks, or
+ * returns undefined when the page has none. The recovering document is reparsed
+ * through the same depth preflight when it is extracted.
+ */
+function noscriptFallbackHtml(html: string): string | undefined {
+  if (!/<noscript[\s>]/i.test(html)) return undefined;
+
+  let sections: string[];
+
+  try {
+    const { document } = parseHTML(html);
+
+    sections = [...document.querySelectorAll("noscript")].flatMap((block) => {
+      const inner = block.innerHTML.trim();
+
+      return inner.length > 0 ? [inner] : [];
+    });
+  } catch {
+    return undefined;
+  }
+
+  return sections.length === 0
+    ? undefined
+    : `<html><head></head><body>${sections.join("\n")}</body></html>`;
+}
+
+/**
+ * Reports whether the primary extraction is too weak to represent the page: empty,
+ * sparse for its markup, or no more than a JavaScript-required notice.
+ */
+function isWeakExtraction(html: string, markdown: string): boolean {
+  const length = markdown.trim().length;
+  const substantive = length >= NOSCRIPT_FALLBACK_MIN_CHARACTERS;
+
+  if (length === 0) return true;
+
+  if (isSparseExtraction(html.length, length) && !substantive) return true;
+
+  return length < NOSCRIPT_PRIMARY_MAX_CHARACTERS && hasJavaScriptMarkers(html) && !substantive;
+}
+
+/**
+ * Reads the page's authored no-JavaScript fallback when the primary extraction is
+ * empty, sparse, or only a JavaScript-required notice. Readable pages keep their
+ * primary content, so fallback navigation or notices never replace real content.
+ */
+async function extractNoscriptFallback(
+  html: string,
+  baseUrl: URL,
+  primary: Awaited<ReturnType<typeof extractHtmlDocument>>,
+): Promise<Awaited<ReturnType<typeof extractHtmlDocument>> | undefined> {
+  if (!isWeakExtraction(html, primary.markdown)) return undefined;
+
+  const fallbackHtml = noscriptFallbackHtml(html);
+
+  if (!fallbackHtml) return undefined;
+
+  try {
+    const fallback = await extractHtmlDocument(fallbackHtml, baseUrl);
+
+    if (
+      fallback.markdown.length < NOSCRIPT_FALLBACK_MIN_CHARACTERS ||
+      fallback.markdown.length <= primary.markdown.length
+    )
+      return undefined;
+
+    return {
+      ...fallback,
+      // The synthesized document has no head metadata of its own.
+      title: primary.title ?? fallback.title,
+      githubReadme: primary.githubReadme,
+      describedByLink: primary.describedByLink ?? fallback.describedByLink,
+      markdownAlternateLink: primary.markdownAlternateLink ?? fallback.markdownAlternateLink,
+      noscriptFallback: true,
+    };
+  } catch {
+    // A fallback must never make an otherwise readable page unavailable.
+    return undefined;
+  }
+}
+
 /** Extract the complete page and, when explicitly requested, a separate surface view. */
 export async function extractHtmlToMarkdown(
   html: string,
@@ -645,7 +750,8 @@ export async function extractHtmlToMarkdown(
   }
 > {
   assertConversionDepth(html);
-  const complete = await extractHtmlDocument(html, baseUrl);
+  const primary = await extractHtmlDocument(html, baseUrl);
+  const complete = (await extractNoscriptFallback(html, baseUrl, primary)) ?? primary;
 
   try {
     const surface = selectSurfaceHtml(html, baseUrl);

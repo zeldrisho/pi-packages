@@ -31,6 +31,9 @@ function restrictOrigin(
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
 
+/** Bounds parallel index probes while allowing substantially deeper paths than two levels. */
+const MAX_LLMS_TXT_CANDIDATES = 16;
+
 const LLMS_TXT_MIN_MARKDOWN_CHARACTERS = 200;
 
 const encoder = new TextEncoder();
@@ -44,11 +47,10 @@ function safeUrl(value: string): URL | undefined {
 }
 
 /**
- * Builds candidate `/llms.txt` URLs for a page: the site-root index plus each ancestor
- * directory index up to `MAX_LLMS_TXT_DIRECTORY_DEPTH` levels deep, mirroring sites that
- * publish per-section indexes (for example `developers.cloudflare.com/r2/llms.txt`).
- * Returns them ordered shallow → deep, and an empty list for non-HTTP(S) targets or when
- * the page itself is already a `llms.txt` path, so a fallback never retries itself.
+ * Builds candidate `/llms.txt` URLs for a page: the site-root index plus every ancestor
+ * directory index, mirroring sites that publish per-section indexes. Returns them ordered
+ * shallow → deep, and an empty list for non-HTTP(S) targets or when the page itself is
+ * already a `llms.txt` path, so a fallback never retries itself.
  */
 function isGitHubLikeHost(hostname: string): boolean {
   return (
@@ -79,9 +81,8 @@ export function buildLlmsTxtCandidateUrls(rawUrl: string): URL[] {
 
     if (url.pathname === "/llms.txt" || url.pathname.endsWith("/llms.txt")) return [];
 
-    // Ancestor directories only, one level deep: for `/r2/buckets/x` probe
-    // `/llms.txt` and `/r2/llms.txt`, never deeper. A trailing slash marks the final
-    // segment as a directory itself, so `/r2/` still probes `/r2/llms.txt`.
+    // A trailing slash marks the final segment as a directory itself, so `/r2/`
+    // probes `/r2/llms.txt`.
     const trimmedDirectory = url.pathname.endsWith("/")
       ? url.pathname
       : url.pathname.replace(/\/[^/]*$/, "/");
@@ -89,11 +90,16 @@ export function buildLlmsTxtCandidateUrls(rawUrl: string): URL[] {
     const directories = ["/"];
     const parts = trimmedDirectory.split("/").filter(Boolean);
 
-    for (let depth = 1; depth <= Math.min(MAX_LLMS_TXT_DIRECTORY_DEPTH, parts.length); depth += 1) {
+    for (let depth = 1; depth <= parts.length; depth += 1) {
       directories.push(`/${parts.slice(0, depth).join("/")}/`);
     }
 
-    return directories.map((pathname) => {
+    const selectedDirectories =
+      directories.length <= MAX_LLMS_TXT_CANDIDATES
+        ? directories
+        : [directories[0], ...directories.slice(-(MAX_LLMS_TXT_CANDIDATES - 1))];
+
+    return selectedDirectories.map((pathname) => {
       const candidate = new URL(url.origin);
       candidate.pathname = `${pathname}llms.txt`;
 
@@ -126,6 +132,9 @@ export function documentationMarkdownUrl(value: string): URL | undefined {
 }
 
 function isLowQualityDocument(document: CompleteDocument): boolean {
+  // An authored fallback is readable content, so a site index would be a downgrade.
+  if (document.noscriptFallback && !document.extractionDiagnostics?.botWall) return false;
+
   // Sparse extraction alone is not proof of an empty app shell: server-rendered pages
   // may include useful content in streaming/framework markup that article extraction
   // does not fully recognize. Keep that page rather than replacing it with a site index.
@@ -143,14 +152,6 @@ interface LlmsTxtProbe {
 }
 
 const MAX_LLMS_TXT_PROBE_ENTRIES = 512;
-
-/**
- * Deepest ancestor-directory `/llms.txt` probed, e.g. `/a/b/c` also probes
- * `/a/b/llms.txt`. Locale-prefixed documentation sites publish their section index
- * one level below the locale root, so two levels are needed to reach
- * `/en/docs/llms.txt` from `/en/docs/catalog/...`.
- */
-const MAX_LLMS_TXT_DIRECTORY_DEPTH = 2;
 
 const llmsTxtProbes = new ExpiringLruCache<string, LlmsTxtProbe>(
   MAX_LLMS_TXT_PROBE_ENTRIES,
@@ -193,21 +194,29 @@ async function ensureLlmsTxtIndex(
   signal: AbortSignal | undefined,
   dependencies: FetchRemoteDependencies,
 ): Promise<{ url: string; document: CompleteDocument; aliases?: string[] } | undefined> {
-  const documents = await Promise.all(
-    candidates.map((candidate) => probeUsableRawText(candidate, signal, dependencies)),
-  );
+  // Candidates are ordered shallow → deep. Probe from the page upward in small batches:
+  // this preserves a preference for the deepest usable index without issuing every
+  // ancestor request when a nearby section index already exists.
+  const batchSize = 4;
 
-  // Candidates are ordered shallow → deep; prefer the deepest usable index because a
-  // section index is the more relevant table of contents for the requested page.
-  for (let depth = documents.length - 1; depth >= 0; depth -= 1) {
-    const document = documents[depth];
+  for (let end = candidates.length; end > 0; end -= batchSize) {
+    const start = Math.max(0, end - batchSize);
+    const batch = candidates.slice(start, end);
 
-    if (document) {
-      const aliases = documents.flatMap((other, i) =>
-        i !== depth && other && other.markdown === document.markdown ? [candidates[i].href] : [],
-      );
+    const documents = await Promise.all(
+      batch.map((candidate) => probeUsableRawText(candidate, signal, dependencies)),
+    );
 
-      return { url: candidates[depth].href, document, aliases };
+    for (let index = documents.length - 1; index >= 0; index -= 1) {
+      const document = documents[index];
+
+      if (document) {
+        const aliases = documents.flatMap((other, i) =>
+          i !== index && other && other.markdown === document.markdown ? [batch[i].href] : [],
+        );
+
+        return { url: batch[index].href, document, aliases };
+      }
     }
   }
 
@@ -300,6 +309,8 @@ export async function fetchDocumentWithLlmsTxtSupport(
   rawUrl: string,
   signal: AbortSignal | undefined,
   dependencies: FetchRemoteDependencies,
+  preferHtml = false,
+  allowMarkdownAlternates = true,
 ): Promise<CompleteDocument> {
   try {
     const url = new URL(rawUrl);
@@ -345,7 +356,7 @@ export async function fetchDocumentWithLlmsTxtSupport(
   // A withheld page must not discard an index that is still usable, so the pair is
   // settled instead of rejected together.
   const [primarySettled, indexSettled] = await Promise.allSettled([
-    fetchCompleteDocument(rawUrl, signal, dependencies, true),
+    fetchCompleteDocument(rawUrl, signal, dependencies, true, true, preferHtml),
     candidates.length > 0
       ? ensureLlmsTxtIndex(candidates, signal, dependencies)
       : Promise.resolve(undefined),
@@ -405,6 +416,7 @@ export async function fetchDocumentWithLlmsTxtSupport(
   // Prefer a page-specific Markdown representation even when HTML extraction succeeded.
   // Restrict the entire redirect chain, and never substitute HTML or arbitrary text.
   if (
+    allowMarkdownAlternates &&
     !primary.surfaceView &&
     primary.extractor !== "raw" &&
     (!primary.markdownAlternateUrl || (!isLowQualityDocument(primary) && primary.markdown.trim()))
@@ -451,7 +463,10 @@ export async function fetchDocumentWithLlmsTxtSupport(
       : undefined;
 
     const alternate =
-      !primary.surfaceView && markdownAlternate && isSafeToProbe(markdownAlternate, primary.url)
+      allowMarkdownAlternates &&
+      !primary.surfaceView &&
+      markdownAlternate &&
+      isSafeToProbe(markdownAlternate, primary.url)
         ? await probeUsableRawText(markdownAlternate, signal, dependencies)
         : undefined;
 

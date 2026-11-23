@@ -36,6 +36,8 @@ export interface CompleteDocument {
   links?: ExtractedLinks;
   /** HTTP validators retained for stale-cache revalidation. */
   validators?: { etag?: string; lastModified?: string };
+  /** Version of the Markdown-preference cache policy that produced this entry. */
+  markdownPolicyVersion?: 2;
   /** Time at which this representation was fetched or successfully revalidated. */
   cachedAt?: number;
   /** True when this document is the site's /llms.txt served instead of a low-quality page. */
@@ -54,6 +56,8 @@ export interface CompleteDocument {
   markdownAlternateUrl?: string;
   /** True when this document is a Markdown representation substituted for the requested page. */
   markdownAlternateFallback?: boolean;
+  /** True when this document is the page's authored no-JavaScript fallback content. */
+  noscriptFallback?: boolean;
   /** Why the Markdown representation was selected. */
   markdownAlternateReason?: "advertised" | "preferred";
   /** Same-origin OpenAPI document advertised by an otherwise empty Swagger UI. */
