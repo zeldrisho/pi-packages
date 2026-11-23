@@ -170,6 +170,24 @@ describe("repository contracts", () => {
     );
   });
 
+  it("publishes and verifies the exact npm version before announcing a GitHub release", () => {
+    const steps = [
+      "Write release notes",
+      "Check published package version",
+      "Publish package",
+      "Verify published package version",
+      "Create or verify GitHub release",
+    ];
+
+    const positions = steps.map((step) => releaseWorkflow.indexOf(`- name: ${step}\n`));
+    expect(positions.every((position, i) => position > (positions[i - 1] ?? -1))).toBe(true);
+
+    const verification = releaseWorkflow.slice(positions[3], positions[4]);
+    expect(verification).toContain("vp pm pack -- --json");
+    expect(verification).toContain("pkg.dist.integrity !== process.env.EXPECTED_INTEGRITY");
+    expect(releaseWorkflow.slice(positions[4])).not.toMatch(/^\s*if:/m);
+  });
+
   it("creates GitHub releases with gh release create on component tag push", () => {
     if (releaseWorkflow.includes("softprops/action-gh-release")) {
       fail("the release workflow must not use softprops/action-gh-release");

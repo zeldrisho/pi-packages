@@ -1,6 +1,6 @@
 # Release
 
-Packages are versioned independently. The agent updates the manifest and changelog, then pushes a component tag. The tag triggers [the release workflow](../.github/workflows/release.yml), which creates a GitHub release from the changelog and publishes to npm with trusted publishing (OIDC).
+Packages are versioned independently. The agent updates the manifest and changelog, then pushes a component tag. The tag triggers [the release workflow](../.github/workflows/release.yml), which publishes to npm with trusted publishing (OIDC), verifies the published version, and then creates a GitHub release from the changelog. GitHub Releases provide versioned notes; their automatic source archives contain the monorepo snapshot, not the installable npm package. Do not attach duplicate tarballs.
 
 ## Normal release
 
@@ -29,12 +29,13 @@ release workflows.
 
 The tag starts the release workflow. After it completes, verify the CI result,
 GitHub release, npm version, provenance, and tarball contents. The workflow is
-safe to retry after partial completion: it verifies an existing GitHub release
-matches the tag, commit, and expected title, then checks the exact package version
-on npm before publishing. Registry lookup errors other than a confirmed `404`
-stop the workflow; an existing version must have matching package/version metadata
-and registry integrity metadata. Published versions are immutable, so investigate
-any mismatch rather than attempting to overwrite or republish them.
+safe to retry after partial completion: it checks the exact npm version and
+publishes only on a confirmed `404`. Before creating or verifying the GitHub
+release, it checks that the registry name, version, and tarball integrity match
+what the workflow packed. The workflow retries `404` briefly after publishing
+and stops on other registry errors. If an existing GitHub release is found, it
+must match the tag, commit, and expected title. Published versions are immutable,
+so investigate any mismatch rather than attempting to overwrite or republish them.
 
 The tag name and manifest version must match. Publishing is automatic: the `publish` environment currently has no manual approval, so verify the package and version before pushing the tag. `scripts/release.ts notes <package> <file>` extracts the released changelog section for the release notes.
 
@@ -46,9 +47,9 @@ Record only user-visible features, fixes, security changes, and usage or compati
 
 ## Recovery and bootstrap
 
-If a tagged release fails, first check `npm view <package>@<version>`. Published versions are permanent: reconcile the existing GitHub release and provenance instead of republishing. If npm does not contain the version, delete the partial GitHub release and remote tag, correct the commit, and recreate the tag.
+If a tagged release fails, first check `npm view <package>@<version>`. If the version is already on npm, repair the failed step and retry the workflow on the same tag without republishing. If you confirm the version was not published and the tagged commit needs correction, delete any partial GitHub release and the remote tag, correct the commit, and recreate the tag.
 
-Trusted publishing cannot publish a package's first registry version ([npm limitation](https://github.com/npm/cli/issues/8544)). Before pushing a new package's first release tag, publish an inspected one-off `0.0.0`, conventionally with `--tag bootstrap`, then configure the npm trusted publisher for `zeldrisho/pi-packages`, workflow `release.yml`, environment `publish`. The published version is what makes trust configuration possible; the `bootstrap` tag only labels the placeholder. Do not commit the `0.0.0` version. Do not push the first release tag before the bootstrap and trust configuration succeed: the workflow creates the GitHub release before publishing, so a failed first publish leaves a partial release.
+Trusted publishing cannot publish a package's first registry version ([npm limitation](https://github.com/npm/cli/issues/8544)). Before pushing a new package's first release tag, publish an inspected one-off `0.0.0`, conventionally with `--tag bootstrap`, then configure the npm trusted publisher for `zeldrisho/pi-packages`, workflow `release.yml`, environment `publish`. The published version is what makes trust configuration possible; the `bootstrap` tag only labels the placeholder. Do not commit the `0.0.0` version. Do not push the first release tag before the bootstrap and trust configuration succeed: the workflow cannot publish the package or create its GitHub release until both are ready.
 
 Run the bootstrap from inside the package directory. `vp pm` is the fallback for package-manager commands that Vite+ does not provide; it delegates to the repository's pinned pnpm. Use `vp pm` for the package operations and `npm` only for trusted-publisher configuration, which has no `vp pm` equivalent:
 

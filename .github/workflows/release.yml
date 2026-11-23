@@ -2,8 +2,8 @@ name: Release
 
 # Releases are driven by the agent: it bumps `package.json`, writes the
 # `CHANGELOG.md` entry by hand, and pushes a `<package>-v<version>` tag
-# (for example `pi-web-search-v0.5.0`). Pushing that tag creates the GitHub
-# release from the changelog and publishes the package to npm.
+# (for example `pi-web-search-v0.5.0`). Pushing that tag publishes and verifies
+# the npm package before creating the GitHub release from the changelog.
 
 on:
   push:
@@ -79,6 +79,69 @@ jobs:
       - name: Write release notes
         run: node scripts/release.ts notes '${{ steps.path.outputs.value }}' "${{ runner.temp }}/notes.md"
 
+      - name: Check published package version
+        id: registry
+        env:
+          PACKAGE_NAME: ${{ fromJSON(steps.pkg.outputs.result).name }}
+          PACKAGE_VERSION: ${{ fromJSON(steps.pkg.outputs.result).version }}
+        run: |
+          encoded_name="$(node -e 'process.stdout.write(encodeURIComponent(process.env.PACKAGE_NAME))')"
+          status="$(curl --silent --show-error --output "$RUNNER_TEMP/registry.json" --write-out '%{http_code}' "https://registry.npmjs.org/$encoded_name/$PACKAGE_VERSION")"
+          case "$status" in
+            404) echo "exists=false" >> "$GITHUB_OUTPUT" ;;
+            200) echo "exists=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "Unexpected npm registry response: HTTP $status" >&2; exit 1 ;;
+          esac
+
+      - name: Publish package
+        if: steps.registry.outputs.exists == 'false'
+        working-directory: ${{ steps.path.outputs.value }}
+        # The tag checkout leaves HEAD detached, so pnpm's publish-branch git
+        # check (master|main) aborts. The custom guard above already verifies the
+        # commit is reviewed on main, so skip pnpm's redundant git checks here.
+        run: vp pm publish -- --access public --no-git-checks --provenance
+
+      - name: Verify published package version
+        working-directory: ${{ steps.path.outputs.value }}
+        env:
+          PACKAGE_NAME: ${{ fromJSON(steps.pkg.outputs.result).name }}
+          PACKAGE_VERSION: ${{ fromJSON(steps.pkg.outputs.result).version }}
+          VERSION_EXISTED: ${{ steps.registry.outputs.exists }}
+        run: |
+          if [[ "$VERSION_EXISTED" == false ]]; then
+            encoded_name="$(node -e 'process.stdout.write(encodeURIComponent(process.env.PACKAGE_NAME))')"
+            registry_url="https://registry.npmjs.org/$encoded_name/$PACKAGE_VERSION"
+            # A newly published version may not be visible immediately.
+            for attempt in 1 2 3 4 5 6; do
+              status="$(curl --silent --show-error --output "$RUNNER_TEMP/registry.json" --write-out '%{http_code}' "$registry_url")"
+              case "$status" in
+                200) break ;;
+                404) if [[ "$attempt" != 6 ]]; then sleep 5; fi ;;
+                *) echo "Unexpected npm registry response: HTTP $status" >&2; exit 1 ;;
+              esac
+            done
+            if [[ "$status" != 200 ]]; then
+              echo "Published version is not visible on npm: $PACKAGE_NAME@$PACKAGE_VERSION" >&2
+              exit 1
+            fi
+          fi
+
+          # Use pnpm for both operations so catalog dependencies are resolved identically.
+          expected_integrity="$(vp pm pack -- --json --pack-destination "$RUNNER_TEMP" | node -e '
+            const pkg = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+            if (!pkg?.integrity) throw new Error("Could not determine expected package integrity");
+            process.stdout.write(pkg.integrity);
+          ')"
+          EXPECTED_INTEGRITY="$expected_integrity" node -e '
+            const pkg = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+            if (pkg.name !== process.env.PACKAGE_NAME || pkg.version !== process.env.PACKAGE_VERSION || !pkg.dist?.integrity) {
+              throw new Error("Registry package metadata does not match the expected package/version");
+            }
+            if (pkg.dist.integrity !== process.env.EXPECTED_INTEGRITY) {
+              throw new Error("Published package integrity mismatch: expected " + process.env.EXPECTED_INTEGRITY + ", got " + pkg.dist.integrity);
+            }
+          ' "$RUNNER_TEMP/registry.json"
+
       - name: Create or verify GitHub release
         env:
           RELEASE_TAG: ${{ github.ref_name }}
@@ -104,42 +167,3 @@ jobs:
           else
             gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TITLE" --notes-file "$NOTES_FILE" --target "$RELEASE_SHA"
           fi
-
-      - name: Check published package version
-        id: registry
-        working-directory: ${{ steps.path.outputs.value }}
-        env:
-          PACKAGE_NAME: ${{ fromJSON(steps.pkg.outputs.result).name }}
-          PACKAGE_VERSION: ${{ fromJSON(steps.pkg.outputs.result).version }}
-        run: |
-          encoded_name="$(node -e 'process.stdout.write(encodeURIComponent(process.env.PACKAGE_NAME))')"
-          status="$(curl --silent --show-error --output "$RUNNER_TEMP/registry.json" --write-out '%{http_code}' "https://registry.npmjs.org/$encoded_name/$PACKAGE_VERSION")"
-          case "$status" in
-            404) echo "exists=false" >> "$GITHUB_OUTPUT" ;;
-            200)
-              expected_integrity="$(npm pack --json --ignore-scripts --pack-destination "$RUNNER_TEMP" | node -e '
-                const [pkg] = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
-                if (!pkg?.integrity) throw new Error("Could not determine expected package integrity");
-                process.stdout.write(pkg.integrity);
-              ')"
-              EXPECTED_INTEGRITY="$expected_integrity" node -e '
-                const pkg = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
-                if (pkg.name !== process.env.PACKAGE_NAME || pkg.version !== process.env.PACKAGE_VERSION || !pkg.dist?.integrity) {
-                  throw new Error("Registry package metadata does not match the expected package/version");
-                }
-                if (pkg.dist.integrity !== process.env.EXPECTED_INTEGRITY) {
-                  throw new Error("Published package integrity mismatch: expected " + process.env.EXPECTED_INTEGRITY + ", got " + pkg.dist.integrity);
-                }
-              ' "$RUNNER_TEMP/registry.json"
-              echo "exists=true" >> "$GITHUB_OUTPUT"
-              ;;
-            *) echo "Unexpected npm registry response: HTTP $status" >&2; exit 1 ;;
-          esac
-
-      - name: Publish package
-        if: steps.registry.outputs.exists == 'false'
-        working-directory: ${{ steps.path.outputs.value }}
-        # The tag checkout leaves HEAD detached, so pnpm's publish-branch git
-        # check (master|main) aborts. The custom guard above already verifies the
-        # commit is reviewed on main, so skip pnpm's redundant git checks here.
-        run: vp pm publish -- --access public --no-git-checks --provenance
