@@ -873,10 +873,8 @@ export function createAntigravityStream(
         const entry = { ...model, thinkingLevelMap: model.thinkingLevelMap ?? {} };
         const runtimeModel = resolveRuntimeModel(entry, options?.reasoning);
 
-        // Live catalog lookup is only needed when Pi is overriding a route's
-        // advertised token budget. Named thinking levels are already encoded in
-        // the runtime model, and the normal budget defaults are local too. Avoid
-        // delaying every cold first request on an unnecessary metadata fetch.
+        // Resolve account-advertised thinking metadata whenever reasoning is requested;
+        // the local route configuration remains the fallback when discovery is unavailable.
         const liveThinkingMetadataNeeded =
           options?.reasoning !== undefined && String(options.reasoning) !== "off";
 
