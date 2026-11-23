@@ -13,8 +13,9 @@ on:
         type: number
 
 concurrency:
-  # Keep each issue's runs ordered without letting a newer event replace a queued run.
-  group: pi-${{ github.event.issue.number || inputs.issue_number }}-${{ github.run_id }}
+  # Run at most one triage job per issue; running jobs are never cancelled.
+  # GitHub keeps only one pending run per group, so a newer pending run replaces an older one.
+  group: pi-${{ github.event.issue.number || inputs.issue_number }}
   cancel-in-progress: false
 
 jobs:
@@ -141,7 +142,7 @@ jobs:
           - Request assignment only for the repository owner when the issue is in scope and has enough evidence for a maintainer to act (for example, a clear reproduction, relevant version/APK, or useful logs). Never request anyone else or unassign anyone.
           - If there is no clear answer, say what you checked and that a maintainer will follow up. Do not invent facts, modify code, or open PRs.
           - Return the proposed reply between `TRIAGE_REPLY_BEGIN` and `TRIAGE_REPLY_END`. Include citations to sources actually used. Do not mention the triage process, workflow, model, or internal reasoning unless relevant.
-          - Return zero or more mutation requests after `TRIAGE_ACTIONS_BEGIN`, one per line, using only: `ACTION: close duplicate <existing-issue-number>`, `ACTION: close not planned`, `ACTION: label <existing-label-name>`, or `ACTION: assign owner`. End with `TRIAGE_ACTIONS_END`. Never include shell commands or a mutation target other than the current issue.
+          - For comment-triggered runs, request mutations only when the commenter is the issue author; otherwise return no actions. Return zero or more mutation requests after `TRIAGE_ACTIONS_BEGIN`, one per line, using only: `ACTION: close duplicate <existing-issue-number>`, `ACTION: close not planned`, `ACTION: label <existing-label-name>`, or `ACTION: assign owner`. End with `TRIAGE_ACTIONS_END`. Never include shell commands or a mutation target other than the current issue.
           - Write like a human maintainer: lead with the answer, be direct and specific, avoid boilerplate and repeated conclusions, and keep only useful details.
           EOF
           } > /tmp/prompt.md
@@ -150,9 +151,6 @@ jobs:
         run: echo "TRIAGE_STARTED_AT=$(date -u +%s)" >> "$GITHUB_ENV"
 
       - name: Run Pi analysis without GitHub credentials or shell tools
-        env:
-          BRAVE_SEARCH_API_KEY: ${{ secrets.BRAVE_SEARCH_API_KEY }}
-          BRAVE_ANSWERS_API_KEY: ${{ secrets.BRAVE_ANSWERS_API_KEY }}
         run: |
           set -a
           # shellcheck disable=SC1091
@@ -160,7 +158,7 @@ jobs:
           rm -f /tmp/pi-provider.env
           set +a
           ./packages/pi-opencode-free/node_modules/.bin/pi --print --no-session \
-            --no-builtin-tools --tools read,web_search,web_fetch \
+            --no-builtin-tools --tools web_search,web_fetch \
             -e ./packages/pi-opencode-free \
             -e ./packages/pi-web-search \
             -e ./packages/pi-web-fetch \
@@ -172,12 +170,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
+          ALLOW_MUTATIONS: ${{ github.event_name != 'issue_comment' || github.event.comment.user.login == github.event.issue.user.login }}
         run: |
           set -euo pipefail
           reply=$(awk '/^TRIAGE_REPLY_BEGIN$/{capture=1; next} /^TRIAGE_REPLY_END$/{capture=0} capture' /tmp/triage-output.txt)
           if [ -n "$reply" ]; then
             printf '%s\n' "$reply" > /tmp/reply.md
             gh issue comment "$ISSUE_NUMBER" --body-file /tmp/reply.md
+          fi
+
+          if [ "$ALLOW_MUTATIONS" != "true" ]; then
+            echo "Issue-comment runs may not apply GitHub mutations unless the commenter opened the issue."
+            exit 0
           fi
 
           awk '/^TRIAGE_ACTIONS_BEGIN$/{capture=1; next} /^TRIAGE_ACTIONS_END$/{capture=0} capture' /tmp/triage-output.txt |
