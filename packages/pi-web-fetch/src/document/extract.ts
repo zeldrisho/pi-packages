@@ -686,10 +686,13 @@ function noscriptFallbackHtml(html: string): string | undefined {
  */
 function isWeakExtraction(html: string, markdown: string): boolean {
   const length = markdown.trim().length;
+  const substantive = length >= NOSCRIPT_FALLBACK_MIN_CHARACTERS;
 
-  if (length === 0 || isSparseExtraction(html.length, length)) return true;
+  if (length === 0) return true;
 
-  return length < NOSCRIPT_PRIMARY_MAX_CHARACTERS && hasJavaScriptMarkers(html);
+  if (isSparseExtraction(html.length, length) && !substantive) return true;
+
+  return length < NOSCRIPT_PRIMARY_MAX_CHARACTERS && hasJavaScriptMarkers(html) && !substantive;
 }
 
 /**

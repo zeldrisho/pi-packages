@@ -17,7 +17,7 @@ import {
 import type { ProviderConfig } from "@earendil-works/pi-coding-agent";
 import { resolveIdentity } from "./ids.ts";
 import { isBudgetRoute, overrideThinkingBudget } from "./budget-overrides.ts";
-import { ANTIGRAVITY_API, resolveRuntimeModel, thinkingConfig } from "./models.ts";
+import { ANTIGRAVITY_API, resolveRuntimeModel } from "./models.ts";
 import type { createThinkingMetadataResolver } from "./thinking-metadata.ts";
 import { isJsonNumber, isJsonObject, isJsonText, parseJsonValue } from "./json.ts";
 import { parseApiKey } from "./oauth.ts";
@@ -671,7 +671,9 @@ async function handleEvent(dataLines: readonly string[], context: StreamContext)
     throw new Error(
       describeFailure(
         chunk.error.status ?? 500,
-        chunk.error.status === 429 ? payload : chunk.error.message,
+        chunk.error.status === 403 || chunk.error.status === 429 || chunk.error.status === 503
+          ? payload
+          : chunk.error.message,
       ),
     );
   }
@@ -883,10 +885,24 @@ export function createAntigravityStream(
             options.reasoning === "high") &&
           options.thinkingBudgets?.[options.reasoning] !== undefined;
 
+        const standardReasoning =
+          options?.reasoning === "minimal" ||
+          options?.reasoning === "low" ||
+          options?.reasoning === "medium" ||
+          options?.reasoning === "high";
+
+        const thinkingBudget =
+          options?.reasoning === "minimal" ||
+          options?.reasoning === "low" ||
+          options?.reasoning === "medium" ||
+          options?.reasoning === "high"
+            ? options.thinkingBudgets?.[options.reasoning]
+            : undefined;
+
         const liveThinkingMetadataNeeded =
           options?.reasoning !== undefined &&
-          (budgetOverrideRequested ||
-            thinkingConfig(runtimeModel, options.reasoning) === undefined);
+          String(options.reasoning) !== "off" &&
+          (budgetOverrideRequested || !standardReasoning || thinkingBudget === undefined);
 
         const discoveredThinkingConfig = liveThinkingMetadataNeeded
           ? await resolveThinking?.(

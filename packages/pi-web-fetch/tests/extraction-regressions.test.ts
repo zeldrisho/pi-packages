@@ -214,6 +214,17 @@ describe("extraction regressions", () => {
     expect(result.markdown).not.toContain("reconnecting");
   });
 
+  it("keeps substantive article content when scripts make the extraction sparse", async () => {
+    const article = "Readable article content survives script-heavy pages. ".repeat(8);
+    const html = `<html><body><main><article><h1>Article</h1><p>${article}</p></article></main><noscript><nav>${'<a href="/section">Section</a>'.repeat(20)}</nav></noscript><script>${"x".repeat(100_000)}</script></body></html>`;
+
+    const result = await extractHtmlToMarkdown(html, new URL("https://example.com/article"));
+
+    expect(result.noscriptFallback).toBeUndefined();
+    expect(result.markdown).toContain("Readable article content survives");
+    expect(result.markdown).not.toContain("Section");
+  });
+
   it("keeps readable content instead of replacing it with no-JavaScript navigation", async () => {
     const html = `<html><body><main><article><h1>Release notes</h1><p>${substantial}</p></article></main><noscript><nav><a href="/one">One</a><a href="/two">Two</a><a href="/three">Three</a></nav><p>${"Fallback navigation link text. ".repeat(20)}</p></noscript></body></html>`;
 

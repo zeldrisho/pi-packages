@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Read a page's authored no-JavaScript fallback when script-only markup leaves the extraction empty or sparse, instead of returning stray interface text.
 - Preserve conditional revalidation for stale pages cached under the current Markdown-preference policy while migrating older entries once.
 - Discover documentation indexes from deeper URL ancestors and filter Android BOM pages to the requested version.
+- Preserve HTML representation preferences across redirects, keep Android BOM selections isolated in the cache, and avoid treating readable fallback content as a markup shell.
 
 ## [0.18.0] - 2026-11-20
 

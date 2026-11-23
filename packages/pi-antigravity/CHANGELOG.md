@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Parse structured Antigravity error reasons for more accurate quota, rate-limit, capacity, and account-suspension guidance, and accept multiline SSE events.
+- Parse structured Antigravity error reasons for more accurate quota, rate-limit, capacity, and account-suspension guidance, including streamed errors, and accept multiline SSE events.
+- Preserve account-advertised thinking budgets when routes use local reasoning levels without an explicit budget override.
 
 ## [0.2.0] - 2026-11-20
 

@@ -404,7 +404,11 @@ async function documentFromDecoded(
   }
 
   const shellSuspected = extractionDiagnostics
-    ? hasExtractionWarning(extractionDiagnostics)
+    ? hasExtractionWarning(
+        noscriptFallback
+          ? { ...extractionDiagnostics, javascriptRequired: false }
+          : extractionDiagnostics,
+      )
     : false;
 
   const etag = responseHeader(response, "etag");
@@ -704,6 +708,12 @@ async function fetchDocument(
   const requestDependencies: FetchRemoteDependencies = {
     ...dependencies,
     cookies: dependencies.cookies ?? new CookieJar(),
+    persistentHeaders: preferHtml
+      ? {
+          ...dependencies.persistentHeaders,
+          Accept: "text/html, text/plain;q=0.9, */*;q=0.1",
+        }
+      : dependencies.persistentHeaders,
   };
 
   try {

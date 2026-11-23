@@ -51,6 +51,35 @@ describe("web_fetch redirects", () => {
     expect(result.url).toBe(`${origin}/html`);
   });
 
+  it("preserves representation preferences but not validators across redirects", async () => {
+    const headers: Record<string, string>[] = [];
+
+    const result = await requestFollowingRedirects(
+      `${origin}/redirect`,
+      new AbortController().signal,
+      {
+        validateUrl: async (value) => {
+          const url = value instanceof URL ? value : new URL(value);
+
+          return { url, address: "127.0.0.1", family: 4 };
+        },
+        request: async (target, signal, requestHeaders) => {
+          headers.push({ ...requestHeaders });
+
+          return await requestPinned(target, signal, { headers: requestHeaders });
+        },
+        persistentHeaders: { Accept: "text/html", "User-Agent": "test" },
+      },
+      { Accept: "text/html", "If-None-Match": "stale" },
+    );
+
+    result.response.destroy();
+    expect(headers).toEqual([
+      { Accept: "text/html", "If-None-Match": "stale" },
+      { Accept: "text/html", "User-Agent": "test" },
+    ]);
+  });
+
   it("rejects a redirect to a blocked target before requesting it", async () => {
     const requested: string[] = [];
     await expect(

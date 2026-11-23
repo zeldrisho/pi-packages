@@ -38,6 +38,11 @@ const CACHE_MAX_MARKDOWN_BYTES = 20 * 1_024 * 1_024;
 
 const MAX_INFLIGHT_REQUESTS = 100;
 
+interface CacheDimensions {
+  surfaceExtraction?: number;
+  androidBomVersion?: string;
+}
+
 function androidBomVersionQuery(url: string, query: string | undefined): string | undefined {
   if (query === undefined || !/^\d{4}\.\d{2}\.\d{2}$/.test(query.trim())) return undefined;
 
@@ -506,11 +511,13 @@ export async function executeWebFetch(
   const bomVersion = androidBomVersionQuery(sourceUrl, params.query);
 
   // Older persisted entries predate surface views and must not mask explicit selections.
-  const cacheKey = safeUrl(sourceUrl)?.searchParams.has("tab")
-    ? canonicalKey({ url: sourceUrl, surfaceExtraction: 1 })
-    : bomVersion
-      ? canonicalKey({ url: sourceUrl, androidBomVersion: bomVersion })
-      : canonicalKey({ url: sourceUrl });
+  const cacheDimensions: CacheDimensions = {};
+
+  if (safeUrl(sourceUrl)?.searchParams.has("tab")) cacheDimensions.surfaceExtraction = 1;
+
+  if (bomVersion) cacheDimensions.androidBomVersion = bomVersion;
+
+  const cacheKey = canonicalKey({ url: sourceUrl, ...cacheDimensions });
 
   let document = fetchCache.get(cacheKey);
   const now = Date.now();
@@ -674,7 +681,7 @@ export async function executeWebFetch(
       : document;
 
   const focused =
-    blocked || params.query === undefined
+    blocked || params.query === undefined || bomVersion
       ? undefined
       : focusMarkdown(fragmentDocument.markdown, params.query);
 

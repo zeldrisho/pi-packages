@@ -293,6 +293,30 @@ describe("discovered model routing", () => {
     });
   });
 
+  it("resolves account-advertised thinking metadata when no local budget override exists", async () => {
+    let requestBody = "";
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- provider request body is serialized JSON in this test
+      requestBody = typeof init.body === "string" ? init.body : "";
+
+      return sse([textFrame("OK")]);
+    });
+
+    const resolver = vi.fn(async () => ({ includeThoughts: true, thinkingBudget: 123 }));
+
+    const result = await createAntigravityStream(resolver)(streamModel, contextWith("Hi"), {
+      apiKey: API_KEY,
+      reasoning: "medium",
+    }).result();
+
+    expect(result.stopReason).toBe("stop");
+    expect(resolver).toHaveBeenCalledOnce();
+    expect(JSON.parse(requestBody).request.generationConfig.thinkingConfig).toEqual({
+      includeThoughts: true,
+      thinkingBudget: 123,
+    });
+  });
+
   it("uses the selected model's runtime mapping and limits, including models absent from the seed", async () => {
     let requestBody = "";
 
@@ -765,6 +789,34 @@ describe("stream implementation", () => {
 
     expect(types.at(-1)).toBe("error");
     expect(final?.errorMessage).toMatch(/denied access/);
+  });
+
+  it("classifies structured SSE terms violations as account suspension", async () => {
+    const { final } = await collect([
+      JSON.stringify({
+        error: {
+          code: 403,
+          message: "Request denied",
+          details: [{ reason: "TOS_VIOLATION" }],
+        },
+      }),
+    ]);
+
+    expect(final?.errorMessage).toMatch(/Terms of Service violation/);
+  });
+
+  it("classifies structured-only SSE capacity errors", async () => {
+    const { final } = await collect([
+      JSON.stringify({
+        error: {
+          code: 503,
+          message: "Request failed",
+          details: [{ reason: "MODEL_CAPACITY_EXHAUSTED" }],
+        },
+      }),
+    ]);
+
+    expect(final?.errorMessage).toMatch(/no capacity available/);
   });
 
   it("fails a stream that ends without a finish reason", async () => {

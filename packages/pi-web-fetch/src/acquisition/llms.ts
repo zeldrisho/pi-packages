@@ -133,7 +133,7 @@ export function documentationMarkdownUrl(value: string): URL | undefined {
 
 function isLowQualityDocument(document: CompleteDocument): boolean {
   // An authored fallback is readable content, so a site index would be a downgrade.
-  if (document.noscriptFallback) return false;
+  if (document.noscriptFallback && !document.extractionDiagnostics?.botWall) return false;
 
   // Sparse extraction alone is not proof of an empty app shell: server-rendered pages
   // may include useful content in streaming/framework markup that article extraction
