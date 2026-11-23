@@ -17,7 +17,7 @@ import {
 import type { ProviderConfig } from "@earendil-works/pi-coding-agent";
 import { resolveIdentity } from "./ids.ts";
 import { isBudgetRoute, overrideThinkingBudget } from "./budget-overrides.ts";
-import { ANTIGRAVITY_API, resolveRuntimeModel } from "./models.ts";
+import { ANTIGRAVITY_API, resolveRuntimeModel, thinkingConfig } from "./models.ts";
 import type { createThinkingMetadataResolver } from "./thinking-metadata.ts";
 import { isJsonNumber, isJsonObject, isJsonText, parseJsonValue } from "./json.ts";
 import { parseApiKey } from "./oauth.ts";
@@ -871,16 +871,32 @@ export function createAntigravityStream(
         const entry = { ...model, thinkingLevelMap: model.thinkingLevelMap ?? {} };
         const runtimeModel = resolveRuntimeModel(entry, options?.reasoning);
 
-        const discoveredThinkingConfig =
-          options?.reasoning === undefined || String(options.reasoning) === "off"
-            ? undefined
-            : await resolveThinking?.(
-                credentials.token,
-                credentials.projectId,
-                runtimeModel,
-                options.signal,
-                options.fetch,
-              );
+        // Live catalog lookup is only needed when Pi is overriding a route's
+        // advertised token budget. Named thinking levels are already encoded in
+        // the runtime model, and the normal budget defaults are local too. Avoid
+        // delaying every cold first request on an unnecessary metadata fetch.
+        const budgetOverrideRequested =
+          options?.reasoning !== undefined &&
+          (options.reasoning === "minimal" ||
+            options.reasoning === "low" ||
+            options.reasoning === "medium" ||
+            options.reasoning === "high") &&
+          options.thinkingBudgets?.[options.reasoning] !== undefined;
+
+        const liveThinkingMetadataNeeded =
+          options?.reasoning !== undefined &&
+          (budgetOverrideRequested ||
+            thinkingConfig(runtimeModel, options.reasoning) === undefined);
+
+        const discoveredThinkingConfig = liveThinkingMetadataNeeded
+          ? await resolveThinking?.(
+              credentials.token,
+              credentials.projectId,
+              runtimeModel,
+              options.signal,
+              options.fetch,
+            )
+          : undefined;
 
         const selectedThinkingConfig = overrideThinkingBudget({
           enabled: isBudgetRoute(entry.thinkingLevelMap, runtimeModel),
