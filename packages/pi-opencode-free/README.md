@@ -1,4 +1,4 @@
-# @zeldrisho/pi-opencode-free
+# pi-opencode-free
 
 Use OpenCode's free-tier models from Pi. This experimental extension is independently maintained, and access may change without notice. OpenCode states that its free-tier chat models require OpenCode; access from Pi is not guaranteed. No account, API key, or OpenCode installation is required by this extension.
 

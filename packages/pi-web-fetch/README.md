@@ -1,4 +1,4 @@
-# @zeldrisho/pi-web-fetch
+# pi-web-fetch
 
 Fetch bounded content from public HTTP(S) pages and source files with Pi. No API key is required.
 

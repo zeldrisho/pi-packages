@@ -1,4 +1,4 @@
-# @zeldrisho/pi-web-search
+# pi-web-search
 
 Search the public web with [Brave Search](https://brave.com/search/api/) from Pi.
 

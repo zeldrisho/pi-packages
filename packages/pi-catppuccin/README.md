@@ -1,4 +1,4 @@
-# @zeldrisho/pi-catppuccin
+# pi-catppuccin
 
 Catppuccin Mocha theme for Pi. Choose this fixed palette when you want Pi to use Catppuccin Mocha regardless of your terminal colors; choose Pi's built-in `system` theme to adapt to your terminal palette instead.
 

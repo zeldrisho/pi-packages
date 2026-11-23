@@ -1,4 +1,4 @@
-# @zeldrisho/pi-gate
+# pi-gate
 
 Pi extension that blocks or confirms `bash` tool calls and protects its configuration from `write` and `edit` calls.
 

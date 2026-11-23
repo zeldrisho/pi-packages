@@ -1,4 +1,4 @@
-# @zeldrisho/pi-antigravity
+# pi-antigravity
 
 Use Google Antigravity models from Pi with your Google AI Pro or Ultra subscription. The extension signs in with your Google account; no Gemini API key is required.
 
