@@ -5,13 +5,17 @@ description: Create or refresh reviewer-facing PR titles and descriptions. Use w
 
 # PR Writer
 
-Write the PR body as a cover note for reviewers, not a changelog, template,
-validation log, or file-by-file summary.
+Follow the target repository’s requirements for PR titles and descriptions,
+including any applicable PR template. Use this skill’s title and body guidance
+where the repository does not specify its own. By default, write the PR body
+as a cover note for reviewers, not a changelog, validation log, or file-by-file
+summary.
 
 ## Inspect the Change
 
-Requires authenticated `gh`. Inspect the current branch, working tree, PR,
-base branch, commits, and full diff:
+Requires authenticated `gh`. Check the target repository’s contribution guidance
+and PR templates. Inspect the current branch, working tree, PR, base branch,
+commits, and full diff:
 
 ```bash
 git branch --show-current
@@ -46,15 +50,19 @@ commit or existing PR text.
 
 ## Titles
 
-Use `<type>(<scope>): <subject>` or `<type>: <subject>`.
+Follow the target repository’s PR title requirements. If none are specified:
 
-Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`,
-`build`, `ci`, `chore`, and `revert`.
+- Use `<type>(<scope>): <subject>` or `<type>: <subject>`.
+- Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`,
+  `build`, `ci`, `chore`, and `revert`.
+- Choose the narrowest accurate type and scope.
+- Use `!` only when the change breaks an external contract.
 
-- Describe the dominant full-branch change with the narrowest accurate type
-  and scope.
-- Use `!` only when the change breaks an external contract, and explain the
-  affected surface in the body.
+For all titles:
+
+- Describe the dominant full-branch change.
+- If the change breaks an external contract, explain the affected surface in the
+  body.
 - Avoid vague subjects such as `update`, `cleanup`, `misc`, `fix stuff`,
   or `address feedback`. Do not add a trailing period.
 - Keep an existing title only when it still describes the whole diff.

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The `pr-writer` skill follows repository-specific PR title and description requirements, including PR templates, before applying its defaults.
+
 ## [0.1.6] - 2026-11-20
 
 ### Changed
