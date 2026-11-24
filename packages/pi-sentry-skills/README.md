@@ -5,6 +5,7 @@ Pi package of selected [Sentry agent skills](https://github.com/getsentry/skills
 | Skill             | Purpose                                                    |
 | ----------------- | ---------------------------------------------------------- |
 | `agents-md`       | Create and maintain repository agent instructions          |
+| `commit`          | Follow repo commit rules; default to Conventional Commits  |
 | `security-review` | Review code for exploitable security vulnerabilities       |
 | `pr-writer`       | Draft and update reviewer-facing pull request descriptions |
 

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The `commit` skill follows repository commit rules and defaults to Conventional Commits.
+
 ### Changed
 
 - The `pr-writer` skill follows repository-specific PR title and description requirements, including PR templates, before applying its defaults.
