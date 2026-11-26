@@ -11,7 +11,6 @@ Monorepo for my personal Pi extensions, skills, and themes.
 | [`@zeldrisho/pi-opencode-free`](packages/pi-opencode-free) | Extension | Use OpenCode's free-tier models                        | `pi install npm:@zeldrisho/pi-opencode-free` |
 | [`@zeldrisho/pi-web-fetch`](packages/pi-web-fetch)         | Extension | Fetch public web pages as bounded Markdown             | `pi install npm:@zeldrisho/pi-web-fetch`     |
 | [`@zeldrisho/pi-web-search`](packages/pi-web-search)       | Extension | Search the web with Brave Search                       | `pi install npm:@zeldrisho/pi-web-search`    |
-| [`@zeldrisho/pi-sentry-skills`](packages/pi-sentry-skills) | Skills    | Skills adapted from Sentry                             | `pi install npm:@zeldrisho/pi-sentry-skills` |
 | [`@zeldrisho/pi-catppuccin`](packages/pi-catppuccin)       | Theme     | Catppuccin Mocha theme for Pi                          | `pi install npm:@zeldrisho/pi-catppuccin`    |
 
 Install only the packages or resources you need using the commands above. See each package README for configuration, behavior, and usage.

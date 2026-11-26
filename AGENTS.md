@@ -2,7 +2,7 @@
 
 ## Project Structure
 
-This Vite+ and pnpm workspace publishes independent Pi packages from `packages/pi-*/`. Runtime TypeScript lives in `src/`, with package tests in `tests/` and fixtures in `tests/fixtures/` where needed. Themes ship from `packages/pi-catppuccin/themes/`, skills from `packages/pi-sentry-skills/skills/`, and generated fetch workers from `packages/pi-web-fetch/workers/`. Root `tests/` covers repository contracts and packaging; `scripts/` holds maintenance tasks. Keep package READMEs user-facing and maintenance notes in `docs/`.
+This Vite+ and pnpm workspace publishes independent Pi packages from `packages/pi-*/`. Runtime TypeScript lives in `src/`, with package tests in `tests/` and fixtures in `tests/fixtures/` where needed. Themes ship from `packages/pi-catppuccin/themes/`, and generated fetch workers from `packages/pi-web-fetch/workers/`. Root `tests/` covers repository contracts and packaging; `scripts/` holds maintenance tasks. Keep package READMEs user-facing and maintenance notes in `docs/`.
 
 ## Development Commands
 
