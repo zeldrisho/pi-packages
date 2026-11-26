@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve tool schema keys such as `__proto__` as data without changing the schema object's prototype.
+
 ## [0.2.1] - 2026-11-23
 
 ### Fixed

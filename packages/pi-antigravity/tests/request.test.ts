@@ -375,6 +375,41 @@ describe("schema normalization", () => {
     });
   });
 
+  it("preserves reserved names as own data properties through normalization and serialization", () => {
+    const key = "__proto__";
+
+    const schema = normalizeSchema({
+      type: "object",
+      [key]: { description: "Custom keyword" },
+      $defs: { Name: { type: "string", $id: "urn:test:name" } },
+      properties: {
+        [key]: { $ref: "#/$defs/Name" },
+        constructor: { type: "number" },
+        prototype: { type: "boolean" },
+      },
+    });
+
+    expect(Object.getPrototypeOf(schema)).toBe(Object.prototype);
+    expect(Object.getPrototypeOf(schema.properties)).toBe(Object.prototype);
+    expect(Object.getOwnPropertyDescriptor(schema, key)?.value).toEqual({
+      description: "Custom keyword",
+    });
+    expect(Object.getOwnPropertyDescriptor(schema.properties, key)?.value).toEqual({
+      type: "string",
+    });
+    expect(JSON.stringify(schema)).toBe(
+      JSON.stringify({
+        type: "object",
+        [key]: { description: "Custom keyword" },
+        properties: {
+          [key]: { type: "string" },
+          constructor: { type: "number" },
+          prototype: { type: "boolean" },
+        },
+      }),
+    );
+  });
+
   it("builds Gemini declarations with a JSON schema", () => {
     const tools = buildTools([BAKE_BREAD]);
 
