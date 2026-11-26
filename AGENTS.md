@@ -1,43 +1,28 @@
-# Agent Instructions
+# Repository Guidelines
 
-## Toolchain
+## Project Structure
 
-- Use **Vite+** (`vp install`) with the pnpm workspace and lockfile.
-- Use `vp run <name>` for project scripts; `vp <name>` invokes a built-in command.
-- Use `vp pm <command>` for package-manager commands Vite+ does not provide; it delegates to pnpm (for example, `vp pm publish`).
-- Use `fd` for file discovery.
-- Use `rg` for content search.
+This Vite+ and pnpm workspace publishes independent Pi packages from `packages/pi-*/`. Runtime TypeScript lives in `src/`, with package tests in `tests/` and fixtures in `tests/fixtures/` where needed. Themes ship from `packages/pi-catppuccin/themes/`, skills from `packages/pi-sentry-skills/skills/`, and generated fetch workers from `packages/pi-web-fetch/workers/`. Root `tests/` covers repository contracts and packaging; `scripts/` holds maintenance tasks. Keep package READMEs user-facing and maintenance notes in `docs/`.
 
-## Commands
+## Development Commands
 
-| Task                          | Command                              |
-| ----------------------------- | ------------------------------------ |
-| Run one test file             | `vp test <path-to-test>`             |
-| Package tests (if defined)    | `vp run '@zeldrisho/<package>#test'` |
-| Auto-fix formatting and lint  | `vp check --fix`                     |
-| Complete checks before review | `vp run ready`                       |
+Use the current Node.js LTS and run these from the repository root:
 
-## Rules
+- `vp install` installs workspace dependencies using the pnpm lockfile.
+- `vp check` checks formatting, lint, and types; `vp check --fix` applies available fixes.
+- `vp test <path>` runs focused tests, e.g. `vp test packages/pi-gate/tests/rules.test.ts`.
+- `vp run ready` runs the full CI gate, including coverage, tarball inspection, and packaged smoke tests. Smoke tests may require registry access.
 
-- Before implementing package changes, research related existing packages at `site:pi.dev/packages`.
-- Keep READMEs user-guide-only; put implementation and maintenance details in `docs/`.
-- Record only user-facing changes under `Unreleased` in package changelogs; run `vp run format:changelog` after edits.
-- Edit shared `cache.ts`, `inflight.ts`, and `render.ts` in `packages/pi-web-fetch/src/`, then run `vp run sync:web-modules` to update `pi-web-search`.
-- Read `docs/development.md` before runtime or dependency changes, especially its security and regression requirements.
-- Read `docs/architecture.md` before changing package boundaries, network acquisition, caching, or derived views.
-- Follow `docs/releasing.md` before version bumps, changelog edits, tags, or publishing.
-- Update work branches from their target before review.
+Pi loads TypeScript directly; there is no general build step. For local Pi testing, load only the affected packages and follow `docs/testing.md` for isolation and model selection.
 
-## References
+## Coding Style & Maintenance
 
-| Need                                            | File                                    |
-| ----------------------------------------------- | --------------------------------------- |
-| Package catalog                                 | `README.md`                             |
-| Setup, conventions, security, dependency policy | `docs/development.md`                   |
-| Architecture and network trust boundaries       | `docs/architecture.md`                  |
-| Release process                                 | `docs/releasing.md`                     |
-| Package behavior, setup, and usage              | `packages/<package>/README.md`          |
-| Package configuration schemas (when present)    | `packages/<package>/config.schema.json` |
-| Dependency catalog and override conditions      | `pnpm-workspace.yaml`                   |
-| Task definitions and test configuration         | `package.json`, `vite.config.ts`        |
-| CI checks                                       | `.github/workflows/ci.yml`              |
+Use two spaces, no tabs, and kebab-case filenames. Follow formatting and lint rules in `vite.config.ts`. Edit shared `cache.ts`, `inflight.ts`, and `render.ts` in `packages/pi-web-fetch/src/`, then run `vp run sync:web-modules`. Read `docs/development.md` before runtime or dependency changes and `docs/architecture.md` before changing network or cache behavior.
+
+## Testing
+
+Use Vitest and name new tests `*.test.ts`. Prefer deterministic fixtures and mocked external responses; add regression tests for boundary and failure paths. V8 coverage minimums apply per source file: 80% lines, 75% functions and statements, and 60% branches. Never commit live credentials.
+
+## Commits & Pull Requests
+
+Recent commits use short, action-oriented subjects, often with a type and optional scope (e.g. `fix(pi-antigravity): correct thinking lookup comment`). Update your branch from its target before review. Describe what changed and why, list verification results, and link relevant issues. Record user-facing changes under `Unreleased` in the package changelog and run `vp run format:changelog`.
