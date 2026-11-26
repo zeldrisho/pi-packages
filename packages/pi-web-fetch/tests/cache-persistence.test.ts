@@ -99,7 +99,6 @@ describe("web_fetch disk cache", () => {
     await writeFile(path, "this is not valid cache data", "utf8");
 
     const second = makeCache(directory, () => now);
-    expect(() => second.get("https://example.com/c")).not.toThrow();
     expect(second.get("https://example.com/c")).toBeUndefined();
   });
 
@@ -152,11 +151,10 @@ describe("web_fetch disk cache", () => {
     expect(dirStat.mode & 0o777).toBe(0o700);
   });
 
-  it("hashes keys into collision-resistant, filesystem-safe names", () => {
+  it("hashes distinct keys into distinct filesystem-safe names", () => {
     const key = "https://example.com/a/b?c=1&d=2";
-    expect(stableKeyHash(key)).not.toContain("/");
-    expect(stableKeyHash(key)).not.toContain(":");
-    expect(stableKeyHash(key)).toBe(stableKeyHash(key));
-    expect(stableKeyHash("a")).not.toBe(stableKeyHash("b"));
+    const filename = stableKeyHash(key);
+    expect(filename).toMatch(/^[a-f0-9]{64}$/u);
+    expect(filename).not.toBe(stableKeyHash(`${key}3`));
   });
 });

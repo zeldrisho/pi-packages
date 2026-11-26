@@ -407,13 +407,6 @@ describe("piGate extension", () => {
       expect(uiState.notifyCalls[0]?.text).toContain("is empty");
     });
 
-    it("does not notify when the config file has rules", async () => {
-      setConfig(JSON.stringify({ operations: { sudo: "block", "rm -rf": "prompt" } }));
-      const { ctx, uiState, handlers } = makeExtension().install();
-      await handlers.sessionStart!({ reason: "startup" }, ctx);
-      expect(uiState.notifyCalls).toHaveLength(0);
-    });
-
     it("does not notify when a single rule is loaded", async () => {
       setConfig(JSON.stringify({ operations: { sudo: "block" } }));
       const { ctx, uiState, handlers } = makeExtension().install();

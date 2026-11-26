@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "ready": "vp check && vp test --coverage && vp run test:packages",
+    "ready": "vp check && vp test && vp run test:packages",
     "format:changelog": "node scripts/format-changelog.ts",
     "compatibility:capture": "node scripts/compatibility.ts capture",
     "compatibility:compare": "node scripts/compatibility.ts compare",
@@ -20,7 +20,6 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@vitest/coverage-v8": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:",

@@ -410,27 +410,17 @@ describe("extension registration", () => {
     });
   });
 
-  it("registers the Antigravity provider once", () => {
+  it("registers the Antigravity provider with its catalog, streaming adapter, and Google sign-in", () => {
     const { name, config } = register();
 
     expect(name).toBe(PROVIDER_ID);
     expect(config.name).toBe("Antigravity");
     expect(config.api).toBe("antigravity");
     expect(config.baseUrl).toBe("https://daily-cloudcode-pa.googleapis.com");
-  });
-
-  it("registers the catalog and a streaming adapter", () => {
-    const { config } = register();
-
     expect(config.models?.map((model) => model.id)).toEqual(
       FALLBACK_MODELS.map((model) => model.id),
     );
     expect(config.streamSimple).toBeTypeOf("function");
-  });
-
-  it("offers Google sign-in backed by a subscription", () => {
-    const { config } = register();
-
     expect(config.oauth?.name).toContain("Google account");
     expect(config.oauth?.isSubscription).toBe(true);
     expect(Object.keys(config.oauth ?? {})).toEqual(

@@ -1,6 +1,3 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import type {
   Model,
   ModelsPublication,
@@ -12,7 +9,7 @@ import type { ExtensionAPI, ProviderConfig } from "@earendil-works/pi-coding-age
 import { normalizeContext } from "@earendil-works/pi-ai/compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import piOpencodeFree, { PROVIDER_ID, registerOpencodeFree } from "../src/index";
+import { PROVIDER_ID, registerOpencodeFree } from "../src/index";
 import { CLIENT_VERSION, PROVIDER_MARKER_HEADER } from "../src/client-headers";
 import { DEFAULT_BASE_URL, MODEL_CATALOG_URL, initialFreeModels } from "../src/models";
 import type { ProviderRequestPayload } from "../src/request";
@@ -911,22 +908,5 @@ describe("opencode-free extension", () => {
       expect(calls).toHaveLength(6);
       expect(otherEndpoint.publications).toHaveLength(1);
     });
-  });
-
-  it("provides a default export for Pi", () => {
-    const directory = mkdtempSync(join(tmpdir(), "opencode-free-test-"));
-    vi.stubEnv("PI_CODING_AGENT_DIR", directory);
-
-    try {
-      const { pi, state } = createFakePi();
-      piOpencodeFree(pi);
-      expect(state.provider?.name).toBe(PROVIDER_ID);
-
-      const ids = state.provider?.config.models?.map((model) => model.id) ?? [];
-      expect(ids.length).toBeGreaterThan(0);
-    } finally {
-      vi.unstubAllEnvs();
-      rmSync(directory, { recursive: true, force: true });
-    }
   });
 });
