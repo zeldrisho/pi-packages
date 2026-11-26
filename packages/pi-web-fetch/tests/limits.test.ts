@@ -36,22 +36,33 @@ describe("web_fetch limit contracts", () => {
       expect(Check(webFetchParameters, params)).toBe(false);
   });
 
-  it.each([
-    [{ url: "https://example.com", offset: 1.5 }, "offset must be an integer"],
-    [
-      { url: "x".repeat(FETCH_MAX_URL_CHARACTERS + 1) },
-      "url must contain between 1 and 2048 characters",
-    ],
-    [
-      { url: "https://example.com", offset: FETCH_MAX_OFFSET_CHARACTERS + 1 },
-      "offset must be an integer",
-    ],
-    [{ url: "https://example.com", maxCharacters: 1.5 }, "maxCharacters must be an integer"],
-    [
-      { url: "https://example.com", maxCharacters: FETCH_MAX_CHARACTERS + 1 },
-      "maxCharacters must be an integer",
-    ],
-  ])("enforces runtime limits for %j", async (params, message) => {
-    await expect(executeWebFetch(params, undefined, undefined)).rejects.toThrow(message);
+  it("rejects invalid URL lengths and numeric limits at runtime", async () => {
+    const url = "https://example.com";
+
+    const samples = [
+      ["fractional offset", { url, offset: 1.5 }, "offset must be an integer"],
+      [
+        "oversized URL",
+        { url: "x".repeat(FETCH_MAX_URL_CHARACTERS + 1) },
+        "url must contain between 1 and 2048 characters",
+      ],
+      [
+        "oversized offset",
+        { url, offset: FETCH_MAX_OFFSET_CHARACTERS + 1 },
+        "offset must be an integer",
+      ],
+      ["fractional maxCharacters", { url, maxCharacters: 1.5 }, "maxCharacters must be an integer"],
+      [
+        "oversized maxCharacters",
+        { url, maxCharacters: FETCH_MAX_CHARACTERS + 1 },
+        "maxCharacters must be an integer",
+      ],
+    ] as const;
+
+    for (const [label, params, message] of samples) {
+      await expect
+        .soft(executeWebFetch(params, undefined, undefined), label)
+        .rejects.toThrow(message);
+    }
   });
 });

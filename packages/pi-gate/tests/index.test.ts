@@ -532,27 +532,32 @@ describe("piGate extension", () => {
       expect(result).toBeUndefined();
     });
 
-    it.each(["echo sudo", "printf '%s' sudo", "git checkout-index --help"])(
-      "does not prompt for literal output or partial command names: %s",
-      async (command) => {
-        setConfig(JSON.stringify({ operations: { sudo: "prompt", "git checkout": "prompt" } }));
-        const { ctx, uiState, handlers } = makeExtension().install();
+    it("does not prompt for literal output or partial command names", async () => {
+      setConfig(JSON.stringify({ operations: { sudo: "prompt", "git checkout": "prompt" } }));
+      const { ctx, uiState, handlers } = makeExtension().install();
 
-        expect(await handlers.toolCall!(bashEvent(command), ctx)).toBeUndefined();
-        expect(uiState.selectCalls).toHaveLength(0);
-      },
-    );
+      for (const command of ["echo sudo", "printf '%s' sudo", "git checkout-index --help"]) {
+        expect.soft(await handlers.toolCall!(bashEvent(command), ctx), command).toBeUndefined();
+      }
 
-    it.each(["echo sudo; sudo true", "echo sudo | sh", "echo $(sudo true)"])(
-      "retains approval for real calls and uncertain shell syntax: %s",
-      async (command) => {
-        setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
-        const { ctx, uiState, handlers } = makeExtension().install();
+      expect(uiState.selectCalls).toHaveLength(0);
+    });
 
-        expect(await handlers.toolCall!(bashEvent(command), ctx)).toMatchObject({ block: true });
-        expect(uiState.selectCalls).toHaveLength(1);
-      },
-    );
+    it("retains approval for real calls and uncertain shell syntax", async () => {
+      setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
+      const { ctx, uiState, handlers } = makeExtension().install();
+
+      for (const [index, command] of [
+        "echo sudo; sudo true",
+        "echo sudo | sh",
+        "echo $(sudo true)",
+      ].entries()) {
+        expect
+          .soft(await handlers.toolCall!(bashEvent(command), ctx), command)
+          .toMatchObject({ block: true });
+        expect.soft(uiState.selectCalls, command).toHaveLength(index + 1);
+      }
+    });
 
     it("returns undefined when all rules are empty", async () => {
       setConfig('{"operations":{}}');
@@ -724,9 +729,8 @@ describe("piGate extension", () => {
       expect(uiState.selectCalls).toHaveLength(0);
     });
 
-    it.each(["abort", "session-change", "policy-change"])(
-      "denies a stale prompt after %s",
-      async (kind) => {
+    it("denies a stale prompt after abort, session change, or policy change", async () => {
+      for (const kind of ["abort", "session-change", "policy-change"] as const) {
         setConfig(JSON.stringify({ operations: { sudo: "prompt" } }));
         const { ctx, uiState, handlers } = makeExtension().install();
         const controller = new AbortController();
@@ -739,12 +743,12 @@ describe("piGate extension", () => {
           else setConfig(JSON.stringify({ operations: { sudo: "block" } }));
         };
 
-        expect(await handlers.toolCall!(bashEvent("sudo echo hi"), ctx)).toMatchObject({
+        expect.soft(await handlers.toolCall!(bashEvent("sudo echo hi"), ctx), kind).toMatchObject({
           block: true,
           reason: expect.stringContaining("cancelled or policy changed"),
         });
-      },
-    );
+      }
+    });
 
     it.each(["shutdown", "replacement"])(
       "cancels active and queued approvals on %s",

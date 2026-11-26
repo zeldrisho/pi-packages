@@ -187,40 +187,15 @@ describe("segmented compaction", () => {
     expect(harness.calls.length).toBeGreaterThanOrEqual(3);
     expect(harness.notifications.join(" ")).toContain("Compacted 60 messages");
     expect(harness.statuses.at(-1)).toBeUndefined();
-  });
-
-  it("leaves the answer cap to Pi so the window clamp decides", async () => {
-    const harness = createHarness({ contextWindow: 40_000 });
-
-    await harness.handler(harness.event, harness.context);
-
-    expect(harness.calls.length).toBeGreaterThan(0);
-
-    for (const call of harness.calls) {
-      expect(call.carriesCap).toBe(false);
-      // The advertised output limit must still fit beside the prompt, so Pi's clamp
-      // only trims it instead of cutting the answer to nothing.
-      expect(Math.ceil(call.prompt.length / 4) + 32_000).toBeLessThanOrEqual(40_000);
-    }
-  });
-
-  it("never requests a thinking level", async () => {
-    const harness = createHarness({ contextWindow: 40_000 });
-
-    await harness.handler(harness.event, harness.context);
-
-    expect(harness.calls.length).toBeGreaterThan(0);
-
-    for (const call of harness.calls) expect(call.reasoning).toBe(false);
-  });
-
-  it("accumulates usage across requests", async () => {
-    const harness = createHarness({ contextWindow: 40_000 });
-
-    const result = await harness.handler(harness.event, harness.context);
-
     expect(result?.compaction?.usage?.totalTokens).toBe(USAGE.totalTokens * harness.calls.length);
     expect(result?.compaction?.usage?.cost.total).toBe(0);
+
+    for (const call of harness.calls) {
+      expect(call.reasoning).toBe(false);
+      expect(call.carriesCap).toBe(false);
+      // Leave the cap to Pi while keeping room for the advertised output limit.
+      expect(Math.ceil(call.prompt.length / 4) + 32_000).toBeLessThanOrEqual(40_000);
+    }
   });
 
   it("splits a segment whose digest hits the token cap instead of keeping the partial text", async () => {

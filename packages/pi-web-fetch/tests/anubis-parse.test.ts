@@ -105,12 +105,11 @@ describe("parseAnubisChallenge", () => {
     ).toBeUndefined();
   });
 
-  it.each(["//evil.test", "/a/..", "/a/%2e%2e", "relative", "/a?b=1"])(
-    "returns undefined for an unsafe base prefix %s",
-    (basePrefix) => {
-      expect(parseAnubisChallenge(page({ basePrefix }), pageUrl)).toBeUndefined();
-    },
-  );
+  it("returns undefined for unsafe base prefixes", () => {
+    for (const basePrefix of ["//evil.test", "/a/..", "/a/%2e%2e", "relative", "/a?b=1"]) {
+      expect.soft(parseAnubisChallenge(page({ basePrefix }), pageUrl), basePrefix).toBeUndefined();
+    }
+  });
 
   it("rejects a non-string difficulty", () => {
     const challenge =
@@ -135,20 +134,16 @@ describe("parseAnubisChallenge", () => {
     expect(parseAnubisChallenge(page({}, challenge), pageUrl)).toBeUndefined();
   });
 
-  it.each([false, 0, "css-load", {}])("rejects malformed extensions %j", (extensions) => {
-    const challenge = JSON.stringify({
-      challenge: { id: "cid", method: "fast", randomData: "00", difficulty: 1, extensions },
-    });
+  it("rejects malformed extension lists", () => {
+    for (const extensions of [false, 0, "css-load", {}, [1]]) {
+      const challenge = JSON.stringify({
+        challenge: { id: "cid", method: "fast", randomData: "00", difficulty: 1, extensions },
+      });
 
-    expect(parseAnubisChallenge(page({}, challenge), pageUrl)).toBeUndefined();
-  });
-
-  it("rejects non-string extensions", () => {
-    const challenge = JSON.stringify({
-      challenge: { id: "cid", method: "fast", randomData: "00", difficulty: 1, extensions: [1] },
-    });
-
-    expect(parseAnubisChallenge(page({}, challenge), pageUrl)).toBeUndefined();
+      expect
+        .soft(parseAnubisChallenge(page({}, challenge), pageUrl), JSON.stringify(extensions))
+        .toBeUndefined();
+    }
   });
 
   it("rejects an unknown method shape", () => {

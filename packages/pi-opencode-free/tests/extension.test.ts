@@ -282,19 +282,16 @@ describe("opencode-free extension", () => {
     expect(state.handlers.has("before_provider_request")).toBe(false);
   });
 
-  it.each([
-    { OPENCODE_FREE_BASE_URL: " http://localhost:8080/v1/ " },
-    { OPENCODE_FREE_API_KEY: " secret " },
-    { OPENCODE_API_KEY: " paid " },
-    { OPENCODE_FREE_CLI_VERSION: "2.999.0" },
-    {
+  it("keeps discovery on the public endpoint despite obsolete environment overrides", async () => {
+    const { pi, state } = createFakePi();
+    const calls: string[] = [];
+
+    const environment = {
       OPENCODE_FREE_BASE_URL: " http://localhost:8080/v1/ ",
       OPENCODE_FREE_API_KEY: " secret ",
       OPENCODE_API_KEY: " paid ",
-    },
-  ])("ignores removed environment overrides: %j", async (environment) => {
-    const { pi, state } = createFakePi();
-    const calls: string[] = [];
+      OPENCODE_FREE_CLI_VERSION: "2.999.0",
+    };
 
     registerOpencodeFree(pi, dependencies(environment, discoveryFetcher(calls)));
 
@@ -511,9 +508,15 @@ describe("opencode-free extension", () => {
       expect(publications[0]?.persist?.checkedAt).toBe(now);
     });
 
-    it.each([undefined, Number.NaN, Number.POSITIVE_INFINITY, -1, start + 1, start - ttl])(
-      "refreshes stored models with an absent, invalid, future, or expired timestamp: %s",
-      async (checkedAt) => {
+    it("refreshes stored models with an absent, invalid, future, or expired timestamp", async () => {
+      for (const checkedAt of [
+        undefined,
+        Number.NaN,
+        Number.POSITIVE_INFINITY,
+        -1,
+        start + 1,
+        start - ttl,
+      ]) {
         const calls: string[] = [];
         const config = provider(discoveryFetcher(calls));
 
@@ -523,13 +526,12 @@ describe("opencode-free extension", () => {
         });
 
         await refreshModels(config, context);
-        expect(calls).toHaveLength(2);
-      },
-    );
+        expect.soft(calls, String(checkedAt)).toHaveLength(2);
+      }
+    });
 
-    it.each([{ models: [] }, { models: [{ ...storedModel, provider: "other" }] }])(
-      "does not treat a timestamp without usable models as a fresh catalog: %j",
-      async ({ models }) => {
+    it("does not treat a timestamp without usable models as a fresh catalog", async () => {
+      for (const models of [[], [{ ...storedModel, provider: "other" }]]) {
         const calls: string[] = [];
         const config = provider(discoveryFetcher(calls));
 
@@ -539,9 +541,9 @@ describe("opencode-free extension", () => {
         });
 
         await refreshModels(config, context);
-        expect(calls).toHaveLength(2);
-      },
-    );
+        expect.soft(calls, models.length ? "other provider" : "empty catalog").toHaveLength(2);
+      }
+    });
 
     it.each([false, true])(
       "caches successful discovery in memory even when persistence throws: %s",
@@ -750,35 +752,37 @@ describe("opencode-free extension", () => {
       expect(calls).toHaveLength(2);
     });
 
-    it.each([404, 501])("persists native missing-catalog markers for HTTP %s", async (status) => {
-      const calls: string[] = [];
-      const successfulFetch = discoveryFetcher(calls);
-      const builtin = initialFreeModels()[0];
+    it("persists native missing-catalog markers for absent catalog endpoints", async () => {
+      for (const status of [404, 501]) {
+        now = start;
+        const calls: string[] = [];
+        const successfulFetch = discoveryFetcher(calls);
+        const builtin = initialFreeModels()[0];
 
-      if (!builtin) throw new Error("missing bundled model");
+        if (!builtin) throw new Error("missing bundled model");
 
-      const config = provider(async (input, init) => {
-        const response = await successfulFetch(input, init);
+        const config = provider(async (input, init) => {
+          const response = await successfulFetch(input, init);
 
-        if (input === MODEL_CATALOG_URL) return new Response(null, { status });
+          if (input === MODEL_CATALOG_URL) return new Response(null, { status });
 
-        return input === `${DEFAULT_BASE_URL}/models`
-          ? Response.json({ data: [{ id: builtin.id }] })
-          : response;
-      });
+          return input === `${DEFAULT_BASE_URL}/models`
+            ? Response.json({ data: [{ id: builtin.id }] })
+            : response;
+        });
 
-      const { context, publications } = refreshContext({ allowNetwork: true });
-      expect(await refreshModels(config, context)).toEqual([builtin]);
-      expect(publications[0]?.persist).toMatchObject({ lastModified: 0, checkedAt: now });
-      expect(publications[0]?.persist?.etag).toBeUndefined();
-      now += ttl - 1;
-      await refreshModels(config, context);
-      expect(calls).toHaveLength(2);
+        const { context, publications } = refreshContext({ allowNetwork: true });
+        expect.soft(await refreshModels(config, context), String(status)).toEqual([builtin]);
+        expect.soft(publications[0]?.persist).toMatchObject({ lastModified: 0, checkedAt: now });
+        expect.soft(publications[0]?.persist?.etag).toBeUndefined();
+        now += ttl - 1;
+        await refreshModels(config, context);
+        expect.soft(calls, String(status)).toHaveLength(2);
+      }
     });
 
-    it.each(["transport", "invalid-json"])(
-      "does not advance freshness on catalog %s failures",
-      async (failure) => {
+    it("does not advance freshness on catalog transport or parse failures", async () => {
+      for (const failure of ["transport", "invalid-json"] as const) {
         const calls: string[] = [];
         const successfulFetch = discoveryFetcher(calls);
 
@@ -799,12 +803,12 @@ describe("opencode-free extension", () => {
           stored: { models: [storedModel], checkedAt: start - ttl, lastModified: 0 },
         });
 
-        expect((await refreshModels(config, context))[0]?.id).toBe("cached-free");
+        expect.soft((await refreshModels(config, context))[0]?.id, failure).toBe("cached-free");
         await refreshModels(config, context);
-        expect(calls).toHaveLength(4);
-        expect(publications).toEqual([]);
-      },
-    );
+        expect.soft(calls, failure).toHaveLength(4);
+        expect.soft(publications, failure).toEqual([]);
+      }
+    });
 
     it("rechecks legacy snapshots without Last-Modified instead of trusting checkedAt alone", async () => {
       const calls: string[] = [];
@@ -841,18 +845,20 @@ describe("opencode-free extension", () => {
       expect(calls).toHaveLength(6);
     });
 
-    it.each(["offline", "aborted"])("never lets force override %s mode", async (mode) => {
-      const calls: string[] = [];
-      const config = provider(discoveryFetcher(calls));
+    it("never lets force override offline or aborted mode", async () => {
+      for (const mode of ["offline", "aborted"] as const) {
+        const calls: string[] = [];
+        const config = provider(discoveryFetcher(calls));
 
-      const { context } = refreshContext({
-        allowNetwork: mode !== "offline",
-        force: true,
-        signal: mode === "aborted" ? AbortSignal.abort() : undefined,
-      });
+        const { context } = refreshContext({
+          allowNetwork: mode !== "offline",
+          force: true,
+          signal: mode === "aborted" ? AbortSignal.abort() : undefined,
+        });
 
-      expect(await refreshModels(config, context)).toEqual(initialFreeModels());
-      expect(calls).toEqual([]);
+        expect.soft(await refreshModels(config, context), mode).toEqual(initialFreeModels());
+        expect.soft(calls, mode).toEqual([]);
+      }
     });
 
     it("does not advance freshness after caller cancellation during discovery", async () => {

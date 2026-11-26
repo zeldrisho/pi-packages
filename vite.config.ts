@@ -10,6 +10,16 @@ export default defineConfig({
   test: {
     setupFiles: [join(repoRoot, "tests", "cache-env.setup.ts")],
   },
+  run: {
+    tasks: {
+      ready: {
+        command: "vp test",
+        dependsOn: ["ready:check", "test:packages"],
+        cache: false,
+      },
+      "ready:check": { command: "vp check", cache: false },
+    },
+  },
   fmt: {
     ignorePatterns: [
       "dist/**",

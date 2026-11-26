@@ -380,9 +380,8 @@ describe("executeWebFetch llms.txt support", () => {
     expect(result.content[0]?.text).not.toContain(`Index: ${index}`);
   });
 
-  it.each([true, false])(
-    "suppresses only equivalent index links (identical: %s)",
-    async (identical) => {
+  it("suppresses equivalent index links but preserves links to distinct indexes", async () => {
+    for (const identical of [true, false]) {
       const origin = `https://${identical ? "same" : "distinct"}-aliases.example.com`;
       const root = `${origin}/llms.txt`;
       const section = `${origin}/docs/llms.txt`;
@@ -411,48 +410,48 @@ describe("executeWebFetch llms.txt support", () => {
         dependencies,
       );
 
-      expect(result.details.llmsTxtUrl).toBe(section);
-      expect(result.content[0]?.text).toContain(`Documentation index: ${root}`);
+      expect.soft(result.details.llmsTxtUrl, origin).toBe(section);
+      expect.soft(result.content[0]?.text, origin).toContain(`Documentation index: ${root}`);
+      expect.soft(result.content[0]?.text.includes(`Index: ${section}`), origin).toBe(!identical);
+    }
+  });
 
-      if (identical) expect(result.content[0]?.text).not.toContain(`Index: ${section}`);
-      else expect(result.content[0]?.text).toContain(`Index: ${section}`);
-    },
-  );
+  it("suppresses index notices only when the matching link is already visible", async () => {
+    const samples = [
+      ["[llms.txt](/llms.txt)", false],
+      ["[index](../llms.txt)", true],
+      ["[index](https://elsewhere.example/llms.txt)", false],
+      ["[index](/llms.txt-other)", false],
+      ["llms.txt", false],
+    ] as const;
 
-  it.each([
-    ["[llms.txt](/llms.txt)", false],
-    ["[index](../llms.txt)", true],
-    ["[index](https://elsewhere.example/llms.txt)", false],
-    ["[index](/llms.txt-other)", false],
-    ["llms.txt", false],
-  ])("recognizes visible same-origin index links: %s", async (link, suppress) => {
-    const origin = `https://links-${suppress ? "yes" : "no"}-${link.length}.example.com`;
-    const section = `${origin}/docs/llms.txt`;
+    for (const [link, suppress] of samples) {
+      const origin = `https://links-${suppress ? "yes" : "no"}-${link.length}.example.com`;
+      const section = `${origin}/docs/llms.txt`;
 
-    const { dependencies } = recordingDependencies((href) => {
-      if (href === section) return fakeResponse(200, "text/markdown", LLMS_TXT);
+      const { dependencies } = recordingDependencies((href) => {
+        if (href === section) return fakeResponse(200, "text/markdown", LLMS_TXT);
 
-      if (href.endsWith("/llms.txt")) return fakeResponse(404, "text/plain", "Not Found");
+        if (href.endsWith("/llms.txt")) return fakeResponse(404, "text/plain", "Not Found");
 
-      return fakeResponse(
-        200,
-        "text/plain",
-        `Documentation: ${link}\n${"Page content. ".repeat(30)}`,
+        return fakeResponse(
+          200,
+          "text/plain",
+          `Documentation: ${link}\n${"Page content. ".repeat(30)}`,
+        );
+      });
+
+      const result = await executeWebFetch(
+        { url: `${origin}/docs/guides/page` },
+        undefined,
+        undefined,
+        dependencies,
       );
-    });
 
-    const result = await executeWebFetch(
-      { url: `${origin}/docs/guides/page` },
-      undefined,
-      undefined,
-      dependencies,
-    );
-
-    expect(result.details.llmsTxtUrl).toBe(section);
-    expect(result.content[0]?.text).toContain(link);
-
-    if (suppress) expect(result.content[0]?.text).not.toContain(`Index: ${section}`);
-    else expect(result.content[0]?.text).toContain(`Index: ${section}`);
+      expect.soft(result.details.llmsTxtUrl, link).toBe(section);
+      expect.soft(result.content[0]?.text, link).toContain(link);
+      expect.soft(result.content[0]?.text.includes(`Index: ${section}`), link).toBe(!suppress);
+    }
   });
 
   it("prefers a deeper section index over the site-wide one", async () => {
@@ -802,14 +801,15 @@ describe("executeWebFetch llms.txt support", () => {
     expect(result.details.shellSuspected).toBe(true);
   });
 
-  it.each([
-    { name: "plain", offset: undefined, query: undefined, fragment: "" },
-    { name: "continuation", offset: 100, query: undefined, fragment: "" },
-    { name: "focus", offset: undefined, query: "Anubis", fragment: "" },
-    { name: "fragment", offset: undefined, query: undefined, fragment: "#verification" },
-  ])(
-    "reports and does not cache an Anubis challenge ($name)",
-    async ({ name, offset, query, fragment }) => {
+  it("reports uncached Anubis challenges consistently across output views", async () => {
+    const views = [
+      { name: "plain", offset: undefined, query: undefined, fragment: "" },
+      { name: "continuation", offset: 100, query: undefined, fragment: "" },
+      { name: "focus", offset: undefined, query: "Anubis", fragment: "" },
+      { name: "fragment", offset: undefined, query: undefined, fragment: "#verification" },
+    ];
+
+    for (const { name, offset, query, fragment } of views) {
       const { dependencies, requests } = recordingDependencies((href) =>
         href.endsWith("/llms.txt")
           ? fakeResponse(404, "text/plain", "Not Found")
@@ -826,24 +826,31 @@ describe("executeWebFetch llms.txt support", () => {
       const first = await executeWebFetch(params, undefined, undefined, dependencies);
       const second = await executeWebFetch(params, undefined, undefined, dependencies);
 
-      expect(first.details.extractionDiagnostics?.botWall).toBe(true);
-      expect(first.details.title).toBeUndefined();
-      expect(first.content[0]?.text).toBe(
-        "Blocked by an anti-bot challenge. Requested page content is unavailable.",
-      );
-      expect(first.content[0]?.text).not.toContain("administrator");
-      expect(first.details.truncated).toBe(false);
-      expect(first.details.nextOffset).toBeUndefined();
-      expect(first.details.totalCharacters).toBe(0);
-      expect(first.details.characterCount).toBe(0);
-      expect(first.details.offset).toBe(0);
-      expect(first.details.focus).toBeUndefined();
-      expect(first.details.outline.headings).toEqual([]);
-      expect(first.details.links).toBeUndefined();
-      expect(second.details.cacheStatus).toBe("miss");
-      expect(requests.filter((request) => request === url)).toHaveLength(2);
-    },
-  );
+      expect
+        .soft(first.content[0]?.text, name)
+        .toBe("Blocked by an anti-bot challenge. Requested page content is unavailable.");
+      expect.soft(first.details, name).toMatchObject({
+        extractionDiagnostics: { botWall: true },
+        truncated: false,
+        totalCharacters: 0,
+        characterCount: 0,
+        offset: 0,
+        outline: { headings: [] },
+      });
+
+      for (const field of ["title", "nextOffset", "focus", "links"] as const) {
+        expect.soft(first.details[field], `${name}: ${field}`).toBeUndefined();
+      }
+
+      expect.soft(second.details.cacheStatus, name).toBe("miss");
+      expect
+        .soft(
+          requests.filter((request) => request === url),
+          name,
+        )
+        .toHaveLength(2);
+    }
+  });
 
   it("caches the per-origin probe across pages on the same origin", async () => {
     const { dependencies, requests } = recordingDependencies((href) =>

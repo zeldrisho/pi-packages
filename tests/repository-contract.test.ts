@@ -43,8 +43,6 @@ const packageSpecificFiles = new Map([
   ["pi-web-fetch", ["workers"]],
 ]);
 
-const promptPackages = new Set<string>();
-
 const themePackages = new Set(["pi-catppuccin"]);
 
 const expectedScripts = {
@@ -418,7 +416,7 @@ describe("repository contracts", () => {
     // packages use `files: ["src", ...]` and Pi loads TypeScript directly —
     // a stray `src/*.js` would be published without a build step.
     for (const directory of packageDirectories) {
-      if (promptPackages.has(directory) || themePackages.has(directory)) continue;
+      if (themePackages.has(directory)) continue;
       const stack = [join(packagesDirectory, directory, "src")];
 
       while (stack.length > 0) {
@@ -453,13 +451,11 @@ describe("repository contracts", () => {
         await readFile(join(packageDirectory, "tsconfig.json"), "utf8"),
       );
 
-      const isPromptPackage = promptPackages.has(directory);
       const isThemePackage = themePackages.has(directory);
 
       const expectedName = `@zeldrisho/${directory}`;
       const packageReadme = `https://github.com/zeldrisho/pi-packages/tree/main/packages/${directory}#readme`;
       const packagePath = join("packages", directory);
-      const isContentOnly = isPromptPackage || isThemePackage;
       const changelog = await readFile(join(packageDirectory, "CHANGELOG.md"), "utf8");
 
       if (manifest.name !== expectedName) {
@@ -497,7 +493,7 @@ describe("repository contracts", () => {
         fail(`${manifest.name} must rely on npm's automatic README and LICENSE inclusion`);
       }
 
-      if (!isContentOnly) {
+      if (!isThemePackage) {
         if (JSON.stringify(manifest.scripts) !== JSON.stringify(expectedScripts)) {
           fail(`${manifest.name} scripts must match the extension package scripts`);
         }
@@ -505,7 +501,7 @@ describe("repository contracts", () => {
         fail(`${manifest.name} content-only packages must not declare package-local tooling`);
       }
 
-      const expectedPackageTypeScriptConfiguration = isContentOnly
+      const expectedPackageTypeScriptConfiguration = isThemePackage
         ? expectedContentOnlyTypeScriptConfiguration
         : expectedTypeScriptConfiguration;
 
@@ -516,11 +512,9 @@ describe("repository contracts", () => {
         fail(`${manifest.name} tsconfig.json does not match its package type`);
       }
 
-      const packageFiles = isPromptPackage
-        ? ["prompts", "CHANGELOG.md"]
-        : isThemePackage
-          ? ["themes", "CHANGELOG.md"]
-          : [...expectedFiles, ...(packageSpecificFiles.get(directory) ?? [])];
+      const packageFiles = isThemePackage
+        ? ["themes", "CHANGELOG.md"]
+        : [...expectedFiles, ...(packageSpecificFiles.get(directory) ?? [])];
 
       if (!sameValues(manifest.files ?? [], packageFiles)) {
         fail(
@@ -540,11 +534,7 @@ describe("repository contracts", () => {
         }
       }
 
-      if (isPromptPackage) {
-        if (JSON.stringify(manifest.pi?.prompts) !== JSON.stringify(["./prompts"])) {
-          fail(`${manifest.name} must expose only ./prompts as its Pi prompts`);
-        }
-      } else if (isThemePackage) {
+      if (isThemePackage) {
         if (JSON.stringify(manifest.pi?.themes) !== JSON.stringify(["./themes"])) {
           fail(`${manifest.name} must expose only ./themes as its Pi themes`);
         }

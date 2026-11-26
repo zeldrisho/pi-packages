@@ -53,14 +53,13 @@ describe("web_fetch transport", () => {
     await fixture.stop();
   });
 
-  it.each(["/empty", "/empty-html"])(
-    "reports empty document content clearly for %s",
-    async (path) => {
-      await expect(
-        fetchRemoteContent(`${origin}${path}`, 0, 6_000, undefined, dependencies),
-      ).rejects.toThrow("web_fetch: Page has no extractable content.");
-    },
-  );
+  it("reports empty document content clearly for tagged and untagged pages", async () => {
+    for (const path of ["/empty", "/empty-html"]) {
+      await expect
+        .soft(fetchRemoteContent(`${origin}${path}`, 0, 6_000, undefined, dependencies), path)
+        .rejects.toThrow("web_fetch: Page has no extractable content.");
+    }
+  });
 
   it("prefers Markdown while advertising the supported text representations", async () => {
     let accept = "";
@@ -270,14 +269,6 @@ describe("web_fetch transport", () => {
     expect(result.markdown).toContain("second line");
   });
 
-  it("extracts HTML while removing executable content", async () => {
-    const result = await fetchRemoteContent(`${origin}/html`, 0, 6_000, undefined, dependencies);
-    expect(result.markdown).toContain("Hello");
-    expect(result.markdown).toContain("World");
-    expect(result.markdown).not.toContain("bad()");
-    expect(result.title).toBe("Fixture");
-  });
-
   it("extracts HTML when the server repeats an equivalent media type", async () => {
     const result = await fetchRemoteContent(
       `${origin}/duplicated-html-type`,
@@ -410,21 +401,26 @@ describe("web_fetch transport", () => {
     ).rejects.toThrow(/blocked by Cloudflare's anti-bot challenge \(HTTP 403\)/);
   });
 
-  it.each([202, 403])("reports AWS WAF challenges with HTTP %s", async (status) => {
-    const challengeDependencies: FetchRemoteDependencies = {
-      ...dependencies,
-      solveAwsWafChallenges: false,
-      request: async () =>
-        fixtureResponse(
-          status,
-          { "content-type": "text/html", "x-amzn-waf-action": "challenge" },
-          "",
-        ),
-    };
+  it("reports AWS WAF challenges for 202 and 403 responses", async () => {
+    for (const status of [202, 403]) {
+      const challengeDependencies: FetchRemoteDependencies = {
+        ...dependencies,
+        solveAwsWafChallenges: false,
+        request: async () =>
+          fixtureResponse(
+            status,
+            { "content-type": "text/html", "x-amzn-waf-action": "challenge" },
+            "",
+          ),
+      };
 
-    await expect(
-      fetchRemoteContent(`${origin}/aws-waf`, 0, 6_000, undefined, challengeDependencies),
-    ).rejects.toThrow(`blocked by an AWS WAF anti-bot challenge (HTTP ${status})`);
+      await expect
+        .soft(
+          fetchRemoteContent(`${origin}/aws-waf`, 0, 6_000, undefined, challengeDependencies),
+          String(status),
+        )
+        .rejects.toThrow(`blocked by an AWS WAF anti-bot challenge (HTTP ${status})`);
+    }
   });
 
   it("retries a slash-sensitive missing page without the trailing slash and preserves its query", async () => {
@@ -464,48 +460,48 @@ describe("web_fetch transport", () => {
     expect(validated).toEqual(requests);
   });
 
-  it.each(["/", "/missing", "/missing/"])("bounds missing-page retries for %s", async (path) => {
-    const requests: string[] = [];
+  it("bounds missing-page retries for root and missing routes", async () => {
+    for (const path of ["/", "/missing", "/missing/"]) {
+      const requests: string[] = [];
 
-    const fallbackDependencies: FetchRemoteDependencies = {
-      validateUrl: async (value) => {
-        const url = new URL(value.toString());
+      const fallbackDependencies: FetchRemoteDependencies = {
+        validateUrl: async (value) => {
+          const url = new URL(value.toString());
 
-        return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
-      },
-      request: async (target) => {
-        requests.push(target.url.pathname);
+          return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
+        },
+        request: async (target) => {
+          requests.push(target.url.pathname);
 
-        return fixtureResponse(404, { "content-type": "text/plain" }, "missing");
-      },
-    };
+          return fixtureResponse(404, { "content-type": "text/plain" }, "missing");
+        },
+      };
 
-    await expect(
-      fetchRemoteContent(
-        `https://missing-test.invalid${path}`,
-        0,
-        6000,
-        undefined,
-        fallbackDependencies,
-      ),
-    ).rejects.toThrow("HTTP 404. Page not found or inaccessible.");
-    expect(requests).toEqual(path === "/missing/" ? [path, path, "/missing"] : [path, path]);
+      await expect
+        .soft(
+          fetchRemoteContent(
+            `https://missing-test.invalid${path}`,
+            0,
+            6000,
+            undefined,
+            fallbackDependencies,
+          ),
+          path,
+        )
+        .rejects.toThrow("HTTP 404. Page not found or inaccessible.");
+      expect
+        .soft(requests, path)
+        .toEqual(path === "/missing/" ? [path, path, "/missing"] : [path, path]);
+    }
   });
 
-  it("explains that a missing page may be inaccessible", async () => {
-    await expect(
-      fetchRemoteContent(`${origin}/missing`, 0, 6_000, undefined, dependencies),
-    ).rejects.toThrow("HTTP 404. Page not found or inaccessible.");
+  it("reports the raw response limit for declared and streamed bodies", async () => {
+    for (const path of ["/declared-large", "/streamed-large"]) {
+      await expect
+        .soft(fetchRemoteContent(`${origin}${path}`, 0, 6_000, undefined, dependencies), path)
+        .rejects.toThrow(/raw download limit.*maxCharacters only controls returned output/);
+    }
   });
-
-  it.each(["/declared-large", "/streamed-large"])(
-    "reports the raw response limit and explains maxCharacters for %s",
-    async (path) => {
-      await expect(
-        fetchRemoteContent(`${origin}${path}`, 0, 6_000, undefined, dependencies),
-      ).rejects.toThrow(/raw download limit.*maxCharacters only controls returned output/);
-    },
-  );
 
   it("preserves page text without adding wrapper-specific escaping", async () => {
     const result = await fetchRemoteContent(

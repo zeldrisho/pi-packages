@@ -223,14 +223,22 @@ describe("query-focused Markdown", () => {
     expect(focusMarkdown("Cached pages expire.", "caching").markdown).toContain("Cached");
   });
 
-  it.each([
-    ["cache", "caches"],
-    ["archive", "archives"],
-    ["string", "strings"],
-    ["process", "processes"],
-  ])("matches %s and %s in either direction", (singular, plural) => {
-    expect(focusMarkdown(`Target: ${plural}`, singular).markdown).toContain(plural);
-    expect(focusMarkdown(`Target: ${singular}`, plural).markdown).toContain(singular);
+  it("matches singulars and plurals in either direction", () => {
+    const pairs = [
+      ["cache", "caches"],
+      ["archive", "archives"],
+      ["string", "strings"],
+      ["process", "processes"],
+    ] as const;
+
+    for (const [singular, plural] of pairs) {
+      expect
+        .soft(focusMarkdown(`Target: ${plural}`, singular).markdown, singular)
+        .toContain(plural);
+      expect
+        .soft(focusMarkdown(`Target: ${singular}`, plural).markdown, plural)
+        .toContain(singular);
+    }
   });
 
   it("does not confuse plural stems with unrelated words", () => {
@@ -264,46 +272,50 @@ describe("query-focused Markdown", () => {
     expect(result.markdown.indexOf("needle")).toBeLessThan(6000);
   });
 
-  it.each([
-    [
-      "grammy commands",
-      "bot.command",
-      "## Commands\n\nUse `bot.command` for handlers.\n\n## Menus\n\nConfigure menus.",
-      "Use `bot.command`",
-      "Configure menus",
-    ],
-    [
-      "admin provider",
-      "dataProvider",
-      "## Provider\n\nSet the `dataProvider` prop.\n\n## Theme\n\nChoose colors.",
-      "dataProvider",
-      "Choose colors",
-    ],
-    [
-      "worker cron",
-      "scheduled handler",
-      "## Cron\n\nUse a scheduled handler for cron triggers.\n\n## HTTP\n\nHandle requests.",
-      "scheduled handler",
-      "Handle requests",
-    ],
-    [
-      "D1 API",
-      "env.DB.prepare",
-      "## D1\n\n```js\nenv.DB.prepare(sql)\n```\n\n## KV\n\nUse KV.",
-      "env.DB.prepare",
-      "Use KV",
-    ],
-    [
-      "package catalog",
-      "web fetch",
-      "### pi-web-access\n\nWeb search and fetch tools.\n\n### pi-theme\n\nA theme.",
-      "pi-web-access",
-      "pi-theme",
-    ],
-  ])("focuses representative %s documentation", (_name, query, markdown, expected, omitted) => {
-    const result = focusMarkdown(markdown, query);
-    expect(result.markdown).toContain(expected);
-    expect(result.markdown).not.toContain(omitted);
+  it("selects matching sections and omits unrelated sections in representative documentation", () => {
+    const samples = [
+      [
+        "grammy commands",
+        "bot.command",
+        "## Commands\n\nUse `bot.command` for handlers.\n\n## Menus\n\nConfigure menus.",
+        "Use `bot.command`",
+        "Configure menus",
+      ],
+      [
+        "admin provider",
+        "dataProvider",
+        "## Provider\n\nSet the `dataProvider` prop.\n\n## Theme\n\nChoose colors.",
+        "dataProvider",
+        "Choose colors",
+      ],
+      [
+        "worker cron",
+        "scheduled handler",
+        "## Cron\n\nUse a scheduled handler for cron triggers.\n\n## HTTP\n\nHandle requests.",
+        "scheduled handler",
+        "Handle requests",
+      ],
+      [
+        "D1 API",
+        "env.DB.prepare",
+        "## D1\n\n```js\nenv.DB.prepare(sql)\n```\n\n## KV\n\nUse KV.",
+        "env.DB.prepare",
+        "Use KV",
+      ],
+      [
+        "package catalog",
+        "web fetch",
+        "### pi-web-access\n\nWeb search and fetch tools.\n\n### pi-theme\n\nA theme.",
+        "pi-web-access",
+        "pi-theme",
+      ],
+    ] as const;
+
+    for (const [name, query, markdown, expected, omitted] of samples) {
+      const result = focusMarkdown(markdown, query);
+      expect.soft(result.markdown, name).toContain(expected);
+      expect.soft(result.markdown, name).not.toContain(omitted);
+    }
   });
 
   it("returns honest empty evidence when no section matches", () => {

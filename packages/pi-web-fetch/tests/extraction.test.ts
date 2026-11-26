@@ -32,7 +32,10 @@ describe("extracted CSS cleanup", () => {
       "Readable prose remains.",
     ].join("\n");
 
-    expect(stripExtractedCssCruft(markdown)).toBe("# Guide\n\nReadable prose remains.");
+    const cleaned = stripExtractedCssCruft(markdown);
+
+    expect(cleaned).toBe("# Guide\n\nReadable prose remains.");
+    expect(stripExtractedCssCruft(cleaned)).toBe(cleaned);
   });
 
   it("does not recreate style elements when nested fragments are removed", () => {
@@ -79,13 +82,6 @@ describe("extracted CSS cleanup", () => {
     ].join("\n");
 
     expect(stripExtractedCssCruft(markdown)).toBe(markdown);
-  });
-
-  it("is idempotent", () => {
-    const markdown = "Intro.\n.foo { color: red; }\nOutro.";
-    const cleaned = stripExtractedCssCruft(markdown);
-
-    expect(stripExtractedCssCruft(cleaned)).toBe(cleaned);
   });
 });
 
@@ -392,32 +388,32 @@ describe("conversion depth bounds", () => {
     expect(exceedsConversionDepth(script)).toBe(false);
   });
 
-  it.each(['<div x=a">', "<div x=a'>", '<div x=a=" >', "<div x=a=' >"])(
-    "does not let quotes inside unquoted attributes hide nesting: %s",
-    (tag) => {
-      expect(exceedsConversionDepth(tag.repeat(MAX_CONVERSION_DEPTH + 1))).toBe(true);
-    },
-  );
+  it("does not let quotes inside unquoted attributes hide nesting", () => {
+    for (const tag of ['<div x=a">', "<div x=a'>", '<div x=a=" >', "<div x=a=' >"]) {
+      expect.soft(exceedsConversionDepth(tag.repeat(MAX_CONVERSION_DEPTH + 1)), tag).toBe(true);
+    }
+  });
 
-  it.each(['"', "'"])("preserves properly quoted attribute values: %s", (quote) => {
+  it("preserves properly quoted attribute values", () => {
     const value = `> ${"<div>".repeat(MAX_CONVERSION_DEPTH + 1)}`;
-    const html = `<div x= \t\n\f\r${quote}${value}${quote} y=unquoted z=${quote}${value}${quote}>leaf</div>`;
 
-    expect(exceedsConversionDepth(html)).toBe(false);
+    for (const quote of ['"', "'"]) {
+      const html = `<div x= \t\n\f\r${quote}${value}${quote} y=unquoted z=${quote}${value}${quote}>leaf</div>`;
+      expect.soft(exceedsConversionDepth(html), `quote ${quote}`).toBe(false);
+    }
   });
 
-  it("accepts the exact ceiling and refuses the next opening element", () => {
-    expect(exceedsConversionDepth("<div>".repeat(MAX_CONVERSION_DEPTH))).toBe(false);
-    expect(exceedsConversionDepth("<div>".repeat(MAX_CONVERSION_DEPTH + 1))).toBe(true);
-  });
+  it("does not let unusual markup hide nesting", () => {
+    const samples = {
+      "self-closing divs": "<div/>".repeat(600),
+      "noscript content": `<noscript>${nestedHtml(600)}</noscript>`,
+      "quoted angle bracket": `<div data-value="quoted > text">${nestedHtml(600)}</div>`,
+      "unbalanced divs and spans": "<div><span></div>".repeat(600),
+    };
 
-  it.each([
-    "<div/>".repeat(600),
-    `<noscript>${nestedHtml(600)}</noscript>`,
-    `<div data-value="quoted > text">${nestedHtml(600)}</div>`,
-    "<div><span></div>".repeat(600),
-  ])("does not let malformed or self-closing markup hide nesting", (html) => {
-    expect(exceedsConversionDepth(html)).toBe(true);
+    for (const [label, html] of Object.entries(samples)) {
+      expect.soft(exceedsConversionDepth(html), label).toBe(true);
+    }
   });
 
   it("refuses hostile nesting before either DOM extractor is called", async () => {

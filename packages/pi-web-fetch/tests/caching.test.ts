@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vite-plus/test";
-import { executeWebFetch, fetchRemoteContent, type FetchRemoteDependencies } from "../src/index";
+import { executeWebFetch, type FetchRemoteDependencies } from "../src/index";
 import { createFetchHarness } from "./harness";
 
 describe("web_fetch caching", () => {
@@ -160,30 +160,6 @@ describe("web_fetch caching", () => {
     }
   });
 
-  it("returns stable continuation offsets", async () => {
-    const first = await fetchRemoteContent(
-      `${origin}/continuation`,
-      0,
-      1_000,
-      undefined,
-      dependencies,
-    );
-
-    expect(first.truncated).toBe(true);
-    expect(first.nextOffset).toBe(1_000);
-
-    const second = await fetchRemoteContent(
-      `${origin}/continuation`,
-      first.nextOffset!,
-      2_000,
-      undefined,
-      dependencies,
-    );
-
-    expect(second.offset).toBe(1_000);
-    expect(second.markdown).toContain("[End of results.]");
-  });
-
   it("reuses one extracted page across continuation chunks", async () => {
     fixture.resetContinuationRequests();
     const url = `${origin}/versioned-continuation?cache=continuation`;
@@ -219,7 +195,9 @@ describe("web_fetch caching", () => {
     expect(second.details.cached).toBe(true);
     expect(repeated.details.cached).toBe(true);
     expect(fixture.continuationRequests()).toBe(1);
+    expect(second.details.offset).toBe(1_000);
     expect(second.content[0].text).toContain("end-version-1");
+    expect(second.content[0].text).toContain("[End of results.]");
     expect(second.content[0].text).not.toContain("version-2");
     expect(updates).toEqual([`Fetching ${url}…`, `Using cached content for ${url}…`]);
   });

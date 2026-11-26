@@ -18,18 +18,18 @@ const fragment = [
 ].join("\n");
 
 describe("tag-omitted HTML5 documents", () => {
-  it.each(["", "  \n ", "<!-- empty -->", "<!doctype html>"])(
-    "handles rootless document input %j without throwing",
-    async (input) => {
-      const url = new URL("https://example.test/empty");
+  it("returns empty Markdown for rootless documents with no visible content", async () => {
+    const url = new URL("https://example.test/empty");
 
-      await expect(extractHtmlToMarkdown(input, url)).resolves.toMatchObject({
+    for (const input of ["", "  \n ", "<!-- empty -->", "<!doctype html>"]) {
+      const label = JSON.stringify(input);
+      await expect.soft(extractHtmlToMarkdown(input, url), label).resolves.toMatchObject({
         markdown: "",
         extractor: "basic",
       });
-      expect(htmlToMarkdownFallback(input)).toBe("");
-    },
-  );
+      expect.soft(htmlToMarkdownFallback(input), label).toBe("");
+    }
+  });
 
   it("preserves rootless text content in both extraction paths", async () => {
     const input = "Plain text from a rootless document";
@@ -39,7 +39,7 @@ describe("tag-omitted HTML5 documents", () => {
     expect(htmlToMarkdownFallback(input)).toBe(input);
   });
 
-  it("extracts content and title when html/head/body tags are omitted", async () => {
+  it("extracts content in both paths when html/head/body tags are omitted", async () => {
     const result = await extractHtmlToMarkdown(
       fragment,
       new URL("https://example.test/pkgs/rust-ripgrep/ripgrep/"),
@@ -49,11 +49,10 @@ describe("tag-omitted HTML5 documents", () => {
     expect(result.markdown).toContain("Line-oriented search tool.");
     expect(result.markdown).toContain("Releases Overview");
     expect(result.markdown).toContain("15.2.0-1.fc44");
-  });
 
-  it("extracts plain text via the fallback when tags are omitted", () => {
-    expect(htmlToMarkdownFallback(fragment)).toContain("Line-oriented search tool.");
-    expect(htmlToMarkdownFallback(fragment)).toContain("Releases Overview");
+    const fallback = htmlToMarkdownFallback(fragment);
+    expect(fallback).toContain("Line-oriented search tool.");
+    expect(fallback).toContain("Releases Overview");
   });
 
   it("maps whitespace-normalized wrapper content to the original Markdown offset", () => {

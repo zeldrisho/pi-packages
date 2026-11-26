@@ -1,6 +1,6 @@
 # Manual Live Testing
 
-Use this guide for opt-in end-to-end checks against real models, networks, and external services. Deterministic tests belong in each package's `tests/` directory; run them with `vp test <path>` or `vp run test:packages`. Architecture invariants are in [architecture.md](architecture.md), and the full pre-review checklist is in [development.md](development.md).
+Use this guide for opt-in end-to-end checks against real models, networks, and external services. Run deterministic source tests with `vp test <path>`. Separately, `vp run test:packages` packs and installs the publishable packages into a temporary project to check what will ship. It does not call live models and is included in `vp run ready`. Architecture invariants are in [architecture.md](architecture.md), and the full pre-review checklist is in [development.md](development.md).
 
 ## Isolate the Pi process
 

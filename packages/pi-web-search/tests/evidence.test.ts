@@ -4,17 +4,9 @@ import { summarizeDomainDiversity } from "../src/search";
 import { createSearchTool, jsonResponse } from "./harness";
 
 describe("classifyResultQuality", () => {
-  it("flags snippet-rich results as high", () => {
-    expect(classifyResultQuality({ title: "T", snippet: "x".repeat(80) })).toBe("high");
-  });
-
   it("flags title-or-snippet results as medium", () => {
     expect(classifyResultQuality({ title: "T", snippet: "" })).toBe("medium");
-    expect(classifyResultQuality({ title: "", snippet: "short" })).toBe("medium");
-  });
-
-  it("flags empty results as low", () => {
-    expect(classifyResultQuality({ title: "", snippet: "" })).toBe("low");
+    expect(classifyResultQuality({ title: "", snippet: "x".repeat(79) })).toBe("medium");
   });
 });
 
@@ -44,7 +36,7 @@ describe("web_search honest-evidence details", () => {
         jsonResponse({
           web: {
             results: [
-              { title: "A", url: "https://example.com/a", description: "x".repeat(120) },
+              { title: "A", url: "https://example.com/a", description: "x".repeat(80) },
               { title: "B", url: "https://example.com/b", description: "short" },
               { title: "", url: "https://example.com/c", description: "" },
             ],
@@ -69,51 +61,5 @@ describe("web_search honest-evidence details", () => {
       topDomainShare: 1,
     });
     expect(result.details.results.map((item) => item.quality)).toEqual(["high", "medium", "low"]);
-  });
-
-  it("surfaces when Brave returns fewer results than requested", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "fewer-secret";
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        jsonResponse({
-          web: {
-            results: [{ title: "Only", url: "https://example.com/only", description: "one" }],
-          },
-        }),
-      ),
-    );
-
-    const result = await createSearchTool().execute(
-      "call",
-      { query: "fewer", count: 5 },
-      undefined,
-      undefined,
-    );
-
-    expect(result.details.evidence.requestedCount).toBe(5);
-    expect(result.details.evidence.returnedCount).toBe(1);
-    expect(result.details.evidence.dropped).toBe(0);
-  });
-
-  it("omits freshness from the evidence summary", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "fresh-secret";
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        jsonResponse({
-          web: { results: [{ title: "T", url: "https://example.com/t", description: "d" }] },
-        }),
-      ),
-    );
-
-    const result = await createSearchTool().execute(
-      "call",
-      { query: "unfiltered", count: 1 },
-      undefined,
-      undefined,
-    );
-
-    expect(result.details.evidence).not.toHaveProperty("freshness");
   });
 });

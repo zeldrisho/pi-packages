@@ -57,61 +57,73 @@ describe("resolveRule", () => {
     ).toEqual({ pattern: "chmod 777", action: "block" });
   });
 
-  it.each([
-    "echo sudo",
-    "echo 'sudo apt update'",
-    'echo "sudo"',
-    "printf '%s\\n' sudo",
-    "printf '%s' 'git checkout main'",
-    "git checkout-index --help",
-    "git switcheroo",
-    "gh pr create-example",
-    "git status # sudo",
-    "# sudo\ngit status",
-    "echo sudo && git status",
-    "echo sudo || git status",
-    "echo sudo & git status",
-    "echo sudo\ngit status",
-    "echo '$(sudo)'",
-  ])("ignores literal output, comments, or partial words: %s", (command) => {
-    expect(
-      resolveAction(command, {
-        sudo: "prompt",
-        "git checkout": "prompt",
-        "git switch": "prompt",
-        "gh pr create": "prompt",
-      }),
-    ).toBeNull();
+  it("ignores literal output, comments, and partial words", () => {
+    const commands = [
+      "echo sudo",
+      "echo 'sudo apt update'",
+      'echo "sudo"',
+      "printf '%s\\n' sudo",
+      "printf '%s' 'git checkout main'",
+      "git checkout-index --help",
+      "git switcheroo",
+      "gh pr create-example",
+      "git status # sudo",
+      "# sudo\ngit status",
+      "echo sudo && git status",
+      "echo sudo || git status",
+      "echo sudo & git status",
+      "echo sudo\ngit status",
+      "echo '$(sudo)'",
+    ];
+
+    for (const command of commands) {
+      expect
+        .soft(
+          resolveAction(command, {
+            sudo: "prompt",
+            "git checkout": "prompt",
+            "git switch": "prompt",
+            "gh pr create": "prompt",
+          }),
+          JSON.stringify(command),
+        )
+        .toBeNull();
+    }
   });
 
-  it.each([
-    "sudo true",
-    "/usr/bin/sudo true",
-    "'sudo' true",
-    "su'do' true",
-    "echo sudo; sudo true",
-    "echo sudo && sudo true",
-    "echo sudo || sudo true",
-    "echo sudo & sudo true",
-    "echo sudo\nsudo true",
-    "echo sudo # comment\nsudo true",
-    "echo $(sudo true)",
-    "echo `sudo true`",
-    "echo sudo | sh",
-    "printf sudo | xargs",
-    "echo sudo |& bash",
-    "echo sudo > /tmp/script; bash /tmp/script",
-    "bash -c 'sudo; true'",
-    "bash -c 'sudo'",
-    "python -c \"import os; os.system('sudo true')\"",
-    "VAR=value sudo true",
-    "env sudo true",
-    "(sudo true)",
-    "echo sudo\\\n",
-    "echo 'sudo",
-    `echo ${"x".repeat(65_536)} sudo`,
-  ])("keeps actual calls and uncertain shell constructs gated: %s", (command) => {
-    expect(resolveAction(command, { sudo: "prompt" })).toBe("prompt");
+  it("keeps actual calls and uncertain shell constructs gated", () => {
+    const commands = [
+      "sudo true",
+      "/usr/bin/sudo true",
+      "'sudo' true",
+      "su'do' true",
+      "echo sudo; sudo true",
+      "echo sudo && sudo true",
+      "echo sudo || sudo true",
+      "echo sudo & sudo true",
+      "echo sudo\nsudo true",
+      "echo sudo # comment\nsudo true",
+      "echo $(sudo true)",
+      "echo `sudo true`",
+      "echo sudo | sh",
+      "printf sudo | xargs",
+      "echo sudo |& bash",
+      "echo sudo > /tmp/script; bash /tmp/script",
+      "bash -c 'sudo; true'",
+      "bash -c 'sudo'",
+      "python -c \"import os; os.system('sudo true')\"",
+      "VAR=value sudo true",
+      "env sudo true",
+      "(sudo true)",
+      "echo sudo\\\n",
+      "echo 'sudo",
+      `echo ${"x".repeat(65_536)} sudo`,
+    ];
+
+    for (const command of commands) {
+      const label = command.length > 120 ? "oversized shell input" : JSON.stringify(command);
+      expect.soft(resolveAction(command, { sudo: "prompt" }), label).toBe("prompt");
+    }
   });
 
   it("preserves restrictive combined-flag and numeric-mode coverage", () => {
