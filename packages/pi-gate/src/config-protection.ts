@@ -2,10 +2,9 @@ import { existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { CONFIG_NAMES } from "./config.ts";
 
 export const CONFIG_CHANGE_REASON = "pi-gate: gate config change requires approval";
-
-const CONFIG_NAMES = ["gate.json", "pi-gate.json"] as const;
 
 /** Returns the configured agent directory, defaulting to ~/.pi/agent. */
 function configDirectory(): string {

@@ -12,11 +12,13 @@ export const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 /** Google token endpoint used for code exchange and refresh. */
 export const TOKEN_URL = "https://oauth2.googleapis.com/token";
 
-/** Loopback redirect Google accepts for installed-application clients. */
-export const DEFAULT_REDIRECT_URI = "http://localhost:51121/oauth-callback";
+/** Default port and route for the loopback listener. */
+const DEFAULT_CALLBACK_PORT = 51121;
 
-/** Callback path served by the loopback listener. */
 const CALLBACK_PATH = "/oauth-callback";
+
+/** Loopback redirect Google accepts for installed-application clients. */
+export const DEFAULT_REDIRECT_URI = `http://localhost:${DEFAULT_CALLBACK_PORT}${CALLBACK_PATH}`;
 
 /** How long the loopback listener waits for a browser redirect. */
 const CALLBACK_TIMEOUT_MS = 5 * 60 * 1000;
@@ -334,12 +336,12 @@ function escapeHtml(text: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/** Extracts the callback listener port from the redirect URI, defaulting to 51121. */
+/** Extracts the callback listener port from the redirect URI, falling back to the default port. */
 function callbackPort(): number {
   try {
-    return Number(new URL(redirectUri()).port) || 51121;
+    return Number(new URL(redirectUri()).port) || DEFAULT_CALLBACK_PORT;
   } catch {
-    return 51121;
+    return DEFAULT_CALLBACK_PORT;
   }
 }
 
@@ -539,7 +541,7 @@ async function acquireCode(
     while (!abort.signal.aborted) {
       const answer = await callbacks.onPrompt({
         message,
-        placeholder: "http://localhost:51121/oauth-callback?state=…&code=…",
+        placeholder: `${DEFAULT_REDIRECT_URI}?state=…&code=…`,
       });
 
       try {

@@ -39,6 +39,12 @@ node scripts/request-capture.ts evidence 'Does the header exist?' \
   '{"observed":["- Header present in capture"],"inferred":[],"unknown":["- Server enforcement"]}'
 ```
 
+## Advertised CLI versions
+
+The providers pin the versions they advertise: `DEFAULT_CLI_VERSION` in `packages/pi-antigravity/src/cli-version.ts` and `CLIENT_VERSION` in `packages/pi-opencode-free/src/client-headers.ts`. These are wire-compatibility values, not minimum supported versions. Neither provider looks up a version at runtime.
+
+When reviewing an upstream release, compare the advertised user agent with the pinned value. For Antigravity, also review the OAuth client fingerprints separately; a version change does not establish that the client has rotated. Keep the existing pin unless compatibility evidence supports an update. If changing a pin, record the version and evidence in the change, run the affected provider's tests, and follow [testing.md](testing.md) for any authorized live verification.
+
 ## Evidence and fixes
 
 Record upstream version, artifact identity, source location, date and limitations. Distinguish static observations from runtime observations and inferences; mark unverified claims unknown. For protocol differences, isolate one variable in an authorized controlled test. Sanitize any evidence and convert confirmed regressions into deterministic fixtures before changing runtime behavior. Preserve the security and regression requirements in [development.md](development.md) and the trust boundaries in [architecture.md](architecture.md).

@@ -104,6 +104,12 @@ describe("OAuth login", () => {
       projectId: "project-live",
     });
     expect(onPrompt).toHaveBeenCalledTimes(2);
+    expect(onPrompt).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        placeholder: "http://localhost:51121/oauth-callback?state=…&code=…",
+      }),
+    );
   });
 
   it.each([
@@ -260,6 +266,11 @@ describe("OAuth refresh", () => {
       /unexpected response/,
     );
   });
+  it("uses the registered loopback URI when the override is blank", () => {
+    vi.stubEnv("PI_ANTIGRAVITY_REDIRECT_URI", " ");
+    expect(redirectUri()).toBe("http://localhost:51121/oauth-callback");
+  });
+
   it("accepts a trimmed redirect URI override", () => {
     vi.stubEnv("PI_ANTIGRAVITY_REDIRECT_URI", " http://localhost:1234/oauth-callback ");
     expect(redirectUri()).toBe("http://localhost:1234/oauth-callback");

@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { configPath } from "../src/config";
 import {
   bashTouchesConfig,
   CONFIG_CHANGE_REASON,
@@ -49,6 +50,20 @@ describe("config path protection", () => {
     expect(isProtectedConfigPath(alias)).toBe(true);
     expect(isProtectedConfigPath(join(root, "notes.txt"))).toBe(false);
     expect(CONFIG_CHANGE_REASON).toBe("pi-gate: gate config change requires approval");
+  });
+
+  it("protects the legacy fallback even before it exists", () => {
+    const directory = join(root, ".pi", "agent");
+    const current = join(directory, "gate.json");
+    const legacy = join(directory, "pi-gate.json");
+
+    expect(configPath()).toBe(current);
+    expect(isProtectedConfigPath(legacy)).toBe(true);
+
+    rmSync(current);
+    writeFileSync(legacy, "{}", "utf-8");
+    expect(configPath()).toBe(legacy);
+    expect(isProtectedConfigPath(configPath())).toBe(true);
   });
 
   it("matches config paths but does not match unrelated occurrences of config filenames", () => {
