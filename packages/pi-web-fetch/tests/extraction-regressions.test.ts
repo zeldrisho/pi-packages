@@ -194,23 +194,24 @@ describe("extraction regressions", () => {
     }
   });
 
-  it("omits explicitly hidden elements in primary and fallback extraction", async () => {
-    const html = `<html><body><main><article><h1>Guide</h1><p>${substantial}</p><p hidden>HIDDEN_SENTINEL</p><p aria-hidden="true">ARIA_SENTINEL</p><p style="display:none">DISPLAY_SENTINEL</p></article></main></body></html>`;
+  it("omits hidden elements but retains visible content in both extraction paths", async () => {
+    const html = `<html><body><main><article><h1>Guide</h1><p>${substantial}</p>
+      <p hidden>HiddenByAttribute</p><p aria-hidden="true">HiddenByAria</p>
+      <p style="display:none">HiddenByDisplay</p><p style="visibility: hidden !important">HiddenByVisibility</p>
+      <p aria-hidden="false">VisibleByAria</p><p style="display: block; visibility: visible">VisibleByStyle</p>
+      </article></main></body></html>`;
+
     const result = await extractHtmlToMarkdown(html, new URL("https://example.com/hidden"));
+
     const fallback = htmlToMarkdownFallback(html);
 
-    for (const sentinel of ["HIDDEN_SENTINEL", "ARIA_SENTINEL", "DISPLAY_SENTINEL"]) {
-      expect(result.markdown).not.toContain(sentinel);
-      expect(fallback).not.toContain(sentinel);
+    for (const output of [result.markdown, fallback]) {
+      expect(output).toContain("VisibleByAria");
+      expect(output).toContain("VisibleByStyle");
+      expect(output).not.toMatch(/HiddenByAttribute|HiddenByAria|HiddenByDisplay/);
     }
-  });
 
-  it("retains visible content with unrelated accessibility and style attributes", () => {
-    const html = `<main><p aria-hidden="false">VISIBLE_ARIA</p><p style="display: block; visibility: visible">VISIBLE_STYLE</p><p style="visibility: hidden !important">HIDDEN_STYLE</p></main>`;
-    const output = htmlToMarkdownFallback(html);
-    expect(output).toContain("VISIBLE_ARIA");
-    expect(output).toContain("VISIBLE_STYLE");
-    expect(output).not.toContain("HIDDEN_STYLE");
+    expect(fallback).not.toContain("HiddenByVisibility");
   });
 
   it("does not flag a content-rich app shell as sparse", async () => {
@@ -224,21 +225,6 @@ describe("extraction regressions", () => {
     expect(result.markdown).toContain("Application documentation");
     expect(diagnostics.sparseExtraction).toBe(false);
     expect(diagnostics.javascriptRequired).toBe(false);
-  });
-
-  it("recovers the authored no-JavaScript fallback of a script-only page", async () => {
-    const html = await readFile(
-      new URL("./fixtures/frontierharness-issue-127.html", import.meta.url),
-      "utf8",
-    );
-
-    const result = await extractHtmlToMarkdown(html, new URL("https://frontierharness.org/"));
-
-    expect(result.noscriptFallback).toBe(true);
-    expect(result.title).toContain("FrontierHarness Eval");
-    expect(result.markdown).toContain("open benchmark of AI coding agent harnesses");
-    expect(result.markdown).toContain("How the benchmark is scored");
-    expect(result.markdown).not.toContain("reconnecting");
   });
 
   it("keeps substantive article content when scripts make the extraction sparse", async () => {
@@ -295,6 +281,7 @@ describe("extraction regressions", () => {
 
     expect(text).toContain("[Showing the page's no-JavaScript fallback");
     expect(text).toContain("open benchmark of AI coding agent harnesses");
+    expect(text).toContain("How the benchmark is scored");
     expect(text).not.toContain("reconnecting");
     expect(result.details.noscriptFallback).toBe(true);
     expect(result.details.extractionDiagnostics?.sparseExtraction).toBe(false);

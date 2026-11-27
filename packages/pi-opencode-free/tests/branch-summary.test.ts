@@ -217,8 +217,11 @@ describe("segmented branch summary", () => {
     expect(harness.calls).toHaveLength(0);
   });
 
-  it("summarizes a branch that a single request cannot cover", async () => {
-    const harness = createHarness({ contextWindow: 40_000 });
+  it("summarizes an oversized branch using Pi's format and the user's focus", async () => {
+    const harness = createHarness({
+      contextWindow: 40_000,
+      customInstructions: "focus on the parser rewrite",
+    });
 
     const result = await harness.handler(harness.event, harness.context);
 
@@ -228,7 +231,11 @@ describe("segmented branch summary", () => {
     expect(summary).toContain("## Goal");
     expect(summary).toContain("## Next Steps");
     expect(harness.calls.length).toBeGreaterThanOrEqual(3);
-    expect(harness.calls.at(-1)?.prompt).toContain("DIGEST-");
+    const checkpoint = harness.calls.at(-1)?.prompt;
+    expect(checkpoint).toContain("DIGEST-");
+    expect(checkpoint).toContain("Additional focus: focus on the parser rewrite");
+    expect(checkpoint).toContain("## Next Steps");
+    expect(checkpoint).not.toContain("## Critical Context");
     expect(harness.notifications.join(" ")).toContain("Summarized branch");
     expect(harness.statuses.at(-1)).toBeUndefined();
     expect(result?.summary?.usage?.totalTokens).toBe(USAGE.totalTokens * harness.calls.length);
@@ -263,20 +270,6 @@ describe("segmented branch summary", () => {
     expect(result?.summary?.summary).toContain(
       "<modified-files>\nsrc/nested-written.ts\n</modified-files>",
     );
-  });
-
-  it("appends custom instructions as focus, as Pi does", async () => {
-    const harness = createHarness({
-      contextWindow: 40_000,
-      customInstructions: "focus on the parser rewrite",
-    });
-
-    await harness.handler(harness.event, harness.context);
-
-    expect(harness.calls.at(-1)?.prompt).toContain("Additional focus: focus on the parser rewrite");
-    expect(harness.calls.at(-1)?.prompt).toContain("## Next Steps");
-    // The branch format has no critical-context section, unlike a compaction checkpoint.
-    expect(harness.calls.at(-1)?.prompt).not.toContain("## Critical Context");
   });
 
   it("uses custom instructions as the whole prompt when Pi replaces them", async () => {

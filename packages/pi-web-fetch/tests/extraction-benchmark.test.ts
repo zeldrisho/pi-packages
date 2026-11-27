@@ -10,7 +10,7 @@ const validEntry = {
 };
 
 describe("extraction benchmark", () => {
-  it("parses filters, timeouts, JSON output, and corpus paths", () => {
+  it("parses supported benchmark options and rejects invalid arguments", () => {
     const options = parseBenchmarkOptions([
       "--filter",
       "Documentation",
@@ -25,20 +25,15 @@ describe("extraction benchmark", () => {
     expect(options.timeoutMs).toBe(1500);
     expect(options.json).toBe(true);
     expect(options.corpusPath).toMatch(/fixtures[/\\]corpus\.json$/);
-  });
 
-  it("rejects malformed command-line values", () => {
     expect(() => parseBenchmarkOptions(["--timeout", "0"])).toThrow(
       "--timeout requires a positive integer",
     );
     expect(() => parseBenchmarkOptions(["--unknown"])).toThrow("Unknown option");
   });
 
-  it("accepts a non-empty corpus of public HTTP entries", () => {
+  it("requires each corpus entry to include markers and a positive size floor", () => {
     expect(parseCorpusJson(JSON.stringify([validEntry]))).toEqual([validEntry]);
-  });
-
-  it("rejects entries without markers or a positive size floor", () => {
     expect(() =>
       parseCorpusJson(JSON.stringify([{ ...validEntry, requiredMarkers: [] }])),
     ).toThrow();

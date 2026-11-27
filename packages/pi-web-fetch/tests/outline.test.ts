@@ -48,25 +48,7 @@ describe("document outlines", () => {
     ]);
   });
 
-  it("ignores heading syntax inside backtick and tilde fences", () => {
-    const outline = createDocumentOutline(
-      [
-        "# Real",
-        "```md",
-        "## Not a section",
-        "```",
-        "~~~",
-        "### Also not a section",
-        "~~~",
-        "Body text.",
-      ].join("\n"),
-    );
-
-    expect(outline.totalHeadings).toBe(1);
-    expect(outline.headings[0]).toMatchObject({ text: "Real", inferred: false });
-  });
-
-  it("requires a closing fence to be long enough and have no suffix", () => {
+  it("ignores headings inside tilde and backtick fences until a valid close", () => {
     const outline = createDocumentOutline(
       [
         "# Real",
@@ -78,6 +60,9 @@ describe("document outlines", () => {
         "## Hidden three",
         "````",
         "## Visible",
+        "~~~",
+        "### Hidden in a tilde fence",
+        "~~~",
         "Body.",
       ].join("\n"),
     );
@@ -92,27 +77,15 @@ describe("document outlines", () => {
         "Install this package with the package manager and then configure it for your project.",
         "Usage",
         "Run the command from your project directory after installation.",
-      ].join("\n"),
-    );
-
-    expect(outline.headings).toEqual([
-      { level: 2, text: "Installation", words: 14, inferred: true },
-      { level: 2, text: "Usage", words: 9, inferred: true },
-    ]);
-  });
-
-  it("does not infer headings from ordinary prose or lists", () => {
-    const outline = createDocumentOutline(
-      [
-        "This is a normal sentence.",
-        "Another ordinary paragraph follows here.",
         "- A list item",
         "- Another list item",
       ].join("\n"),
     );
 
-    expect(outline.totalHeadings).toBe(0);
-    expect(outline.headings).toEqual([]);
+    expect(outline.headings).toEqual([
+      { level: 2, text: "Installation", words: 14, inferred: true },
+      { level: 2, text: "Usage", words: 17, inferred: true },
+    ]);
   });
 
   it("bounds heading count and remote heading text", () => {

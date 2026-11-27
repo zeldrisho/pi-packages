@@ -7,20 +7,11 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("version defaults", () => {
-  it("keeps a verified bundled default", () => {
-    expect(DEFAULT_CLI_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
-  });
-});
-
 describe("platform tokens", () => {
-  it("maps the platforms the backend knows", () => {
+  it("maps supported platforms and uses Linux for unknown platforms", () => {
     expect(platformTokens("darwin", "arm64")).toEqual({ osType: "darwin", arch: "arm64" });
     expect(platformTokens("linux", "x64")).toEqual({ osType: "linux", arch: "amd64" });
     expect(platformTokens("win32", "x64")).toEqual({ osType: "windows", arch: "amd64" });
-  });
-
-  it("falls back to linux rather than emitting an empty token", () => {
     expect(platformTokens("", "ia32")).toEqual({ osType: "linux", arch: "amd64" });
   });
 });
@@ -41,6 +32,7 @@ describe("version resolution", () => {
   it("advertises the bundled version without probing the CLI", async () => {
     vi.stubEnv("PATH", "");
 
+    expect(DEFAULT_CLI_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
     expect((await antigravityHeaders("token")).get("user-agent")).toContain(DEFAULT_CLI_VERSION);
   });
 

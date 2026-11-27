@@ -336,17 +336,25 @@ describe("content conversion", () => {
 });
 
 describe("schema normalization", () => {
-  it("inlines local references and strips metadata", () => {
+  it("inlines local references and strips metadata without confusing property names for keywords", () => {
     const schema = normalizeSchema({
       $schema: "https://json-schema.org/draft/2020-12/schema",
       type: "object",
       $defs: { Loaves: { type: "number" } },
-      properties: { loaves: { $ref: "#/$defs/Loaves" } },
+      properties: {
+        loaves: { $ref: "#/$defs/Loaves" },
+        $ref: { type: "string" },
+        items: { type: "array", items: { type: "string" } },
+      },
     });
 
     expect(schema).toEqual({
       type: "object",
-      properties: { loaves: { type: "number" } },
+      properties: {
+        loaves: { type: "number" },
+        $ref: { type: "string" },
+        items: { type: "array", items: { type: "string" } },
+      },
     });
   });
 
@@ -358,21 +366,6 @@ describe("schema normalization", () => {
     });
 
     expect(schema).toEqual({ type: "object", properties: { node: {} } });
-  });
-
-  it("treats property names as names, not keywords", () => {
-    const schema = normalizeSchema({
-      type: "object",
-      properties: { $ref: { type: "string" }, items: { type: "array", items: { type: "string" } } },
-    });
-
-    expect(schema).toEqual({
-      type: "object",
-      properties: {
-        $ref: { type: "string" },
-        items: { type: "array", items: { type: "string" } },
-      },
-    });
   });
 
   it("preserves reserved names as own data properties through normalization and serialization", () => {
@@ -479,11 +472,6 @@ describe("envelope assembly", () => {
     expect(envelope.request.labels.used_claude).toBe("false");
     expect(envelope.request.labels.used_claude_conservative).toBe("false");
     expect(envelope.request.labels.used_non_gemini_model).toBe("false");
-  });
-
-  it("sets the system instruction and thinking budget", () => {
-    const envelope = buildRequest(input({ thinkingLevel: "high" }));
-
     expect(envelope.request.systemInstruction).toEqual({
       role: "user",
       parts: [{ text: "You are a baker." }],

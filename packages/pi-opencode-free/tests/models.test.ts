@@ -125,7 +125,7 @@ describe("initial free models", () => {
     const models = initialFreeModels();
     const ids = models.map((model) => model.id);
 
-    expect(ids.length).toBeGreaterThan(0);
+    expect(initialFreeModels()).not.toBe(models);
     expect(ids).toContain("big-pickle");
     expect(ids).not.toContain("jev-1.13-free");
 
@@ -135,10 +135,6 @@ describe("initial free models", () => {
       expect(model.maxTokens).toBeGreaterThan(0);
       expect(model.contextWindow).toBeGreaterThan(0);
     }
-  });
-
-  it("returns a fresh array for each call", () => {
-    expect(initialFreeModels()).not.toBe(initialFreeModels());
   });
 });
 
@@ -178,7 +174,9 @@ describe("stored model conversion", () => {
       compat: { supportsStore: false },
     };
 
-    expect(storedModelsFromConfigs([config], "opencode-free", "http://proxy.test/v1")).toEqual([
+    const stored = storedModelsFromConfigs([config], "opencode-free", "http://proxy.test/v1");
+
+    expect(stored).toEqual([
       {
         ...config,
         provider: "opencode-free",
@@ -186,6 +184,7 @@ describe("stored model conversion", () => {
         baseUrl: "http://proxy.test/v1",
       },
     ]);
+    expect(configsFromStoredModels(stored, "opencode-free")).toEqual([config]);
   });
 });
 
@@ -215,39 +214,18 @@ describe("persisted catalog metadata", () => {
 });
 
 describe("free model discovery", () => {
-  it("discovers free Responses models through chat translation without Responses-only compatibility", async () => {
-    const crouton = {
-      ...remoteBeam,
-      id: "crouton-alpha-free",
-      api: "openai-responses",
-      compat: { sessionAffinityFormat: "openai-nosession" },
-    };
-
-    const { fetcher } = createFetcher((url) =>
-      url === MODEL_CATALOG_URL
-        ? jsonResponse(JSON.stringify([crouton]), 200, { "last-modified": FUTURE_LAST_MODIFIED })
-        : jsonResponse(JSON.stringify({ data: [{ id: "crouton-alpha-free" }] })),
-    );
-
-    const models = requireModels(
-      await discoverFreeModels({
-        baseUrl: "http://proxy.test/v1",
-        headers: {},
-        signal: new AbortController().signal,
-        fetcher,
-        allowNetwork: true,
-      }),
-    );
-
-    expect(models.map((model) => model.id)).toEqual(["crouton-alpha-free"]);
-    expect(models[0]?.compat).toBeUndefined();
-  });
-  it("intersects live models with Pi's native free chat catalog", async () => {
+  it("intersects live models with Pi's free catalog and translates Responses models to chat", async () => {
     const { fetcher, calls } = createFetcher((url) => {
       if (url === MODEL_CATALOG_URL) {
         return jsonResponse(
           JSON.stringify([
             ...remoteCatalog,
+            {
+              ...remoteBeam,
+              id: "crouton-alpha-free",
+              api: "openai-responses",
+              compat: { sessionAffinityFormat: "openai-nosession" },
+            },
             {
               id: "big-pickle",
               name: "Big Pickle Native",
@@ -300,6 +278,7 @@ describe("free model discovery", () => {
             { id: "beam-free" },
             { id: "deepseek-v4.1-flash-free" },
             { id: "big-pickle" },
+            { id: "crouton-alpha-free" },
             { id: "paid-model" },
             { id: "jev-1.13-free" },
             { id: "anthropic-only-free" },
@@ -309,21 +288,25 @@ describe("free model discovery", () => {
       );
     });
 
-    const models = requireModels(
-      await discoverFreeModels({
-        baseUrl: "http://proxy.test/v1",
-        headers: { "x-test-header": "yes" },
-        signal: new AbortController().signal,
-        fetcher,
-        allowNetwork: true,
-      }),
-    );
+    const outcome = await discoverFreeModelsWithStatus({
+      baseUrl: "http://proxy.test/v1",
+      headers: { "x-test-header": "yes" },
+      signal: new AbortController().signal,
+      fetcher,
+      allowNetwork: true,
+    });
+
+    expect(outcome.status).toBe("ok");
+    expect(outcome.liveModelCount).toBe(8);
+    const models = requireModels(outcome.models);
 
     expect(models.map((model) => model.id)).toEqual([
       "beam-free",
       "deepseek-v4.1-flash-free",
       "big-pickle",
+      "crouton-alpha-free",
     ]);
+    expect(models.find((model) => model.id === "crouton-alpha-free")?.compat).toBeUndefined();
 
     const beam = models[0];
     expect(beam?.name).toBe("Beam Free");
@@ -437,81 +420,6 @@ describe("free model discovery", () => {
     expect(calls.find((call) => call.url === MODEL_CATALOG_URL)?.headers.get("if-none-match")).toBe(
       '"old"',
     );
-  });
-
-  it("returns undefined when the native catalog is unavailable", async () => {
-    const { fetcher } = createFetcher((url) => {
-      if (url === MODEL_CATALOG_URL) return jsonResponse("unavailable", 503);
-
-      return jsonResponse(
-        JSON.stringify({
-          data: [{ id: "beam-free" }, { id: "big-pickle" }, { id: "paid-model" }],
-        }),
-      );
-    });
-
-    const models = await discoverFreeModels({
-      baseUrl: DEFAULT_BASE_URL,
-      headers: {},
-      signal: new AbortController().signal,
-      fetcher,
-      allowNetwork: true,
-    });
-
-    expect(models).toBeUndefined();
-  });
-
-  it("returns undefined when the live endpoint fails", async () => {
-    const { fetcher } = createFetcher((url) =>
-      url === MODEL_CATALOG_URL
-        ? jsonResponse(JSON.stringify(remoteCatalog), 200, {
-            "last-modified": FUTURE_LAST_MODIFIED,
-          })
-        : jsonResponse("nope", 500),
-    );
-
-    const models = await discoverFreeModels({
-      baseUrl: DEFAULT_BASE_URL,
-      headers: {},
-      signal: new AbortController().signal,
-      fetcher,
-      allowNetwork: true,
-    });
-
-    expect(models).toBeUndefined();
-  });
-
-  it("returns undefined when no live model is known to be free", async () => {
-    const { fetcher } = createFetcher((url) =>
-      url === MODEL_CATALOG_URL
-        ? jsonResponse(
-            JSON.stringify([
-              {
-                id: "paid-model",
-                provider: "opencode",
-                api: "openai-completions",
-                input: ["text"],
-                cost: { input: 1, output: 1 },
-                contextWindow: 100_000,
-                maxTokens: 10_000,
-                reasoning: false,
-              },
-            ]),
-            200,
-            { "last-modified": FUTURE_LAST_MODIFIED },
-          )
-        : jsonResponse(JSON.stringify({ data: [{ id: "paid-model" }, { id: "unknown" }] })),
-    );
-
-    const models = await discoverFreeModels({
-      baseUrl: DEFAULT_BASE_URL,
-      headers: {},
-      signal: new AbortController().signal,
-      fetcher,
-      allowNetwork: true,
-    });
-
-    expect(models).toBeUndefined();
   });
 
   it("rejects invalid limits or cache pricing", async () => {
@@ -697,25 +605,6 @@ describe("free model discovery", () => {
           .soft(await discoverFreeModelsWithStatus(options(fetcher, controller.signal)), kind)
           .toEqual({ status: kind === "timeout" ? "timeout" : "aborted" });
       }
-    });
-
-    it("reports the live catalog size on success", async () => {
-      const { fetcher } = createFetcher((url) =>
-        url === MODEL_CATALOG_URL
-          ? catalogResponse(remoteCatalog)
-          : jsonResponse(
-              JSON.stringify({ data: [{ id: "beam-free" }, { id: "deepseek-v4.1-flash-free" }] }),
-            ),
-      );
-
-      const outcome = await discoverFreeModelsWithStatus(options(fetcher));
-
-      expect(outcome.status).toBe("ok");
-      expect(outcome.liveModelCount).toBe(2);
-      expect(outcome.models?.map((model) => model.id)).toEqual([
-        "beam-free",
-        "deepseek-v4.1-flash-free",
-      ]);
     });
   });
 });

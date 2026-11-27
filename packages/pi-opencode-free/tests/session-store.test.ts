@@ -49,33 +49,22 @@ function memoryStore(initial?: string) {
 }
 
 describe("session identity reuse", () => {
-  it("creates and persists an identity when the store is empty", () => {
+  it("creates and persists an identity, then reuses it without rewriting the store", () => {
     const store = memoryStore();
 
     const id = resolveSessionId({ now: NOW, create: () => identityAt(0), store });
 
     expect(id).toMatch(/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/u);
     expect(store.state.saved).toEqual([id]);
-    expect(store.state.id).toBe(id);
+    expect(resolveSessionId({ now: NOW + DAY_MS, create: () => identityAt(0, 1), store })).toBe(id);
+    expect(store.state.saved).toEqual([id]);
   });
 
-  it("reuses a stored identity instead of creating a new one", () => {
-    const stored = identityAt(DAY_MS);
-    const store = memoryStore(stored);
-
-    expect(resolveSessionId({ now: NOW, create: () => identityAt(0), store })).toBe(stored);
-    expect(store.state.saved).toEqual([]);
-  });
-
-  it("accepts a slightly future-dated identity for clock drift", () => {
-    const drifted = identityAt(-60_000);
-
-    expect(isReusableSessionId(drifted, NOW)).toBe(true);
-  });
-
-  it("rejects identities at or beyond the reuse window", () => {
+  it("allows small future clock drift but rejects identities at the reuse limit", () => {
+    expect(isReusableSessionId(identityAt(-60_000), NOW)).toBe(true);
     expect(isReusableSessionId(identityAt(SESSION_REUSE_MS - 1), NOW)).toBe(true);
     expect(isReusableSessionId(identityAt(SESSION_REUSE_MS), NOW)).toBe(false);
+    expect(isReusableSessionId(identityAt(0), Number.NaN)).toBe(false);
   });
 
   it("replaces stale identities returned by a custom store", () => {
@@ -84,7 +73,6 @@ describe("session identity reuse", () => {
 
     expect(resolveSessionId({ now: NOW, create: () => fresh, store })).toBe(fresh);
     expect(store.state.saved).toEqual([fresh]);
-    expect(isReusableSessionId(fresh, Number.NaN)).toBe(false);
   });
 });
 

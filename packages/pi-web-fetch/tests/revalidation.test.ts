@@ -26,7 +26,7 @@ function response(
 describe("stale cache revalidation", () => {
   afterEach(() => vi.useRealTimers());
 
-  it("revalidates through the pinned transport with ETag and Last-Modified", async () => {
+  it("serves a fresh cache hit and revalidates expired content through the pinned transport", async () => {
     const startedAt = Date.now();
     vi.useFakeTimers();
     vi.setSystemTime(startedAt);
@@ -55,7 +55,10 @@ describe("stale cache revalidation", () => {
     };
 
     const first = await executeWebFetch({ url }, undefined, undefined, dependencies);
+    const fresh = await executeWebFetch({ url }, undefined, undefined, dependencies);
     expect(first.details.cacheStatus).toBe("miss");
+    expect(fresh.details.cacheStatus).toBe("hit");
+    expect(requests).toBe(1);
 
     vi.setSystemTime(startedAt + 24 * 60 * 60 * 1_000 + 1);
     const second = await executeWebFetch({ url }, undefined, undefined, dependencies);
@@ -121,26 +124,5 @@ describe("stale cache revalidation", () => {
 
     expect(staleCacheNeedsMarkdownPolicy(legacy)).toBe(true);
     expect(staleCacheNeedsMarkdownPolicy(current)).toBe(false);
-  });
-
-  it("distinguishes fresh hits from cache misses", async () => {
-    const startedAt = Date.now();
-    vi.useFakeTimers();
-    vi.setSystemTime(startedAt);
-    const url = `https://raw.githubusercontent.com/example/project/main/hit-${process.pid}-${Math.random()}.txt`;
-
-    const dependencies: FetchRemoteDependencies = {
-      validateUrl: async (value) => ({
-        url: value instanceof URL ? value : new URL(value),
-        address: "203.0.113.10",
-        family: 4,
-      }),
-      request: async () => response(200, "fresh representation", { "content-type": "text/plain" }),
-    };
-
-    const miss = await executeWebFetch({ url }, undefined, undefined, dependencies);
-    const hit = await executeWebFetch({ url }, undefined, undefined, dependencies);
-    expect(miss.details.cacheStatus).toBe("miss");
-    expect(hit.details.cacheStatus).toBe("hit");
   });
 });

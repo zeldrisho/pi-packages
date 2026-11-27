@@ -31,37 +31,19 @@ function decodeSessionTimestamp(id: string): number {
 }
 
 describe("opencode session identity", () => {
-  it("renders a canonical session id with the pinned counter bits", () => {
-    const id = createCanonicalSessionId(deterministicSeed());
+  it("encodes the creation time, counter bits, and seed in a canonical session ID", () => {
+    const now = 1_793_000_000_000;
+    const seed = deterministicSeed();
+    const id = createCanonicalSessionId(seed, now);
 
     expect(id).toMatch(SESSION_PATTERN);
-    expect(id).toHaveLength(30);
     expect(id.slice(4, 16).endsWith("ffe")).toBe(true);
-  });
-
-  it("is deterministic for a fixed seed and changes with different bytes", () => {
-    const now = 1_793_000_000_000;
-
-    expect(createCanonicalSessionId(deterministicSeed(), now)).toBe(
-      createCanonicalSessionId(deterministicSeed(), now),
-    );
-    expect(createCanonicalSessionId(deterministicSeed(1), now)).not.toBe(
-      createCanonicalSessionId(deterministicSeed(), now),
-    );
-  });
-
-  it("encodes the creation time in the identifier", () => {
-    const now = 1_793_000_000_000;
-    const id = createCanonicalSessionId(deterministicSeed(), now);
-
     expect(decodeSessionTimestamp(id)).toBe(now % SESSION_TS_MODULUS);
-  });
-
-  it("tracks the wall clock instead of the seed", () => {
-    const first = createCanonicalSessionId(deterministicSeed(), 1_700_000_000_000);
-    const second = createCanonicalSessionId(deterministicSeed(), 1_700_000_060_000);
-
-    expect(decodeSessionTimestamp(second) - decodeSessionTimestamp(first)).toBe(60_000);
+    expect(createCanonicalSessionId(seed, now)).toBe(id);
+    expect(createCanonicalSessionId(deterministicSeed(1), now)).not.toBe(id);
+    expect(decodeSessionTimestamp(createCanonicalSessionId(seed, now + 60_000))).toBe(
+      (now + 60_000) % SESSION_TS_MODULUS,
+    );
   });
 
   it("defaults the creation time to now", () => {
@@ -77,32 +59,19 @@ describe("opencode session identity", () => {
     expect(() => createCanonicalSessionId(new Uint8Array(19))).toThrow(/at least 20 bytes/u);
   });
 
-  it("recovers the creation time and age of an identifier", () => {
-    const now = 1_793_000_000_000;
-    const id = createCanonicalSessionId(deterministicSeed(), now - 90_000);
-
-    expect(sessionIdCreatedAt(id)).toBe((now - 90_000) % SESSION_TS_MODULUS);
-    expect(sessionIdAgeMs(id, now)).toBe(90_000);
-    expect(sessionIdAgeMs(id, now - 60_000)).toBe(30_000);
-  });
-
-  it("reads future-dated identifiers as negative ages across the wrap", () => {
-    const now = 1_793_000_000_000;
-    const id = createCanonicalSessionId(deterministicSeed(), now + 45_000);
-
-    expect(sessionIdAgeMs(id, now)).toBe(-45_000);
-  });
-
   it("returns no age for malformed identifiers", () => {
     expect(sessionIdCreatedAt("ses_xyz")).toBeUndefined();
     expect(sessionIdCreatedAt("ses_000000000000")).toBeUndefined();
     expect(sessionIdAgeMs("not-a-session", Date.now())).toBeUndefined();
   });
 
-  it("measures ages on both sides of the timestamp wrap", () => {
+  it("recovers creation time and signed ages across the timestamp wrap", () => {
     const beforeWrap = createCanonicalSessionId(deterministicSeed(), SESSION_TS_MODULUS - 500);
     const afterWrap = createCanonicalSessionId(deterministicSeed(), SESSION_TS_MODULUS + 500);
 
+    expect(sessionIdCreatedAt(beforeWrap)).toBe(SESSION_TS_MODULUS - 500);
+    expect(sessionIdCreatedAt(afterWrap)).toBe(500);
+    expect(sessionIdAgeMs(afterWrap, SESSION_TS_MODULUS + 1_000)).toBe(500);
     expect(sessionIdAgeMs(beforeWrap, SESSION_TS_MODULUS + 500)).toBe(1_000);
     expect(sessionIdAgeMs(afterWrap, SESSION_TS_MODULUS - 500)).toBe(-1_000);
   });
@@ -114,19 +83,14 @@ describe("opencode session identity", () => {
     expect(id).toHaveLength(30);
   });
 
-  it("creates a fresh twenty-byte seed", () => {
+  it("builds client headers with an identity derived from a fresh seed", () => {
     const seed = createSessionSeed();
-
-    expect(seed).toBeInstanceOf(Uint8Array);
     expect(seed).toHaveLength(20);
-  });
-
-  it("builds the full client header set", () => {
-    const sessionId = createCanonicalSessionId(deterministicSeed());
+    const sessionId = createCanonicalSessionId(seed);
 
     const headers = buildClientHeaders(sessionId, CLI_VERSION);
 
-    expect(headers["User-Agent"]).toBe(buildUserAgent(CLI_VERSION));
+    expect(headers["User-Agent"]).toBe(`opencode/latest/${CLI_VERSION}/cli`);
     expect(headers["x-opencode-client"]).toBe("cli");
     expect(headers["x-opencode-project"]).toBe("global");
     expect(headers[PROVIDER_MARKER_HEADER]).toBe("1");
@@ -173,9 +137,5 @@ describe("opencode session identity", () => {
       Authorization: "Bearer secret",
       "x-opencode-session": "ses_other",
     });
-  });
-
-  it("builds the user agent from a resolved client version", () => {
-    expect(buildUserAgent(CLI_VERSION)).toBe(`opencode/latest/${CLI_VERSION}/cli`);
   });
 });

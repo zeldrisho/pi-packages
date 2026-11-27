@@ -29,6 +29,9 @@ describe("extracted CSS cleanup", () => {
       ".hidden { display: none; }",
       "</style>",
       ".mw-parser-output .infobox { float: right; margin: 0; }",
+      "@media (min-width: 40rem) {",
+      "  .card { display: grid; }",
+      "}",
       "Readable prose remains.",
     ].join("\n");
 
@@ -44,44 +47,22 @@ describe("extracted CSS cleanup", () => {
     expect(stripExtractedCssCruft(markdown)).toBe("Before.\n\nAfter.");
   });
 
-  it("does not close a longer fence with a shorter or suffixed delimiter", () => {
+  it("preserves CSS examples until a valid closing fence", () => {
     const markdown = [
+      "Use @media queries for responsive layouts.",
+      "",
       "````css",
       ".first { display: block; }",
       "```",
       ".second { display: block; }",
       "```` not a close",
+      "@media (min-width: 40rem) { .card { grid-template-columns: 1fr 1fr; } }",
       ".third { display: block; }",
       "````",
       ".outside { display: none; }",
     ].join("\n");
 
     expect(stripExtractedCssCruft(markdown)).toBe(markdown.split("\n").slice(0, -1).join("\n"));
-  });
-
-  it("removes nested block at-rules", () => {
-    const markdown = [
-      "Before.",
-      "@media (min-width: 40rem) {",
-      "  .card { display: grid; }",
-      "}",
-      "After.",
-    ].join("\n");
-
-    expect(stripExtractedCssCruft(markdown)).toBe("Before.\nAfter.");
-  });
-
-  it("preserves fenced stylesheet examples and prose mentioning CSS", () => {
-    const markdown = [
-      "Use @media queries for responsive layouts.",
-      "",
-      "```css",
-      ".card { display: grid; }",
-      "@media (min-width: 40rem) { .card { grid-template-columns: 1fr 1fr; } }",
-      "```",
-    ].join("\n");
-
-    expect(stripExtractedCssCruft(markdown)).toBe(markdown);
   });
 });
 
@@ -132,21 +113,7 @@ describe("HTML extraction", () => {
     }
   });
 
-  it("keeps the README scope when Defuddle fails", async () => {
-    const { Defuddle } = await import("defuddle/node");
-    vi.mocked(Defuddle).mockRejectedValueOnce(new Error("failure"));
-
-    const result = await extractHtmlToMarkdown(
-      githubRepository,
-      new URL("https://github.com/owner/repo"),
-    );
-
-    expect(result.extractor).toBe("basic");
-    expect(result.markdown).toContain("README title");
-    expect(result.markdown).not.toContain("FILE LISTING");
-  });
-
-  it("preserves original numeric IDs in the README fallback", async () => {
+  it("keeps the README scope and original fragment IDs when Defuddle fails", async () => {
     const { Defuddle } = await import("defuddle/node");
     vi.mocked(Defuddle).mockRejectedValueOnce(new Error("failure"));
 
@@ -157,6 +124,8 @@ describe("HTML extraction", () => {
 
     expect(result.extractor).toBe("basic");
     expect(result.fragmentOffsets?.["1"]).toBeDefined();
+    expect(result.markdown).toContain("README title");
+    expect(result.markdown).not.toContain("FILE LISTING");
   });
 
   it("does not scope other paths or hosts, or roots without a README", async () => {
@@ -186,18 +155,7 @@ describe("HTML extraction", () => {
     expect(result.markdown.slice(offset)).toContain("Before you can run hooks");
   });
 
-  it("records fragment offsets for headings and explicit anchors", async () => {
-    const result = await extractHtmlToMarkdown(
-      `<main><h1>Guide</h1><h2 id="get-started">Get started</h2><p>Install it.</p><h2>Next steps</h2></main>`,
-      new URL("https://example.com/guide"),
-    );
-
-    const offset = result.fragmentOffsets?.["get-started"];
-    expect(offset).toBeDefined();
-    expect(result.markdown.slice(offset)).toMatch(/^#+ Get started/m);
-  });
-
-  it("strips markup before generating fragment slugs", async () => {
+  it("maps explicit heading IDs to Markdown offsets even when the heading contains markup", async () => {
     const result = await extractHtmlToMarkdown(
       `<main><article><h1>Guide</h1><h2 id="markup-heading"><em>Markup</em> heading</h2><p>${longText()}</p></article></main>`,
       new URL("https://example.com/guide"),
@@ -205,7 +163,7 @@ describe("HTML extraction", () => {
 
     const offset = result.fragmentOffsets?.["markup-heading"];
     expect(offset).toBeDefined();
-    expect(result.markdown.slice(offset)).toMatch(/^#+ Markup heading/m);
+    expect(result.markdown.slice(offset ?? -1)).toMatch(/^#+ Markup heading/);
   });
 
   it("discards malformed schema.org data without writing through Pi's TUI", async () => {

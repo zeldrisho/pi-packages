@@ -33,7 +33,7 @@ describe("ExpiringLruCache", () => {
     expect(cache.byteSize).toBe(7);
   });
 
-  it("accounts for replacement and expiry deletion", () => {
+  it("updates byte accounting as entries are replaced, expire, or become too large", () => {
     let now = 0;
     const cache = new ExpiringLruCache<string, string>(10, 10, sizeOf, () => now);
     cache.set("a", "1234", 10);
@@ -45,13 +45,8 @@ describe("ExpiringLruCache", () => {
     expect(cache.get("b")).toBeUndefined();
     expect(cache.byteSize).toBe(1);
     expect(cache.get("a")).toBe("1");
-  });
 
-  it("does not retain an individually oversized replacement", () => {
-    const cache = new ExpiringLruCache<string, string>(10, 5, sizeOf, () => 0);
-    cache.set("a", "small", 100);
-
-    expect(cache.set("a", "larger", 100)).toBe(false);
+    expect(cache.set("a", "oversized value", 10)).toBe(false);
     expect(cache.get("a")).toBeUndefined();
     expect(cache.size).toBe(0);
     expect(cache.byteSize).toBe(0);

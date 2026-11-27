@@ -36,10 +36,15 @@ describe("web_fetch limit contracts", () => {
       expect(Check(webFetchParameters, params)).toBe(false);
   });
 
-  it("rejects invalid URL lengths and numeric limits at runtime", async () => {
+  it("rejects invalid parameters at runtime", async () => {
     const url = "https://example.com";
 
     const samples = [
+      [
+        "blank focus query",
+        { url, query: "   " },
+        "query must contain between 1 and 400 characters",
+      ],
       ["fractional offset", { url, offset: 1.5 }, "offset must be an integer"],
       [
         "oversized URL",

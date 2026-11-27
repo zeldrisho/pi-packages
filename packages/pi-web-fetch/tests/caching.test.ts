@@ -111,22 +111,7 @@ describe("web_fetch caching", () => {
     expect(columns.content[0].text).not.toContain("let second");
   });
 
-  it("starts GitHub-style Markdown fetches at a heading fragment", async () => {
-    const result = await executeWebFetch(
-      { url: `${origin}/markdown-fragments.md#styling` },
-      undefined,
-      undefined,
-      dependencies,
-    );
-
-    expect(result.content[0].text).toContain("[Starting at the requested URL fragment.]");
-    expect(result.content[0].text).toContain("### Styling\nStyle guidance.");
-    expect(result.content[0].text).not.toContain("# Guide");
-    expect(result.content[0].text).not.toContain("Not a heading");
-    expect(result.details.fragment).toMatchObject({ requested: "styling", matched: true });
-  });
-
-  it("resolves Markdown link and Setext heading slugs", async () => {
+  it("starts Markdown output at a linked ATX heading or a Setext heading", async () => {
     const linked = await executeWebFetch(
       { url: `${origin}/markdown-fragments.md#linked-style-guide` },
       undefined,
@@ -141,6 +126,11 @@ describe("web_fetch caching", () => {
       dependencies,
     );
 
+    expect(linked.details.fragment).toMatchObject({
+      requested: "linked-style-guide",
+      matched: true,
+    });
+    expect(linked.content[0].text).toContain("[Starting at the requested URL fragment.]");
     expect(linked.content[0].text).toContain("Linked [Style](https://example.test) Guide");
     expect(linked.content[0].text).not.toContain("# Guide");
     expect(setext.content[0].text).toContain("Setext Section\n===");
@@ -172,8 +162,13 @@ describe("web_fetch caching", () => {
       dependencies,
     );
 
-    expect(first.details.cached).toBe(false);
-    expect(first.details.nextOffset).toBe(1_000);
+    expect(first.details).toMatchObject({
+      cached: false,
+      contentKind: "raw-text",
+      extractor: "raw",
+      confidence: "high",
+      nextOffset: 1_000,
+    });
     expect(first.details.truncation).toEqual({
       truncated: true,
       strategy: "continuation",
@@ -229,32 +224,28 @@ describe("web_fetch caching", () => {
     expect(complete.details.cached).toBe(true);
     expect(complete.details.focus).toBeUndefined();
     expect(complete.content[0].text).toContain("Installation uses Vite+.");
-  });
+    expect(focused.structuredContent).toMatchObject({
+      focus: { query: "caching", matchedSections: 1 },
+      markdown: expect.stringContaining("Caching stores complete pages."),
+    });
+    expect(complete.structuredContent).toMatchObject({
+      cacheStatus: "hit",
+      markdown: expect.stringContaining("Installation"),
+    });
+    expect(complete.structuredContent).not.toHaveProperty("focus");
 
-  it("reports an empty focused view without claiming the page had no readable text", async () => {
-    const result = await executeWebFetch(
-      { url: `${origin}/focused?none=${Date.now()}`, query: "quasar" },
+    const unmatched = await executeWebFetch(
+      { url, query: "quasar" },
       undefined,
       undefined,
       dependencies,
     );
 
-    expect(result.content[0].text).toContain(
+    expect(unmatched.content[0].text).toContain(
       "No sections selected. The query may miss relevant content; omit query for the full page.",
     );
-    expect(result.content[0].text).not.toContain("page contained no readable text");
-    expect(result.details.focus?.matchedSections).toBe(0);
-  });
-
-  it("rejects invalid focus queries at the runtime boundary", async () => {
-    await expect(
-      executeWebFetch(
-        { url: `${origin}/focused`, query: "   " },
-        undefined,
-        undefined,
-        dependencies,
-      ),
-    ).rejects.toThrow("query must contain between 1 and 400 characters");
+    expect(unmatched.content[0].text).not.toContain("page contained no readable text");
+    expect(unmatched.details.focus?.matchedSections).toBe(0);
   });
 
   it("coalesces concurrent fetches without letting one caller cancel another", async () => {
@@ -270,35 +261,5 @@ describe("web_fetch caching", () => {
     await cancelledExpectation;
     await expect(completed).resolves.toMatchObject({ details: { cached: false } });
     expect(fixture.coalescedRequests()).toBe(1);
-  });
-
-  it("wraps tool output and caches identical requests", async () => {
-    const updates: string[] = [];
-    const params = { url: `${origin}/html`, maxCharacters: 6_000 };
-
-    const first = await executeWebFetch(
-      params,
-      undefined,
-      (update) => updates.push(update.content[0].text),
-      dependencies,
-    );
-
-    const second = await executeWebFetch(
-      params,
-      undefined,
-      (update) => updates.push(update.content[0].text),
-      dependencies,
-    );
-
-    expect(first.details.cached).toBe(false);
-    expect(second.details.cached).toBe(true);
-    expect(first.content[0].text).not.toContain("Caution:");
-    expect(first.content[0].text).not.toContain("<untrusted_web_content");
-    expect(first.details.truncation).toEqual({
-      truncated: false,
-      strategy: "none",
-      nextOffset: undefined,
-    });
-    expect(updates).toEqual([`Fetching ${params.url}…`, `Using cached content for ${params.url}…`]);
   });
 });

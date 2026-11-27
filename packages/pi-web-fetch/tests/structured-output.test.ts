@@ -54,7 +54,9 @@ describe("web_fetch structured output", () => {
     expect(structured.markdown).not.toContain("bad()");
     expect(structured.outline.totalHeadings).toBe(1);
     expect(result.content[0].text).toContain("Hello");
+    expect(result.content[0].text).not.toMatch(/Caution:|<untrusted_web_content/);
     expect(result.details).toMatchObject({
+      truncation: { truncated: false, strategy: "none", nextOffset: undefined },
       title: "Fixture",
       requestedUrl: `${origin}/html`,
       finalUrl: `${origin}/html`,
@@ -163,33 +165,6 @@ describe("web_fetch structured output", () => {
     expect(second.details.totalCharacters).toBe(first.details.totalCharacters);
     expect(second.content[0].text).toContain("target");
     expect(second.content[0].text).not.toContain("before");
-  });
-
-  it("returns focused and cached metadata without changing the canonical document", async () => {
-    const focused = await executeWebFetch(
-      { url: `${origin}/focused`, query: "Redirect" },
-      undefined,
-      undefined,
-      dependencies,
-    );
-
-    expect(focused.structuredContent).toMatchObject({
-      focus: { query: "Redirect", matchedSections: 1 },
-      markdown: expect.stringContaining("Redirect targets"),
-    });
-
-    const complete = await executeWebFetch(
-      { url: `${origin}/focused` },
-      undefined,
-      undefined,
-      dependencies,
-    );
-
-    expect(complete.structuredContent).toMatchObject({
-      cacheStatus: "hit",
-      markdown: expect.stringContaining("Installation"),
-    });
-    expect(complete.structuredContent).not.toHaveProperty("focus");
   });
 
   it.each(["/deep-html", "/deep-anubis"])(

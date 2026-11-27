@@ -29,7 +29,7 @@ afterEach(async () => {
 });
 
 describe("tag resolution", () => {
-  it("discovers package metadata and resolves it by component tag", async () => {
+  it("resolves release tags only for known packages at the manifest version", async () => {
     const root = await createPackageFixture("1.2.3");
     const automation = createReleaseAutomation({ root });
 
@@ -46,14 +46,9 @@ describe("tag resolution", () => {
 
     await expect(automation.packageCatalog()).resolves.toEqual([alpha]);
     await expect(automation.resolvePackageByTag("alpha-v1.2.3")).resolves.toEqual(alpha);
-  });
-
-  it("rejects tags that do not identify a package at its manifest version", async () => {
-    const root = await createPackageFixture();
-    const automation = createReleaseAutomation({ root });
 
     const samples = [
-      ["alpha-v1.0.1", "does not match @zeldrisho/alpha manifest version 1.0.0"],
+      ["alpha-v1.0.1", "does not match @zeldrisho/alpha manifest version 1.2.3"],
       ["missing-v1.0.0", "No package matches the tag"],
       ["alpha-not-semver", "does not match <package>-v<version>"],
     ] as const;
@@ -65,7 +60,7 @@ describe("tag resolution", () => {
 });
 
 describe("release notes extraction", () => {
-  it("requires a known package path and a changelog entry for its version", async () => {
+  it("writes only the matching version section for a known package", async () => {
     const root = await createPackageFixture();
     const automation = createReleaseAutomation({ root });
     const notesPath = join(root, "notes.md");
@@ -76,16 +71,11 @@ describe("release notes extraction", () => {
     await expect
       .soft(automation.writeReleaseNotes("packages/alpha", notesPath))
       .rejects.toThrow("Changelog does not contain @zeldrisho/alpha@1.0.0");
-  });
 
-  it("extracts the version section from the changelog", async () => {
-    const root = await createPackageFixture();
     await writeFile(
       join(root, "packages/alpha/CHANGELOG.md"),
       "# Changelog\n\n## 1.0.0 (2026-08-05)\n\n* Initial release\n\n## 0.0.1\n\n* Bootstrap\n",
     );
-    const automation = createReleaseAutomation({ root });
-    const notesPath = join(root, "notes.md");
     await automation.writeReleaseNotes("packages/alpha", notesPath);
     const notes = await readFile(notesPath, "utf8");
     expect(notes).toContain("## 1.0.0");

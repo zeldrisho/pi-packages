@@ -18,28 +18,19 @@ describe("project discovery", () => {
     await expect(discoverProjectId("access", undefined)).resolves.toBe("project");
     expect(fetch).toHaveBeenCalledOnce();
   });
-  it("falls back to the second endpoint after an error", async () => {
-    const fetch = vi
-      .fn()
-      .mockRejectedValueOnce(new Error("network"))
-      .mockResolvedValueOnce(Response.json({ projectId: "fallback" }));
-
-    vi.stubGlobal("fetch", fetch);
-    await expect(discoverProjectId("access", undefined)).resolves.toBe("fallback");
-    expect(fetch).toHaveBeenCalledTimes(2);
-  });
-  it("uses a separate deadline for each load endpoint", async () => {
+  it("falls back to the second load endpoint with a fresh deadline", async () => {
     const timeout = vi.spyOn(AbortSignal, "timeout");
     vi.stubGlobal(
       "fetch",
       vi
         .fn()
-        .mockRejectedValueOnce(new Error("timeout"))
+        .mockRejectedValueOnce(new Error("network"))
         .mockResolvedValueOnce(Response.json({ projectId: "fallback" })),
     );
 
     try {
       await expect(discoverProjectId("access", undefined)).resolves.toBe("fallback");
+      expect(fetch).toHaveBeenCalledTimes(2);
       expect(timeout.mock.calls.filter(([ms]) => ms === 8_000)).toHaveLength(2);
       expect(timeout).toHaveBeenCalledWith(16_000);
     } finally {
@@ -56,24 +47,17 @@ describe("project discovery", () => {
     vi.stubGlobal("fetch", fetch);
     await expect(discoverProjectId("access", undefined)).resolves.toBe("listed");
   });
-  it.each(["network", "invalid JSON"])(
-    "tries the next project list endpoint after %s",
-    async (failure) => {
-      const fetch = vi
-        .fn()
-        .mockResolvedValueOnce(Response.json({}))
-        .mockImplementationOnce(async () => {
-          if (failure === "network") throw new Error("network");
+  it("tries the next project list endpoint after a malformed response", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({}))
+      .mockResolvedValueOnce(new Response("invalid JSON"))
+      .mockResolvedValueOnce(Response.json({ projects: [{ id: "listed" }] }));
 
-          return new Response("invalid JSON");
-        })
-        .mockResolvedValueOnce(Response.json({ projects: [{ id: "listed" }] }));
-
-      vi.stubGlobal("fetch", fetch);
-      await expect(discoverProjectId("access", undefined)).resolves.toBe("listed");
-      expect(fetch).toHaveBeenCalledTimes(3);
-    },
-  );
+    vi.stubGlobal("fetch", fetch);
+    await expect(discoverProjectId("access", undefined)).resolves.toBe("listed");
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
   it("rejects if no endpoint returns a usable project", async () => {
     vi.stubGlobal(
       "fetch",

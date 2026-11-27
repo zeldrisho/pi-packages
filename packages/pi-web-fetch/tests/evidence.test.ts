@@ -117,15 +117,9 @@ describe("detectAppShell", () => {
     expect(detectAppShell(`<html>${"x".repeat(20_000)}</html>`, "tiny")).toBe(true);
   });
 
-  it("does not flag ordinary prose that merely mentions consent", () => {
-    const body = "By continuing you consent to our newsletter and privacy policy. ".repeat(150);
-    const raw = "<html><body><article>" + body + "</article></body></html>";
-    expect(detectAppShell(raw, body)).toBe(false);
-  });
-
-  it("does not flag a content-rich page dominated by script markup", () => {
+  it("does not flag a readable article that mentions consent and contains a large script", () => {
     const script = "<script>" + "x".repeat(60_000) + "</script>";
-    const body = "Lorem ipsum dolor sit amet. ".repeat(400);
+    const body = "By continuing you consent to our newsletter and privacy policy. ".repeat(180);
     const raw = "<html><body>" + script + "<article>" + body + "</article></body></html>";
     expect(detectAppShell(raw, body)).toBe(false);
   });
@@ -157,7 +151,7 @@ describe("classifyContentKind", () => {
         false,
         "repository-readme",
       ],
-      ["raw extractor output", "https://example.com/a.json", "raw", false, "raw-text"],
+      ["plain text", "https://example.com/a.txt", "raw", false, "raw-text"],
       ["Defuddle extraction", "https://example.com/article", "defuddle", false, "article"],
       ["unrecognized basic extraction", "https://example.com/x", "basic", false, "unknown"],
     ] as const;
@@ -461,19 +455,6 @@ describe("web_fetch honest-evidence details", () => {
     );
     expect(JSON.stringify(result.details.links)).not.toContain("internal-secret");
     expect(JSON.stringify(result.details.links)).not.toContain("external-secret");
-  });
-
-  it("classifies plain text as raw-text with high confidence", async () => {
-    const result = await executeWebFetch(
-      { url: `${origin}/continuation` },
-      undefined,
-      undefined,
-      dependencies,
-    );
-
-    expect(result.details.contentKind).toBe("raw-text");
-    expect(result.details.extractor).toBe("raw");
-    expect(result.details.confidence).toBe("high");
   });
 
   it("rewrites github blob URLs and reports the canonical raw source", async () => {

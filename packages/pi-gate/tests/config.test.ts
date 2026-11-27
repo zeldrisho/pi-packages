@@ -66,14 +66,12 @@ describe("parseConfig", () => {
     }
   });
 
-  it("accepts a positive prompt timeout up to one day", () => {
+  it("accepts positive prompt timeouts up to one day and defaults out-of-range values", () => {
     expect(parseConfig('{"promptTimeoutMs":15000,"operations":{}}').promptTimeoutMs).toBe(15000);
     expect(parseConfig('{"promptTimeoutMs":86400000,"operations":{}}').promptTimeoutMs).toBe(
       86_400_000,
     );
-  });
 
-  it("uses the default prompt timeout for invalid values", () => {
     for (const value of [0, -1, 1.5, 86_400_001, "1000", null]) {
       const config = parseConfig(JSON.stringify({ promptTimeoutMs: value, operations: {} }));
       expect(config.promptTimeoutMs).toBe(DEFAULT_PROMPT_TIMEOUT_MS);
@@ -158,13 +156,9 @@ describe("formatCommandForDisplay", () => {
 });
 
 describe("highlightRuleForDisplay", () => {
-  it("wraps every visible occurrence of the matched rule", () => {
-    expect(highlightRuleForDisplay("sudo echo sudo", "sudo")).toBe("»sudo« echo »sudo«");
-  });
-
-  it("highlights terminal-safe text without restoring control characters", () => {
-    expect(highlightRuleForDisplay("dangerous\x1b[31m", "dangerous")).toBe(
-      "»dangerous«\\u{001b}[31m",
+  it("highlights each visible match without restoring terminal control characters", () => {
+    expect(highlightRuleForDisplay("sudo echo sudo\x1b[31m", "sudo")).toBe(
+      "»sudo« echo »sudo«\\u{001b}[31m",
     );
   });
 
@@ -187,15 +181,12 @@ describe("highlightRuleForDisplay", () => {
 });
 
 describe("loadConfig", () => {
-  it("returns an empty configuration for missing and malformed files", () => {
+  it("loads the current file and returns defaults if it is missing or malformed", () => {
     const emptyConfig = { operations: {}, promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS };
 
     expect.soft(loadConfig(), "missing file").toEqual(emptyConfig);
     setConfig("{ not valid");
     expect.soft(loadConfig(), "malformed file").toEqual(emptyConfig);
-  });
-
-  it("returns the parsed configuration when the file is present", () => {
     setConfig(JSON.stringify({ operations: { sudo: "block" }, promptTimeoutMs: 5000 }));
     expect(loadConfig()).toEqual({ operations: { sudo: "block" }, promptTimeoutMs: 5000 });
   });

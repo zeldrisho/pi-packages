@@ -1,14 +1,6 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import { classifyResultQuality } from "../src/brave";
 import { summarizeDomainDiversity } from "../src/search";
 import { createSearchTool, jsonResponse } from "./harness";
-
-describe("classifyResultQuality", () => {
-  it("flags title-or-snippet results as medium", () => {
-    expect(classifyResultQuality({ title: "T", snippet: "" })).toBe("medium");
-    expect(classifyResultQuality({ title: "", snippet: "x".repeat(79) })).toBe("medium");
-  });
-});
 
 describe("search domain diversity", () => {
   it("normalizes www hosts and reports the dominant-domain share", () => {
@@ -37,8 +29,9 @@ describe("web_search honest-evidence details", () => {
           web: {
             results: [
               { title: "A", url: "https://example.com/a", description: "x".repeat(80) },
-              { title: "B", url: "https://example.com/b", description: "short" },
-              { title: "", url: "https://example.com/c", description: "" },
+              { title: "Title only", url: "https://example.com/b", description: "" },
+              { title: "", url: "https://example.com/c", description: "Snippet only" },
+              { title: "", url: "https://example.com/d", description: "" },
             ],
           },
         }),
@@ -47,19 +40,24 @@ describe("web_search honest-evidence details", () => {
 
     const result = await createSearchTool().execute(
       "call",
-      { query: "evidence query", count: 3 },
+      { query: "evidence query", count: 4 },
       undefined,
       undefined,
     );
 
     expect(result.details.evidence).toEqual({
-      requestedCount: 3,
-      returnedCount: 3,
+      requestedCount: 4,
+      returnedCount: 4,
       dropped: 0,
       truncated: false,
       uniqueDomains: 1,
       topDomainShare: 1,
     });
-    expect(result.details.results.map((item) => item.quality)).toEqual(["high", "medium", "low"]);
+    expect(result.details.results.map((item) => item.quality)).toEqual([
+      "high",
+      "medium",
+      "medium",
+      "low",
+    ]);
   });
 });

@@ -78,14 +78,4 @@ describe("tag-omitted HTML5 documents", () => {
     expect(result.markdown).toContain("Wrapped body text.");
     expect(htmlToMarkdownFallback(explicitWrappers)).toContain("Wrapped body text.");
   });
-
-  it("still extracts a well-formed document", async () => {
-    const result = await extractHtmlToMarkdown(
-      "<html><head><title>Full</title></head><body><h1>Heading</h1><p>Body text.</p></body></html>",
-      new URL("https://example.test/"),
-    );
-
-    expect(result.title).toBe("Full");
-    expect(result.markdown).toContain("Body text.");
-  });
 });

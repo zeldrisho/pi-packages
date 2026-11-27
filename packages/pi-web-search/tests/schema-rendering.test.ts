@@ -1,7 +1,7 @@
 import { Check } from "typebox/value";
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vite-plus/test";
-import { webSearchOutputSchema, webSearchParameters } from "../src/index";
+import { webSearchOutputSchema } from "../src/index";
 import { SEARCH_WEB_MAX_QUERY_CHARACTERS } from "../src/limits";
 import { createSearchTool, jsonResponse, renderTheme } from "./harness";
 
@@ -13,32 +13,13 @@ vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
 
 describe("web_search schema rendering", () => {
   initTheme();
-  it("exposes a provider-compatible object schema without allOf or anyOf", () => {
-    expect(webSearchParameters.type).toBe("object");
-    const schema = JSON.stringify(webSearchParameters);
-    expect(schema).not.toContain("allOf");
-    expect(schema).not.toContain("anyOf");
-    expect(Check(webSearchParameters, { query: "x" })).toBe(true);
-    expect(Object.keys(webSearchParameters.properties)).toEqual(["query"]);
-  });
-
-  it("accepts up to the query limit at the schema level", () => {
-    expect(
-      Check(webSearchParameters, {
-        query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS),
-      }),
-    ).toBe(true);
-    expect(
-      Check(webSearchParameters, { query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS + 1) }),
-    ).toBe(false);
-  });
-
-  it("enforces the query limit at runtime", async () => {
+  it("rejects blank and oversized queries before making a request", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "test-secret";
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
+    const tool = createSearchTool();
     await expect(
-      createSearchTool().execute(
+      tool.execute(
         "call",
         { query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS + 1) },
         undefined,
@@ -47,16 +28,9 @@ describe("web_search schema rendering", () => {
     ).rejects.toThrow(
       `Search queries cannot exceed ${SEARCH_WEB_MAX_QUERY_CHARACTERS} characters.`,
     );
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("rejects whitespace-only queries before making a request", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "test-secret";
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    await expect(
-      createSearchTool().execute("call", { query: "   " }, undefined, undefined),
-    ).rejects.toThrow("cannot be empty");
+    await expect(tool.execute("call", { query: "   " }, undefined, undefined)).rejects.toThrow(
+      "cannot be empty",
+    );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

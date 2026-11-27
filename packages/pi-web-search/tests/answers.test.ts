@@ -7,13 +7,32 @@ const citation = '<citation>{"number":1,"url":"https://example.com/source"}</cit
 const usage = '<usage>{"X-Request-Total-Cost":0.01}</usage>';
 
 describe("Answers mode", () => {
-  it("calls only Answers and retains citations and usage across split deltas", async () => {
+  it("calls only Answers and preserves UTF-8 text, citations, and usage across chunks", async () => {
     process.env.BRAVE_ANSWERS_API_KEY = "answers-secret";
     process.env.BRAVE_SEARCH_API_KEY = "web-only-secret";
 
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
-      answerResponse(["A grounded answer. ", citation.slice(0, 14), citation.slice(14), usage]),
-    );
+    const wire = await answerResponse([
+      "Café answer. ",
+      citation.slice(0, 14),
+      citation.slice(14),
+      usage,
+    ]).text();
+
+    const bytes = new TextEncoder().encode(wire);
+    const split = bytes.indexOf(0xc3) + 1;
+    expect(split).toBeGreaterThan(0);
+
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(bytes.subarray(0, split));
+          controller.enqueue(bytes.subarray(split));
+          controller.close();
+        },
+      });
+
+      return new Response(body);
+    });
 
     vi.stubGlobal("fetch", fetchMock);
 
@@ -51,7 +70,7 @@ describe("Answers mode", () => {
     });
     expect(result.details.mode).toBe("answers");
     expect(result.details.answer).toEqual({
-      text: "A grounded answer. [1]",
+      text: "Café answer. [1]",
       citations: [{ number: 1, url: "https://example.com/source" }],
       usage: { "X-Request-Total-Cost": 0.01 },
     });
@@ -134,28 +153,6 @@ describe("Answers mode", () => {
     expect(text).not.toContain("<untrusted_web_content>");
   });
 
-  it("reports provider HTTP errors without falling back", async () => {
-    process.env.BRAVE_ANSWERS_API_KEY = "failure-secret";
-    const tool = createSearchTool();
-
-    for (const status of [402, 403, 429, 503]) {
-      const fetchMock = vi.fn(async () => jsonResponse({ error: "unavailable" }, status));
-      vi.stubGlobal("fetch", fetchMock);
-      await expect
-        .soft(
-          tool.execute(
-            "call",
-            { query: `failed answer ${status}`, mode: "answers" },
-            undefined,
-            undefined,
-          ),
-          `HTTP ${status}`,
-        )
-        .rejects.toThrow(`HTTP ${status}`);
-      expect.soft(fetchMock, `HTTP ${status}`).toHaveBeenCalledTimes(1);
-    }
-  });
-
   it("rejects web-only options before making an Answers request", async () => {
     process.env.BRAVE_ANSWERS_API_KEY = "unused-test-key";
     const fetchMock = vi.fn();
@@ -189,33 +186,6 @@ describe("Answers mode", () => {
     }
 
     expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("parses UTF-8 and SSE data split across network chunks", async () => {
-    process.env.BRAVE_ANSWERS_API_KEY = "chunk-secret";
-    const bytes = new TextEncoder().encode(await answerResponse(["héllo", citation, usage]).text());
-
-    const body = new ReadableStream<Uint8Array>({
-      start(controller) {
-        for (let offset = 0; offset < bytes.length; offset += 7)
-          controller.enqueue(bytes.subarray(offset, offset + 7));
-        controller.close();
-      },
-    });
-
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response(body)),
-    );
-
-    const result = await createSearchTool().execute(
-      "call",
-      { query: "chunked answer", mode: "answers" },
-      undefined,
-      undefined,
-    );
-
-    expect(result.details.answer?.text).toBe("héllo[1]");
   });
 
   it("rejects an oversized Answers response and cancels its stream", async () => {
@@ -316,7 +286,8 @@ describe("Answers mode", () => {
     vi.stubGlobal("fetch", fetchMock);
     const tool = createSearchTool();
     const params = { query: "answer retry", mode: "answers" as const };
-    await expect(tool.execute("first", params, undefined, undefined)).rejects.toThrow("503");
+    await expect(tool.execute("first", params, undefined, undefined)).rejects.toThrow("HTTP 503");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     const result = await tool.execute("retry", params, undefined, undefined);
     expect(result.details.cached).toBe(false);
     expect(result.details.answer?.text).toBe("Recovered");

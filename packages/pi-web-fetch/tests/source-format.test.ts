@@ -13,17 +13,6 @@ const minifiedOpenApi = (): string =>
   `import{a}from"./chunk.js";const e={openapi:"3.1.1",info:{title:"Wallet",description:"${"Endpoint documentation. ".repeat(100)}"},paths:{"/sapi/v1/capital/deposit/hisrec":{get:{summary:"Deposit \\"History\\"",tags:["capital"],values:[-1,2.5e3,true,false,null]}}}};export{e as default};`;
 
 describe("indentMinifiedSource", () => {
-  it("adds line breaks and indentation without altering any character", () => {
-    const source = minifiedOpenApi();
-    const indented = indentMinifiedSource(source);
-
-    expect(indented).toBeDefined();
-    expect(indented!.split("\n").length).toBeGreaterThan(10);
-    expect(indented).toContain('  openapi:"3.1.1",');
-    // Layout is the only change: no character was dropped, added, or reordered.
-    expect(withoutWhitespace(indented!)).toBe(withoutWhitespace(source));
-  });
-
   it("keeps punctuation inside string literals out of the layout", () => {
     const source = `const e={a:"x,y:{z}[1]",b:'open{brace',c:"esc\\"aped,still",d:1};${"pad".repeat(700)}`;
 
@@ -38,18 +27,13 @@ describe("indentMinifiedSource", () => {
     ]);
   });
 
-  it("leaves short and already-structured source alone", () => {
-    expect(indentMinifiedSource("const e={a:1};")).toBeUndefined();
-
+  it("leaves already-structured and oversized source alone", () => {
     const structured = Array.from(
       { length: 200 },
       (_, index) => `const v${index} = ${index};`,
     ).join("\n");
 
     expect(indentMinifiedSource(structured)).toBeUndefined();
-  });
-
-  it("leaves oversized bodies in their original layout", () => {
     expect(indentMinifiedSource("a,".repeat(1_100_000))).toBeUndefined();
   });
 
@@ -68,16 +52,20 @@ describe("indentMinifiedSource", () => {
 });
 
 describe("formatMinifiedSource", () => {
-  it("fences reformatted source with a language for its media type", () => {
+  it("adds a language fence and indentation without changing source tokens", () => {
     expect(sourceLanguageFor("text/javascript")).toBe("js");
     expect(sourceLanguageFor("text/yaml")).toBe("yaml");
     expect(sourceLanguageFor("text/html")).toBeUndefined();
 
-    const formatted = formatMinifiedSource(minifiedOpenApi(), "text/javascript");
+    const source = minifiedOpenApi();
+    const formatted = formatMinifiedSource(source, "text/javascript");
+    const lines = formatted?.markdown.split("\n") ?? [];
 
     expect(formatted?.language).toBe("js");
-    expect(formatted?.markdown.startsWith("```js\n")).toBe(true);
-    expect(formatted?.markdown.endsWith("\n```")).toBe(true);
+    expect(lines[0]).toBe("```js");
+    expect(lines.at(-1)).toBe("```");
+    expect(lines).toContain('  openapi:"3.1.1",');
+    expect(withoutWhitespace(lines.slice(1, -1).join("\n"))).toBe(withoutWhitespace(source));
   });
 
   it("does not reformat prose, HTML, or short bodies", () => {

@@ -5,7 +5,9 @@ import { webSearchParameters } from "../src/index";
 import { SEARCH_WEB_MAX_QUERY_CHARACTERS } from "../src/limits";
 
 describe("web_search limit contracts", () => {
-  it("exposes only the compact model-facing parameters", () => {
+  it("exposes a provider-compatible schema with a single bounded query", () => {
+    expect(webSearchParameters.type).toBe("object");
+    expect(JSON.stringify(webSearchParameters)).not.toMatch(/"(?:allOf|anyOf)"/);
     expect(
       Check(webSearchParameters, {
         query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS),
@@ -16,12 +18,8 @@ describe("web_search limit contracts", () => {
         query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS + 1),
       }),
     ).toBe(false);
-    const schema = JSON.parse(JSON.stringify(webSearchParameters));
-    expect(Object.keys(schema.properties)).toEqual(["query"]);
-    expect(schema.properties.query.description).toBeUndefined();
-    expect(schema.properties.count).toBeUndefined();
-    expect(schema.properties.freshness).toBeUndefined();
-    expect(schema.properties.spellcheck).toBeUndefined();
+    expect(Object.keys(webSearchParameters.properties)).toEqual(["query"]);
+    expect(webSearchParameters.properties.query).not.toHaveProperty("description");
   });
 
   it("keeps documented query limits aligned with the constants", async () => {

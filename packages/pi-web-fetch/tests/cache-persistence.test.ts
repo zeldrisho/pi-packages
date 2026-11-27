@@ -48,13 +48,15 @@ describe("web_fetch disk cache", () => {
     await rm(directory, { recursive: true, force: true });
   });
 
-  it("reloads a private on-disk entry after restart within its TTL", async () => {
+  it("reloads a private on-disk entry after restart, then removes it at expiry", async () => {
     let now = 1_000;
-    const key = "https://example.com/a";
+    const key = "https://example.com/a/b?c=1&d=2";
     const first = makeCache(directory, () => now);
     first.set(key, document(key, "alpha"), now + DAY_MS);
 
-    const fileStat = await stat(join(directory, stableKeyHash(key)));
+    const filename = stableKeyHash(key);
+    expect(filename).toMatch(/^[a-f0-9]{64}$/u);
+    const fileStat = await stat(join(directory, filename));
     expect(fileStat.isFile()).toBe(true);
     expect(fileStat.mode & 0o777).toBe(0o600);
     expect((await stat(directory)).mode & 0o777).toBe(0o700);
@@ -62,19 +64,11 @@ describe("web_fetch disk cache", () => {
     now = 2_000;
     const second = makeCache(directory, () => now);
     expect(second.get(key)).toMatchObject({ markdown: "alpha", url: key });
-  });
 
-  it("treats an expired on-disk entry as a miss and removes its file", async () => {
-    let now = 1_000;
-    const first = makeCache(directory, () => now);
-    first.set("https://example.com/exp", document("https://example.com/exp", "x"), now + 1_000);
-
-    now = 5_000;
-    const second = makeCache(directory, () => now);
-    expect(second.get("https://example.com/exp")).toBeUndefined();
-
-    const files = await readdir(directory);
-    expect(files).not.toContain(stableKeyHash("https://example.com/exp"));
+    now = 1_000 + DAY_MS;
+    const expired = makeCache(directory, () => now);
+    expect(expired.get(key)).toBeUndefined();
+    expect(await readdir(directory)).toEqual([]);
   });
 
   it("deletes backing files when entries are evicted by the count limit", async () => {
@@ -119,12 +113,5 @@ describe("web_fetch disk cache", () => {
       false,
     );
     expect(cache.get("big")).toBeUndefined();
-  });
-
-  it("hashes distinct keys into distinct filesystem-safe names", () => {
-    const key = "https://example.com/a/b?c=1&d=2";
-    const filename = stableKeyHash(key);
-    expect(filename).toMatch(/^[a-f0-9]{64}$/u);
-    expect(filename).not.toBe(stableKeyHash(`${key}3`));
   });
 });

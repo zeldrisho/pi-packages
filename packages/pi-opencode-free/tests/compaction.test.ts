@@ -311,10 +311,13 @@ describe("segmented compaction", () => {
     });
   });
 
-  it("records written and edited files as modified and carries earlier lists", async () => {
+  it("carries valid prior file lists into compaction details and summary", async () => {
     const harness = createHarness({
       contextWindow: 40_000,
       branchEntries: [
+        { type: "message" },
+        { type: "compaction", details: "not-an-object" },
+        { type: "compaction", details: { readFiles: [1, 2] } },
         { type: "compaction", details: { readFiles: ["old.ts"], modifiedFiles: ["old-mod.ts"] } },
       ],
     });
@@ -322,36 +325,16 @@ describe("segmented compaction", () => {
     const result = await harness.handler(harness.event, harness.context);
     const summary = result?.compaction?.summary ?? "";
 
-    const readBlock = summary.slice(
-      summary.indexOf("<read-files>"),
-      summary.indexOf("</read-files>"),
-    );
-
-    const modifiedBlock = summary.slice(
-      summary.indexOf("<modified-files>"),
-      summary.indexOf("</modified-files>"),
-    );
-
-    expect(readBlock).toContain("src/read-only.ts");
-    expect(readBlock).toContain("old.ts");
-    expect(readBlock).not.toContain("src/edited.ts");
-    expect(modifiedBlock).toContain("src/edited.ts");
-    expect(modifiedBlock).toContain("src/written.ts");
-    expect(modifiedBlock).toContain("old-mod.ts");
-  });
-
-  it("ignores malformed file lists on earlier compaction entries", async () => {
-    const harness = createHarness({
-      contextWindow: 40_000,
-      branchEntries: [{ type: "compaction", details: { readFiles: [1, 2] } }],
-    });
-
-    const result = await harness.handler(harness.event, harness.context);
-
     expect(result?.compaction?.details).toEqual({
-      readFiles: ["src/read-only.ts"],
-      modifiedFiles: ["src/edited.ts", "src/written.ts"],
+      readFiles: ["old.ts", "src/read-only.ts"],
+      modifiedFiles: ["old-mod.ts", "src/edited.ts", "src/written.ts"],
     });
+    expect(summary).toMatch(
+      /<read-files>[\s\S]*old\.ts[\s\S]*src\/read-only\.ts[\s\S]*<\/read-files>/,
+    );
+    expect(summary).toMatch(
+      /<modified-files>[\s\S]*old-mod\.ts[\s\S]*src\/edited\.ts[\s\S]*src\/written\.ts[\s\S]*<\/modified-files>/,
+    );
   });
 
   it("does not use a partial digest when a single message cannot be split", async () => {
@@ -379,24 +362,6 @@ describe("segmented compaction", () => {
     expect(result?.compaction?.summary).not.toContain("<read-files>");
     expect(result?.compaction?.summary).not.toContain("<modified-files>");
     expect(result?.compaction?.details).toEqual({ readFiles: [], modifiedFiles: [] });
-  });
-
-  it("ignores details that are not file lists", async () => {
-    const harness = createHarness({
-      contextWindow: 40_000,
-      branchEntries: [
-        { type: "message" },
-        { type: "compaction", details: "not-an-object" },
-        { type: "compaction", details: { readFiles: ["kept.ts"] } },
-      ],
-    });
-
-    const result = await harness.handler(harness.event, harness.context);
-
-    expect(result?.compaction?.details).toEqual({
-      readFiles: ["kept.ts", "src/read-only.ts"],
-      modifiedFiles: ["src/edited.ts", "src/written.ts"],
-    });
   });
 
   it("accumulates reasoning tokens reported by the provider", async () => {

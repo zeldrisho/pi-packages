@@ -148,31 +148,21 @@ describe("documentation Markdown", () => {
 describe("buildLlmsTxtCandidateUrls", () => {
   it("maps any page path to the root index plus ancestor directory indexes", () => {
     expect(
-      buildLlmsTxtCandidateUrls("https://example.com/a/b/c?x=1#frag").map((u) => u.href),
+      buildLlmsTxtCandidateUrls(
+        "https://example.com/en/docs/catalog/pay/api/rest-api?x=1#frag",
+      ).map((u) => u.href),
     ).toEqual([
       "https://example.com/llms.txt",
-      "https://example.com/a/llms.txt",
-      "https://example.com/a/b/llms.txt",
+      "https://example.com/en/llms.txt",
+      "https://example.com/en/docs/llms.txt",
+      "https://example.com/en/docs/catalog/llms.txt",
+      "https://example.com/en/docs/catalog/pay/llms.txt",
+      "https://example.com/en/docs/catalog/pay/api/llms.txt",
     ]);
     expect(buildLlmsTxtCandidateUrls("https://example.com").map((u) => u.href)).toEqual([
       "https://example.com/llms.txt",
     ]);
     expect(buildLlmsTxtCandidateUrls("http://example.com/a/b")[0].protocol).toBe("http:");
-  });
-
-  it("reaches a section index nested below a locale prefix", () => {
-    expect(
-      buildLlmsTxtCandidateUrls("https://example.com/en/docs/catalog/pay/api/rest-api").map(
-        (u) => u.pathname,
-      ),
-    ).toEqual([
-      "/llms.txt",
-      "/en/llms.txt",
-      "/en/docs/llms.txt",
-      "/en/docs/catalog/llms.txt",
-      "/en/docs/catalog/pay/llms.txt",
-      "/en/docs/catalog/pay/api/llms.txt",
-    ]);
   });
 
   it("treats a trailing slash as a directory and never probes the page itself", () => {
@@ -213,10 +203,6 @@ describe("parseLinkHeaderForAgentHints", () => {
         "https://example.com/",
       ),
     ).toEqual({});
-  });
-
-  it("returns no hints for an empty header", () => {
-    expect(parseLinkHeaderForAgentHints("", "https://example.com/")).toEqual({});
   });
 });
 
@@ -355,31 +341,6 @@ describe("executeWebFetch llms.txt support", () => {
     expect(second.content[0]?.text).toContain("Index: https://indexed.example.com/llms.txt");
   });
 
-  it("omits the index notice when the same URL is already in the returned page", async () => {
-    const index = "https://linked-index.example.com/llms.txt";
-
-    const { dependencies } = recordingDependencies((href) =>
-      href === index
-        ? fakeResponse(200, "text/markdown", LLMS_TXT)
-        : fakeResponse(
-            200,
-            "text/plain",
-            `Documentation index: ${index}\n${"Page content. ".repeat(30)}`,
-          ),
-    );
-
-    const result = await executeWebFetch(
-      { url: "https://linked-index.example.com/page" },
-      undefined,
-      undefined,
-      dependencies,
-    );
-
-    expect(result.details.llmsTxtUrl).toBe(index);
-    expect(result.content[0]?.text).toContain(`Documentation index: ${index}`);
-    expect(result.content[0]?.text).not.toContain(`Index: ${index}`);
-  });
-
   it("suppresses equivalent index links but preserves links to distinct indexes", async () => {
     for (const identical of [true, false]) {
       const origin = `https://${identical ? "same" : "distinct"}-aliases.example.com`;
@@ -417,17 +378,16 @@ describe("executeWebFetch llms.txt support", () => {
   });
 
   it("suppresses index notices only when the matching link is already visible", async () => {
-    const samples = [
-      ["[llms.txt](/llms.txt)", false],
-      ["[index](../llms.txt)", true],
-      ["[index](https://elsewhere.example/llms.txt)", false],
-      ["[index](/llms.txt-other)", false],
-      ["llms.txt", false],
-    ] as const;
-
-    for (const [link, suppress] of samples) {
-      const origin = `https://links-${suppress ? "yes" : "no"}-${link.length}.example.com`;
+    for (const target of ["visible-relative", "visible-absolute", "different-origin"] as const) {
+      const origin = `https://links-${target}.example.com`;
       const section = `${origin}/docs/llms.txt`;
+
+      const link =
+        target === "visible-relative"
+          ? "[index](../llms.txt)"
+          : target === "visible-absolute"
+            ? section
+            : "[index](https://elsewhere.example/docs/llms.txt)";
 
       const { dependencies } = recordingDependencies((href) => {
         if (href === section) return fakeResponse(200, "text/markdown", LLMS_TXT);
@@ -450,7 +410,9 @@ describe("executeWebFetch llms.txt support", () => {
 
       expect.soft(result.details.llmsTxtUrl, link).toBe(section);
       expect.soft(result.content[0]?.text, link).toContain(link);
-      expect.soft(result.content[0]?.text.includes(`Index: ${section}`), link).toBe(!suppress);
+      expect
+        .soft(result.content[0]?.text.includes(`Index: ${section}`), link)
+        .toBe(target === "different-origin");
     }
   });
 

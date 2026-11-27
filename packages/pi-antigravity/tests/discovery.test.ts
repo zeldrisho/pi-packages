@@ -20,7 +20,7 @@ function metadata(displayName: string, extra: JsonObject = {}): JsonObject {
   return { displayName, ...extra };
 }
 
-function availableModels(): JsonObject {
+function availableModels() {
   return {
     models: {
       "gemini-3.8-flash-low": metadata("Gemini 3.8 Flash (Low)", {
@@ -108,50 +108,7 @@ describe("catalog grouping", () => {
     ).toBe("example-xhigh");
   });
 
-  it("collapses the runtime variants the CLI lists into public models", () => {
-    const catalog = catalogFromAvailableModels(availableModels());
-
-    expect(catalog?.map((model) => model.id)).toEqual([
-      "gemini-3.8-flash",
-      "gemini-claude-sonnet-4-6",
-      "gemini-claude-opus-4-6",
-      "gemini-gpt-oss-120b",
-    ]);
-  });
-
-  it("maps each thinking level to the runtime id the backend serves", () => {
-    const gemini = catalogFromAvailableModels(availableModels())?.find(
-      (model) => model.id === "gemini-3.8-flash",
-    );
-
-    expect(gemini?.thinkingLevelMap).toEqual({
-      off: null,
-      minimal: null,
-      low: "gemini-3.8-flash-low",
-      medium: "gemini-3.8-flash-medium",
-      high: "gemini-3.8-flash-high",
-      xhigh: null,
-      max: null,
-    });
-  });
-
-  it("exposes discovered Gemini levels to Pi and routes each selection", () => {
-    const catalog = catalogFromAvailableModels(availableModels());
-    const stored = storedModelsFrom(modelConfigs(catalog), "antigravity", "https://example.test");
-    const gemini = stored.find((model) => model.id === "gemini-3.8-flash");
-
-    expect(gemini).toBeDefined();
-
-    if (gemini === undefined) return;
-
-    expect(getSupportedThinkingLevels(gemini)).toEqual(["low", "medium", "high"]);
-
-    for (const level of ["low", "medium", "high"] as const) {
-      expect(resolveRuntimeModel(gemini, level)).toBe(`gemini-3.8-flash-${level}`);
-    }
-  });
-
-  it("exposes only the advertised levels for every current model", () => {
+  it("collapses runtime variants into public models with only their advertised routes", () => {
     const catalog = catalogFromAvailableModels(availableModels());
     const stored = storedModelsFrom(modelConfigs(catalog), "antigravity", "https://example.test");
 
@@ -166,7 +123,13 @@ describe("catalog grouping", () => {
       "gemini-gpt-oss-120b": { medium: "gemini-gpt-oss-120b-medium" },
     } as const;
 
-    expect(stored).toHaveLength(Object.keys(expected).length);
+    expect(stored.map((model) => model.id)).toEqual(Object.keys(expected));
+    expect(catalog?.map((model) => model.name)).toEqual([
+      "Gemini 3.8 Flash",
+      "Claude Sonnet 4.6",
+      "Claude Opus 4.6",
+      "GPT-OSS 120B",
+    ]);
 
     for (const [id, routes] of Object.entries(expected)) {
       const model = stored.find((entry) => entry.id === id);
@@ -178,6 +141,10 @@ describe("catalog grouping", () => {
       for (const level of getSupportedThinkingLevels(model)) {
         const route = Object.entries(routes).find(([key]) => key === level);
         expect(resolveRuntimeModel(model, level)).toBe(route?.[1]);
+      }
+
+      if (id === "gemini-claude-opus-4-6") {
+        expect(clampThinkingLevel(model, "medium")).toBe("high");
       }
     }
   });
@@ -228,32 +195,6 @@ describe("catalog grouping", () => {
     expect(
       catalog?.find((model) => model.id === "gemini-invalid")?.thinkingLevelMap.low,
     ).toBeNull();
-  });
-
-  it("lets Pi clamp fixed-effort models to their advertised level", () => {
-    const catalog = catalogFromAvailableModels(availableModels());
-    const stored = storedModelsFrom(modelConfigs(catalog), "antigravity", "https://example.test");
-    const opus = stored.find((model) => model.id === "gemini-claude-opus-4-6");
-    const gpt = stored.find((model) => model.id === "gemini-gpt-oss-120b");
-
-    expect(opus).toBeDefined();
-    expect(gpt).toBeDefined();
-
-    if (opus === undefined || gpt === undefined) return;
-    expect(getSupportedThinkingLevels(opus)).toEqual(["high"]);
-    expect(clampThinkingLevel(opus, "medium")).toBe("high");
-    expect(getSupportedThinkingLevels(gpt)).toEqual(["medium"]);
-  });
-
-  it("takes the name from the display name without its level", () => {
-    const names = catalogFromAvailableModels(availableModels())?.map((model) => model.name);
-
-    expect(names).toEqual([
-      "Gemini 3.8 Flash",
-      "Claude Sonnet 4.6",
-      "Claude Opus 4.6",
-      "GPT-OSS 120B",
-    ]);
   });
 
   it("uses the limits the backend advertises", () => {
@@ -352,7 +293,10 @@ describe("catalog grouping", () => {
 
   it("honours the backend's recommended list", () => {
     const catalog = catalogFromAvailableModels({
-      ...availableModels(),
+      models: {
+        ...availableModels().models,
+        "gemini-4-hydrogen-high": metadata("Gemini 4 Hydrogen (High)"),
+      },
       agentModelSorts: [
         {
           groups: [
@@ -376,18 +320,6 @@ describe("catalog grouping", () => {
     });
 
     expect(catalog).toBeUndefined();
-  });
-
-  it("does not add unrecommended hydrogen variants", () => {
-    const catalog = catalogFromAvailableModels({
-      models: {
-        "gemini-3.8-flash-low": metadata("Gemini 3.8 Flash (Low)"),
-        "gemini-4-hydrogen-high": metadata("Gemini 4 Hydrogen (High)"),
-      },
-      agentModelSorts: [{ groups: [{ modelIds: ["gemini-3.8-flash-low"] }] }],
-    });
-
-    expect(catalog?.map((model) => model.id)).toEqual(["gemini-3.8-flash"]);
   });
 
   it("reads recommended ids defensively", () => {
@@ -464,7 +396,7 @@ describe("catalog refresh", () => {
     expect(catalog.map((model) => model.id)).toEqual(FALLBACK_MODELS.map((model) => model.id));
   });
 
-  it("keeps the seed catalog when the account is not signed in", async () => {
+  it("does not discover or publish models when the account is not signed in", async () => {
     const fetchSpy = vi.fn();
 
     vi.stubGlobal("fetch", fetchSpy);
@@ -529,11 +461,19 @@ describe("catalog refresh", () => {
     ]);
   });
 
-  it("round-trips a discovered catalog through Pi's stored model shape", () => {
+  it("round-trips the discovered catalog while filtering unsupported stored entries", () => {
     const catalog = catalogFromAvailableModels(availableModels()) ?? [];
     const configs = modelConfigs(catalog);
     const stored = storedModelsFrom(configs, "antigravity", "https://example.test");
-    const restored = modelsFromStored(stored, "antigravity");
+    const first = stored[0]!;
+
+    const ignored = [
+      { ...first, id: "claude-opus-4-6" },
+      { ...first, id: "gemini-other-provider", provider: "other-provider" },
+      { ...first, id: "gemini-other-api", api: "openai-completions" },
+    ];
+
+    const restored = modelsFromStored([...stored, ...ignored], "antigravity");
 
     expect(stored).toEqual(
       expect.arrayContaining(
@@ -553,34 +493,6 @@ describe("catalog refresh", () => {
 
   it("returns no catalog for empty stored input", () => {
     expect(modelsFromStored([], "antigravity")).toBeUndefined();
-  });
-
-  it("filters legacy non-Gemini entries from stored catalogs", () => {
-    const stored = storedModelsFrom(
-      modelConfigs(catalogFromAvailableModels(availableModels()) ?? []),
-      "antigravity",
-      "https://example.test",
-    );
-
-    const legacy = { ...stored[0]!, id: "claude-opus-4-6" };
-
-    expect(
-      modelsFromStored([...stored, legacy], "antigravity")?.every((model) =>
-        model.id.startsWith("gemini-"),
-      ),
-    ).toBe(true);
-  });
-
-  it("ignores stored models owned by another provider or API", () => {
-    const foreign = [
-      ...storedModelsFrom(modelConfigs(), "other-provider", "https://example.test"),
-      {
-        ...storedModelsFrom(modelConfigs(), "antigravity", "https://example.test")[0],
-        api: "openai-completions",
-      },
-    ];
-
-    expect(modelsFromStored(foreign, "antigravity")).toBeUndefined();
   });
 
   it("never throws when the credential cannot be decoded", async () => {

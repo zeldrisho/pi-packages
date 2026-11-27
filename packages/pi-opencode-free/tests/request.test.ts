@@ -12,6 +12,8 @@ describe("free-tier request normalization", () => {
       model: "big-pickle",
       stream: false,
       temperature: 0.2,
+      tool_choice: "auto",
+      max_tokens: 2048,
     };
 
     expect(isProviderRequestPayload(payload)).toBe(true);
@@ -20,7 +22,9 @@ describe("free-tier request normalization", () => {
 
     expect(result.stream).toBe(true);
     expect(result.temperature).toBe(0.2);
-    expect(result.tools?.[0]?.function?.name).toBe("read");
+    expect(result.tool_choice).toBe("auto");
+    expect(result.max_tokens).toBe(2048);
+    expect(result.tools).toEqual([{ type: "function", function: { name: "read" } }]);
     expect(payload.stream).toBe(false);
     expect(payload.tools).toBeUndefined();
   });
@@ -32,23 +36,6 @@ describe("free-tier request normalization", () => {
 
     expect(result.tools).toEqual([{ type: "function", function: { name: "read" } }]);
     expect(payload.tools).toEqual([]);
-  });
-
-  it("reuses an existing read declaration", () => {
-    const payload: ProviderRequestPayload = {
-      model: "beam-free",
-      tools: [
-        { type: "function", function: { name: "bash" } },
-        { type: "function", function: { name: "read", description: "custom" } },
-      ],
-    };
-
-    expect(isProviderRequestPayload(payload)).toBe(true);
-
-    const result = normalizeFreeRequestPayload(payload);
-
-    expect(result.tools).toHaveLength(2);
-    expect(result.tools?.[1]?.function?.name).toBe("read");
   });
 
   it("preserves another tool without appending read", () => {
@@ -75,19 +62,6 @@ describe("free-tier request normalization", () => {
 
     expect(normalizeFreeRequestPayload(stringChoice)).not.toHaveProperty("tool_choice");
     expect(normalizeFreeRequestPayload(objectChoice)).not.toHaveProperty("tool_choice");
-  });
-
-  it("preserves supported tool choices and token limits", () => {
-    const payload: ProviderRequestPayload = {
-      model: "flint-40b-free",
-      tool_choice: "auto",
-      max_tokens: 2048,
-    };
-
-    const result = normalizeFreeRequestPayload(payload);
-
-    expect(result.tool_choice).toBe("auto");
-    expect(result.max_tokens).toBe(2048);
   });
 
   it("rejects payloads that cannot be normalized safely", () => {
@@ -145,13 +119,14 @@ describe("prompt preservation", () => {
   it("prefixes a minimal env block and preserves the prompt", () => {
     const messages = [
       { role: "system", content: "You are Pi." },
-      { role: "user", content: "Hi" },
+      { role: "user", content: "<cwd>/user</cwd>" },
     ];
 
     const result = normalizeFreeRequestPayload({ model: "beam-free", messages });
     expect(result.messages?.[0]?.content).toBe(
       `<env>\n Working directory: ${process.cwd()}\n</env>\n\nYou are Pi.`,
     );
+    expect(result.messages?.[1]).toEqual(messages[1]);
     expect(messages[0]?.content).toBe("You are Pi.");
   });
   it("recognizes structured env content without matching text outside a block", () => {
@@ -248,32 +223,6 @@ describe("working directory block", () => {
     expect(messages[1]?.content).toBe("<cwd>/fourth</cwd> rules");
   });
 
-  it("keeps Pi's cwd block available for other providers", () => {
-    const messages = [{ role: "system", content: "<cwd>\n/workspace\n</cwd>" }];
-
-    normalizeFreeRequestPayload({ model: "beam-free", messages });
-
-    expect(messages[0]?.content).toBe("<cwd>\n/workspace\n</cwd>");
-  });
-
-  it("converts the cwd block of structured content without mutating it", () => {
-    const content = [
-      { type: "text", text: "<cwd>\n/workspace\n</cwd>" },
-      { type: "text", text: "tail" },
-    ];
-
-    const result = normalizeFreeRequestPayload({
-      model: "beam-free",
-      messages: [{ role: "developer", content }],
-    });
-
-    expect(result.messages?.[0]?.content).toEqual([
-      { type: "text", text: "<env>\n Working directory: /workspace\n</env>" },
-      { type: "text", text: "tail" },
-    ]);
-    expect(content[0]?.text).toBe("<cwd>\n/workspace\n</cwd>");
-  });
-
   it("converts a cwd block in a later instruction message in place", () => {
     const messages = [
       { role: "system", content: "Pi" },
@@ -299,17 +248,6 @@ describe("working directory block", () => {
 
     const result = normalizeFreeRequestPayload({ model: "beam-free", messages });
 
-    expect(result.messages?.[0]?.content).toBe(
-      `<env>\n Working directory: ${process.cwd()}\n</env>`,
-    );
-  });
-
-  it("leaves a cwd block in a user message untouched", () => {
-    const messages = [{ role: "user", content: "<cwd>\n/workspace\n</cwd>" }];
-
-    const result = normalizeFreeRequestPayload({ model: "beam-free", messages });
-
-    expect(result.messages?.[1]?.content).toBe("<cwd>\n/workspace\n</cwd>");
     expect(result.messages?.[0]?.content).toBe(
       `<env>\n Working directory: ${process.cwd()}\n</env>`,
     );

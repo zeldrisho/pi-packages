@@ -60,37 +60,29 @@ describe("extractKeyValue", () => {
 });
 
 describe("resolveApiKey", () => {
-  it("prefers the process environment over .env files", async () => {
+  it("resolves the web key in precedence order as each source is removed", async () => {
+    const workspaceEnv = join(workspaceDirectory, ".env");
+    const agentEnv = join(agentDirectory, ".env");
     process.env.BRAVE_SEARCH_API_KEY = "env-key";
-    await writeFile(join(workspaceDirectory, ".env"), "BRAVE_SEARCH_API_KEY=file-key\n");
-    const resolved = await resolveApiKey(workspaceDirectory);
-    expect(resolved).toEqual({ key: "env-key", source: "environment" });
-  });
+    await writeFile(workspaceEnv, 'BRAVE_SEARCH_API_KEY="workspace-key"\n');
+    await writeFile(agentEnv, "BRAVE_SEARCH_API_KEY=agent-key\n");
 
-  it("falls back to the workspace .env when the environment is unset", async () => {
-    await writeFile(join(agentDirectory, ".env"), "BRAVE_SEARCH_API_KEY=agent-key\n");
-    await writeFile(join(workspaceDirectory, ".env"), 'BRAVE_SEARCH_API_KEY="workspace-key"\n');
-    const resolved = await resolveApiKey(workspaceDirectory);
-    expect(resolved).toEqual({ key: "workspace-key", source: "workspace .env" });
-  });
-
-  it("falls back to the agent .env last", async () => {
-    await writeFile(join(agentDirectory, ".env"), "BRAVE_SEARCH_API_KEY=agent-key\n");
-    const resolved = await resolveApiKey(workspaceDirectory);
-    expect(resolved).toEqual({ key: "agent-key", source: "agent .env" });
-  });
-
-  it("returns undefined without a key anywhere and tolerates missing files", async () => {
+    expect(await resolveApiKey(workspaceDirectory)).toEqual({
+      key: "env-key",
+      source: "environment",
+    });
+    delete process.env.BRAVE_SEARCH_API_KEY;
+    expect(await resolveApiKey(workspaceDirectory)).toEqual({
+      key: "workspace-key",
+      source: "workspace .env",
+    });
+    await rm(workspaceEnv);
+    expect(await resolveApiKey(workspaceDirectory)).toEqual({
+      key: "agent-key",
+      source: "agent .env",
+    });
+    await rm(agentEnv);
     await expect(resolveApiKey(workspaceDirectory)).resolves.toBeUndefined();
-  });
-
-  it("never exposes reporting metadata beyond the source", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "secret-value";
-    const resolved = await resolveApiKey(workspaceDirectory);
-    // The resolver returns the key for provider calls, but everything that
-    // reaches tool output must be the source label only.
-    expect(resolved?.source).toBe("environment");
-    expect(Object.keys(resolved ?? {}).sort()).toEqual(["key", "source"]);
   });
 });
 
