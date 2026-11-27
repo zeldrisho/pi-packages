@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import { createReleaseAutomation, runReleaseCli, type PackageInfo } from "../scripts/release.ts";
 
 const temporaryDirectories: string[] = [];
@@ -97,46 +97,29 @@ describe("release notes extraction", () => {
 });
 
 describe("release CLI", () => {
-  it("loads with Node's native TypeScript support", () => {
-    expect(() =>
-      execFileSync(
-        process.execPath,
-        ["--input-type=module", "--eval", "await import('./scripts/release.ts')"],
-        { cwd: process.cwd() },
-      ),
-    ).not.toThrow();
-  });
+  it("prints the tagged package and writes its release notes under native Node", async () => {
+    const root = await createPackageFixture();
+    await mkdir(join(root, "scripts"));
+    await copyFile(
+      new URL("../scripts/release.ts", import.meta.url),
+      join(root, "scripts/release.ts"),
+    );
+    const notes = "## 1.0.0\n\n* Initial release\n";
+    await writeFile(join(root, "packages/alpha/CHANGELOG.md"), `# Changelog\n\n${notes}`);
 
-  function fakeAutomation() {
-    const resolvePackageByTag = vi.fn().mockResolvedValue({ path: "packages/alpha" });
-    const writeReleaseNotes = vi.fn();
+    const run = (...args: string[]): string =>
+      execFileSync(process.execPath, ["scripts/release.ts", ...args], {
+        cwd: root,
+        encoding: "utf8",
+      });
 
-    return {
-      automation: {
-        packageCatalog: vi.fn(),
-        resolvePackageByTag,
-        writeReleaseNotes,
-      },
-      resolvePackageByTag,
-      writeReleaseNotes,
-    };
-  }
-
-  it("dispatches the package and notes commands to release automation", async () => {
-    const fake = fakeAutomation();
-
-    await expect
-      .soft(runReleaseCli(["package", "alpha-v1.0.0"], fake.automation), "package command")
-      .resolves.toBeUndefined();
-    expect.soft(fake.resolvePackageByTag).toHaveBeenCalledWith("alpha-v1.0.0");
-
-    await expect
-      .soft(
-        runReleaseCli(["notes", "packages/alpha", "notes.md"], fake.automation),
-        "notes command",
-      )
-      .resolves.toBeUndefined();
-    expect.soft(fake.writeReleaseNotes).toHaveBeenCalledWith("packages/alpha", "notes.md");
+    expect(JSON.parse(run("package", "alpha-v1.0.0"))).toMatchObject({
+      name: "@zeldrisho/alpha",
+      path: "packages/alpha",
+      tag: "alpha-v1.0.0",
+    });
+    run("notes", "packages/alpha", "notes.md");
+    expect(await readFile(join(root, "notes.md"), "utf8")).toBe(notes);
   });
 
   it("rejects missing arguments and unknown commands", async () => {
@@ -147,9 +130,7 @@ describe("release CLI", () => {
     ] satisfies Array<[string[], string]>;
 
     for (const [args, message] of samples) {
-      await expect
-        .soft(runReleaseCli(args, fakeAutomation().automation), args.join(" "))
-        .rejects.toThrow(message);
+      await expect.soft(runReleaseCli(args), args.join(" ")).rejects.toThrow(message);
     }
   });
 });

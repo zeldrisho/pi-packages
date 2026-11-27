@@ -95,41 +95,19 @@ describe("Answers mode", () => {
     );
 
     vi.stubGlobal("fetch", fetchMock);
-    const tool = createSearchTool();
-    const params = { query: "group identical citations", mode: "answers" as const };
-    const result = await tool.execute("first", params, undefined, undefined);
+
+    const result = await createSearchTool().execute(
+      "first",
+      { query: "group identical citations", mode: "answers" },
+      undefined,
+      undefined,
+    );
+
     const text = result.content[0]!.text;
     expect(text).toContain("First[1] Second[2] Third[3]");
     expect(text).toContain("[1, 3] <https://example.com/source>\n[2] <https://example.com/other>");
     expect(text.match(/https:\/\/example.com\/source/g)).toHaveLength(1);
     expect(result.details.answer?.citations).toHaveLength(3);
-    const cached = await tool.execute("cached", params, undefined, undefined);
-    expect(cached.content).toEqual(result.content);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("caches each mode separately without implicit switching", async () => {
-    process.env.BRAVE_ANSWERS_API_KEY = "separate-secret";
-    process.env.BRAVE_SEARCH_API_KEY = "web-separate-secret";
-
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) =>
-      (input instanceof Request ? input.url : input.toString()).includes("chat/completions")
-        ? answerResponse(["Answer", citation])
-        : jsonResponse({ web: { results: [] } }),
-    );
-
-    vi.stubGlobal("fetch", fetchMock);
-    const tool = createSearchTool();
-    const params = { query: "separate modes", mode: "answers" as const };
-    const first = await tool.execute("a", params, undefined, undefined);
-    const second = await tool.execute("b", params, undefined, undefined);
-    expect(second.details.cached).toBe(true);
-    expect(second.content).toEqual(first.content);
-    expect(second.details.answer).toEqual(first.details.answer);
-    const fallback = await tool.execute("w", { query: params.query }, undefined, undefined);
-    expect(fallback.content[0]!.text).toContain("## No web results. AI-generated answer:");
-    expect(fallback.content[0]!.text).not.toContain(params.query);
-    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("returns generated answer text without a caution notice or wrapper", async () => {

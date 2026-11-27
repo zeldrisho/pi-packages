@@ -103,7 +103,11 @@ describe("web_fetch redirects", () => {
     expect(requested).toEqual(["/redirect-blocked"]);
   });
 
-  it.each([302, 500])("closes a stalled discarded HTTP %i body", async (status) => {
+  it.each([
+    { status: 302, scenario: "missing Location" },
+    { status: 302, scenario: "invalid Location", location: "http://[" },
+    { status: 500, scenario: "server error" },
+  ])("closes a stalled discarded body ($scenario)", async ({ status, location }) => {
     let closed!: () => void;
 
     const disconnected = new Promise<void>((resolve) => {
@@ -111,6 +115,7 @@ describe("web_fetch redirects", () => {
     });
 
     const server = createServer((_request, response) => {
+      if (location) response.setHeader("Location", location);
       response.writeHead(status, { "content-type": "text/plain" });
       response.write("unfinished");
       response.once("close", closed);

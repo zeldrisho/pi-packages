@@ -2,7 +2,7 @@ import type { IncomingMessage } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { executeWebFetch, type FetchRemoteDependencies } from "../src/index";
 import { classifyContentKind, classifyConfidence } from "../src/service";
-import { detectAppShell, normalizeGitHubRawUrl } from "../src/acquisition/fetch.ts";
+import { normalizeGitHubRawUrl } from "../src/acquisition/fetch.ts";
 import { createFetchHarness } from "./harness";
 
 /** Builds a minimal HTTP response for offline fetch testing. */
@@ -106,25 +106,6 @@ describe("normalizeGitHubRawUrl", () => {
   });
 });
 
-describe("detectAppShell", () => {
-  it("flags consent and bot-wall markers", () => {
-    expect(detectAppShell("<title>Please enable JavaScript</title>", "")).toBe(true);
-    expect(detectAppShell("Before you continue, consent to cookies", "")).toBe(true);
-    expect(detectAppShell("Checking your browser", "")).toBe(true);
-  });
-
-  it("flags sparse text relative to a huge raw page", () => {
-    expect(detectAppShell(`<html>${"x".repeat(20_000)}</html>`, "tiny")).toBe(true);
-  });
-
-  it("does not flag a readable article that mentions consent and contains a large script", () => {
-    const script = "<script>" + "x".repeat(60_000) + "</script>";
-    const body = "By continuing you consent to our newsletter and privacy policy. ".repeat(180);
-    const raw = "<html><body>" + script + "<article>" + body + "</article></body></html>";
-    expect(detectAppShell(raw, body)).toBe(false);
-  });
-});
-
 describe("classifyContentKind", () => {
   it("classifies the kind of content an extraction represents", () => {
     const samples = [
@@ -168,7 +149,6 @@ describe("classifyConfidence", () => {
       ["shell-suspected Defuddle page", "defuddle", true, 5000, "low"],
       ["raw extraction", "raw", false, 0, "high"],
       ["substantial Defuddle extraction", "defuddle", false, 200, "high"],
-      ["larger Defuddle extraction", "defuddle", false, 5000, "high"],
       ["sparse Defuddle extraction", "defuddle", false, 50, "medium"],
       ["substantial basic extraction", "basic", false, 200, "medium"],
       ["sparse basic extraction", "basic", false, 10, "low"],

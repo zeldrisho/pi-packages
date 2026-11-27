@@ -15,14 +15,6 @@ const STATE = "state-value";
 const CLIENT = { id: "test-client-id", secret: "test-client-secret" };
 
 describe("PKCE and authorization URL", () => {
-  it("uses the discovered OAuth client in the authorization URL", () => {
-    const url = new URL(
-      buildAuthUrl({ verifier: "verifier", challenge: "challenge" }, STATE, CLIENT),
-    );
-
-    expect(url.searchParams.get("client_id")).toBe("test-client-id");
-  });
-
   it("derives a deterministic challenge from fixed randomness", () => {
     const random = (size: number): Uint8Array => new Uint8Array(size).fill(7);
     const first = createPkcePair(random);
@@ -34,12 +26,19 @@ describe("PKCE and authorization URL", () => {
     expect(first.challenge).toMatch(/^[A-Za-z0-9_-]+$/);
   });
 
-  it("builds an offline authorization URL with the required scopes", () => {
-    const url = new URL(
-      buildAuthUrl({ verifier: "verifier", challenge: "challenge" }, STATE, CLIENT),
+  it("builds an offline authorization URL without disclosing the verifier or client secret", () => {
+    const raw = buildAuthUrl(
+      { verifier: "secret-verifier", challenge: "challenge" },
+      STATE,
+      CLIENT,
     );
 
+    const url = new URL(raw);
+
+    expect(raw).not.toContain("secret-verifier");
+    expect(raw).not.toContain(CLIENT.secret);
     expect(url.origin).toBe("https://accounts.google.com");
+    expect(url.searchParams.get("client_id")).toBe(CLIENT.id);
     expect(url.searchParams.get("response_type")).toBe("code");
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
     expect(url.searchParams.get("code_challenge")).toBe("challenge");
@@ -53,59 +52,26 @@ describe("PKCE and authorization URL", () => {
     expect(scope).toContain("https://www.googleapis.com/auth/aicode");
     expect(scope).toContain("https://www.googleapis.com/auth/cloud-platform");
   });
-
-  it("keeps the code verifier out of the authorization URL", () => {
-    const url = buildAuthUrl(
-      { verifier: "secret-verifier", challenge: "challenge" },
-      STATE,
-      CLIENT,
-    );
-
-    expect(url).not.toContain("secret-verifier");
-  });
 });
 
 describe("pasted callback parsing", () => {
-  it("accepts a full callback URL", () => {
-    expect(
-      parsePastedCallback(
-        "http://localhost:51121/oauth-callback?state=state-value&code=4/abc",
-        STATE,
-      ),
-    ).toBe("4/abc");
+  const callback = "http://localhost:51121/oauth-callback";
+
+  it.each([
+    ["a full URL", `${callback}?state=${STATE}&code=4/abc`],
+    ["a bare query", `code=4/abc&state=${STATE}`],
+  ])("accepts %s", (_scenario, input) => {
+    expect(parsePastedCallback(input, STATE)).toBe("4/abc");
   });
 
-  it("accepts a bare query string", () => {
-    expect(parsePastedCallback("code=4/abc&state=state-value", STATE)).toBe("4/abc");
-  });
-
-  it("rejects a pasted code without state", () => {
-    expect(() => parsePastedCallback("code=4/abc", STATE)).toThrow(/different sign-in/);
-  });
-
-  it("rejects a callback from another sign-in", () => {
-    expect(() =>
-      parsePastedCallback("http://localhost:51121/oauth-callback?state=other&code=4/abc", STATE),
-    ).toThrow(/different sign-in/);
-  });
-
-  it("rejects a callback without a code", () => {
-    expect(() =>
-      parsePastedCallback("http://localhost:51121/oauth-callback?state=state-value", STATE),
-    ).toThrow(/missing `code`/);
-  });
-
-  it("reports an OAuth error delivered through the callback", () => {
-    expect(() =>
-      parsePastedCallback(
-        "http://localhost:51121/oauth-callback?error=access_denied&state=state-value",
-        STATE,
-      ),
-    ).toThrow(/access_denied/);
-  });
-
-  it("rejects empty input", () => {
-    expect(() => parsePastedCallback("   ", STATE)).toThrow(/Nothing pasted/);
+  it.each([
+    ["missing state", "code=4/abc", /different sign-in/],
+    ["mismatched state", `${callback}?state=other&code=4/abc`, /different sign-in/],
+    ["missing code", `${callback}?state=${STATE}`, /missing `code`/],
+    ["provider denial", `${callback}?error=access_denied&state=${STATE}`, /access_denied/],
+    ["empty input", "   ", /Nothing pasted/],
+  ])("rejects a callback with %s", (_scenario, input, message) => {
+    expect(() => parsePastedCallback(input, STATE)).toThrow(message);
   });
 });
 

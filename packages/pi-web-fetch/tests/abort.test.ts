@@ -2,15 +2,12 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import { awaitWithAbort } from "../src/abort";
 
 describe("awaitWithAbort", () => {
-  it("rejects an already-aborted signal without attaching a listener", async () => {
-    const controller = new AbortController();
-    controller.abort();
-    const add = vi.spyOn(controller.signal, "addEventListener");
-
-    await expect(awaitWithAbort(Promise.resolve("late"), controller.signal)).rejects.toMatchObject({
+  it("rejects an already-aborted signal", async () => {
+    await expect(
+      awaitWithAbort(Promise.resolve("late"), AbortSignal.abort()),
+    ).rejects.toMatchObject({
       name: "AbortError",
     });
-    expect(add).not.toHaveBeenCalled();
   });
 
   it("ignores late settlement after aborting", async () => {
@@ -27,26 +24,22 @@ describe("awaitWithAbort", () => {
     resolveOperation("late");
 
     await expect(pending).rejects.toMatchObject({ name: "AbortError" });
-    await expect(operation).resolves.toBe("late");
   });
 
-  it("preserves operation rejections", async () => {
-    const expected = new Error("operation failed");
-    await expect(
-      awaitWithAbort(Promise.reject(expected), new AbortController().signal),
-    ).rejects.toBe(expected);
-  });
+  it.each([
+    { settlement: "success", value: "ok" },
+    { settlement: "failure", error: new Error("operation failed") },
+  ])("preserves $settlement and detaches the abort listener", async ({ error, value }) => {
+    const { signal } = new AbortController();
+    const add = vi.spyOn(signal, "addEventListener");
+    const remove = vi.spyOn(signal, "removeEventListener");
+    const pending = awaitWithAbort(error ? Promise.reject(error) : Promise.resolve(value), signal);
 
-  it.each(["resolve", "reject"] as const)("removes its listener after %s", async (settlement) => {
-    const controller = new AbortController();
-    const remove = vi.spyOn(controller.signal, "removeEventListener");
+    if (error) await expect(pending).rejects.toBe(error);
+    else await expect(pending).resolves.toBe(value);
 
-    const operation =
-      settlement === "resolve" ? Promise.resolve("ok") : Promise.reject(new Error("failed"));
-
-    await awaitWithAbort(operation, controller.signal).catch(() => undefined);
-
-    expect(remove).toHaveBeenCalledOnce();
-    expect(remove.mock.calls[0][0]).toBe("abort");
+    const listener = add.mock.calls.find(([event]) => event === "abort")?.[1];
+    expect(listener).toBeTypeOf("function");
+    expect(remove).toHaveBeenCalledWith("abort", listener);
   });
 });

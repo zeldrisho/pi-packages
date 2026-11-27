@@ -4,23 +4,31 @@ import { webSearchOutputSchema } from "../src/search";
 import { answerResponse, createSearchTool, jsonResponse } from "./harness";
 
 describe("generated-answer fallback", () => {
-  it("distinguishes generated answers and respects credential removal with cached searches", async () => {
+  it("isolates direct and fallback answer caches and respects credential removal", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "fallback-web-secret";
     process.env.BRAVE_ANSWERS_API_KEY = "fallback-answers-secret";
 
-    const fetchMock = vi.fn(async (input: string | URL | Request) => {
-      const url = input instanceof Request ? input.url : input.toString();
+    const requests: string[] = [];
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+      const path = new URL(input instanceof Request ? input.url : input.toString()).pathname;
+      requests.push(path);
 
-      return url.includes("/chat/completions")
+      return path === "/res/v1/chat/completions"
         ? answerResponse([
             'Claim. <citation>{"number":1,"url":"https://example.com/source"}</citation>',
           ])
         : jsonResponse({ web: { results: [] } });
     });
 
-    vi.stubGlobal("fetch", fetchMock);
     const tool = createSearchTool();
     const params = { query: "fallback-policy-and-caching" };
+    const answerParams = { ...params, mode: "answers" } as const;
+    const direct = await tool.execute("direct", answerParams, undefined, undefined);
+    const cachedDirect = await tool.execute("cached-direct", answerParams, undefined, undefined);
+    expect(cachedDirect.details.cached).toBe(true);
+    expect(cachedDirect.content).toEqual(direct.content);
+    expect(cachedDirect.details.answer).toEqual(direct.details.answer);
+
     const first = await tool.execute("first", params, undefined, undefined);
 
     expect(Check(webSearchOutputSchema, first.structuredContent)).toBe(true);
@@ -30,14 +38,14 @@ describe("generated-answer fallback", () => {
       payloadOmitted: false,
       answer: { text: "Claim. [1]", citations: [{ number: 1, url: "https://example.com/source" }] },
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(first.content[0]?.text).toContain("## No web results. AI-generated answer:");
+    expect(first.content[0]?.text).not.toContain(params.query);
 
     const cached = await tool.execute("cached", params, undefined, undefined);
     expect(cached.structuredContent).toMatchObject({
       resultType: "generated-answer",
       cached: true,
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
 
     delete process.env.BRAVE_ANSWERS_API_KEY;
     const disabled = await tool.execute("disabled", params, undefined, undefined);
@@ -47,7 +55,11 @@ describe("generated-answer fallback", () => {
       results: [],
     });
     expect(disabled.structuredContent).not.toHaveProperty("answer");
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(requests).toEqual([
+      "/res/v1/chat/completions",
+      "/res/v1/web/search",
+      "/res/v1/chat/completions",
+    ]);
   });
 
   it("does not request a generated answer without an Answers key", async () => {

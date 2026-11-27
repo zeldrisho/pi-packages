@@ -65,6 +65,16 @@ describe("bounded extraction diagnostics", () => {
     });
   });
 
+  it("does not mistake a readable article for a consent interstitial or sparse page", () => {
+    const body = "By continuing you consent to our newsletter and privacy policy. ".repeat(180);
+    const raw = `<script>${"x".repeat(60_000)}</script><article>${body}</article>`;
+
+    expect(diagnoseExtraction(raw, body)).toMatchObject({
+      consentInterstitial: false,
+      sparseExtraction: false,
+    });
+  });
+
   it("flags JavaScript CAPTCHA interstitials as bot walls", () => {
     const capPage = [
       '<!DOCTYPE html><html lang="en"><head><title>Security check</title>',

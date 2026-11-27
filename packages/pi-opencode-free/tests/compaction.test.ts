@@ -578,32 +578,6 @@ describe("segmented compaction", () => {
     expect(result?.compaction?.summary).toContain("## Goal");
   });
 
-  it("registers the handler on the extension API", () => {
-    const registered: string[] = [];
-
-    const proxy = new Proxy(
-      {},
-      {
-        get(_target, property) {
-          if (property === "on") {
-            return (name: string): (() => void) => {
-              registered.push(name);
-
-              return () => {};
-            };
-          }
-
-          return undefined;
-        },
-      },
-    );
-
-    // SAFETY: the proxy supplies the ExtensionAPI member this registration reads.
-    registerChunkedCompaction(proxy as ExtensionAPI, PROVIDER_ID);
-
-    expect(registered).toEqual(["session_before_compact"]);
-  });
-
   it("adapts Pi's extension context without a thinking level or model switch", async () => {
     const requests: SimpleStreamOptions[] = [];
     const notifications: string[] = [];
@@ -688,7 +662,7 @@ describe("segmented compaction", () => {
     // SAFETY: the proxy supplies the ExtensionContext members the adapter reads.
     const result = await registered?.(harness.event, context as ExtensionContext);
 
-    expect(result?.compaction).toBeDefined();
+    expect(result?.compaction?.summary).toContain(CHECKPOINT);
     expect(requests.length).toBeGreaterThan(0);
 
     for (const request of requests) {

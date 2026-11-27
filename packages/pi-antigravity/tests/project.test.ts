@@ -37,26 +37,18 @@ describe("project discovery", () => {
       timeout.mockRestore();
     }
   });
-  it("lists companion projects when loadCodeAssist omits the id", async () => {
+  it.each([
+    { scenario: "HTTP failure", body: "unavailable", status: 503 },
+    { scenario: "malformed JSON", body: "invalid JSON", status: 200 },
+  ])("falls back to companion projects despite $scenario", async ({ body, status }) => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(Response.json({}))
-      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
+      .mockResolvedValueOnce(new Response(body, { status }))
       .mockResolvedValueOnce(Response.json({ projects: [{ id: "listed" }] }));
 
     vi.stubGlobal("fetch", fetch);
     await expect(discoverProjectId("access", undefined)).resolves.toBe("listed");
-  });
-  it("tries the next project list endpoint after a malformed response", async () => {
-    const fetch = vi
-      .fn()
-      .mockResolvedValueOnce(Response.json({}))
-      .mockResolvedValueOnce(new Response("invalid JSON"))
-      .mockResolvedValueOnce(Response.json({ projects: [{ id: "listed" }] }));
-
-    vi.stubGlobal("fetch", fetch);
-    await expect(discoverProjectId("access", undefined)).resolves.toBe("listed");
-    expect(fetch).toHaveBeenCalledTimes(3);
   });
   it("rejects if no endpoint returns a usable project", async () => {
     vi.stubGlobal(

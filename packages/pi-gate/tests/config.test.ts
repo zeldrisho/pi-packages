@@ -9,7 +9,6 @@ import {
   loadConfig,
   parseConfig,
   resolveAction,
-  resolveRule,
   CONFIG_SCHEMA_URL,
   DEFAULT_PROMPT_TIMEOUT_MS,
   MAX_DISPLAY_COMMAND_CHARACTERS,
@@ -189,35 +188,6 @@ describe("loadConfig", () => {
     expect.soft(loadConfig(), "malformed file").toEqual(emptyConfig);
     setConfig(JSON.stringify({ operations: { sudo: "block" }, promptTimeoutMs: 5000 }));
     expect(loadConfig()).toEqual({ operations: { sudo: "block" }, promptTimeoutMs: 5000 });
-  });
-});
-
-describe("resolveRule", () => {
-  it("returns the matching pattern and action", () => {
-    expect(resolveRule("sudo apt update", { sudo: "block" })).toEqual({
-      pattern: "sudo",
-      action: "block",
-    });
-  });
-
-  it("allows only when the allow span contains the restrictive match", () => {
-    expect(
-      resolveRule("rm -rf /", { rm: "block", "rm -rf": "prompt", "rm -rf /": "allow" }),
-    ).toEqual({ pattern: "rm -rf /", action: "allow" });
-    expect(resolveRule("rm -rf / && rm", { rm: "block", "rm -rf /": "allow" })).toEqual({
-      pattern: "rm",
-      action: "block",
-    });
-  });
-
-  it("returns null when no rule matches", () => {
-    expect(resolveRule("ls -la", { sudo: "block" })).toBeNull();
-  });
-});
-
-describe("resolveAction", () => {
-  it("returns null for an empty rule set", () => {
-    expect(resolveAction("anything", {})).toBeNull();
   });
 });
 

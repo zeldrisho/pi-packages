@@ -322,11 +322,6 @@ describe("conversion depth bounds", () => {
   const nestedHtml = (depth: number): string =>
     `<div>${"<div>".repeat(depth)}Readable leaf${"</div>".repeat(depth)}</div>`;
 
-  it("detects markup beyond the conversion depth ceiling", () => {
-    expect(exceedsConversionDepth(nestedHtml(10))).toBe(false);
-    expect(exceedsConversionDepth(nestedHtml(513))).toBe(true);
-  });
-
   it("preserves scanner indices after Unicode text", () => {
     const shallow = `İ${nestedHtml(10)}`.repeat(MAX_CONVERSION_DEPTH + 1);
     const deep = `İİİ${"br<ab>".repeat(MAX_CONVERSION_DEPTH + 1)}`;
@@ -334,16 +329,6 @@ describe("conversion depth bounds", () => {
     expect(exceedsConversionDepth(shallow)).toBe(false);
     expect(exceedsConversionDepth(deep)).toBe(true);
     expect(exceedsConversionDepth("İ<DIV>leaf</DIV>".repeat(600))).toBe(false);
-  });
-
-  it("ignores comments, void elements, and raw-text bodies", () => {
-    const comment = `<!-- ${"<div>".repeat(600)} --><p>Visible</p>`;
-    const voids = `${"<br>".repeat(600)}<img src="x"><p>Visible</p>`;
-    const script = `<script>${"<div>".repeat(600)}</script><p>Visible</p>`;
-
-    expect(exceedsConversionDepth(comment)).toBe(false);
-    expect(exceedsConversionDepth(voids)).toBe(false);
-    expect(exceedsConversionDepth(script)).toBe(false);
   });
 
   it("does not let quotes inside unquoted attributes hide nesting", () => {

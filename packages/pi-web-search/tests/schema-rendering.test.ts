@@ -5,12 +5,6 @@ import { webSearchOutputSchema } from "../src/index";
 import { SEARCH_WEB_MAX_QUERY_CHARACTERS } from "../src/limits";
 import { createSearchTool, jsonResponse, renderTheme } from "./harness";
 
-vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@earendil-works/pi-coding-agent")>();
-
-  return { ...actual, keyHint: () => "Ctrl+O to expand" };
-});
-
 describe("web_search schema rendering", () => {
   initTheme();
   it("rejects blank and oversized queries before making a request", async () => {

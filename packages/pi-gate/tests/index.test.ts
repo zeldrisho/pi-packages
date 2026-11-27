@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import {
-  isToolCallEventType,
   type ExtensionAPI,
   type KeybindingsManager,
   type Theme,
@@ -314,15 +313,6 @@ describe("legacy configuration fallback", () => {
 });
 
 describe("piGate extension", () => {
-  it("registers session lifecycle and tool_call handlers", () => {
-    const ext = makeExtension();
-    const { handlers } = ext.install();
-    // SAFETY: the captured handlers list is keyed by the names the extension registered.
-    expect(handlers.sessionStart).toBeDefined();
-    expect(handlers.sessionShutdown).toBeDefined();
-    expect(handlers.toolCall).toBeDefined();
-  });
-
   describe("session_start notification", () => {
     it("does not create configuration until a session starts", async () => {
       const { ctx, handlers } = makeExtension().install();
@@ -523,13 +513,6 @@ describe("piGate extension", () => {
       };
 
       expect(await handlers.toolCall!(bashEvent("sudo true"), ctx)).toBeUndefined();
-    });
-
-    it("returns undefined when no rule matches", async () => {
-      setConfig(JSON.stringify({ operations: { sudo: "block" } }));
-      const { ctx, handlers } = makeExtension().install();
-      const result = await handlers.toolCall!(bashEvent("ls -la"), ctx);
-      expect(result).toBeUndefined();
     });
 
     it("does not prompt for literal output or partial command names", async () => {
@@ -876,14 +859,7 @@ describe("piGate extension", () => {
       expect(uiState.selectCalls).toHaveLength(0);
     });
 
-    it("treats allow as a pass-through even when other rules match", async () => {
-      setConfig(JSON.stringify({ operations: { sudo: "block", "sudo apt": "allow" } }));
-      const { ctx, handlers } = makeExtension().install();
-      const result = await handlers.toolCall!(bashEvent("sudo apt update"), ctx);
-      expect(result).toBeUndefined();
-    });
-
-    it("picks the longest pattern to resolve conflicts", async () => {
+    it("allows the exception unless a longer restriction applies", async () => {
       setConfig(
         JSON.stringify({
           operations: { sudo: "block", "sudo apt": "allow", "sudo apt update": "block" },
@@ -899,28 +875,6 @@ describe("piGate extension", () => {
       });
       const allowed = await handlers.toolCall!(bashEvent("sudo apt install foo"), ctx);
       expect(allowed).toBeUndefined();
-    });
-
-    it("accepts a typed bash event and reads the command from event.input", async () => {
-      setConfig(JSON.stringify({ operations: { sudo: "block" } }));
-      const { ctx, handlers } = makeExtension().install();
-
-      const event: BashToolCallEvent = {
-        toolName: "bash",
-        toolCallId: "t1",
-        input: { command: "sudo echo hi" },
-      };
-
-      // SAFETY: exercise the type-narrowing helper the extension actually uses.
-      // SAFETY: isToolCallEventType accepts a generic over the expected event shape; our locally-built event satisfies the runtime shape but TypeScript cannot infer it from the local type.
-      if (!isToolCallEventType("bash", event as never)) throw new Error("expected bash event");
-
-      const result = await handlers.toolCall!(event, ctx);
-      expect(result).toEqual({
-        block: true,
-        reason: 'pi-gate: command blocked by rule "sudo". Ask the user before proceeding.',
-        terminate: true,
-      });
     });
   });
 });

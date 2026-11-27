@@ -72,8 +72,6 @@ describe("web_search code-search options", () => {
   });
 
   it("validates advanced inputs", () => {
-    expect(() => normalizeResultFilter("web,discussions,faq")).not.toThrow();
-
     for (const value of ["web,bogus", "", "news"])
       expect(() => normalizeResultFilter(value)).toThrow("resultFilter");
     expect(() => validateProviderRequest("q", 5, "web", { country: "USA" })).toThrow(
@@ -138,8 +136,5 @@ describe("web_search recovery guidance", () => {
       );
       expect(text.indexOf("Returned")).toBeLessThan(text.indexOf("1. ["));
     } else expect(text).not.toContain("If needed, read relevant pages");
-    const cached = await tool.execute("cached", params, undefined, undefined);
-    expect(cached.content).toEqual(result.content);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

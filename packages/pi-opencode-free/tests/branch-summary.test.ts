@@ -473,7 +473,7 @@ describe("segmented branch summary", () => {
     // SAFETY: the proxy supplies the ExtensionContext members the adapter reads.
     const result = await registered?.(harness.event, context as ExtensionContext);
 
-    expect(result?.summary).toBeDefined();
+    expect(result?.summary?.summary).toContain(BRANCH_SUMMARY);
     expect(requests.length).toBeGreaterThan(0);
 
     for (const request of requests) {

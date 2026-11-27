@@ -302,7 +302,7 @@ describe("opencode-free extension", () => {
     expect(ids).not.toContain("jev-1.13-free");
 
     expect(state.handlers.has("session_start")).toBe(true);
-    expect(config?.streamSimple).toBeDefined();
+    expect(config?.streamSimple).toBeTypeOf("function");
     expect(state.handlers.has("before_provider_headers")).toBe(false);
     expect(state.handlers.has("before_provider_request")).toBe(false);
   });

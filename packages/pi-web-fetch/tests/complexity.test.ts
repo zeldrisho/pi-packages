@@ -69,7 +69,7 @@ describe("conversion depth preflight", () => {
     }
   });
 
-  it("tracks foreign-content integration points before applying self-closing syntax", () => {
+  it("applies self-closing syntax in foreign content, not in HTML", () => {
     const cases = [
       // foreignObject re-enters HTML mode, so its own slash is ignored and the following
       // HTML elements nest; a normal SVG path remains self-closing.
@@ -82,6 +82,8 @@ describe("conversion depth preflight", () => {
       expect(linkedomDepth(html) > MAX_CONVERSION_DEPTH).toBe(exceeds);
       expect(exceedsConversionDepth(html)).toBe(exceeds);
     }
+
+    expect(exceedsConversionDepth("<span/>".repeat(MAX_CONVERSION_DEPTH + 1))).toBe(true);
   });
 
   it("does not treat a slash in an unquoted attribute value as self-closing", () => {
@@ -97,19 +99,20 @@ describe("conversion depth preflight", () => {
     expect(exceedsConversionDepth(html)).toBe(true);
   });
 
-  it("honors self-closing foreign content but not HTML elements", () => {
-    const svg = `<svg>${"<path/>".repeat(MAX_CONVERSION_DEPTH * 2)}</svg>`;
-    expect(linkedomDepth(svg)).toBeLessThan(MAX_CONVERSION_DEPTH);
-    expect(exceedsConversionDepth(svg)).toBe(false);
+  it("does not count void elements or markup-like text toward the nesting ceiling", () => {
+    const tags = "<div>".repeat(MAX_CONVERSION_DEPTH + 1);
+    const leaf = "<p>Visible</p>";
 
-    const html = `${"<span/>".repeat(MAX_CONVERSION_DEPTH + 1)}`;
-    expect(exceedsConversionDepth(html)).toBe(true);
-  });
+    const cases = {
+      comment: `<!-- ${tags} -->${leaf}`,
+      "void elements": `${"<br>".repeat(MAX_CONVERSION_DEPTH + 1)}<img src="x">${leaf}`,
+      script: `<script>${tags}</script>${leaf}`,
+      "unterminated script": `<script>${tags}`,
+      "attribute value": `<div title="${tags}">${leaf}</div>`,
+    };
 
-  it("does not let raw text or comments hide nesting", () => {
-    expect(exceedsConversionDepth(`<script>${"<div>".repeat(10)}</script>`)).toBe(false);
-    expect(exceedsConversionDepth(`<script>${"<div>".repeat(10)}`)).toBe(false);
-    expect(exceedsConversionDepth(`<!-- ${"<div>".repeat(10)} -->`)).toBe(false);
-    expect(exceedsConversionDepth(`<div title="<div>">`)).toBe(false);
+    for (const [scenario, html] of Object.entries(cases)) {
+      expect.soft(exceedsConversionDepth(html), scenario).toBe(false);
+    }
   });
 });

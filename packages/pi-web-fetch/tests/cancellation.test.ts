@@ -56,16 +56,18 @@ describe("web_fetch cancellation", () => {
     await expect(pending).rejects.toThrow("web_fetch was cancelled.");
   });
 
-  it("times out while HTML extraction is stalled", async () => {
+  it.each([
+    { trigger: "deadline", message: "web_fetch timed out after 1 seconds." },
+    { trigger: "caller abort", message: "web_fetch was cancelled." },
+  ])("stops stalled HTML extraction on $trigger", async ({ trigger, message }) => {
+    const controller = new AbortController();
     const started = Promise.withResolvers<void>();
-    let extractionCount = 0;
     vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
 
     try {
-      const pending = fetchRemoteContent(`${origin}/html`, 0, 6_000, undefined, {
+      const pending = fetchRemoteContent(`${origin}/html`, 0, 6_000, controller.signal, {
         ...dependencies,
         extractHtml: () => {
-          extractionCount += 1;
           started.resolve();
 
           return new Promise<never>(() => {});
@@ -73,34 +75,21 @@ describe("web_fetch cancellation", () => {
         timeoutMs: 1_000,
       });
 
-      // Reject promptly if the fetch fails before it reaches extraction.
-      await Promise.race([started.promise, pending]);
-      const rejection = expect(pending).rejects.toThrow("web_fetch timed out after 1 seconds.");
-      await vi.advanceTimersByTimeAsync(1_000);
+      // Fail promptly if the request fails or settles before reaching extraction.
+      const extractionStarted = await Promise.race([
+        started.promise.then(() => true),
+        pending.then(() => false),
+      ]);
+
+      expect(extractionStarted).toBe(true);
+      const rejection = expect(pending).rejects.toThrow(message);
+
+      if (trigger === "deadline") await vi.advanceTimersByTimeAsync(1_000);
+      else controller.abort();
       await rejection;
-      expect(extractionCount).toBe(1);
     } finally {
       vi.useRealTimers();
     }
-  });
-
-  it("cancels while HTML extraction is stalled", async () => {
-    const controller = new AbortController();
-    let extractionStarted = false;
-
-    const pending = fetchRemoteContent(`${origin}/html`, 0, 6_000, controller.signal, {
-      ...dependencies,
-      extractHtml: () => {
-        extractionStarted = true;
-
-        return new Promise<never>(() => {});
-      },
-      timeoutMs: 10_000,
-    });
-
-    await vi.waitFor(() => expect(extractionStarted).toBe(true));
-    controller.abort();
-    await expect(pending).rejects.toThrow("web_fetch was cancelled.");
   });
 
   it("times out while initial URL validation is stalled", async () => {
