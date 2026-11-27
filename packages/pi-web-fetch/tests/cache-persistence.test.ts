@@ -1,4 +1,3 @@
-import { mkdirSync } from "node:fs";
 import { mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -49,18 +48,20 @@ describe("web_fetch disk cache", () => {
     await rm(directory, { recursive: true, force: true });
   });
 
-  it("survives a simulated restart within the TTL", async () => {
+  it("reloads a private on-disk entry after restart within its TTL", async () => {
     let now = 1_000;
+    const key = "https://example.com/a";
     const first = makeCache(directory, () => now);
-    first.set("https://example.com/a", document("https://example.com/a", "alpha"), now + DAY_MS);
+    first.set(key, document(key, "alpha"), now + DAY_MS);
+
+    const fileStat = await stat(join(directory, stableKeyHash(key)));
+    expect(fileStat.isFile()).toBe(true);
+    expect(fileStat.mode & 0o777).toBe(0o600);
+    expect((await stat(directory)).mode & 0o777).toBe(0o700);
 
     now = 2_000;
     const second = makeCache(directory, () => now);
-    const loaded = second.get("https://example.com/a");
-
-    expect(loaded).toBeDefined();
-    expect(loaded?.markdown).toBe("alpha");
-    expect(loaded?.url).toBe("https://example.com/a");
+    expect(second.get(key)).toMatchObject({ markdown: "alpha", url: key });
   });
 
   it("treats an expired on-disk entry as a miss and removes its file", async () => {
@@ -90,41 +91,26 @@ describe("web_fetch disk cache", () => {
     expect(files).toContain(stableKeyHash("d"));
   });
 
-  it("treats corrupt files as a miss without throwing", async () => {
-    let now = 0;
-    const first = makeCache(directory, () => now);
-    first.set("https://example.com/c", document("https://example.com/c", "clean"), now + DAY_MS);
-
-    const path = join(directory, stableKeyHash("https://example.com/c"));
-    await writeFile(path, "this is not valid cache data", "utf8");
-
-    const second = makeCache(directory, () => now);
-    expect(() => second.get("https://example.com/c")).not.toThrow();
-    expect(second.get("https://example.com/c")).toBeUndefined();
-  });
-
-  it("treats too-short on-disk files as a miss", async () => {
-    mkdirSync(directory, { recursive: true, mode: 0o700 });
-    const path = join(directory, stableKeyHash("https://example.com/short"));
-    await writeFile(path, Buffer.from([1, 2, 3, 4]), "utf8");
-
+  it("treats corrupt, truncated, and oversized cache files as misses", async () => {
     const cache = makeCache(directory, () => 0);
-    expect(cache.get("https://example.com/short")).toBeUndefined();
-  });
+    const header = Buffer.alloc(8);
+    header.writeBigUInt64BE(BigInt(DAY_MS));
 
-  it("treats oversized on-disk entries as a miss", async () => {
-    mkdirSync(directory, { recursive: true, mode: 0o700 });
-    const path = join(directory, stableKeyHash("https://example.com/big"));
-    const header = new Uint8Array(8);
+    const samples = {
+      corrupt: Buffer.concat([header, Buffer.from("invalid JSON")]),
+      truncated: header.subarray(0, 4),
+      oversized: Buffer.concat([
+        header,
+        encoder.encode(JSON.stringify(document("oversized", "z".repeat(1_000_001)))),
+      ]),
+    };
 
-    const payload = encoder.encode(
-      JSON.stringify(document("https://example.com/big", "z".repeat(2_000_000))),
-    );
+    for (const [key, bytes] of Object.entries(samples)) {
+      await writeFile(join(directory, stableKeyHash(key)), bytes);
+      expect.soft(cache.get(key), key).toBeUndefined();
+    }
 
-    await writeFile(path, Buffer.concat([header, payload]), "utf8");
-
-    const cache = makeCache(directory, () => 0);
-    expect(cache.get("https://example.com/big")).toBeUndefined();
+    expect(await readdir(directory)).toEqual([]);
   });
 
   it("rejects individually oversized entries and stores nothing", () => {
@@ -135,28 +121,10 @@ describe("web_fetch disk cache", () => {
     expect(cache.get("big")).toBeUndefined();
   });
 
-  it("writes a private 0600 backing file in a 0700 directory on set", async () => {
-    const cache = makeCache(directory);
-    cache.set(
-      "https://example.com/w",
-      document("https://example.com/w", "written"),
-      Date.now() + DAY_MS,
-    );
-
-    const filePath = join(directory, stableKeyHash("https://example.com/w"));
-    const fileStat = await stat(filePath);
-    expect(fileStat.isFile()).toBe(true);
-    expect(fileStat.mode & 0o777).toBe(0o600);
-
-    const dirStat = await stat(directory);
-    expect(dirStat.mode & 0o777).toBe(0o700);
-  });
-
-  it("hashes keys into collision-resistant, filesystem-safe names", () => {
+  it("hashes distinct keys into distinct filesystem-safe names", () => {
     const key = "https://example.com/a/b?c=1&d=2";
-    expect(stableKeyHash(key)).not.toContain("/");
-    expect(stableKeyHash(key)).not.toContain(":");
-    expect(stableKeyHash(key)).toBe(stableKeyHash(key));
-    expect(stableKeyHash("a")).not.toBe(stableKeyHash("b"));
+    const filename = stableKeyHash(key);
+    expect(filename).toMatch(/^[a-f0-9]{64}$/u);
+    expect(filename).not.toBe(stableKeyHash(`${key}3`));
   });
 });

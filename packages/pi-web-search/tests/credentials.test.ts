@@ -145,9 +145,19 @@ describe("Answers key resolution", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("does not reuse the Answers key for web mode", async () => {
+  it("requires a web key even when an Answers key is set", async () => {
     process.env.BRAVE_ANSWERS_API_KEY = "answers-only";
     expect(await resolveApiKey(workspaceDirectory)).toBeUndefined();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { createSearchTool } = await import("./harness");
+
+    await expect(
+      createSearchTool().execute("call", { query: "missing web key" }, undefined, undefined, {
+        cwd: workspaceDirectory,
+      }),
+    ).rejects.toThrow("BRAVE_SEARCH_API_KEY is required");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

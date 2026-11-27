@@ -178,11 +178,15 @@ describe("extraction regressions", () => {
     expect(result.markdown.indexOf("Run alpha")).toBeLessThan(result.markdown.indexOf("Run beta"));
   });
 
-  it("removes script, template and comment content in both extraction paths", async () => {
-    const html = `<html><body><main><article><h1>Guide</h1><p>${substantial}</p><!-- COMMENT_SENTINEL --><script>SCRIPT_SENTINEL</script><template>TEMPLATE_SENTINEL</template></article></main></body></html>`;
+  it("strips non-content elements while retaining readable text", async () => {
+    const html = `<html><body><nav>NAV_SENTINEL</nav><main><article><h1>Guide</h1><p>${substantial}</p><!-- COMMENT_SENTINEL --><script>SCRIPT_SENTINEL</script><template>TEMPLATE_SENTINEL</template><p>Hello   world</p></article></main></body></html>`;
     const result = await extractHtmlToMarkdown(html, new URL("https://example.com/guide"));
+    const fallback = htmlToMarkdownFallback(html);
 
-    for (const output of [result.markdown, htmlToMarkdownFallback(html)]) {
+    expect(fallback).toContain("Hello world");
+    expect(fallback).not.toContain("NAV_SENTINEL");
+
+    for (const output of [result.markdown, fallback]) {
       expect(output).toContain("Readable issue context");
       expect(output).not.toContain("COMMENT_SENTINEL");
       expect(output).not.toContain("SCRIPT_SENTINEL");

@@ -32,32 +32,48 @@ describe("literal command recognition", () => {
     expect(literalCommands(" \t\n# comment")).toEqual([]);
   });
 
-  it.each([
-    "echo sudo | sh",
-    "echo sudo |& sh",
-    "echo $VALUE",
-    'echo "$VALUE"',
-    'echo "`sudo`"',
-    "echo `sudo`",
-    "(sudo)",
-    "{ sudo; }",
-    "echo sudo > script",
-    "cat < script",
-    "echo *",
-    "echo ?",
-    "echo [a]",
-    "echo ~",
-    "! sudo",
-    "echo 'unfinished",
-    'echo "unfinished',
-    "echo trailing\\",
-    "echo continued\\\nline",
-    "echo continued\\\rline",
-    "bash -c 'sudo; true'",
-    "bash -c 'sudo true'",
-    "bash -c 'sudo' ; echo $VALUE",
-    "echo ".repeat(20_000),
-  ])("falls back instead of guessing about %s", (command) => {
-    expect(literalCommands(command)).toBeUndefined();
+  it("falls back for shell operators, expansions, and nested commands", () => {
+    const commands = [
+      "echo sudo | sh",
+      "echo sudo |& sh",
+      "echo $VALUE",
+      'echo "$VALUE"',
+      'echo "`sudo`"',
+      "echo `sudo`",
+      "(sudo)",
+      "{ sudo; }",
+      "echo sudo > script",
+      "cat < script",
+      "echo *",
+      "echo ?",
+      "echo [a]",
+      "echo ~",
+      "! sudo",
+      "bash -c 'sudo; true'",
+      "bash -c 'sudo true'",
+      "bash -c 'sudo' ; echo $VALUE",
+    ];
+
+    for (const command of commands) {
+      expect.soft(literalCommands(command), JSON.stringify(command)).toBeUndefined();
+    }
+  });
+
+  it("falls back for incomplete or continued syntax", () => {
+    const commands = [
+      "echo 'unfinished",
+      'echo "unfinished',
+      "echo trailing\\",
+      "echo continued\\\nline",
+      "echo continued\\\rline",
+    ];
+
+    for (const command of commands) {
+      expect.soft(literalCommands(command), JSON.stringify(command)).toBeUndefined();
+    }
+  });
+
+  it("falls back for oversized input", () => {
+    expect(literalCommands("echo ".repeat(20_000))).toBeUndefined();
   });
 });

@@ -17,16 +17,20 @@ describe("ExpiringLruCache", () => {
     expect(cache.size).toBe(2);
   });
 
-  it("evicts entries until the aggregate byte limit is satisfied", () => {
-    const cache = new ExpiringLruCache<string, string>(10, 5, sizeOf, () => 0);
-    cache.set("a", "aaa", 100);
+  it("evicts least-recently-used entries until the aggregate byte limit is satisfied", () => {
+    const cache = new ExpiringLruCache<string, string>(10, 8, sizeOf, () => 0);
+    cache.set("a", "aa", 100);
     cache.set("b", "bb", 100);
-    cache.set("c", "ccc", 100);
+    cache.set("c", "cccc", 100);
+    expect(cache.get("a")).toBe("aa");
 
-    expect(cache.get("a")).toBeUndefined();
-    expect(cache.get("b")).toBe("bb");
-    expect(cache.get("c")).toBe("ccc");
-    expect(cache.byteSize).toBe(5);
+    cache.set("d", "ddddd", 100);
+
+    expect(cache.get("b")).toBeUndefined();
+    expect(cache.get("c")).toBeUndefined();
+    expect(cache.get("a")).toBe("aa");
+    expect(cache.get("d")).toBe("ddddd");
+    expect(cache.byteSize).toBe(7);
   });
 
   it("accounts for replacement and expiry deletion", () => {

@@ -184,57 +184,55 @@ describe("OpenCode provider stream boundary", () => {
     expect(onProviderStreamEvent).toHaveBeenCalledTimes(1);
   });
 
-  it.each(["3600", "Fri, 23 Oct 2026 13:00:00 GMT", undefined, "invalid"])(
-    "reports a usage limit with Retry-After %s",
-    async (retryAfter) => {
-      const now = Date.parse("2026-10-23T12:00:00Z");
+  it("reports a usage limit with or without a usable Retry-After", async () => {
+    const now = Date.parse("2026-10-23T12:00:00Z");
+    const retryAfters = ["3600", "Fri, 23 Oct 2026 13:00:00 GMT", undefined, "invalid"] as const;
+
+    for (const retryAfter of retryAfters) {
       const clock = vi.spyOn(Date, "now").mockReturnValue(now);
 
       try {
         const fetcher = vi.fn(async () => refusal(429, "FreeUsageLimitError", retryAfter));
         const native = createFreeStream(fetcher, identity);
-
         const result = await native(model, summary, options).result();
-        expect(result.stopReason).toBe("error");
+        const label = String(retryAfter);
 
         const reset =
           retryAfter === "3600" || retryAfter?.startsWith("Fri")
             ? `Reset time: ${formatResetTime(Date.parse("2026-10-23T13:00:00Z"))}.`
             : "Reset time unavailable.";
 
-        expect(result.errorMessage).toBe(
-          `OpenCode Free usage limit or request refusal (FreeUsageLimitError).\n${reset}`,
-        );
-        expect(isRetryableAssistantError(result)).toBe(false);
-        expect(fetcher).toHaveBeenCalledTimes(1);
-        expect(result.errorMessage).not.toMatch(/Retry-After|https:\/\//u);
+        expect.soft(result.stopReason, label).toBe("error");
+        expect
+          .soft(result.errorMessage, label)
+          .toBe(`OpenCode Free usage limit or request refusal (FreeUsageLimitError).\n${reset}`);
+        expect.soft(isRetryableAssistantError(result), label).toBe(false);
+        expect.soft(fetcher, label).toHaveBeenCalledTimes(1);
+        expect.soft(result.errorMessage, label).not.toMatch(/Retry-After|https:\/\//u);
       } finally {
         clock.mockRestore();
       }
-    },
-  );
-
-  it.each([
-    [403, "FreeTierError"],
-    [429, "RateLimitError"],
-    [500, "FreeUsageLimitError"],
-  ])("preserves unrelated failures: %s %s", async (status, type) => {
-    const native = createFreeStream(async () => refusal(status, type, "3600"), identity);
-
-    const result = await native(model, summary, options).result();
-    expect(result.stopReason).toBe("error");
-    expect(result.errorMessage).toContain(type);
-    expect(result.errorMessage).not.toContain("Reset time:");
+    }
   });
 
-  it("keeps ordinary rate limits retryable", async () => {
-    const native = createFreeStream(async () => refusal(429, "RateLimitError", "3600"), identity);
+  it("preserves unrelated failures without claiming a quota reset", async () => {
+    const samples = [
+      [403, "FreeTierError"],
+      [429, "RateLimitError"],
+      [500, "FreeUsageLimitError"],
+    ] as const;
 
-    const result = await native(model, summary, options).result();
-    expect(result.stopReason).toBe("error");
-    expect(isRetryableAssistantError(result)).toBe(true);
-    expect(result.errorMessage).toContain("RateLimitError");
-    expect(result.errorMessage).not.toContain("Reset time:");
+    for (const [status, type] of samples) {
+      const native = createFreeStream(async () => refusal(status, type, "3600"), identity);
+      const result = await native(model, summary, options).result();
+      const label = `${status} ${type}`;
+
+      expect.soft(result.stopReason, label).toBe("error");
+      expect.soft(result.errorMessage, label).toContain(type);
+      expect.soft(result.errorMessage, label).not.toContain("Reset time:");
+
+      if (status === 429) expect.soft(isRetryableAssistantError(result), label).toBe(true);
+    }
   });
 
   it("keeps quota timing scoped to each concurrent request", async () => {
@@ -459,14 +457,16 @@ describe("quota reset formatting", () => {
     expect(formatResetTime(resetAt + 37_000)).toBe(formatResetTime(resetAt));
   });
 
-  it.each([
-    ["de_DE.UTF-8", "de-DE", "Europe/Berlin", "02:00"],
-    ["en_US.UTF-8", "en-US", "America/New_York", "20:00"],
-    ["en_US.UTF-8", "en-US", "UTC", "00:00"],
-  ])(
-    "inherits %s (%s) and timezone %s from a fresh Pi host process",
-    (language, locale, timeZone, clock) => {
+  it("inherits host locale and timezone from a fresh Pi process", () => {
+    const samples = [
+      ["de_DE.UTF-8", "de-DE", "Europe/Berlin", "02:00"],
+      ["en_US.UTF-8", "en-US", "America/New_York", "20:00"],
+      ["en_US.UTF-8", "en-US", "UTC", "00:00"],
+    ] as const;
+
+    for (const [language, locale, timeZone, clock] of samples) {
       const source = new URL("../src/quota.ts", import.meta.url).href;
+      const label = `${language} ${timeZone}`;
 
       const code = `
       import { formatResetTime } from ${JSON.stringify(source)};
@@ -487,13 +487,13 @@ describe("quota reset formatting", () => {
         .trim()
         .split("\n");
 
-      expect(lines[0]).toBe(lines[1]);
-      expect(lines[0]).toContain(clock);
-      expect(lines[0]).not.toMatch(/AM|PM|\d{2}:\d{2}:\d{2}/u);
-      expect(lines[2]).toBe(locale);
-      expect(lines[3]).toBe(timeZone);
-    },
-  );
+      expect.soft(lines[0], label).toBe(lines[1]);
+      expect.soft(lines[0], label).toContain(clock);
+      expect.soft(lines[0], label).not.toMatch(/AM|PM|\d{2}:\d{2}:\d{2}/u);
+      expect.soft(lines[2], label).toBe(locale);
+      expect.soft(lines[3], label).toBe(timeZone);
+    }
+  });
 
   it("uses locale-specific formatting and daylight-saving rules", () => {
     const german = new Intl.DateTimeFormat("de-DE", {
@@ -517,40 +517,52 @@ describe("quota reset formatting", () => {
 });
 
 describe("native quota error recognition", () => {
-  it.each([
-    '429 {"type":"FreeUsageLimitError","message":"Quota reached"}',
-    '429: {"error":{"type":"FreeUsageLimitError"}}',
-  ])("recognizes the actual error tag: %s", (message) => {
-    expect(isFreeUsageLimitMessage(message)).toBe(true);
+  it("recognizes the actual FreeUsageLimitError tag shapes", () => {
+    const messages = [
+      '429 {"type":"FreeUsageLimitError","message":"Quota reached"}',
+      '429: {"error":{"type":"FreeUsageLimitError"}}',
+    ];
+
+    for (const message of messages) {
+      expect.soft(isFreeUsageLimitMessage(message), message).toBe(true);
+    }
   });
-  it.each([
-    undefined,
-    "",
-    "429 FreeUsageLimitError",
-    '429 {"type":',
-    '429 {"type":"OtherError","message":"FreeUsageLimitError"}',
-    '429 {"type":"OtherError","details":{"type":"FreeUsageLimitError"}}',
-    '429 {"error":null}',
-    '429 {"error":"FreeUsageLimitError"}',
-    `429 ${"x".repeat(16_385)}`,
-  ])("leaves unrelated, malformed, or oversized errors unchanged", (message) => {
-    expect(isFreeUsageLimitMessage(message)).toBe(false);
+  it("leaves unrelated, malformed, or oversized errors unchanged", () => {
+    const messages = [
+      undefined,
+      "",
+      "429 FreeUsageLimitError",
+      '429 {"type":',
+      '429 {"type":"OtherError","message":"FreeUsageLimitError"}',
+      '429 {"type":"OtherError","details":{"type":"FreeUsageLimitError"}}',
+      '429 {"error":null}',
+      '429 {"error":"FreeUsageLimitError"}',
+      `429 ${"x".repeat(16_385)}`,
+    ];
+
+    for (const message of messages) {
+      expect.soft(isFreeUsageLimitMessage(message), String(message).slice(0, 40)).toBe(false);
+    }
   });
 });
 
 describe("quota timing", () => {
   const now = Date.parse("2026-10-23T12:00:00Z");
-  it.each([
-    "-1",
-    "Infinity",
-    "NaN",
-    "1e20",
-    "999999999999999999",
-    "Thu, 22 Oct 2026 12:00:00 GMT",
-    "",
-    "garbage",
-  ])("rejects invalid or past Retry-After %s", (value) => {
-    expect(quotaResetAt(new Headers({ "retry-after": value }), now)).toBeUndefined();
+  it("rejects invalid or past Retry-After values", () => {
+    const values = [
+      "-1",
+      "Infinity",
+      "NaN",
+      "1e20",
+      "999999999999999999",
+      "Thu, 22 Oct 2026 12:00:00 GMT",
+      "",
+      "garbage",
+    ];
+
+    for (const value of values) {
+      expect.soft(quotaResetAt(new Headers({ "retry-after": value }), now), value).toBeUndefined();
+    }
   });
   it("preserves a zero or fractional retry delay", () => {
     expect(quotaResetAt(new Headers({ "retry-after": "0" }), now)).toBe(now);

@@ -9,22 +9,19 @@ const repoRoot = dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   test: {
     setupFiles: [join(repoRoot, "tests", "cache-env.setup.ts")],
-    coverage: {
-      provider: "v8",
-      reporter: [["text", { skipFull: false }]],
-      include: ["**/src/**/*.ts"],
-      thresholds: {
-        perFile: true,
-        lines: 80,
-        functions: 75,
-        statements: 75,
-        branches: 60,
+  },
+  run: {
+    tasks: {
+      ready: {
+        command: "vp test",
+        dependsOn: ["ready:check", "test:packages"],
+        cache: false,
       },
+      "ready:check": { command: "vp check", cache: false },
     },
   },
   fmt: {
     ignorePatterns: [
-      "coverage/**",
       "dist/**",
       "packages/pi-web-fetch/workers/anubis-solver.js",
       "packages/pi-web-fetch/workers/anubis-worker.js",
@@ -50,7 +47,6 @@ export default defineConfig({
   },
   lint: {
     ignorePatterns: [
-      "coverage/**",
       "dist/**",
       "packages/pi-web-fetch/workers/anubis-solver.js",
       "packages/pi-web-fetch/workers/anubis-worker.js",

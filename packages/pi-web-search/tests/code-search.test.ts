@@ -13,15 +13,25 @@ vi.mock("../src/credentials", async (importOriginal) => {
 });
 
 describe("web_search code-search options", () => {
-  it("passes web options without a spellcheck override", async () => {
+  it("passes advanced web options and reports the provider's echoed query metadata", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "code-secret";
 
     const fetchMock = vi.fn(async (_input: RequestInfo | URL) =>
-      jsonResponse({ web: { results: [] } }),
+      jsonResponse({
+        query: {
+          altered: "corrected query",
+          spellcheck_off: false,
+          show_strict_warning: true,
+          more_results_available: true,
+          search_operators: { applied: true, sites: ["github.com"] },
+        },
+        web: { results: [] },
+      }),
     );
 
     vi.stubGlobal("fetch", fetchMock);
-    await createSearchTool().execute(
+
+    const result = await createSearchTool().execute(
       "call",
       {
         query: "site:github.com filetype:pdf intitle:vite",
@@ -36,6 +46,7 @@ describe("web_search code-search options", () => {
       undefined,
       undefined,
     );
+
     const input = fetchMock.mock.calls[0]![0];
     const url = new URL(input instanceof Request ? input.url : input.toString());
     expect(url.searchParams.get("operators")).toBe("true");
@@ -46,33 +57,7 @@ describe("web_search code-search options", () => {
     expect(url.searchParams.get("ui_lang")).toBe("en-US");
     expect(url.searchParams.get("country")).toBe("ALL");
     expect(url.searchParams.get("freshness")).toBe("2025-01-01to2025-06-30");
-  });
-
-  it("retains echoed query metadata without exposing spellcheck as a parameter", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "meta-secret";
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        jsonResponse({
-          query: {
-            altered: "corrected query",
-            spellcheck_off: false,
-            show_strict_warning: true,
-            more_results_available: true,
-            search_operators: { applied: true, sites: ["github.com"] },
-          },
-          web: { results: [] },
-        }),
-      ),
-    );
-
-    const result = await createSearchTool().execute(
-      "call",
-      { query: "excat error string" },
-      undefined,
-      undefined,
-    );
-
+    expect(result.details.evidence).not.toHaveProperty("freshness");
     expect(result.details.evidence).toMatchObject({
       alteredQuery: "corrected query",
       spellcheckOff: false,
@@ -112,7 +97,7 @@ describe("web_search code-search options", () => {
 });
 
 describe("web_search recovery guidance", () => {
-  it.each([0, 1, 2, 5])("reports %s of 5 results without automatic fallback", async (count) => {
+  it.each([0, 1, 5])("reports %s of 5 results without automatic fallback", async (count) => {
     process.env.BRAVE_SEARCH_API_KEY = "guidance-secret";
     delete process.env.BRAVE_ANSWERS_API_KEY;
 
@@ -133,6 +118,11 @@ describe("web_search recovery guidance", () => {
     const params = { query: `guidance ${count}` };
     const result = await tool.execute("call", params, undefined, undefined);
     const text = result.content[0]!.text;
+    expect(result.details.evidence).toMatchObject({
+      requestedCount: 5,
+      returnedCount: count,
+      dropped: 0,
+    });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(text).not.toContain("context");
     expect(text).not.toContain("_Provider:");

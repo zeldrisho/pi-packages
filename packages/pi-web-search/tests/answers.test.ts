@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { parseAnswerStream } from "../src/answers";
-import { validateProviderRequest } from "../src/request-validation";
 import { answerResponse, createSearchTool, jsonResponse } from "./harness";
 
 const citation = '<citation>{"number":1,"url":"https://example.com/source"}</citation>';
@@ -135,47 +134,61 @@ describe("Answers mode", () => {
     expect(text).not.toContain("<untrusted_web_content>");
   });
 
-  it.each([402, 403, 429, 503])("reports HTTP %s without falling back", async (status) => {
+  it("reports provider HTTP errors without falling back", async () => {
     process.env.BRAVE_ANSWERS_API_KEY = "failure-secret";
-    const fetchMock = vi.fn(async () => jsonResponse({ error: "unavailable" }, status));
-    vi.stubGlobal("fetch", fetchMock);
-    await expect(
-      createSearchTool().execute(
-        "call",
-        { query: `failed answer ${status}`, mode: "answers" },
-        undefined,
-        undefined,
-      ),
-    ).rejects.toThrow(`HTTP ${status}`);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const tool = createSearchTool();
+
+    for (const status of [402, 403, 429, 503]) {
+      const fetchMock = vi.fn(async () => jsonResponse({ error: "unavailable" }, status));
+      vi.stubGlobal("fetch", fetchMock);
+      await expect
+        .soft(
+          tool.execute(
+            "call",
+            { query: `failed answer ${status}`, mode: "answers" },
+            undefined,
+            undefined,
+          ),
+          `HTTP ${status}`,
+        )
+        .rejects.toThrow(`HTTP ${status}`);
+      expect.soft(fetchMock, `HTTP ${status}`).toHaveBeenCalledTimes(1);
+    }
   });
 
-  it.each([
-    { count: 5 },
-    { goggles: "https://example.com/goggle" },
-    { extraSnippets: true },
-    { operators: false },
-    { offset: 0 },
-    { uiLang: "en-US" },
-    { dateRange: "2025-01-01to2025-06-30" },
-  ])("rejects unsupported Answers options: %j", async (options) => {
+  it("rejects web-only options before making an Answers request", async () => {
+    process.env.BRAVE_ANSWERS_API_KEY = "unused-test-key";
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    await expect(
-      createSearchTool().execute(
-        "call",
-        { query: "invalid options", mode: "answers", ...options },
-        undefined,
-        undefined,
-      ),
-    ).rejects.toThrow("only supported in web mode");
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
+    const tool = createSearchTool();
 
-  it("names goggles in the web-only option error", () => {
-    expect(() =>
-      validateProviderRequest("query", 5, "answers", { goggles: "https://example.com/goggle" }),
-    ).toThrow("goggles options are only supported in web mode");
+    for (const options of [
+      { count: 5 },
+      { goggles: "https://example.com/goggle" },
+      { extraSnippets: true },
+      { operators: false },
+      { offset: 0 },
+      { uiLang: "en-US" },
+      { dateRange: "2025-01-01to2025-06-30" },
+    ]) {
+      await expect
+        .soft(
+          tool.execute(
+            "call",
+            { query: "invalid options", mode: "answers", ...options },
+            undefined,
+            undefined,
+          ),
+          JSON.stringify(options),
+        )
+        .rejects.toThrow(
+          "goggles" in options
+            ? "goggles options are only supported in web mode"
+            : "only supported in web mode",
+        );
+    }
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("parses UTF-8 and SSE data split across network chunks", async () => {
@@ -336,23 +349,30 @@ describe("Answers SSE parser", () => {
     expect(parseAnswerStream(body)).toEqual({ text: "Text", citations: [], usage: {} });
   });
 
-  it.each([
-    "data: not-json\n\ndata: [DONE]\n\n",
-    'data: {"error":{"message":"failed"}}\n\ndata: [DONE]\n\n',
-    'data: {"choices":[{"delta":{"content":1}}]}\n\ndata: [DONE]\n\n',
-    'data: {"choices":[{"delta":{"content":"partial"},"finish_reason":"length"}]}\n\ndata: [DONE]\n\n',
-    'data: {"choices":[{"delta":{"content":"partial"}}]}\n\n',
-  ])("rejects malformed or incomplete streams", (body) =>
-    expect(() => parseAnswerStream(body)).toThrow(),
-  );
+  it("rejects malformed or incomplete streams", () => {
+    const samples = {
+      "invalid JSON": "data: not-json\n\ndata: [DONE]\n\n",
+      "provider error": 'data: {"error":{"message":"failed"}}\n\ndata: [DONE]\n\n',
+      "non-string delta": 'data: {"choices":[{"delta":{"content":1}}]}\n\ndata: [DONE]\n\n',
+      "length limit":
+        'data: {"choices":[{"delta":{"content":"partial"},"finish_reason":"length"}]}\n\ndata: [DONE]\n\n',
+      "missing terminator": 'data: {"choices":[{"delta":{"content":"partial"}}]}\n\n',
+    };
 
-  it.each([
-    "",
-    "<citation>{bad}</citation>",
-    '<usage>{"cost":"wrong"}</usage>',
-    "answer<citation>",
-  ])("rejects empty or malformed content: %s", async (content) => {
-    const body = await answerResponse([content]).text();
-    expect(() => parseAnswerStream(body)).toThrow();
+    for (const [label, body] of Object.entries(samples)) {
+      expect.soft(() => parseAnswerStream(body), label).toThrow();
+    }
+  });
+
+  it("rejects empty or malformed content", async () => {
+    for (const content of [
+      "",
+      "<citation>{bad}</citation>",
+      '<usage>{"cost":"wrong"}</usage>',
+      "answer<citation>",
+    ]) {
+      const body = await answerResponse([content]).text();
+      expect.soft(() => parseAnswerStream(body), JSON.stringify(content)).toThrow();
+    }
   });
 });

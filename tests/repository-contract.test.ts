@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vite-plus/test";
 
 const root = resolve(import.meta.dirname, "./..");
@@ -42,10 +42,6 @@ const packageSpecificFiles = new Map([
   ["pi-gate", ["config.schema.json"]],
   ["pi-web-fetch", ["workers"]],
 ]);
-
-const promptPackages = new Set<string>();
-
-const skillPackages = new Set(["pi-sentry-skills"]);
 
 const themePackages = new Set(["pi-catppuccin"]);
 
@@ -172,95 +168,6 @@ describe("repository contracts", () => {
     expect(changelogMatchesVersion("## [Unreleased]\n\n## [0.1.0] - 2026-01-01", "0.2.0")).toBe(
       false,
     );
-  });
-  it("validates packaged Agent Skill metadata and local reference paths", async () => {
-    const names = new Set<string>();
-
-    for (const packageName of skillPackages) {
-      const packageRoot = join(root, "packages", packageName);
-      const manifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"));
-
-      if (
-        ![
-          "MIT",
-          "Apache-2.0",
-          "(Apache-2.0 AND MIT)",
-          "(Apache-2.0 AND CC-BY-SA-4.0)",
-          "(Apache-2.0 AND CC-BY-SA-4.0 AND MIT)",
-        ].includes(manifest.license)
-      ) {
-        fail(`${manifest.name} must declare its SPDX license expression`);
-      }
-
-      let license: string;
-
-      try {
-        license = await readFile(join(packageRoot, "LICENSE"), "utf8");
-      } catch {
-        fail(`${manifest.name} must include a readable LICENSE file`);
-      }
-
-      if (!license.trim()) fail(`${manifest.name} LICENSE file must not be empty`);
-
-      const skillsRoot = join(packageRoot, "skills");
-      const pending = [skillsRoot];
-
-      while (pending.length > 0) {
-        const directory = pending.pop();
-
-        if (!directory) continue;
-
-        for (const entry of await readdir(directory, { withFileTypes: true })) {
-          const path = join(directory, entry.name);
-
-          if (entry.isDirectory()) {
-            pending.push(path);
-            continue;
-          }
-
-          if (entry.name !== "SKILL.md") continue;
-
-          const source = await readFile(path, "utf8");
-
-          const frontmatter = source.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1];
-
-          if (!frontmatter) fail(`${path} must have YAML frontmatter`);
-
-          const name = frontmatter.match(/^name:\s*(.*?)\s*$/m)?.[1];
-
-          const description = frontmatter.match(/^description:\s*(.*?)\s*$/m)?.[1];
-          const metadata = frontmatter.match(/^metadata:\s*\n((?: {2}.+\n?)*)/m)?.[1];
-          const directoryName = path.split(/[\\/]/).at(-2);
-
-          if (!name || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) || name.length > 64) {
-            fail(`${path} has an invalid skill name`);
-          }
-
-          if (name !== directoryName) fail(`${path} name must match its skill directory`);
-
-          if (names.has(name)) fail(`duplicate skill name: ${name}`);
-          names.add(name);
-
-          if (!description || description.length > 1024) {
-            fail(`${path} must have a nonempty description of at most 1024 characters`);
-          }
-
-          if (metadata && /^ {2}[A-Za-z0-9_-]+:\s*(?:\n|$)/m.test(metadata)) {
-            fail(`${path} metadata values must be scalar strings`);
-          }
-
-          for (const reference of source.matchAll(
-            /(?:\.\/)?((?:references|skills)\/[a-zA-Z0-9_./-]+\.md|github\.md)/g,
-          )) {
-            try {
-              await readFile(join(dirname(path), reference[1]));
-            } catch {
-              fail(`${path} references missing file ${reference[1]}`);
-            }
-          }
-        }
-      }
-    }
   });
 
   it("creates GitHub releases with gh release create on component tag push", () => {
@@ -509,12 +416,7 @@ describe("repository contracts", () => {
     // packages use `files: ["src", ...]` and Pi loads TypeScript directly —
     // a stray `src/*.js` would be published without a build step.
     for (const directory of packageDirectories) {
-      if (
-        promptPackages.has(directory) ||
-        skillPackages.has(directory) ||
-        themePackages.has(directory)
-      )
-        continue;
+      if (themePackages.has(directory)) continue;
       const stack = [join(packagesDirectory, directory, "src")];
 
       while (stack.length > 0) {
@@ -549,14 +451,11 @@ describe("repository contracts", () => {
         await readFile(join(packageDirectory, "tsconfig.json"), "utf8"),
       );
 
-      const isPromptPackage = promptPackages.has(directory);
-      const isSkillPackage = skillPackages.has(directory);
       const isThemePackage = themePackages.has(directory);
 
       const expectedName = `@zeldrisho/${directory}`;
       const packageReadme = `https://github.com/zeldrisho/pi-packages/tree/main/packages/${directory}#readme`;
       const packagePath = join("packages", directory);
-      const isContentOnly = isPromptPackage || isSkillPackage || isThemePackage;
       const changelog = await readFile(join(packageDirectory, "CHANGELOG.md"), "utf8");
 
       if (manifest.name !== expectedName) {
@@ -594,7 +493,7 @@ describe("repository contracts", () => {
         fail(`${manifest.name} must rely on npm's automatic README and LICENSE inclusion`);
       }
 
-      if (!isContentOnly) {
+      if (!isThemePackage) {
         if (JSON.stringify(manifest.scripts) !== JSON.stringify(expectedScripts)) {
           fail(`${manifest.name} scripts must match the extension package scripts`);
         }
@@ -602,7 +501,7 @@ describe("repository contracts", () => {
         fail(`${manifest.name} content-only packages must not declare package-local tooling`);
       }
 
-      const expectedPackageTypeScriptConfiguration = isContentOnly
+      const expectedPackageTypeScriptConfiguration = isThemePackage
         ? expectedContentOnlyTypeScriptConfiguration
         : expectedTypeScriptConfiguration;
 
@@ -613,13 +512,9 @@ describe("repository contracts", () => {
         fail(`${manifest.name} tsconfig.json does not match its package type`);
       }
 
-      const packageFiles = isPromptPackage
-        ? ["prompts", "CHANGELOG.md"]
-        : isSkillPackage
-          ? ["skills", "CHANGELOG.md"]
-          : isThemePackage
-            ? ["themes", "CHANGELOG.md"]
-            : [...expectedFiles, ...(packageSpecificFiles.get(directory) ?? [])];
+      const packageFiles = isThemePackage
+        ? ["themes", "CHANGELOG.md"]
+        : [...expectedFiles, ...(packageSpecificFiles.get(directory) ?? [])];
 
       if (!sameValues(manifest.files ?? [], packageFiles)) {
         fail(
@@ -639,15 +534,7 @@ describe("repository contracts", () => {
         }
       }
 
-      if (isPromptPackage) {
-        if (JSON.stringify(manifest.pi?.prompts) !== JSON.stringify(["./prompts"])) {
-          fail(`${manifest.name} must expose only ./prompts as its Pi prompts`);
-        }
-      } else if (isSkillPackage) {
-        if (JSON.stringify(manifest.pi?.skills) !== JSON.stringify(["./skills"])) {
-          fail(`${manifest.name} must expose only ./skills as its Pi skills`);
-        }
-      } else if (isThemePackage) {
+      if (isThemePackage) {
         if (JSON.stringify(manifest.pi?.themes) !== JSON.stringify(["./themes"])) {
           fail(`${manifest.name} must expose only ./themes as its Pi themes`);
         }

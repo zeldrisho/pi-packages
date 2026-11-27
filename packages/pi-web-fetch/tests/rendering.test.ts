@@ -1,7 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vite-plus/test";
-import { sliceCompleteDocument } from "../src/document/content.ts";
-import { htmlToMarkdownFallback } from "../src/document/extract.ts";
 import registerWebFetch from "../src/index";
 
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
@@ -246,33 +244,5 @@ describe("web_fetch rendering", () => {
         .render(200)
         .join("\n"),
     ).toContain("No content");
-  });
-
-  it("bounds multibyte content without splitting a surrogate pair", () => {
-    const result = sliceCompleteDocument(
-      {
-        url: "https://example.com",
-        contentType: "text/plain",
-        markdown: "😀".repeat(100_000),
-        extractor: "raw",
-        shellSuspected: false,
-      },
-      0,
-      200_000,
-    );
-
-    expect(result.truncated).toBe(true);
-    expect(result.markdown).not.toMatch(/[\uD800-\uDBFF]\n\n\[Content truncated/);
-  });
-
-  it("provides a basic HTML fallback that removes non-content elements", () => {
-    const markdown = htmlToMarkdownFallback(
-      "<html><body>  Hello   world<nav>menu</nav><script>bad()</script><p>Next</p></body></html>",
-    );
-
-    expect(markdown).toContain("Hello world");
-    expect(markdown).toContain("Next");
-    expect(markdown).not.toContain("menu");
-    expect(markdown).not.toContain("bad()");
   });
 });

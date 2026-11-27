@@ -612,6 +612,16 @@ export function normalizeSchema(schema: JsonValue): JsonObject {
   return isJsonObject(normalized) ? stripMeta(normalized) : {};
 }
 
+/** Writes a schema key as JSON data without invoking an inherited setter. */
+function setSchemaEntry(target: JsonObject, key: string, value: JsonValue): void {
+  Object.defineProperty(target, key, {
+    value,
+    enumerable: true,
+    configurable: true,
+    writable: true,
+  });
+}
+
 /**
  * Recursively inlines local references.
  *
@@ -652,7 +662,7 @@ function expandSchema(
   const out: JsonObject = {};
 
   for (const [key, entry] of Object.entries(value)) {
-    out[key] = expandKeyword(key, entry, root, seen, state, depth);
+    setSchemaEntry(out, key, expandKeyword(key, entry, root, seen, state, depth));
   }
 
   return out;
@@ -681,7 +691,7 @@ function expandKeyword(
     const mapped: JsonObject = {};
 
     for (const [name, entry] of Object.entries(value)) {
-      mapped[name] = expandSchema(entry, root, seen, state, depth + 1);
+      setSchemaEntry(mapped, name, expandSchema(entry, root, seen, state, depth + 1));
     }
 
     return mapped;
@@ -710,7 +720,7 @@ function stripMeta(schema: JsonObject): JsonObject {
   for (const [key, value] of Object.entries(schema)) {
     if (META_SCHEMA_KEYWORDS.has(key)) continue;
 
-    out[key] = stripMetaKeyword(key, value);
+    setSchemaEntry(out, key, stripMetaKeyword(key, value));
   }
 
   return out;
@@ -728,7 +738,7 @@ function stripMetaKeyword(key: string, value: JsonValue): JsonValue {
     const mapped: JsonObject = {};
 
     for (const [name, entry] of Object.entries(value)) {
-      mapped[name] = isJsonObject(entry) ? stripMeta(entry) : entry;
+      setSchemaEntry(mapped, name, isJsonObject(entry) ? stripMeta(entry) : entry);
     }
 
     return mapped;

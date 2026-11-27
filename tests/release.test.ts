@@ -7,11 +7,7 @@ import { createReleaseAutomation, runReleaseCli, type PackageInfo } from "../scr
 
 const temporaryDirectories: string[] = [];
 
-function git(root: string, ...args: string[]): string {
-  return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
-}
-
-async function createRepository(version = "1.0.0"): Promise<string> {
+async function createPackageFixture(version = "1.0.0"): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "release-repository-test-"));
   temporaryDirectories.push(root);
   await mkdir(join(root, "packages", "alpha"), { recursive: true });
@@ -20,11 +16,6 @@ async function createRepository(version = "1.0.0"): Promise<string> {
     `${JSON.stringify({ name: "@zeldrisho/alpha", version }, null, 2)}\n`,
   );
   await writeFile(join(root, "packages", "alpha", "CHANGELOG.md"), "# Changelog\n");
-  git(root, "init", "--quiet");
-  git(root, "config", "user.email", "release-test@example.test");
-  git(root, "config", "user.name", "Release Test");
-  git(root, "add", ".");
-  git(root, "commit", "--quiet", "-m", "feat: initial package");
 
   return root;
 }
@@ -37,76 +28,58 @@ afterEach(async () => {
   );
 });
 
-describe("package catalog", () => {
-  it("discovers package directories and computes their component tag", async () => {
-    const root = await createRepository("1.2.3");
-    const automation = createReleaseAutomation({ root });
-    const catalog = await automation.packageCatalog();
-
-    expect(catalog).toEqual<PackageInfo[]>([
-      {
-        directory: "alpha",
-        path: "packages/alpha",
-        manifestPath: join(root, "packages/alpha/package.json"),
-        changelogPath: join(root, "packages/alpha/CHANGELOG.md"),
-        name: "@zeldrisho/alpha",
-        shortName: "alpha",
-        version: "1.2.3",
-        tag: "alpha-v1.2.3",
-      },
-    ]);
-  });
-});
-
 describe("tag resolution", () => {
-  it("resolves a well-formed tag to its package and confirms the manifest version", async () => {
-    const root = await createRepository("1.0.0");
+  it("discovers package metadata and resolves it by component tag", async () => {
+    const root = await createPackageFixture("1.2.3");
     const automation = createReleaseAutomation({ root });
 
-    const pkg = await automation.resolvePackageByTag("alpha-v1.0.0");
+    const alpha: PackageInfo = {
+      directory: "alpha",
+      path: "packages/alpha",
+      manifestPath: join(root, "packages/alpha/package.json"),
+      changelogPath: join(root, "packages/alpha/CHANGELOG.md"),
+      name: "@zeldrisho/alpha",
+      shortName: "alpha",
+      version: "1.2.3",
+      tag: "alpha-v1.2.3",
+    };
 
-    expect(pkg.path).toBe("packages/alpha");
-    expect(pkg.version).toBe("1.0.0");
+    await expect(automation.packageCatalog()).resolves.toEqual([alpha]);
+    await expect(automation.resolvePackageByTag("alpha-v1.2.3")).resolves.toEqual(alpha);
   });
 
-  it("rejects a tag whose version does not match the manifest", async () => {
-    const root = await createRepository("1.0.0");
+  it("rejects tags that do not identify a package at its manifest version", async () => {
+    const root = await createPackageFixture();
     const automation = createReleaseAutomation({ root });
 
-    await expect(automation.resolvePackageByTag("alpha-v1.0.1")).rejects.toThrow(
-      "does not match @zeldrisho/alpha manifest version 1.0.0",
-    );
-  });
+    const samples = [
+      ["alpha-v1.0.1", "does not match @zeldrisho/alpha manifest version 1.0.0"],
+      ["missing-v1.0.0", "No package matches the tag"],
+      ["alpha-not-semver", "does not match <package>-v<version>"],
+    ] as const;
 
-  it("rejects a tag with no matching package", async () => {
-    const root = await createRepository();
-    const automation = createReleaseAutomation({ root });
-
-    await expect(automation.resolvePackageByTag("missing-v1.0.0")).rejects.toThrow(
-      "No package matches the tag",
-    );
-  });
-
-  it("rejects a malformed tag", async () => {
-    const automation = createReleaseAutomation();
-
-    await expect(automation.resolvePackageByTag("alpha-not-semver")).rejects.toThrow(
-      "does not match <package>-v<version>",
-    );
+    for (const [tag, message] of samples) {
+      await expect.soft(automation.resolvePackageByTag(tag), tag).rejects.toThrow(message);
+    }
   });
 });
 
 describe("release notes extraction", () => {
-  it("rejects invalid package paths", async () => {
-    const root = await createRepository();
+  it("requires a known package path and a changelog entry for its version", async () => {
+    const root = await createPackageFixture();
     const automation = createReleaseAutomation({ root });
-    await expect(
-      automation.writeReleaseNotes("packages/missing", join(root, "notes.md")),
-    ).rejects.toThrow("Unknown package path");
+    const notesPath = join(root, "notes.md");
+
+    await expect
+      .soft(automation.writeReleaseNotes("packages/missing", notesPath))
+      .rejects.toThrow("Unknown package path");
+    await expect
+      .soft(automation.writeReleaseNotes("packages/alpha", notesPath))
+      .rejects.toThrow("Changelog does not contain @zeldrisho/alpha@1.0.0");
   });
 
   it("extracts the version section from the changelog", async () => {
-    const root = await createRepository();
+    const root = await createPackageFixture();
     await writeFile(
       join(root, "packages/alpha/CHANGELOG.md"),
       "# Changelog\n\n## 1.0.0 (2026-08-05)\n\n* Initial release\n\n## 0.0.1\n\n* Bootstrap\n",
@@ -119,16 +92,8 @@ describe("release notes extraction", () => {
     expect(notes).not.toContain("## 0.0.1");
   });
 
-  it("throws when the changelog lacks the version entry", async () => {
-    const root = await createRepository();
-    const automation = createReleaseAutomation({ root });
-    await expect(
-      automation.writeReleaseNotes("packages/alpha", join(root, "notes.md")),
-    ).rejects.toThrow("Changelog does not contain @zeldrisho/alpha@1.0.0");
-  });
-
   it("rejects output paths that escape via a sibling-directory prefix", async () => {
-    const root = await createRepository();
+    const root = await createPackageFixture();
     await writeFile(
       join(root, "packages/alpha/CHANGELOG.md"),
       "# Changelog\n\n## 1.0.0 (2026-08-05)\n\n* Initial release\n\n## 0.0.1\n\n* Bootstrap\n",
@@ -167,38 +132,34 @@ describe("release CLI", () => {
     };
   }
 
-  it.each([
-    ["package", "alpha-v1.0.0", undefined],
-    ["notes", "packages/alpha", "notes.md"],
-  ] as const)("dispatches %s", async (command, argument, secondArgument) => {
+  it("dispatches the package and notes commands to release automation", async () => {
     const fake = fakeAutomation();
-    await runReleaseCli(
-      secondArgument
-        ? [command, argument, secondArgument]
-        : argument
-          ? [command, argument]
-          : [command],
-      fake.automation,
-    );
 
-    if (command === "package")
-      expect(fake.resolvePackageByTag).toHaveBeenCalledWith("alpha-v1.0.0");
-    else expect(fake.writeReleaseNotes).toHaveBeenCalledWith("packages/alpha", "notes.md");
+    await expect
+      .soft(runReleaseCli(["package", "alpha-v1.0.0"], fake.automation), "package command")
+      .resolves.toBeUndefined();
+    expect.soft(fake.resolvePackageByTag).toHaveBeenCalledWith("alpha-v1.0.0");
+
+    await expect
+      .soft(
+        runReleaseCli(["notes", "packages/alpha", "notes.md"], fake.automation),
+        "notes command",
+      )
+      .resolves.toBeUndefined();
+    expect.soft(fake.writeReleaseNotes).toHaveBeenCalledWith("packages/alpha", "notes.md");
   });
 
-  it("rejects a missing argument for package", async () => {
-    await expect(runReleaseCli(["package"], fakeAutomation().automation)).rejects.toThrow(
-      "A tag is required",
-    );
-  });
+  it("rejects missing arguments and unknown commands", async () => {
+    const samples = [
+      [["package"], "A tag is required"],
+      [["notes", "packages/alpha"], "A package path and output path are required"],
+      [["unknown"], "Usage:"],
+    ] satisfies Array<[string[], string]>;
 
-  it("rejects a missing output path for notes", async () => {
-    await expect(
-      runReleaseCli(["notes", "packages/alpha"], fakeAutomation().automation),
-    ).rejects.toThrow("A package path and output path are required");
-  });
-
-  it("rejects unknown commands with usage", async () => {
-    await expect(runReleaseCli(["unknown"], fakeAutomation().automation)).rejects.toThrow("Usage:");
+    for (const [args, message] of samples) {
+      await expect
+        .soft(runReleaseCli(args, fakeAutomation().automation), args.join(" "))
+        .rejects.toThrow(message);
+    }
   });
 });

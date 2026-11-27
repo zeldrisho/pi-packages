@@ -16,7 +16,6 @@ import {
   MAX_DISPLAY_COMMAND_LINES,
   MAX_RULE_COUNT,
   MAX_RULE_PATTERN_LENGTH,
-  type Action,
 } from "../src/index";
 
 let workDir: string;
@@ -49,25 +48,22 @@ function setConfig(content: string | null): void {
 describe("parseConfig", () => {
   const emptyConfig = { operations: {}, promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS };
 
-  it("returns an empty configuration for invalid JSON", () => {
-    expect(parseConfig("{not valid")).toEqual(emptyConfig);
-  });
+  it("returns an empty configuration when JSON or its operations object is invalid", () => {
+    const invalidConfigs = [
+      "{not valid",
+      '"a string"',
+      "42",
+      "null",
+      "[1, 2, 3]",
+      "{}",
+      '{"other": []}',
+      '{"operations": []}',
+      '{"operations": "nope"}',
+    ];
 
-  it("returns an empty configuration for a non-object root", () => {
-    expect(parseConfig('"a string"')).toEqual(emptyConfig);
-    expect(parseConfig("42")).toEqual(emptyConfig);
-    expect(parseConfig("null")).toEqual(emptyConfig);
-    expect(parseConfig("[1, 2, 3]")).toEqual(emptyConfig);
-  });
-
-  it("returns an empty configuration when operations is missing", () => {
-    expect(parseConfig("{}")).toEqual(emptyConfig);
-    expect(parseConfig('{"other": []}')).toEqual(emptyConfig);
-  });
-
-  it("returns an empty configuration when operations is not an object", () => {
-    expect(parseConfig('{"operations": []}')).toEqual(emptyConfig);
-    expect(parseConfig('{"operations": "nope"}')).toEqual(emptyConfig);
+    for (const input of invalidConfigs) {
+      expect.soft(parseConfig(input), input).toEqual(emptyConfig);
+    }
   });
 
   it("accepts a positive prompt timeout up to one day", () => {
@@ -102,34 +98,15 @@ describe("parseConfig", () => {
     });
   });
 
-  it("skips rules with invalid actions", () => {
-    const result = parseConfig(
-      JSON.stringify({
-        operations: {
-          "rm -rf": "prompt",
-          "bad-action": "maybe",
-          "not-a-string": 42,
-        },
-      }),
-    );
-
-    expect(result.operations).toEqual({ "rm -rf": "prompt" });
-  });
-
   it("fails closed for generated malformed operation values while retaining valid rules", () => {
-    const invalidValues: unknown[] = [null, false, 0, [], {}, "", "ALLOW", "execute", "block "];
+    const invalidValues: unknown[] = [null, false, 0, 42, [], {}, "", "maybe", "ALLOW", "block "];
 
     for (const invalid of invalidValues) {
       const config = parseConfig(
         JSON.stringify({ operations: { safe: "prompt", generated: invalid } }),
       );
 
-      expect(config.operations).toEqual({ safe: "prompt" });
-      expect(
-        Object.values(config.operations).every((action) =>
-          ["prompt", "block", "allow"].includes(action),
-        ),
-      ).toBe(true);
+      expect.soft(config.operations, JSON.stringify(invalid)).toEqual({ safe: "prompt" });
     }
   });
 
@@ -210,24 +187,17 @@ describe("highlightRuleForDisplay", () => {
 });
 
 describe("loadConfig", () => {
-  it("returns an empty configuration when the file is missing", () => {
-    expect(loadConfig()).toEqual({
-      operations: {},
-      promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS,
-    });
+  it("returns an empty configuration for missing and malformed files", () => {
+    const emptyConfig = { operations: {}, promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS };
+
+    expect.soft(loadConfig(), "missing file").toEqual(emptyConfig);
+    setConfig("{ not valid");
+    expect.soft(loadConfig(), "malformed file").toEqual(emptyConfig);
   });
 
   it("returns the parsed configuration when the file is present", () => {
     setConfig(JSON.stringify({ operations: { sudo: "block" }, promptTimeoutMs: 5000 }));
     expect(loadConfig()).toEqual({ operations: { sudo: "block" }, promptTimeoutMs: 5000 });
-  });
-
-  it("returns an empty configuration when the file is malformed", () => {
-    setConfig("{ not valid");
-    expect(loadConfig()).toEqual({
-      operations: {},
-      promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS,
-    });
   });
 });
 
@@ -255,49 +225,13 @@ describe("resolveRule", () => {
 });
 
 describe("resolveAction", () => {
-  it("keeps starter rules from prompting on common safe commands", () => {
-    const starterRules = {
-      "rm -rf": "prompt",
-      sudo: "prompt",
-      "sudo apt update": "allow",
-      "chmod 777": "block",
-      "corepack enable": "block",
-    } as const;
-
-    for (const command of ["ls -la", "pwd", "echo hello", "git status", "cat README.md"]) {
-      expect(resolveAction(command, starterRules), command).toBeNull();
-    }
-
-    expect(resolveAction("sudo apt update", starterRules)).toBe("allow");
-  });
-  it("returns null when no rule matches", () => {
-    expect(resolveAction("ls -la", { sudo: "block" })).toBeNull();
-  });
-
-  it("returns the action of a single matching rule", () => {
-    expect(resolveAction("sudo apt update", { sudo: "block" })).toBe<Action>("block");
-    expect(resolveAction("rm -rf node_modules", { "rm -rf": "prompt" })).toBe<Action>("prompt");
-  });
-
-  it("uses block precedence over prompt and allow", () => {
-    const action = resolveAction("rm -rf / && sudo && chmod 777", {
-      rm: "block",
-      "rm -rf": "prompt",
-      "rm -rf /": "allow",
-      sudo: "prompt",
-      "chmod 777": "block",
-    });
-
-    expect(action).toBe<Action>("block");
-  });
-
   it("returns null for an empty rule set", () => {
     expect(resolveAction("anything", {})).toBeNull();
   });
 });
 
 describe("ensureConfig", () => {
-  it("writes the default configuration on first run", () => {
+  it("writes starter rules on first run without gating common safe commands", () => {
     ensureConfig();
     const path = join(workDir, "gate.json");
     expect(existsSync(path)).toBe(true);
@@ -313,6 +247,14 @@ describe("ensureConfig", () => {
         "corepack enable": "block",
       },
     });
+
+    const { operations } = loadConfig();
+
+    for (const command of ["ls -la", "pwd", "echo hello", "git status", "cat README.md"]) {
+      expect.soft(resolveAction(command, operations), command).toBeNull();
+    }
+
+    expect(resolveAction("sudo apt update", operations)).toBe("allow");
   });
 
   it("does not overwrite an existing configuration", () => {

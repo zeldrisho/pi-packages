@@ -8,14 +8,16 @@ import {
 import { createSearchTool, jsonResponse } from "./harness";
 
 describe("web_search provider transport", () => {
-  it.each([SEARCH_MIN_RESULT_COUNT - 1, SEARCH_MAX_RESULT_COUNT + 1, 1.5])(
-    "rejects invalid provider result counts (%s)",
-    async (count) => {
-      await expect(
-        searchBraveWeb("query", count, undefined, undefined, "transport-secret"),
-      ).rejects.toThrow("Search result count must be an integer");
-    },
-  );
+  it("rejects fractional and out-of-range provider result counts", async () => {
+    for (const count of [SEARCH_MIN_RESULT_COUNT - 1, SEARCH_MAX_RESULT_COUNT + 1, 1.5]) {
+      await expect
+        .soft(
+          searchBraveWeb("query", count, undefined, undefined, "transport-secret"),
+          String(count),
+        )
+        .rejects.toThrow("Search result count must be an integer");
+    }
+  });
 
   it("rejects Answers queries beyond the tool limit", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "context-secret";
@@ -32,31 +34,14 @@ describe("web_search provider transport", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("rejects successful responses with an oversized declared content length", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "declared-oversize-secret";
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response("{}", {
-            headers: { "content-length": "2000001", "content-type": "application/json" },
-          }),
-      ),
-    );
-
-    await expect(
-      createSearchTool().execute("call", { query: "declared oversize test" }, undefined, undefined),
-    ).rejects.toThrow("Search provider response is too large.");
-  });
-
-  it("handles a rejected cancellation for declared oversized responses", async () => {
+  it("rejects oversized declared bodies even if cancelling the stream fails", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "declared-cancel-secret";
 
-    const body = new ReadableStream<Uint8Array>({
-      cancel() {
-        return Promise.reject(new Error("cancel failed"));
-      },
+    const cancel = vi.fn(async () => {
+      throw new Error("cancel failed");
     });
+
+    const body = new ReadableStream<Uint8Array>({ cancel });
 
     vi.stubGlobal(
       "fetch",
@@ -71,20 +56,22 @@ describe("web_search provider transport", () => {
     await expect(
       createSearchTool().execute("call", { query: "declared cancel test" }, undefined, undefined),
     ).rejects.toThrow("Search provider response is too large.");
+    expect(cancel).toHaveBeenCalledOnce();
   });
 
-  it("rejects successful streamed responses that exceed the byte limit", async () => {
+  it("enforces the cumulative streamed byte limit even if cancelling fails", async () => {
     process.env.BRAVE_SEARCH_API_KEY = "streamed-oversize-secret";
-    let cancelled = false;
+
+    const cancel = vi.fn(async () => {
+      throw new Error("cancel failed");
+    });
 
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(new Uint8Array(1_000_001).fill(0x20));
         controller.enqueue(new Uint8Array(1_000_000).fill(0x20));
       },
-      cancel() {
-        cancelled = true;
-      },
+      cancel,
     });
 
     vi.stubGlobal(
@@ -95,7 +82,7 @@ describe("web_search provider transport", () => {
     await expect(
       createSearchTool().execute("call", { query: "streamed oversize test" }, undefined, undefined),
     ).rejects.toThrow("Search provider response is too large.");
-    expect(cancelled).toBe(true);
+    expect(cancel).toHaveBeenCalledOnce();
   });
 
   it("preserves the HTTP status when an error body cannot be read", async () => {
@@ -162,28 +149,6 @@ describe("web_search provider transport", () => {
     expect(err.message).not.toContain("<b>");
     expect(err.message.length).toBeLessThan(550);
     expect(cancelled).toBe(true);
-  });
-
-  it("handles a rejected cancellation for streamed oversized responses", async () => {
-    process.env.BRAVE_SEARCH_API_KEY = "streamed-cancel-secret";
-
-    const body = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(new Uint8Array(2_000_001).fill(0x20));
-      },
-      cancel() {
-        return Promise.reject(new Error("cancel failed"));
-      },
-    });
-
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response(body)),
-    );
-
-    await expect(
-      createSearchTool().execute("call", { query: "streamed cancel test" }, undefined, undefined),
-    ).rejects.toThrow("Search provider response is too large.");
   });
 
   it("reports provider timeouts", async () => {

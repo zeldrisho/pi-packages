@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -8,7 +9,10 @@ const root = resolve(import.meta.dirname, "./..");
 const packagesDirectory = join(root, "packages");
 
 const packageDirectories = (await readdir(packagesDirectory, { withFileTypes: true }))
-  .filter((entry) => entry.isDirectory())
+  .filter(
+    (entry) =>
+      entry.isDirectory() && existsSync(join(packagesDirectory, entry.name, "package.json")),
+  )
   .map((entry) => join(packagesDirectory, entry.name));
 
 const temporaryDirectory = await mkdtemp(join(tmpdir(), "pi-package-smoke-"));
@@ -157,127 +161,70 @@ try {
     )}\n`,
   );
   await writeFile(
+    join(fixtureDirectory, "spawns-child.ts"),
+    `import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+export default function (pi) {
+  pi.on("session_start", () => {});
+  void promisify(execFile)(process.execPath, ["-e", ""]);
+}
+`,
+  );
+  await writeFile(
     join(fixtureDirectory, "smoke.ts"),
-    `import { readFile, readdir } from "node:fs/promises";
+    `import assert from "node:assert/strict";
+import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { syncBuiltinESMExports } from "node:module";
+import { mock } from "node:test";
 import { discoverAndLoadExtensions } from "@earendil-works/pi-coding-agent";
 import childProcess from "node:child_process";
 
+const processMethods = ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync", "fork"];
 const packageNames = ${JSON.stringify(packageNames)};
+const agentDirectory = join(process.cwd(), ".agent");
+process.env.PI_CODING_AGENT_DIR = agentDirectory;
 for (const packageName of packageNames) {
-  const createdProcesses = new Set<string>();
-  const originalSpawn = childProcess.spawn;
-  const originalSpawnSync = childProcess.spawnSync;
-  const originalExec = childProcess.exec;
-  const originalExecSync = childProcess.execSync;
-  const originalExecFile = childProcess.execFile;
-  const originalExecFileSync = childProcess.execFileSync;
-  const originalFork = childProcess.fork;
+  const packageDirectory = join(process.cwd(), "node_modules", ...packageName.split("/"));
+  const manifest = JSON.parse(await readFile(join(packageDirectory, "package.json"), "utf8"));
+  if (Array.isArray(manifest.pi?.themes)) {
+    if (JSON.stringify(manifest.pi.themes) !== JSON.stringify(["./themes"])) {
+      throw new Error(\`Invalid Pi theme manifest for \${packageName}\`);
+    }
+    const themeDirectory = join(packageDirectory, "themes");
+    const themeFiles = (await readdir(themeDirectory)).filter((file) => file.endsWith(".json"));
+    if (themeFiles.length === 0) {
+      throw new Error(\`\${packageName} did not package any themes\`);
+    }
+    for (const themeFile of themeFiles) {
+      const theme = JSON.parse(await readFile(join(themeDirectory, themeFile), "utf8"));
+      if (typeof theme.name !== "string" || typeof theme.colors !== "object") {
+        throw new Error(\`\${packageName} has an invalid theme: \${themeFile}\`);
+      }
+    }
+    continue;
+  }
+  if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(["./src/index.ts"])) {
+    throw new Error(\`Invalid Pi extension manifest for \${packageName}\`);
+  }
 
+  await checkExtension(packageName, join(packageDirectory, manifest.pi.extensions[0]));
+}
+
+await assert.rejects(
+  checkExtension("spawns-child", join(process.cwd(), "spawns-child.ts")),
+  /spawns-child started child processes while loading:/,
+);
+
+async function checkExtension(packageName: string, extensionPath: string) {
   try {
-    childProcess.spawn = function (...args: any[]) {
-      createdProcesses.add("spawn");
-      return originalSpawn.apply(this, args as any);
-    } as any;
-    childProcess.spawnSync = function (...args: any[]) {
-      createdProcesses.add("spawnSync");
-      return originalSpawnSync.apply(this, args as any);
-    } as any;
-    childProcess.exec = function (...args: any[]) {
-      createdProcesses.add("exec");
-      return originalExec.apply(this, args as any);
-    } as any;
-    childProcess.execSync = function (...args: any[]) {
-      createdProcesses.add("execSync");
-      return originalExecSync.apply(this, args as any);
-    } as any;
-    childProcess.execFile = function (...args: any[]) {
-      createdProcesses.add("execFile");
-      return originalExecFile.apply(this, args as any);
-    } as any;
-    childProcess.execFileSync = function (...args: any[]) {
-      createdProcesses.add("execFileSync");
-      return originalExecFileSync.apply(this, args as any);
-    } as any;
-    childProcess.fork = function (...args: any[]) {
-      createdProcesses.add("fork");
-      return originalFork.apply(this, args as any);
-    } as any;
+    const processSpies = processMethods.map((name) => ({ name, spy: mock.method(childProcess, name) }));
+    // Node's custom promisifier can bypass the exported execFile and spawn methods.
+    const childSpawn = mock.method(childProcess.ChildProcess.prototype, "spawn");
     syncBuiltinESMExports();
 
-    const packageDirectory = join(process.cwd(), "node_modules", ...packageName.split("/"));
-    const manifest = JSON.parse(await readFile(join(packageDirectory, "package.json"), "utf8"));
-    if (Array.isArray(manifest.pi?.skills)) {
-      if (JSON.stringify(manifest.pi.skills) !== JSON.stringify(["./skills"])) {
-        throw new Error(\`Invalid Pi skill manifest for \${packageName}\`);
-      }
-      const skillDirectory = join(packageDirectory, "skills");
-      const stack = [skillDirectory];
-      let skillCount = 0;
-      while (stack.length > 0) {
-        const current = stack.pop() as string;
-        for (const entry of await readdir(current, { withFileTypes: true })) {
-          const full = join(current, entry.name);
-          if (entry.isDirectory()) stack.push(full);
-          else if (entry.name === "SKILL.md") {
-            const skill = await readFile(full, "utf8");
-            const frontmatter = skill.match(/^---\\n([\\s\\S]*?)\\n---(?:\\n|$)/)?.[1] ?? "";
-            if (!frontmatter.match(/(^|\\n)name:/) || !frontmatter.match(/(^|\\n)description:/)) {
-              throw new Error(\`Invalid Pi skill: \${full}\`);
-            }
-            skillCount++;
-          }
-        }
-      }
-      if (skillCount === 0) throw new Error(\`\${packageName} did not package any Pi skills\`);
-      continue;
-    }
-    if (Array.isArray(manifest.pi?.themes)) {
-      if (JSON.stringify(manifest.pi.themes) !== JSON.stringify(["./themes"])) {
-        throw new Error(\`Invalid Pi theme manifest for \${packageName}\`);
-      }
-      const themeDirectory = join(packageDirectory, "themes");
-      const themeFiles = (await readdir(themeDirectory)).filter((file) => file.endsWith(".json"));
-      if (themeFiles.length === 0) {
-        throw new Error(\`\${packageName} did not package any themes\`);
-      }
-      for (const themeFile of themeFiles) {
-        const theme = JSON.parse(await readFile(join(themeDirectory, themeFile), "utf8"));
-        if (typeof theme.name !== "string" || typeof theme.colors !== "object") {
-          throw new Error(\`\${packageName} has an invalid theme: \${themeFile}\`);
-        }
-      }
-      continue;
-    }
-    if (Array.isArray(manifest.pi?.prompts)) {
-      if (JSON.stringify(manifest.pi.prompts) !== JSON.stringify(["./prompts"])) {
-        throw new Error(\`Invalid Pi prompt manifest for \${packageName}\`);
-      }
-      const promptDirectory = join(packageDirectory, "prompts");
-      const promptFiles = (await readdir(promptDirectory)).filter((file) => file.endsWith(".md"));
-      if (promptFiles.length === 0) {
-        throw new Error(\`\${packageName} did not package any prompt templates\`);
-      }
-      for (const promptFile of promptFiles) {
-        const prompt = await readFile(join(promptDirectory, promptFile), "utf8");
-        const frontmatter = prompt.match(/^---\\n([\\s\\S]*?)\\n---(?:\\n|$)/)?.[1] ?? "";
-        if (!frontmatter.match(/(^|\\n)description:/)) {
-          throw new Error(\`\${packageName} has an invalid prompt template: \${promptFile}\`);
-        }
-      }
-      continue;
-    }
-    if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(["./src/index.ts"])) {
-      throw new Error(\`Invalid Pi extension manifest for \${packageName}\`);
-    }
-
-    const extensionPath = join(packageDirectory, manifest.pi.extensions[0]);
-    const loaded = await discoverAndLoadExtensions(
-      [extensionPath],
-      process.cwd(),
-      join(process.cwd(), ".agent"),
-    );
+    const loaded = await discoverAndLoadExtensions([extensionPath], process.cwd(), agentDirectory);
     if (loaded.errors.length > 0) {
       throw new Error(\`Failed to load \${packageName}: \${JSON.stringify(loaded.errors)}\`);
     }
@@ -296,19 +243,13 @@ for (const packageName of packageNames) {
     }
     await new Promise((resolve) => setImmediate(resolve));
 
-    if (createdProcesses.size > 0) {
-      throw new Error(
-        \`\${packageName} started child processes while loading: \${[...createdProcesses].join(", ")}\`,
-      );
+    const called = processSpies.filter(({ spy }) => spy.mock.callCount() > 0).map(({ name }) => name);
+    if (childSpawn.mock.callCount() > 0) called.push("ChildProcess.prototype.spawn");
+    if (called.length > 0) {
+      throw new Error(\`\${packageName} started child processes while loading: \${called.join(", ")}\`);
     }
   } finally {
-    childProcess.spawn = originalSpawn;
-    childProcess.spawnSync = originalSpawnSync;
-    childProcess.exec = originalExec;
-    childProcess.execSync = originalExecSync;
-    childProcess.execFile = originalExecFile;
-    childProcess.execFileSync = originalExecFileSync;
-    childProcess.fork = originalFork;
+    mock.reset();
     syncBuiltinESMExports();
   }
 }
@@ -317,7 +258,7 @@ for (const packageName of packageNames) {
 
   run("vp", ["install", "--ignore-scripts", "--shamefully-hoist"], fixtureDirectory);
   run("vp", ["exec", "node", "smoke.ts"], fixtureDirectory);
-  console.log(`Smoke-tested ${packageNames.length} packed Pi extensions.`);
+  console.log(`Smoke-tested ${packageNames.length} packed Pi packages.`);
 } finally {
   await rm(temporaryDirectory, { recursive: true, force: true });
 }

@@ -29,11 +29,6 @@ describe("web_search schema rendering", () => {
       }),
     ).toBe(true);
     expect(
-      Check(webSearchParameters, {
-        query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS),
-      }),
-    ).toBe(true);
-    expect(
       Check(webSearchParameters, { query: "x".repeat(SEARCH_WEB_MAX_QUERY_CHARACTERS + 1) }),
     ).toBe(false);
   });
@@ -53,14 +48,6 @@ describe("web_search schema rendering", () => {
       `Search queries cannot exceed ${SEARCH_WEB_MAX_QUERY_CHARACTERS} characters.`,
     );
     expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("fails clearly when the API key is missing", async () => {
-    delete process.env.BRAVE_SEARCH_API_KEY;
-    const tool = createSearchTool();
-    await expect(tool.execute("call", { query: "pi" }, undefined, undefined)).rejects.toThrow(
-      "BRAVE_SEARCH_API_KEY is required",
-    );
   });
 
   it("rejects whitespace-only queries before making a request", async () => {

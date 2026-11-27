@@ -196,17 +196,21 @@ describe("persisted catalog metadata", () => {
     expect(catalogFromStoredEntry(stored)).toEqual({ models, lastModified: 123, etag: '"v1"' });
   });
 
-  it.each([
-    undefined,
-    { models: [], lastModified: 0 },
-    { models: [], catalog: [], lastModified: Number.NaN },
-    { models: [], catalog: [], lastModified: -1 },
-    { models: [], catalog: [] },
-    { models: [], catalog: "invalid", lastModified: 0 },
-    { models: [], catalog: [null], lastModified: 0 },
-    { models: [], catalog: [{ id: "bad" }], lastModified: 0 },
-  ])("rejects unusable metadata bodies: %j", (stored) => {
-    expect(catalogFromStoredEntry(stored)).toBeUndefined();
+  it("rejects unusable metadata bodies", () => {
+    const storedEntries = [
+      undefined,
+      { models: [], lastModified: 0 },
+      { models: [], catalog: [], lastModified: Number.NaN },
+      { models: [], catalog: [], lastModified: -1 },
+      { models: [], catalog: [] },
+      { models: [], catalog: "invalid", lastModified: 0 },
+      { models: [], catalog: [null], lastModified: 0 },
+      { models: [], catalog: [{ id: "bad" }], lastModified: 0 },
+    ];
+
+    for (const stored of storedEntries) {
+      expect.soft(catalogFromStoredEntry(stored), JSON.stringify(stored)).toBeUndefined();
+    }
   });
 });
 
@@ -349,9 +353,8 @@ describe("free model discovery", () => {
     expect(catalogCall?.headers.get("accept")).toBe("application/json");
   });
 
-  it.each(["Thu, 01 Jan 1970 00:00:00 GMT", "invalid"])(
-    "uses bundled metadata when the catalog timestamp is older or invalid (%s)",
-    async (timestamp) => {
+  it("uses bundled metadata when the catalog timestamp is older or invalid", async () => {
+    for (const timestamp of ["Thu, 01 Jan 1970 00:00:00 GMT", "invalid"]) {
       const bundledModels = initialFreeModels();
       const remoteOnlyId = "test-remote-only-free";
 
@@ -386,9 +389,9 @@ describe("free model discovery", () => {
         }),
       );
 
-      expect(models).toEqual(bundledModels);
-    },
-  );
+      expect.soft(models, timestamp).toEqual(bundledModels);
+    }
+  });
 
   it("does not send a validator for an empty cached body or accept unsolicited 304", async () => {
     const { fetcher, calls } = createFetcher((url) =>
@@ -478,46 +481,6 @@ describe("free model discovery", () => {
     expect(models).toBeUndefined();
   });
 
-  it("returns undefined on malformed live JSON", async () => {
-    const { fetcher } = createFetcher((url) =>
-      url === MODEL_CATALOG_URL
-        ? jsonResponse(JSON.stringify(remoteCatalog), 200, {
-            "last-modified": FUTURE_LAST_MODIFIED,
-          })
-        : jsonResponse("{"),
-    );
-
-    const models = await discoverFreeModels({
-      baseUrl: DEFAULT_BASE_URL,
-      headers: {},
-      signal: new AbortController().signal,
-      fetcher,
-      allowNetwork: true,
-    });
-
-    expect(models).toBeUndefined();
-  });
-
-  it("returns undefined on an empty live list", async () => {
-    const { fetcher } = createFetcher((url) =>
-      url === MODEL_CATALOG_URL
-        ? jsonResponse(JSON.stringify(remoteCatalog), 200, {
-            "last-modified": FUTURE_LAST_MODIFIED,
-          })
-        : jsonResponse(JSON.stringify({ data: [] })),
-    );
-
-    const models = await discoverFreeModels({
-      baseUrl: DEFAULT_BASE_URL,
-      headers: {},
-      signal: new AbortController().signal,
-      fetcher,
-      allowNetwork: true,
-    });
-
-    expect(models).toBeUndefined();
-  });
-
   it("returns undefined when no live model is known to be free", async () => {
     const { fetcher } = createFetcher((url) =>
       url === MODEL_CATALOG_URL
@@ -551,51 +514,38 @@ describe("free model discovery", () => {
     expect(models).toBeUndefined();
   });
 
-  it("returns undefined on a malformed native catalog", async () => {
-    const { fetcher } = createFetcher((url) =>
-      url === MODEL_CATALOG_URL
-        ? jsonResponse(JSON.stringify({ opencode: null }))
-        : jsonResponse(JSON.stringify({ data: [{ id: "beam-free" }] })),
-    );
+  it("rejects invalid limits or cache pricing", async () => {
+    const invalids = [
+      { contextWindow: 0.5 },
+      { maxTokens: 0.5 },
+      { cost: { input: 0, output: 0, cacheRead: -1 } },
+      { cost: { input: 0, output: 0, cacheWrite: "invalid" } },
+    ];
 
-    const models = await discoverFreeModels({
-      baseUrl: DEFAULT_BASE_URL,
-      headers: {},
-      signal: new AbortController().signal,
-      fetcher,
-      allowNetwork: true,
-    });
+    for (const invalid of invalids) {
+      const { fetcher } = createFetcher((url) =>
+        url === MODEL_CATALOG_URL
+          ? jsonResponse(
+              JSON.stringify([{ ...remoteBeam, id: "invalid-test-free", ...invalid }]),
+              200,
+              { "last-modified": FUTURE_LAST_MODIFIED },
+            )
+          : jsonResponse(JSON.stringify({ data: [{ id: "invalid-test-free" }] })),
+      );
 
-    expect(models).toBeUndefined();
-  });
-
-  it.each([
-    { contextWindow: 0.5 },
-    { maxTokens: 0.5 },
-    { cost: { input: 0, output: 0, cacheRead: -1 } },
-    { cost: { input: 0, output: 0, cacheWrite: "invalid" } },
-  ])("rejects invalid limits or cache pricing: %j", async (invalid) => {
-    const { fetcher } = createFetcher((url) =>
-      url === MODEL_CATALOG_URL
-        ? jsonResponse(
-            JSON.stringify([{ ...remoteBeam, id: "invalid-test-free", ...invalid }]),
-            200,
-            {
-              "last-modified": FUTURE_LAST_MODIFIED,
-            },
-          )
-        : jsonResponse(JSON.stringify({ data: [{ id: "invalid-test-free" }] })),
-    );
-
-    expect(
-      await discoverFreeModels({
-        baseUrl: DEFAULT_BASE_URL,
-        headers: {},
-        signal: new AbortController().signal,
-        fetcher,
-        allowNetwork: true,
-      }),
-    ).toBeUndefined();
+      expect
+        .soft(
+          await discoverFreeModels({
+            baseUrl: DEFAULT_BASE_URL,
+            headers: {},
+            signal: new AbortController().signal,
+            fetcher,
+            allowNetwork: true,
+          }),
+          JSON.stringify(invalid),
+        )
+        .toBeUndefined();
+    }
   });
 
   it("skips a malformed catalog entry without discarding its valid siblings", async () => {
@@ -661,33 +611,49 @@ describe("free model discovery", () => {
       expect(calls).toHaveLength(0);
     });
 
-    it.each([
-      [
-        "live-request-failed",
-        () => jsonResponse("unavailable", 503),
-        () => catalogResponse(remoteCatalog),
-      ],
-      [
-        "live-response-invalid",
-        () => jsonResponse(JSON.stringify({ data: "nope" })),
-        () => catalogResponse(remoteCatalog),
-      ],
-      [
-        "catalog-request-failed",
-        () => jsonResponse(JSON.stringify({ data: [{ id: "beam-free" }] })),
-        () => jsonResponse("unavailable", 503),
-      ],
-      [
-        "catalog-response-invalid",
-        () => jsonResponse(JSON.stringify({ data: [{ id: "beam-free" }] })),
-        () => jsonResponse(JSON.stringify({ opencode: null })),
-      ],
-    ])("classifies %s", async (status, live, catalog) => {
-      const { fetcher } = createFetcher((url) => (url === MODEL_CATALOG_URL ? catalog() : live()));
+    it("classifies failed or malformed live and catalog responses", async () => {
+      const samples = [
+        [
+          "live-request-failed",
+          () => jsonResponse("unavailable", 503),
+          () => catalogResponse(remoteCatalog),
+        ],
+        ["live-response-invalid", () => jsonResponse("{"), () => catalogResponse(remoteCatalog)],
+        [
+          "live-response-invalid",
+          () => jsonResponse(JSON.stringify({ data: "nope" })),
+          () => catalogResponse(remoteCatalog),
+        ],
+        [
+          "catalog-request-failed",
+          () => jsonResponse(JSON.stringify({ data: [{ id: "beam-free" }] })),
+          () => jsonResponse("unavailable", 503),
+        ],
+        [
+          "catalog-response-invalid",
+          () => jsonResponse(JSON.stringify({ data: [{ id: "beam-free" }] })),
+          () => jsonResponse("{"),
+        ],
+        [
+          "catalog-response-invalid",
+          () => jsonResponse(JSON.stringify({ data: [{ id: "beam-free" }] })),
+          () => jsonResponse(JSON.stringify({ opencode: null })),
+        ],
+      ] as const;
 
-      const outcome = await discoverFreeModelsWithStatus(options(fetcher));
-      expect(outcome.status).toBe(status);
-      expect(outcome.httpStatus).toBe(status.endsWith("request-failed") ? 503 : undefined);
+      for (const [status, live, catalog] of samples) {
+        const { fetcher } = createFetcher((url) =>
+          url === MODEL_CATALOG_URL ? catalog() : live(),
+        );
+
+        const outcome = await discoverFreeModelsWithStatus(options(fetcher));
+
+        expect.soft(outcome.status, status).toBe(status);
+        expect.soft(outcome.models, status).toBeUndefined();
+        expect
+          .soft(outcome.httpStatus, status)
+          .toBe(status.endsWith("request-failed") ? 503 : undefined);
+      }
     });
 
     it("classifies an empty live catalog and an unknown free intersection", async () => {
@@ -713,38 +679,24 @@ describe("free model discovery", () => {
       });
     });
 
-    it.each(["abort", "timeout"])("classifies %s during discovery", async (kind) => {
-      const controller = new AbortController();
+    it("classifies aborts and timeouts during discovery", async () => {
+      for (const kind of ["abort", "timeout"] as const) {
+        const controller = new AbortController();
 
-      const fetcher: typeof fetch = async () => {
-        controller.abort(
-          new DOMException(
-            "private failure details",
-            kind === "timeout" ? "TimeoutError" : "AbortError",
-          ),
-        );
-        throw controller.signal.reason;
-      };
+        const fetcher: typeof fetch = async () => {
+          controller.abort(
+            new DOMException(
+              "private failure details",
+              kind === "timeout" ? "TimeoutError" : "AbortError",
+            ),
+          );
+          throw controller.signal.reason;
+        };
 
-      expect(await discoverFreeModelsWithStatus(options(fetcher, controller.signal))).toEqual({
-        status: kind === "timeout" ? "timeout" : "aborted",
-      });
-    });
-
-    it.each([
-      ["live-response-invalid", "live"],
-      ["catalog-response-invalid", "catalog"],
-    ])("classifies malformed JSON as %s", async (status, endpoint) => {
-      const { fetcher } = createFetcher((url) => {
-        if (url === MODEL_CATALOG_URL)
-          return endpoint === "catalog" ? jsonResponse("{") : catalogResponse(remoteCatalog);
-
-        return endpoint === "live"
-          ? jsonResponse("{")
-          : jsonResponse(JSON.stringify({ data: [{ id: "beam-free" }] }));
-      });
-
-      expect(await discoverFreeModelsWithStatus(options(fetcher))).toEqual({ status });
+        expect
+          .soft(await discoverFreeModelsWithStatus(options(fetcher, controller.signal)), kind)
+          .toEqual({ status: kind === "timeout" ? "timeout" : "aborted" });
+      }
     });
 
     it("reports the live catalog size on success", async () => {
@@ -765,34 +717,5 @@ describe("free model discovery", () => {
         "deepseek-v4.1-flash-free",
       ]);
     });
-  });
-
-  it("does not touch the network when disabled or already aborted", async () => {
-    const { fetcher, calls } = createFetcher(() => {
-      throw new Error("fetch should not run");
-    });
-
-    const controller = new AbortController();
-    controller.abort();
-
-    const offline = await discoverFreeModels({
-      baseUrl: DEFAULT_BASE_URL,
-      headers: {},
-      signal: new AbortController().signal,
-      fetcher,
-      allowNetwork: false,
-    });
-
-    const aborted = await discoverFreeModels({
-      baseUrl: DEFAULT_BASE_URL,
-      headers: {},
-      signal: controller.signal,
-      fetcher,
-      allowNetwork: true,
-    });
-
-    expect(offline).toBeUndefined();
-    expect(aborted).toBeUndefined();
-    expect(calls).toHaveLength(0);
   });
 });

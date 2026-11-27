@@ -231,15 +231,13 @@ describe("segmented branch summary", () => {
     expect(harness.calls.at(-1)?.prompt).toContain("DIGEST-");
     expect(harness.notifications.join(" ")).toContain("Summarized branch");
     expect(harness.statuses.at(-1)).toBeUndefined();
-  });
-
-  it("reports the usage it spent and the files the branch touched", async () => {
-    const harness = createHarness({ contextWindow: 40_000 });
-
-    const result = await harness.handler(harness.event, harness.context);
-
     expect(result?.summary?.usage?.totalTokens).toBe(USAGE.totalTokens * harness.calls.length);
     expect(result?.summary?.details).toEqual({ readFiles: [], modifiedFiles: [] });
+
+    for (const call of harness.calls) {
+      expect(call.reasoning).toBe(false);
+      expect(call.carriesCap).toBe(false);
+    }
   });
 
   it("carries file lists from nested branch summaries into the new one", async () => {
@@ -294,17 +292,6 @@ describe("segmented branch summary", () => {
     expect(harness.calls.at(-1)?.prompt).not.toContain("Use this EXACT format:");
     expect(harness.calls.at(-1)?.prompt).not.toContain("Additional focus:");
     expect(result?.summary?.summary).toContain("## Goal");
-  });
-
-  it("never asks for a thinking level or an answer cap", async () => {
-    const harness = createHarness({ contextWindow: 40_000 });
-
-    await harness.handler(harness.event, harness.context);
-
-    for (const call of harness.calls) {
-      expect(call.reasoning).toBe(false);
-      expect(call.carriesCap).toBe(false);
-    }
   });
 
   it("defers when every segment digest comes back empty", async () => {

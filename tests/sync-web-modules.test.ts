@@ -5,39 +5,33 @@ import { describe, expect, it } from "vite-plus/test";
 import { parseSyncArguments, sync } from "../scripts/sync-web-modules.ts";
 
 describe("parseSyncArguments", () => {
-  it("defaults to check with pi-web-fetch", () => {
-    expect(parseSyncArguments([])).toEqual({ command: "check", from: "pi-web-fetch" });
-  });
-
-  it("parses the --from= spelling", () => {
-    expect(parseSyncArguments(["sync", "--from=pi-web-search"])).toEqual({
-      command: "sync",
-      from: "pi-web-search",
+  it("defaults to check and accepts both --from spellings for sync", () => {
+    expect.soft(parseSyncArguments([]), "no arguments").toEqual({
+      command: "check",
+      from: "pi-web-fetch",
     });
+
+    for (const args of [["--from=pi-web-search"], ["--from", "pi-web-search"]]) {
+      expect.soft(parseSyncArguments(["sync", ...args]), args.join(" ")).toEqual({
+        command: "sync",
+        from: "pi-web-search",
+      });
+    }
   });
 
-  it("parses the --from X spelling", () => {
-    expect(parseSyncArguments(["sync", "--from", "pi-web-search"])).toEqual({
-      command: "sync",
-      from: "pi-web-search",
-    });
-  });
+  it("rejects invalid commands and options", () => {
+    const samples = [
+      [["sync", "--from", "nope"], "--from must be one of"],
+      [["sync", "--from=pi-web-fetch", "--from=pi-web-search"]],
+      [["sync", "--from=pi-web-fetch=extra"]],
+      [["sync", "--unknown"]],
+      [["check", "--from=pi-web-fetch"]],
+      [["frobnicate"], "unknown command"],
+    ] satisfies Array<[string[], string?]>;
 
-  it("rejects an unknown package for --from", () => {
-    expect(() => parseSyncArguments(["sync", "--from", "nope"])).toThrow("--from must be one of");
-  });
-
-  it.each([
-    ["sync", "--from=pi-web-fetch", "--from=pi-web-search"],
-    ["sync", "--from=pi-web-fetch=extra"],
-    ["sync", "--unknown"],
-    ["check", "--from=pi-web-fetch"],
-  ])("rejects invalid arguments %j", (...args) => {
-    expect(() => parseSyncArguments(args)).toThrow();
-  });
-
-  it("rejects an unknown command", () => {
-    expect(() => parseSyncArguments(["frobnicate"])).toThrow("unknown command");
+    for (const [args, message] of samples) {
+      expect.soft(() => parseSyncArguments(args), args.join(" ")).toThrow(message);
+    }
   });
 });
 

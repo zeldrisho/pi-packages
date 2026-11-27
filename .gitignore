@@ -1,6 +1,5 @@
 # Build and test output
 dist/
-coverage/
 *.tsbuildinfo
 *.tgz
 

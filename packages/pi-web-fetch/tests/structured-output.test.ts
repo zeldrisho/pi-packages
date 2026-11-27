@@ -51,20 +51,43 @@ describe("web_fetch structured output", () => {
 
     expect(structured.markdown).toContain("Hello");
     expect(structured.markdown).toContain("World");
-    expect(structured.outline.totalHeadings).toBeGreaterThan(0);
+    expect(structured.markdown).not.toContain("bad()");
+    expect(structured.outline.totalHeadings).toBe(1);
     expect(result.content[0].text).toContain("Hello");
+    expect(result.details).toMatchObject({
+      title: "Fixture",
+      requestedUrl: `${origin}/html`,
+      finalUrl: `${origin}/html`,
+      contentKind: "article",
+      shellSuspected: false,
+      confidence: "medium",
+      outline: {
+        totalHeadings: 1,
+        headings: [{ level: 2, text: "Hello", inferred: false }],
+        omittedHeadings: 0,
+      },
+    });
   });
 
-  it("reports OpenAPI classification in structured output", async () => {
-    const result = await executeWebFetch(
+  it("classifies standalone and embedded OpenAPI specs", async () => {
+    const spec = await executeWebFetch(
       { url: `${origin}/openapi-json` },
       undefined,
       undefined,
       dependencies,
     );
 
-    expect(Check(webFetchOutputSchema, result.structuredContent)).toBe(true);
-    expect(result.structuredContent).toMatchObject({
+    const bundle = await executeWebFetch(
+      { url: `${origin}/minified-js` },
+      undefined,
+      undefined,
+      dependencies,
+    );
+
+    expect(bundle.details.contentKind).toBe("openapi-spec");
+    expect(spec.details.contentKind).toBe("openapi-spec");
+    expect(Check(webFetchOutputSchema, spec.structuredContent)).toBe(true);
+    expect(spec.structuredContent).toMatchObject({
       contentKind: "openapi-spec",
       markdown: expect.stringContaining('"openapi"'),
     });
