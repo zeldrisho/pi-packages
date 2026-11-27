@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Ignore explicitly hidden HTML and avoid returning sparse interface text as page content when a scripted main region is empty.
+
 ## [0.18.1] - 2026-11-23
 
 ### Fixed

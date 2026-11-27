@@ -208,10 +208,32 @@ describe("extraction regressions", () => {
     for (const output of [result.markdown, fallback]) {
       expect(output).toContain("VisibleByAria");
       expect(output).toContain("VisibleByStyle");
-      expect(output).not.toMatch(/HiddenByAttribute|HiddenByAria|HiddenByDisplay/);
+      expect(output).not.toMatch(
+        /HiddenByAttribute|HiddenByAria|HiddenByDisplay|HiddenByVisibility/,
+      );
     }
+  });
 
-    expect(fallback).not.toContain("HiddenByVisibility");
+  it("omits sparse interface text when a scripted main region is empty", async () => {
+    const html = `<html><head><title>Discussion</title></head><body>
+      <a href="#content">Skip to content</a><div>Menu</div>
+      <div style="display:none">false</div><div style="display:none">17761903736463837882</div>
+      <div role="main" id="content"><article></article><script>${"unused;".repeat(8_000)}</script></div>
+      </body></html>`;
+
+    const url = new URL("https://example.com/discussion");
+    const result = await extractHtmlToMarkdown(html, url);
+
+    expect(result.markdown).toBe("");
+    expect(diagnoseExtraction(html, result.markdown).sparseExtraction).toBe(true);
+
+    const readable = await extractHtmlToMarkdown(
+      html.replace("<article></article>", "<article><p>Server status: online.</p></article>"),
+      url,
+    );
+
+    expect(readable.markdown).toContain("Server status: online.");
+    expect(readable.markdown).not.toMatch(/17761903736463837882|\bfalse\b/);
   });
 
   it("does not flag a content-rich app shell as sparse", async () => {

@@ -136,6 +136,50 @@ function normalizeFragmentDocument(document: Document): void {
   document.insertBefore(html, document.firstChild);
 }
 
+/** Removes explicitly hidden body elements before either extractor can promote them to content. */
+function removeHiddenBodyElements(document: Document): void {
+  for (const element of document.body.querySelectorAll("[hidden], [aria-hidden], [style]")) {
+    const style = element.getAttribute("style") ?? "";
+
+    const hiddenStyle =
+      /(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*hidden)\s*(?:!important\s*)?(?:;|$)/i.test(
+        style,
+      );
+
+    if (
+      element.hasAttribute("hidden") ||
+      element.getAttribute("aria-hidden")?.trim().toLowerCase() === "true" ||
+      hiddenStyle
+    ) {
+      element.remove();
+    }
+  }
+}
+
+/** Detects an explicitly marked but empty main region with a script in place of content. */
+function hasEmptyScriptedMain(document: Document): boolean {
+  const regions = document.body.querySelectorAll('main, [role="main"]');
+
+  if (regions.length !== 1) return false;
+
+  const main = regions[0];
+
+  if (
+    !main.querySelector("script") ||
+    main.querySelector("img, svg, video, audio, canvas, iframe, object, embed, form")
+  )
+    return false;
+
+  const copy = document.createElement("div");
+  copy.appendChild(main.cloneNode(true));
+
+  for (const element of copy.querySelectorAll("script, style, template, noscript")) {
+    element.remove();
+  }
+
+  return !(copy.textContent ?? "").trim();
+}
+
 /**
  * Extracts normalized plain text from HTML when structured Markdown extraction is unavailable.
  *
@@ -154,22 +198,7 @@ export function htmlToMarkdownFallback(html: string): string {
     element.remove();
   }
 
-  for (const element of document.querySelectorAll("[hidden], [aria-hidden], [style]")) {
-    const style = element.getAttribute("style") ?? "";
-
-    const hiddenStyle =
-      /(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*hidden)\s*(?:!important\s*)?(?:;|$)/i.test(
-        style,
-      );
-
-    if (
-      element.hasAttribute("hidden") ||
-      element.getAttribute("aria-hidden")?.trim().toLowerCase() === "true" ||
-      hiddenStyle
-    ) {
-      element.remove();
-    }
-  }
+  removeHiddenBodyElements(document);
 
   for (const element of document.body.querySelectorAll(
     "p, div, section, article, li, blockquote, pre, h1, h2, h3, h4, h5, h6, br, tr",
@@ -478,6 +507,10 @@ async function extractHtmlDocument(
   let advertised: AdvertisedLinks = {};
   let fallbackHtml = html;
   let githubReadme = false;
+  let emptyScriptedMain = false;
+
+  const omitSparseChrome = (markdown: string): string =>
+    emptyScriptedMain && isSparseExtraction(html.length, markdown.length) ? "" : markdown;
 
   try {
     assertAbsoluteHttpUrl(baseUrl);
@@ -496,10 +529,12 @@ async function extractHtmlDocument(
 
     stripChromeWrappers(document, baseUrl);
     advertised = readAdvertisedLinks(document, baseUrl);
+    removeHiddenBodyElements(document);
 
     githubReadme = isolateGitHubReadme(document, baseUrl);
 
     if (githubReadme) fallbackHtml = document.documentElement.outerHTML;
+    emptyScriptedMain = isSparseExtraction(html.length, 0) && hasEmptyScriptedMain(document);
     normalizeSelectorUnsafeIds(document);
     // Pass the full absolute URL so Defuddle resolves relative links (e.g.
     // `/owner/repo/releases`) and metadata against the real origin instead of
@@ -513,12 +548,14 @@ async function extractHtmlDocument(
     const trimmedTitle = result?.title?.trim();
 
     if (markdown) {
+      const visibleMarkdown = omitSparseChrome(markdown);
+
       return {
-        markdown,
+        markdown: visibleMarkdown,
         title: trimmedTitle || undefined,
         extractor: "defuddle",
         githubReadme,
-        fragmentOffsets: buildFragmentOffsets(document, markdown, originalIds),
+        fragmentOffsets: buildFragmentOffsets(document, visibleMarkdown, originalIds),
         ...advertised,
       };
     }
@@ -526,7 +563,10 @@ async function extractHtmlDocument(
     // Fall through to the basic converter for malformed or unsupported pages.
   }
 
-  const fallbackMarkdown = stripExtractedCssCruft(htmlToMarkdownFallback(fallbackHtml));
+  const fallbackMarkdown = omitSparseChrome(
+    stripExtractedCssCruft(htmlToMarkdownFallback(fallbackHtml)),
+  );
+
   let fragmentOffsets: Record<string, number> = {};
 
   try {
