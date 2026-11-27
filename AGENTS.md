@@ -25,4 +25,6 @@ Use Vitest and name new tests `*.test.ts`. Prefer deterministic fixtures and moc
 
 ## Commits & Pull Requests
 
-Recent commits use short, action-oriented subjects, often with a type and optional scope (e.g. `fix(pi-antigravity): correct thinking lookup comment`). Update your branch from its target before review. Describe what changed and why, list verification results, and link relevant issues. Record user-facing changes under `Unreleased` in the package changelog and run `vp run format:changelog`.
+Recent commits use short, action-oriented subjects, often with a type and optional scope (e.g. `fix(pi-antigravity): correct thinking lookup comment`). Update your branch from its target before review. Record user-facing changes under `Unreleased` in the package changelog and run `vp run format:changelog`.
+
+When creating or updating a pull request, review the full diff against the PR base, title the PR `<type>(<scope>): <subject>` or `<type>: <subject>` based on the dominant change, and write a concise reviewer-facing note about changed behavior and impact. Skip boilerplate headings and routine validation logs; mention verification only when it helps reviewers assess risk. Open new PRs as drafts.
