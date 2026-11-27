@@ -32,6 +32,9 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
 
 const CACHE_STALE_RETENTION_MS = 7 * CACHE_TTL_MS;
 
+// Bump when HTML extraction changes must invalidate persisted results, even fresh ones.
+const HTML_EXTRACTION_CACHE_VERSION = 1;
+
 const CACHE_MAX_ENTRIES = 100;
 
 const CACHE_MAX_MARKDOWN_BYTES = 20 * 1_024 * 1_024;
@@ -406,13 +409,27 @@ const completeDocumentCacheSchema = Type.Object(
   { additionalProperties: true },
 );
 
+const htmlExtractionCacheMarker = Type.Object({
+  htmlExtractionCacheVersion: Type.Literal(HTML_EXTRACTION_CACHE_VERSION),
+});
+
 function isCompleteDocument(value: CompleteDocument): boolean {
-  return Check(completeDocumentCacheSchema, value);
+  return (
+    Check(completeDocumentCacheSchema, value) &&
+    (value.extractor === "raw" || Check(htmlExtractionCacheMarker, value))
+  );
 }
 
 const fetchCachePersistence: CachePersistence<string, CompleteDocument> = {
   directory: resolveCacheDirectory("pi-web-fetch"),
-  serialize: (document) => encoder.encode(JSON.stringify(document)),
+  serialize: (document) =>
+    encoder.encode(
+      JSON.stringify(
+        document.extractor === "raw"
+          ? document
+          : { ...document, htmlExtractionCacheVersion: HTML_EXTRACTION_CACHE_VERSION },
+      ),
+    ),
   // SAFETY: JSON is validated immediately below before entering the cache.
   deserialize: (bytes) => JSON.parse(new TextDecoder().decode(bytes)) as CompleteDocument,
   validate: isCompleteDocument,

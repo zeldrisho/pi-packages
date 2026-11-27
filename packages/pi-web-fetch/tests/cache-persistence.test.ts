@@ -1,8 +1,8 @@
 import { mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
-import { ExpiringLruCache, stableKeyHash, type CachePersistence } from "../src/cache";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { canonicalKey, ExpiringLruCache, stableKeyHash, type CachePersistence } from "../src/cache";
 import type { CompleteDocument } from "../src/document/content.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
@@ -105,6 +105,47 @@ describe("web_fetch disk cache", () => {
     }
 
     expect(await readdir(directory)).toEqual([]);
+  });
+
+  it("refetches fresh persisted HTML from before the extraction cleanup but retains raw text", async () => {
+    vi.stubEnv("XDG_CACHE_HOME", directory);
+
+    try {
+      const now = Date.now();
+      const cache = makeCache(join(directory, "pi-web-fetch"));
+      const htmlUrl = "https://example.com/discussion";
+      const rawUrl = "https://example.com/readme.txt";
+      cache.set(
+        canonicalKey({ url: htmlUrl }),
+        {
+          ...document(htmlUrl, "stale interface flags"),
+          contentType: "text/html",
+          extractor: "defuddle",
+          cachedAt: now,
+          markdownPolicyVersion: 2,
+          validators: { etag: '"unchanged"' },
+        },
+        now + DAY_MS,
+      );
+      cache.set(canonicalKey({ url: rawUrl }), document(rawUrl, "cached raw text"), now + DAY_MS);
+
+      const { executeWebFetch } = await import("../src/service.ts");
+
+      const dependencies = {
+        validateUrl: async (value: string | URL) => {
+          throw new Error(`unexpected request for ${value}`);
+        },
+      };
+
+      await expect(
+        executeWebFetch({ url: htmlUrl }, undefined, undefined, dependencies),
+      ).rejects.toThrow(`unexpected request for ${htmlUrl}`);
+      const raw = await executeWebFetch({ url: rawUrl }, undefined, undefined, dependencies);
+      expect(raw.details.cacheStatus).toBe("hit");
+      expect(raw.content[0].text).toContain("cached raw text");
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("rejects individually oversized entries and stores nothing", () => {
