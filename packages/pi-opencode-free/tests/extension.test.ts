@@ -1,3 +1,7 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { Agent } from "node:https";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type {
   Model,
   ModelsPublication,
@@ -9,10 +13,11 @@ import type { ExtensionAPI, ProviderConfig } from "@earendil-works/pi-coding-age
 import { normalizeContext } from "@earendil-works/pi-ai/compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { PROVIDER_ID, registerOpencodeFree } from "../src/index";
+import piOpencodeFree, { PROVIDER_ID, registerOpencodeFree } from "../src/index";
 import { CLIENT_VERSION, PROVIDER_MARKER_HEADER } from "../src/client-headers";
 import { DEFAULT_BASE_URL, MODEL_CATALOG_URL, initialFreeModels } from "../src/models";
 import type { ProviderRequestPayload } from "../src/request";
+import { createSessionStore, sessionStorePath } from "../src/session-store";
 
 interface FakeEvent {
   type: string;
@@ -250,6 +255,26 @@ function discoveryFetcher(calls: string[]): typeof fetch {
 }
 
 describe("opencode-free extension", () => {
+  it("persists an identity and disposes its transport through the Pi entry point", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "opencode-free-test-"));
+    const destroy = vi.spyOn(Agent.prototype, "destroy");
+    vi.stubEnv("PI_CODING_AGENT_DIR", directory);
+
+    try {
+      const { pi, state } = createFakePi();
+      piOpencodeFree(pi);
+
+      expect(state.provider?.name).toBe(PROVIDER_ID);
+      expect(createSessionStore(sessionStorePath(directory)).load(Date.now())).toBeDefined();
+      await handlerFor(state, "session_shutdown")({ type: "session_shutdown" }, {});
+      expect(destroy).toHaveBeenCalledOnce();
+    } finally {
+      destroy.mockRestore();
+      vi.unstubAllEnvs();
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("registers the provider, hooks, and initial models", () => {
     const { pi, state } = createFakePi();
 

@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -8,7 +9,10 @@ const root = resolve(import.meta.dirname, "./..");
 const packagesDirectory = join(root, "packages");
 
 const packageDirectories = (await readdir(packagesDirectory, { withFileTypes: true }))
-  .filter((entry) => entry.isDirectory())
+  .filter(
+    (entry) =>
+      entry.isDirectory() && existsSync(join(packagesDirectory, entry.name, "package.json")),
+  )
   .map((entry) => join(packagesDirectory, entry.name));
 
 const temporaryDirectory = await mkdtemp(join(tmpdir(), "pi-package-smoke-"));
@@ -157,8 +161,20 @@ try {
     )}\n`,
   );
   await writeFile(
+    join(fixtureDirectory, "spawns-child.ts"),
+    `import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+export default function (pi) {
+  pi.on("session_start", () => {});
+  void promisify(execFile)(process.execPath, ["-e", ""]);
+}
+`,
+  );
+  await writeFile(
     join(fixtureDirectory, "smoke.ts"),
-    `import { readFile, readdir } from "node:fs/promises";
+    `import assert from "node:assert/strict";
+import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { syncBuiltinESMExports } from "node:module";
 import { mock } from "node:test";
@@ -167,6 +183,8 @@ import childProcess from "node:child_process";
 
 const processMethods = ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync", "fork"];
 const packageNames = ${JSON.stringify(packageNames)};
+const agentDirectory = join(process.cwd(), ".agent");
+process.env.PI_CODING_AGENT_DIR = agentDirectory;
 for (const packageName of packageNames) {
   const packageDirectory = join(process.cwd(), "node_modules", ...packageName.split("/"));
   const manifest = JSON.parse(await readFile(join(packageDirectory, "package.json"), "utf8"));
@@ -191,16 +209,22 @@ for (const packageName of packageNames) {
     throw new Error(\`Invalid Pi extension manifest for \${packageName}\`);
   }
 
+  await checkExtension(packageName, join(packageDirectory, manifest.pi.extensions[0]));
+}
+
+await assert.rejects(
+  checkExtension("spawns-child", join(process.cwd(), "spawns-child.ts")),
+  /spawns-child started child processes while loading:/,
+);
+
+async function checkExtension(packageName: string, extensionPath: string) {
   try {
     const processSpies = processMethods.map((name) => ({ name, spy: mock.method(childProcess, name) }));
+    // Node's custom promisifier can bypass the exported execFile and spawn methods.
+    const childSpawn = mock.method(childProcess.ChildProcess.prototype, "spawn");
     syncBuiltinESMExports();
 
-    const extensionPath = join(packageDirectory, manifest.pi.extensions[0]);
-    const loaded = await discoverAndLoadExtensions(
-      [extensionPath],
-      process.cwd(),
-      join(process.cwd(), ".agent"),
-    );
+    const loaded = await discoverAndLoadExtensions([extensionPath], process.cwd(), agentDirectory);
     if (loaded.errors.length > 0) {
       throw new Error(\`Failed to load \${packageName}: \${JSON.stringify(loaded.errors)}\`);
     }
@@ -220,6 +244,7 @@ for (const packageName of packageNames) {
     await new Promise((resolve) => setImmediate(resolve));
 
     const called = processSpies.filter(({ spy }) => spy.mock.callCount() > 0).map(({ name }) => name);
+    if (childSpawn.mock.callCount() > 0) called.push("ChildProcess.prototype.spawn");
     if (called.length > 0) {
       throw new Error(\`\${packageName} started child processes while loading: \${called.join(", ")}\`);
     }
