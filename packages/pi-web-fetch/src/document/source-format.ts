@@ -51,8 +51,9 @@ const LINE_ENDING_CHARACTERS = new Set([",", ";"]);
  * author's line structure, which is more useful than any generated layout.
  */
 function isMinified(value: string): boolean {
-  if (value.length < MINIFIED_MIN_CHARACTERS || value.length > MINIFIED_MAX_CHARACTERS)
+  if (value.length < MINIFIED_MIN_CHARACTERS || value.length > MINIFIED_MAX_CHARACTERS) {
     return false;
+  }
 
   let lineBreaks = 0;
 

@@ -188,8 +188,9 @@ export function extractDocumentLinks(raw: string, pageUrl: URL): ExtractedLinks 
       continue;
     }
 
-    if (!["http:", "https:"].includes(target.protocol) || target.username || target.password)
+    if (!["http:", "https:"].includes(target.protocol) || target.username || target.password) {
       continue;
+    }
     target.hash = "";
     const anchorText = normalizedAnchor(element.textContent ?? "");
     const key = `${target.href}\0${anchorText}`;

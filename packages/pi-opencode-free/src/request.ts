@@ -301,8 +301,9 @@ function replaceEnvironment(
 
 /** Extract text from an untrusted structured message part. */
 function textPart(part: unknown): string {
-  if (part && typeof part === "object" && "text" in part && typeof part.text === "string")
+  if (part && typeof part === "object" && "text" in part && typeof part.text === "string") {
     return part.text;
+  }
 
   return "";
 }

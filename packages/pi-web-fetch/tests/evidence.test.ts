@@ -223,14 +223,16 @@ describe("web_fetch honest-evidence details", () => {
         return { url, address: "127.0.0.1", family: 4, addresses: ["127.0.0.1"] };
       },
       request: async (target) => {
-        if (target.url.pathname === "/api/swagger.json")
+        if (target.url.pathname === "/api/swagger.json") {
           return fakeTextResponse('{"swagger":"2.0","info":{},"paths":{}}', "application/json");
+        }
 
-        if (target.url.pathname === "/api/")
+        if (target.url.pathname === "/api/") {
           return fakeTextResponse(
             `<html><body><div id="swagger-ui"></div><script>${initializer}</script></body></html>`,
             "text/html",
           );
+        }
 
         return fakeTextResponse("");
       },
@@ -363,8 +365,9 @@ describe("web_fetch honest-evidence details", () => {
 
       if (name === "readme") expect(result.details.confidence).not.toBe("low");
 
-      if (name === "challenge")
+      if (name === "challenge") {
         expect(result.details.extractionDiagnostics?.javascriptRequired).toBe(true);
+      }
     },
   );
 

@@ -53,8 +53,9 @@ export function parseAnswerStream(body: string): BraveAnswer {
 
     const parsed: unknown = JSON.parse(data);
 
-    if (!Check(eventSchema, parsed) || parsed.error !== undefined)
+    if (!Check(eventSchema, parsed) || parsed.error !== undefined) {
       throw new Error("Brave Answers returned an invalid stream event.");
+    }
     const choice = parsed.choices?.[0];
 
     if (choice?.finish_reason && choice.finish_reason !== "stop") {
@@ -80,15 +81,17 @@ export function parseAnswerStream(body: string): BraveAnswer {
         const parsed: unknown = JSON.parse(json);
 
         if (kind === "usage") {
-          if (!Check(usageSchema, parsed))
+          if (!Check(usageSchema, parsed)) {
             throw new Error("Brave Answers returned invalid usage metadata.");
+          }
           usage = parsed;
 
           return "";
         }
 
-        if (!Check(citationSchema, parsed))
+        if (!Check(citationSchema, parsed)) {
           throw new Error("Brave Answers returned invalid citation metadata.");
+        }
         const url = normalizeUrl(parsed.url);
 
         if (!url) return "";
@@ -104,13 +107,15 @@ export function parseAnswerStream(body: string): BraveAnswer {
     )
     .trim();
 
-  if (/<\/?(?:citation|usage)\b/i.test(text))
+  if (/<\/?(?:citation|usage)\b/i.test(text)) {
     throw new Error("Brave Answers returned incomplete metadata tags.");
+  }
 
-  if (!text)
+  if (!text) {
     throw new Error(
       'Brave Answers returned no answer content. Try mode: "web" for sources; no answer does not prove absence.',
     );
+  }
 
   return { text, citations, usage };
 }

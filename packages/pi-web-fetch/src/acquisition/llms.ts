@@ -21,8 +21,9 @@ function restrictOrigin(
     validateUrl: async (value) => {
       const url = value instanceof URL ? value : new URL(value);
 
-      if (url.origin !== origin || url.username || url.password)
+      if (url.origin !== origin || url.username || url.password) {
         throw new Error("Cross-origin fallback redirect refused.");
+      }
 
       return validate(value);
     },
@@ -121,8 +122,9 @@ export function documentationMarkdownUrl(value: string): URL | undefined {
       (url.hostname === "nextjs.org" || url.hostname === "vercel.com") &&
       (url.pathname === "/docs" || url.pathname.startsWith("/docs/"))
     )
-  )
+  ) {
     return;
+  }
 
   if (url.pathname.endsWith(".md")) return;
   url.pathname = `${url.pathname.replace(/\/$/, "")}.md`;
@@ -336,8 +338,9 @@ export async function fetchDocumentWithLlmsTxtSupport(
         if (
           new URL(document.url).origin === "https://prod.packit.dev" &&
           document.contentType === "application/json"
-        )
+        ) {
           return { ...document, representationFallback: "packit-api" };
+        }
       } catch (error) {
         if (signal?.aborted) throw error;
       }
@@ -369,8 +372,9 @@ export async function fetchDocumentWithLlmsTxtSupport(
   if (primarySettled.status === "rejected") {
     // A bot-protection layer replaced the page with a challenge that carries no
     // content; the discovered index is the only remaining pointer to that content.
-    if (indexSettled.value && primarySettled.reason instanceof ChallengeBlockedError)
+    if (indexSettled.value && primarySettled.reason instanceof ChallengeBlockedError) {
       return { ...indexSettled.value.document, llmsTxtFallback: true };
+    }
 
     throw primarySettled.reason;
   }
@@ -389,8 +393,9 @@ export async function fetchDocumentWithLlmsTxtSupport(
         ? await probeUsableRawText(describedBy, signal, dependencies)
         : undefined;
 
-    if (described && describedBy && index?.url !== describedBy.href)
+    if (described && describedBy && index?.url !== describedBy.href) {
       index = { url: describedBy.href, document: described };
+    }
   }
 
   if (
@@ -407,8 +412,9 @@ export async function fetchDocumentWithLlmsTxtSupport(
         false,
       );
 
-      if (isSafeToProbe(toAbsoluteUrl(spec.url), primary.url) && spec.openapiSpec)
+      if (isSafeToProbe(toAbsoluteUrl(spec.url), primary.url) && spec.openapiSpec) {
         return { ...spec, representationFallback: "swagger-spec" };
+      }
     } catch (error) {
       if (signal?.aborted) throw error;
     }
@@ -443,7 +449,7 @@ export async function fetchDocumentWithLlmsTxtSupport(
           /^(text\/markdown|text\/x-markdown)(?:;|$)/i.test(alternate.contentType) &&
           alternate.markdown.trim().length >= LLMS_TXT_MIN_MARKDOWN_CHARACTERS &&
           !alternate.shellSuspected
-        )
+        ) {
           return {
             ...alternate,
             markdownAlternateFallback: true,
@@ -451,6 +457,7 @@ export async function fetchDocumentWithLlmsTxtSupport(
             llmsTxtIndexUrl: index?.url,
             llmsTxtIndexAliases: index?.aliases,
           };
+        }
       } catch (error) {
         if (signal?.aborted) throw error;
       }
@@ -489,8 +496,12 @@ export async function fetchDocumentWithLlmsTxtSupport(
     (!primary.links || (primary.links.internal.length === 0 && primary.links.external.length === 0))
   ) {
     // Preserve diagnostics for empty challenge pages and JavaScript app shells.
-    if (primary.extractionDiagnostics?.botWall || primary.extractionDiagnostics?.javascriptRequired)
+    if (
+      primary.extractionDiagnostics?.botWall ||
+      primary.extractionDiagnostics?.javascriptRequired
+    ) {
       return primary;
+    }
 
     throw new Error("web_fetch: Page has no extractable content.");
   }

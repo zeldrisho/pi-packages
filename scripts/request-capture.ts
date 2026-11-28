@@ -160,8 +160,9 @@ function sanitizeJson(value: Json): Json {
     return result;
   }
 
-  if (isJsonString(value) && value.length > MAX_SAMPLE_BYTES)
+  if (isJsonString(value) && value.length > MAX_SAMPLE_BYTES) {
     return { length: value.length, sha256: createHash("sha256").update(value).digest("hex") };
+  }
 
   return value;
 }
@@ -175,8 +176,9 @@ function redactedJson(value: Json): Json {
 async function describeBody(body: BodyInit | null | undefined): Promise<RecordedBody> {
   if (body === null || body === undefined) return { fields: [], sample: "none", truncated: false };
 
-  if (!isBodyString(body) && !ArrayBuffer.isView(body) && !(body instanceof ArrayBuffer))
+  if (!isBodyString(body) && !ArrayBuffer.isView(body) && !(body instanceof ArrayBuffer)) {
     return { fields: [], sample: "stream", truncated: false };
+  }
 
   if (isBodyString(body)) {
     const parsed = redactedJson(parseJson(body));
@@ -261,7 +263,7 @@ export function createCaptureFetch(
           ? { fields: [], sample: "stream", truncated: false }
           : await describeBody(null);
 
-    if (events.length < MAX_EVENTS)
+    if (events.length < MAX_EVENTS) {
       events.push({
         kind: "request",
         method,
@@ -270,11 +272,12 @@ export function createCaptureFetch(
         body: recordedBody(body),
         at: now(),
       });
+    }
 
     try {
       const response = await upstream(input, init);
 
-      if (events.length < MAX_EVENTS)
+      if (events.length < MAX_EVENTS) {
         events.push({
           kind: "response",
           method,
@@ -284,10 +287,11 @@ export function createCaptureFetch(
           body: { kind: "not-captured" },
           at: now(),
         });
+      }
 
       return response;
     } catch (error) {
-      if (events.length < MAX_EVENTS)
+      if (events.length < MAX_EVENTS) {
         events.push({
           kind: "error",
           method,
@@ -296,6 +300,7 @@ export function createCaptureFetch(
           body: { kind: "not-captured" },
           at: now(),
         });
+      }
       throw error;
     }
   };
@@ -368,8 +373,9 @@ function parseEvidence(text: string): EvidencePayload {
 }
 
 async function main(args: string[]): Promise<void> {
-  if (args.length !== 3 || args[0] !== "evidence")
+  if (args.length !== 3 || args[0] !== "evidence") {
     throw new Error("Usage: evidence <question> <json>");
+  }
   const evidence = parseEvidence(args[2]);
   const question = args[1];
 

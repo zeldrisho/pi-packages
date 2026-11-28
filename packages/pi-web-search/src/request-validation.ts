@@ -22,8 +22,9 @@ export function validateProviderRequest(
   mode: SearchMode,
   extras?: ProviderRequestExtras,
 ): void {
-  if (mode !== "web" && mode !== "answers")
+  if (mode !== "web" && mode !== "answers") {
     throw new Error('Search mode must be "web" or "answers".');
+  }
 
   if (
     mode === "answers" &&

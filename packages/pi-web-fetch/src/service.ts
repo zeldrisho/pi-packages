@@ -145,8 +145,9 @@ export function classifyContentKind(
 
   if (path === "/llms.txt" || path.endsWith("/llms.txt")) return "llms-index";
 
-  if (host === "raw.githubusercontent.com" || host === "gist.githubusercontent.com")
+  if (host === "raw.githubusercontent.com" || host === "gist.githubusercontent.com") {
     return "code-file";
+  }
 
   if (host === "github.com") {
     const segments = path.split("/").filter(Boolean);
@@ -597,8 +598,9 @@ export async function executeWebFetch(
                 extractHtml: async (html: string, url: URL) => {
                   const filtered = filterAndroidBomHtml(html, bomVersion);
 
-                  if (filtered === undefined)
+                  if (filtered === undefined) {
                     throw new Error(`web_fetch: Android BOM version ${bomVersion} was not found.`);
+                  }
 
                   return extractHtmlToMarkdown(filtered, url);
                 },
@@ -632,7 +634,7 @@ export async function executeWebFetch(
   const blocked = Boolean(document.extractionDiagnostics?.botWall);
 
   // Keep acquisition diagnostics, but never expose challenge prose, links, or continuation.
-  if (blocked)
+  if (blocked) {
     document = {
       ...document,
       markdown: "",
@@ -640,6 +642,7 @@ export async function executeWebFetch(
       links: undefined,
       fragmentOffsets: undefined,
     };
+  }
   const canonicalMarkdown = document.markdown;
 
   const surface =

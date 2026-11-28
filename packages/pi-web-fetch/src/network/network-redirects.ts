@@ -212,8 +212,9 @@ export async function requestFollowingRedirects(
 
     if (!location) throw new Error("web_fetch received a redirect without a Location header.");
 
-    if (redirects === FETCH_MAX_REDIRECTS)
+    if (redirects === FETCH_MAX_REDIRECTS) {
       throw new Error("web_fetch followed too many redirects.");
+    }
     target = await awaitWithAbort(validateUrl(new URL(location, target.url)), signal);
     // Validators describe the originally cached resource and must not leak to a redirect target.
     // Representation preferences and challenge identities are safe to retain.

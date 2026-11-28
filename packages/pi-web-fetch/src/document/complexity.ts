@@ -125,8 +125,9 @@ function findRawTextEnd(html: string, name: string, from: number): number {
   while (candidate !== -1) {
     const boundary = html[candidate + prefix.length];
 
-    if (boundary === undefined || boundary === ">" || boundary === "/" || /\s/u.test(boundary))
+    if (boundary === undefined || boundary === ">" || boundary === "/" || /\s/u.test(boundary)) {
       return candidate;
+    }
 
     candidate = html.indexOf(prefix, candidate + prefix.length);
   }

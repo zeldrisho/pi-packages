@@ -541,8 +541,9 @@ export class SearchRuntime {
 
     if (meta.showStrictWarning !== undefined) evidence.showStrictWarning = meta.showStrictWarning;
 
-    if (meta.moreResultsAvailable !== undefined)
+    if (meta.moreResultsAvailable !== undefined) {
       evidence.moreResultsAvailable = meta.moreResultsAvailable;
+    }
 
     if (meta.operatorsApplied !== undefined) evidence.operatorsApplied = meta.operatorsApplied;
 

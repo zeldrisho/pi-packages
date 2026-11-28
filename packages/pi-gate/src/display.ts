@@ -94,8 +94,9 @@ function renderCommandForDisplay(command: string, pattern?: string): string {
     const decorated = `${opensRange ? "»" : ""}${rendered}${closesRange ? "«" : ""}`;
 
     if (rendered === "\n") {
-      if (lineCount >= MAX_DISPLAY_COMMAND_LINES)
+      if (lineCount >= MAX_DISPLAY_COMMAND_LINES) {
         return truncate(command.length - rawStart, wasInsideRange);
+      }
       lineCount += 1;
     }
 

@@ -30,14 +30,16 @@ export function overrideThinkingBudget(input: {
       input.level === "medium" ||
       input.level === "high"
     )
-  )
+  ) {
     return input.advertised;
+  }
   const budget = input.budgets?.[input.level];
 
   if (budget === undefined) return input.advertised;
 
-  if (!Number.isSafeInteger(budget) || budget < 1)
+  if (!Number.isSafeInteger(budget) || budget < 1) {
     throw new Error("Antigravity thinking budget must be a positive integer.");
+  }
 
   if (
     input.advertised === undefined ||
@@ -51,8 +53,9 @@ export function overrideThinkingBudget(input: {
 
   const maximum = input.maxOutputTokens - 1024;
 
-  if (maximum < 1)
+  if (maximum < 1) {
     throw new Error("Antigravity output limit is too small for a thinking budget and answer.");
+  }
 
   return { includeThoughts: true, thinkingBudget: Math.min(budget, maximum) };
 }

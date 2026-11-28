@@ -543,9 +543,9 @@ function ensureUserText(contents: GeminiContent[]): void {
   if (!hasUserText) {
     const userTurn = contents.find((turn) => turn.role === "user");
 
-    if (userTurn === undefined)
+    if (userTurn === undefined) {
       contents.unshift({ role: "user", parts: [{ text: CONTINUATION_TEXT }] });
-    else userTurn.parts.push({ text: CONTINUATION_TEXT });
+    } else userTurn.parts.push({ text: CONTINUATION_TEXT });
   }
 
   if (contents.at(-1)?.role === "model") {

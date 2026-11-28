@@ -721,9 +721,9 @@ describe("piGate extension", () => {
         uiState.selectResponse = "Allow";
         uiState.onSelect = () => {
           if (kind === "abort") controller.abort();
-          else if (kind === "session-change")
+          else if (kind === "session-change") {
             void handlers.sessionStart!({ reason: "switch" }, ctx);
-          else setConfig(JSON.stringify({ operations: { sudo: "block" } }));
+          } else setConfig(JSON.stringify({ operations: { sudo: "block" } }));
         };
 
         expect.soft(await handlers.toolCall!(bashEvent("sudo echo hi"), ctx), kind).toMatchObject({
@@ -768,12 +768,13 @@ describe("piGate extension", () => {
         ctx.ui = createUi(uiState, true);
         uiState.selectResponse = "Allow";
 
-        if (kind === "replacement")
+        if (kind === "replacement") {
           expect(await handlers.toolCall!(bashEvent("sudo echo fresh"), ctx)).toBeUndefined();
-        else
+        } else {
           expect(await handlers.toolCall!(bashEvent("sudo echo stale"), ctx)).toMatchObject({
             block: true,
           });
+        }
         expect(uiState.selectCalls).toHaveLength(kind === "replacement" ? 1 : 0);
       },
     );

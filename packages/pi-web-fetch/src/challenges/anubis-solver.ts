@@ -42,8 +42,9 @@ const ANUBIS_WASM_EXPORTS = [
 
 /** Decodes a lowercase or uppercase hexadecimal string, rejecting odd or non-hex input. */
 function decodeHex(value: string): Uint8Array | undefined {
-  if (value.length === 0 || value.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(value))
+  if (value.length === 0 || value.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(value)) {
     return undefined;
+  }
 
   const bytes = new Uint8Array(value.length / 2);
 
@@ -58,8 +59,9 @@ function decodeHex(value: string): Uint8Array | undefined {
 function readMemory(memory: WebAssembly.Memory, pointer: number, size: number): Uint8Array {
   const offset = pointer >>> 0;
 
-  if (size < 0 || offset + size > memory.buffer.byteLength)
+  if (size < 0 || offset + size > memory.buffer.byteLength) {
     throw new Error("Anubis challenge module returned an out-of-bounds pointer.");
+  }
 
   return new Uint8Array(memory.buffer, offset, size).slice();
 }
@@ -68,8 +70,9 @@ function readMemory(memory: WebAssembly.Memory, pointer: number, size: number): 
 function writeMemory(memory: WebAssembly.Memory, pointer: number, bytes: Uint8Array): void {
   const offset = pointer >>> 0;
 
-  if (offset + bytes.byteLength > memory.buffer.byteLength)
+  if (offset + bytes.byteLength > memory.buffer.byteLength) {
     throw new Error("Anubis challenge module returned an out-of-bounds pointer.");
+  }
 
   new Uint8Array(memory.buffer, offset, bytes.byteLength).set(bytes);
 }
@@ -152,14 +155,16 @@ export function solveAnubisSha256Hex(
   difficulty: number,
   deadline: number,
 ): AnubisSolution {
-  if (!Number.isInteger(difficulty) || difficulty < 0 || difficulty > 64)
+  if (!Number.isInteger(difficulty) || difficulty < 0 || difficulty > 64) {
     throw new Error("Anubis challenge requested an unsupported difficulty.");
+  }
 
   const prefix = "0".repeat(difficulty);
 
   for (let nonce = 0; nonce <= 0xff_ff_ff_ff; nonce += 1) {
-    if ((nonce & 0xf_ff) === 0 && Date.now() > deadline)
+    if ((nonce & 0xf_ff) === 0 && Date.now() > deadline) {
       throw new Error("Anubis proof of work exceeded the time budget.");
+    }
 
     const hash = createHash("sha256").update(randomData).update(String(nonce)).digest("hex");
 
@@ -190,16 +195,19 @@ export function solveAnubisWasm(
   difficulty: number,
   deadline: number,
 ): AnubisSolution {
-  if (moduleBytes.byteLength === 0 || moduleBytes.byteLength > ANUBIS_MAX_WASM_BYTES)
+  if (moduleBytes.byteLength === 0 || moduleBytes.byteLength > ANUBIS_MAX_WASM_BYTES) {
     throw new Error("Anubis challenge module exceeded the size limit.");
+  }
 
-  if (!Number.isInteger(difficulty) || difficulty < 0 || difficulty > 0xff_ff_ff_ff)
+  if (!Number.isInteger(difficulty) || difficulty < 0 || difficulty > 0xff_ff_ff_ff) {
     throw new Error("Anubis challenge requested an unsupported difficulty.");
+  }
 
   const data = decodeHex(randomData);
 
-  if (!data || data.byteLength > ANUBIS_MAX_RANDOM_DATA_BYTES)
+  if (!data || data.byteLength > ANUBIS_MAX_RANDOM_DATA_BYTES) {
     throw new Error("Anubis challenge supplied unsupported random data.");
+  }
 
   if (Date.now() > deadline) throw new Error("Anubis proof of work exceeded the time budget.");
 
@@ -212,8 +220,9 @@ export function solveAnubisWasm(
 
   const memory = instance.exports.memory;
 
-  if (!(memory instanceof WebAssembly.Memory))
+  if (!(memory instanceof WebAssembly.Memory)) {
     throw new Error("Anubis challenge module is missing memory.");
+  }
 
   const dataPtr = requireFunction(instance.exports, "data_ptr");
   const setDataLength = requireFunction(instance.exports, "set_data_length");
@@ -226,15 +235,17 @@ export function solveAnubisWasm(
   const nonce = work(difficulty, 0, 1);
   const hashSize = resultHashSize() >>> 0;
 
-  if (hashSize < 1 || hashSize > 4096)
+  if (hashSize < 1 || hashSize > 4096) {
     throw new Error("Anubis challenge module returned an invalid hash size.");
+  }
 
   const hashBytes = readMemory(memory, resultHashPtr(), hashSize);
 
   if (Date.now() > deadline) throw new Error("Anubis proof of work exceeded the time budget.");
 
-  if (difficulty > 0 && leadingZeroBits(hashBytes) < difficulty)
+  if (difficulty > 0 && leadingZeroBits(hashBytes) < difficulty) {
     throw new Error("Anubis proof of work produced an invalid solution.");
+  }
 
   const hash = Array.from(hashBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 
@@ -243,8 +254,9 @@ export function solveAnubisWasm(
 
 /** Dispatches one worker solve request to the matching pure solver. */
 export function solveAnubisRequest(request: AnubisWorkerRequest): AnubisSolution {
-  if (request.kind === "sha256")
+  if (request.kind === "sha256") {
     return solveAnubisSha256Hex(request.randomData, request.difficulty, request.deadline);
+  }
 
   return solveAnubisWasm(
     request.moduleBytes,

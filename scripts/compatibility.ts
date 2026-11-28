@@ -49,8 +49,9 @@ function formatOf(header: Buffer): Format {
 
   if (
     ["cffaedfe", "feedfacf", "cafebabe", "bebafeca"].includes(header.subarray(0, 4).toString("hex"))
-  )
+  ) {
     return "mach-o";
+  }
 
   return "other";
 }
@@ -63,8 +64,9 @@ export async function capture(providerName: string, path: string): Promise<Snaps
   try {
     const stat = await file.stat();
 
-    if (!stat.isFile() || stat.size < 1 || stat.size > MAX_ARTIFACT_BYTES)
+    if (!stat.isFile() || stat.size < 1 || stat.size > MAX_ARTIFACT_BYTES) {
       throw new Error("Artifact must be a nonempty regular file within the size limit");
+    }
     const hash = createHash("sha256");
     // SAFETY: Every provider marker is initialized in the loop below.
     const markers = {} as Record<ProviderMarkers, boolean>;
@@ -102,8 +104,9 @@ export async function capture(providerName: string, path: string): Promise<Snaps
       after.size !== stat.size ||
       after.mtimeMs !== stat.mtimeMs ||
       after.ctimeMs !== stat.ctimeMs
-    )
+    ) {
       throw new Error("Artifact changed during capture");
+    }
 
     return { schema: 1, provider, sha256: hash.digest("hex"), bytes: position, format, markers };
   } finally {
@@ -148,15 +151,17 @@ export function parseSnapshot(input: string): Snapshot {
       obj.format !== "mach-o" &&
       obj.format !== "other") ||
     !isRecord(obj.markers)
-  )
+  ) {
     throw new Error("Invalid snapshot");
+  }
   const provider = providerFor(obj.provider);
   // SAFETY: Every provider marker is validated below before this object is returned.
   const markers = {} as Record<ProviderMarkers, boolean>;
   const raw = obj.markers;
 
-  if (!isRecord(raw) || Object.keys(raw).length !== MARKERS[provider].length)
+  if (!isRecord(raw) || Object.keys(raw).length !== MARKERS[provider].length) {
     throw new Error("Invalid markers");
+  }
 
   for (const marker of MARKERS[provider]) {
     const found = raw[marker];
@@ -179,8 +184,9 @@ export function compare(before: Snapshot, after: Snapshot): string[] {
   ];
 
   for (const marker of MARKERS[before.provider]) {
-    if (before.markers[marker] !== after.markers[marker])
+    if (before.markers[marker] !== after.markers[marker]) {
       lines.push(`${marker}: ${before.markers[marker]} -> ${after.markers[marker]}`);
+    }
   }
 
   return lines;

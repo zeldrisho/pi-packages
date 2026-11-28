@@ -33,8 +33,9 @@ describe("web_fetch limit contracts", () => {
       { url: "https://example.com", offset: -1 },
       { url: "https://example.com", offset: 0.5 },
       { url: "https://example.com", offset: FETCH_MAX_OFFSET_CHARACTERS + 1 },
-    ])
+    ]) {
       expect(Check(webFetchParameters, params)).toBe(false);
+    }
   });
 
   it("rejects invalid parameters at runtime", async () => {

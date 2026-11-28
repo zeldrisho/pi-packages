@@ -51,8 +51,9 @@ export function parsePiCatalog(value: JsonValue): Map<string, GeminiMetadata> | 
       !isJsonObject(entry) ||
       !isJsonText(entry.id) ||
       !/^gemini-[a-z0-9.-]{1,100}$/.test(entry.id)
-    )
+    ) {
       continue;
+    }
 
     if (entry.type !== undefined && entry.type !== "chat") continue;
 
@@ -60,8 +61,9 @@ export function parsePiCatalog(value: JsonValue): Map<string, GeminiMetadata> | 
       (entry.reasoning !== true && entry.reasoning !== false) ||
       !Array.isArray(entry.input) ||
       !entry.input.includes("text")
-    )
+    ) {
       continue;
+    }
 
     if (
       !isJsonNumber(entry.contextWindow) ||
@@ -70,8 +72,9 @@ export function parsePiCatalog(value: JsonValue): Map<string, GeminiMetadata> | 
       !isJsonNumber(entry.maxTokens) ||
       !Number.isSafeInteger(entry.maxTokens) ||
       entry.maxTokens <= 0
-    )
+    ) {
       continue;
+    }
     const map = entry.thinkingLevelMap;
 
     if (map !== undefined && !isJsonObject(map)) continue;
@@ -81,8 +84,9 @@ export function parsePiCatalog(value: JsonValue): Map<string, GeminiMetadata> | 
       LEVELS.some(
         (level) => map[level] !== undefined && map[level] !== null && !isJsonText(map[level]),
       )
-    )
+    ) {
       continue;
+    }
 
     const levels = !entry.reasoning
       ? ["off" as const]
@@ -127,8 +131,9 @@ export function restorePiSnapshots(value: JsonValue | undefined): PiCatalogSnaps
       !Array.isArray(entry.entries) ||
       !isJsonNumber(entry.lastModified) ||
       entry.lastModified < 0
-    )
+    ) {
       return undefined;
+    }
     const parsed = parsePiCatalog(entry.entries);
 
     if (parsed === undefined || parsed.size !== entry.entries.length) return undefined;
@@ -136,8 +141,9 @@ export function restorePiSnapshots(value: JsonValue | undefined): PiCatalogSnaps
     if (
       entry.etag !== undefined &&
       (!isJsonText(entry.etag) || entry.etag.length > 1024 || /[\r\n]/.test(entry.etag))
-    )
+    ) {
       return undefined;
+    }
 
     return {
       entries: [...entry.entries],
@@ -192,8 +198,9 @@ export async function fetchGeminiMetadata(
         signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]),
       });
 
-      if (response.status === 304 && validator && prior)
+      if (response.status === 304 && validator && prior) {
         return { snapshot: prior, completed: true };
+      }
 
       if (response.status === 404 || response.status === 501) {
         await response.body?.cancel();
@@ -250,8 +257,9 @@ export async function fetchGeminiMetadata(
       const body = parseJsonValue(new TextDecoder().decode(bytes));
       const models = parsePiCatalog(body);
 
-      if (models === undefined || (Array.isArray(body) && body.length > 0 && models.size === 0))
+      if (models === undefined || (Array.isArray(body) && body.length > 0 && models.size === 0)) {
         return { snapshot: prior, completed: false };
+      }
       const date = Date.parse(response.headers.get("last-modified") ?? "");
       const etag = response.headers.get("etag");
 
@@ -281,8 +289,9 @@ export async function fetchGeminiMetadata(
     if (
       snapshot === undefined ||
       (generatedAt !== undefined && snapshot.lastModified <= generatedAt)
-    )
+    ) {
       return;
+    }
 
     for (const [id, model] of parsePiCatalog(snapshot.entries) ?? []) bundled.set(id, model);
   };

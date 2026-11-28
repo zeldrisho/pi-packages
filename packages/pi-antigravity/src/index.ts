@@ -99,8 +99,9 @@ async function refreshModels(
   const configs = modelConfigs(catalog);
 
   if (!metadata.completed) {
-    if (metadata.httpStatus !== undefined)
+    if (metadata.httpStatus !== undefined) {
       throw new Error(`Pi model catalog refresh failed (HTTP ${metadata.httpStatus}).`);
+    }
 
     return configs;
   }
@@ -119,8 +120,9 @@ async function refreshModels(
     // Keep the in-memory catalog when Pi cannot persist it.
   }
 
-  if (metadata.httpStatus !== undefined)
+  if (metadata.httpStatus !== undefined) {
     throw new Error(`Pi model catalog refresh failed (HTTP ${metadata.httpStatus}).`);
+  }
 
   return configs;
 }

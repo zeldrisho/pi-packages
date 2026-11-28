@@ -8,16 +8,18 @@ export function redditChallengeUrl(raw: string, pageUrl: URL): URL | undefined {
     pageUrl.username ||
     pageUrl.password ||
     pageUrl.port
-  )
+  ) {
     return undefined;
+  }
   const { document } = parseHTML(raw);
   const forms = document.querySelectorAll("form");
 
   if (forms.length !== 1) return undefined;
   const form = forms[0];
 
-  if (!form.hasAttribute("hidden") || form.getAttribute("method")?.toLowerCase() !== "get")
+  if (!form.hasAttribute("hidden") || form.getAttribute("method")?.toLowerCase() !== "get") {
     return undefined;
+  }
   const action = form.getAttribute("action");
 
   if (!action) return undefined;
@@ -34,8 +36,9 @@ export function redditChallengeUrl(raw: string, pageUrl: URL): URL | undefined {
     target.pathname !== pageUrl.pathname ||
     target.search ||
     target.hash
-  )
+  ) {
     return undefined;
+  }
   const inputs = [...form.querySelectorAll("input")];
 
   if (inputs.length !== 4) return undefined;
@@ -44,8 +47,9 @@ export function redditChallengeUrl(raw: string, pageUrl: URL): URL | undefined {
   for (const input of inputs) {
     const name = input.getAttribute("name");
 
-    if (!name || values.has(name) || input.getAttribute("type")?.toLowerCase() !== "hidden")
+    if (!name || values.has(name) || input.getAttribute("type")?.toLowerCase() !== "hidden") {
       return undefined;
+    }
     values.set(name, input.getAttribute("value") ?? "");
   }
 
@@ -57,8 +61,9 @@ export function redditChallengeUrl(raw: string, pageUrl: URL): URL | undefined {
     !token ||
     !/^[a-f0-9]{1,256}$/i.test(token) ||
     values.get("jsc_orig_r") !== ""
-  )
+  ) {
     return undefined;
+  }
 
   for (const name of values.keys()) if (pageUrl.searchParams.has(name)) return undefined;
 
@@ -80,8 +85,9 @@ export function redditChallengeUrl(raw: string, pageUrl: URL): URL | undefined {
     !match ||
     !/namedItem\(["']solution["']\)\.value\s*=/.test(script) ||
     !/requestSubmit\(\)/.test(script)
-  )
+  ) {
     return undefined;
+  }
   target.searchParams.set("solution", match[3] + match[3]);
   target.searchParams.set("js_challenge", "1");
   target.searchParams.set("jsc_token", token);

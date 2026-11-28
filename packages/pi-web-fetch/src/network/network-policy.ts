@@ -145,11 +145,13 @@ export async function validateRemoteUrl(
 ): Promise<ValidatedTarget> {
   const url = value instanceof URL ? value : new URL(value);
 
-  if (url.protocol !== "http:" && url.protocol !== "https:")
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error("web_fetch only supports HTTP and HTTPS URLs.");
+  }
 
-  if (url.username || url.password)
+  if (url.username || url.password) {
     throw new Error("web_fetch blocks URLs containing credentials.");
+  }
 
   const hostname = url.hostname
     .toLowerCase()

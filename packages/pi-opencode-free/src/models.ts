@@ -369,11 +369,13 @@ function configFromRemote(entry: RemoteCatalogEntry): FreeChatModelConfig | unde
 
   if (!isPositiveInteger(entry.maxTokens)) return undefined;
 
-  if (entry.cost.cacheRead !== undefined && !isNonNegativeNumber(entry.cost.cacheRead))
+  if (entry.cost.cacheRead !== undefined && !isNonNegativeNumber(entry.cost.cacheRead)) {
     return undefined;
+  }
 
-  if (entry.cost.cacheWrite !== undefined && !isNonNegativeNumber(entry.cost.cacheWrite))
+  if (entry.cost.cacheWrite !== undefined && !isNonNegativeNumber(entry.cost.cacheWrite)) {
     return undefined;
+  }
 
   if (entry.reasoning !== true && entry.reasoning !== false) return undefined;
 
@@ -443,8 +445,9 @@ async function fetchLiveModelIds(
       signal: options.signal,
     });
 
-    if (!response.ok)
+    if (!response.ok) {
       return { ok: false, failure: "live-request-failed", httpStatus: response.status };
+    }
 
     const body: unknown = await response.json().catch(() => undefined);
 
@@ -492,11 +495,13 @@ async function fetchModelCatalog(
 
     if (response.status === 304 && validator && cached) return { ok: true, snapshot: cached };
 
-    if (response.status === 404 || response.status === 501)
+    if (response.status === 404 || response.status === 501) {
       return { ok: true, snapshot: { models: [], lastModified: 0 } };
+    }
 
-    if (!response.ok)
+    if (!response.ok) {
       return { ok: false, failure: "catalog-request-failed", httpStatus: response.status };
+    }
 
     const body: unknown = await response.json().catch(() => undefined);
 
@@ -504,8 +509,9 @@ async function fetchModelCatalog(
 
     const entries = body.filter(isRemoteCatalogEntry);
 
-    if (body.length > 0 && entries.length === 0)
+    if (body.length > 0 && entries.length === 0) {
       return { ok: false, failure: "catalog-response-invalid" };
+    }
 
     const models: FreeChatModelConfig[] = [];
 

@@ -64,8 +64,9 @@ export function createTransport(
       "trailer",
       "transfer-encoding",
       "upgrade",
-    ])
+    ]) {
       headers.delete(name);
+    }
     headers.set("accept-encoding", "identity");
 
     if (body) headers.set("content-length", String(body.length));

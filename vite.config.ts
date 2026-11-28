@@ -71,9 +71,10 @@ export default defineConfig({
       "oxc/no-accumulating-spread": "error",
       // Keep standard bracket notation for the workspace's existing array types.
       "typescript/array-type": ["error", { default: "array", readonly: "array" }],
+      // Permit single-line guards; require braces for multiline bodies.
+      curly: ["error", "multi-line"],
       // Migration baseline: review and re-enable these rules individually.
       "@nkzw/no-instanceof": "off",
-      curly: "off",
       "import/consistent-type-specifier-style": "off",
       "preserve-caught-error": "off",
       "typescript/consistent-type-imports": "off",

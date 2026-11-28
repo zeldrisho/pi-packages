@@ -328,8 +328,9 @@ export function decompressResponse(
       else if (encoding === "br") bytes = brotliDecompressSync(bytes, options);
       else throw new Error(`unsupported content encoding: ${encoding}`);
     } catch (error) {
-      if (error instanceof Error && error.message.startsWith("unsupported content encoding:"))
+      if (error instanceof Error && error.message.startsWith("unsupported content encoding:")) {
         throw error;
+      }
 
       if (error instanceof Error && "code" in error && error.code === "ERR_BUFFER_TOO_LARGE") {
         throw new Error(

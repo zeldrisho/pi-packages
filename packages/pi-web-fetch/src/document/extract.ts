@@ -167,8 +167,9 @@ function hasEmptyScriptedMain(document: Document): boolean {
   if (
     !main.querySelector("script") ||
     main.querySelector("img, svg, video, audio, canvas, iframe, object, embed, form")
-  )
+  ) {
     return false;
+  }
 
   const copy = document.createElement("div");
   copy.appendChild(main.cloneNode(true));
@@ -301,8 +302,12 @@ function stripChromeWrappers(document: Document, baseUrl: URL): void {
 
 /** Restricts GitHub repository roots to their rendered README, when available. */
 function isolateGitHubReadme(document: Document, baseUrl: URL): boolean {
-  if (baseUrl.hostname !== "github.com" || baseUrl.pathname.split("/").filter(Boolean).length !== 2)
+  if (
+    baseUrl.hostname !== "github.com" ||
+    baseUrl.pathname.split("/").filter(Boolean).length !== 2
+  ) {
     return false;
+  }
 
   let readme = document.querySelector("main article.markdown-body.entry-content[itemprop='text']");
 
@@ -648,8 +653,9 @@ function selectSurfaceHtml(
       chosen &&
       ids.every((id) => id && paneIds.includes(id)) &&
       surfacePanes.every((pane) => pane.parentElement === surfacePanes[0].parentElement)
-    )
+    ) {
       candidates.push({ panes: surfacePanes, chosen });
+    }
   }
 
   const unique = candidates.filter(
@@ -757,8 +763,9 @@ async function extractNoscriptFallback(
     if (
       fallback.markdown.length < NOSCRIPT_FALLBACK_MIN_CHARACTERS ||
       fallback.markdown.length <= primary.markdown.length
-    )
+    ) {
       return undefined;
+    }
 
     return {
       ...fallback,

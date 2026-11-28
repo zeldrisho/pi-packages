@@ -12,8 +12,9 @@ export function redditFeedUrl(rawUrl: string): string | undefined {
     url.username ||
     url.password ||
     url.port
-  )
+  ) {
     return undefined;
+  }
 
   const match = /^\/r\/([a-z0-9_]+)\/comments\/([a-z0-9]+)(?:\/[^/]+)?\/?$/i.exec(url.pathname);
 
@@ -56,8 +57,9 @@ export function extractRedditFeed(raw: string, feedUrl: string): string | undefi
     if (
       entry === post ||
       !/^t1_[a-z0-9]+$/i.test(entry.querySelector("id")?.textContent?.trim() ?? "")
-    )
+    ) {
       continue;
+    }
     const comment = render(entry);
 
     if (comment) comments.push(comment);

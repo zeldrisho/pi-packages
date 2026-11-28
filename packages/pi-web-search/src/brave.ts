@@ -52,17 +52,21 @@ export function parseQueryMeta(query: BraveQuery | undefined): BraveQueryMeta {
 
   if (query.show_strict_warning !== undefined) meta.showStrictWarning = query.show_strict_warning;
 
-  if (query.more_results_available !== undefined)
+  if (query.more_results_available !== undefined) {
     meta.moreResultsAvailable = query.more_results_available;
+  }
 
-  if (query.search_operators?.applied !== undefined)
+  if (query.search_operators?.applied !== undefined) {
     meta.operatorsApplied = query.search_operators.applied;
+  }
 
-  if (query.search_operators?.cleaned_query)
+  if (query.search_operators?.cleaned_query) {
     meta.cleanedQuery = query.search_operators.cleaned_query;
+  }
 
-  if (Array.isArray(query.search_operators?.sites))
+  if (Array.isArray(query.search_operators?.sites)) {
     meta.operatorSites = [...query.search_operators.sites];
+  }
 
   return meta;
 }
@@ -146,8 +150,9 @@ export async function searchBraveWeb(
 
   if (extras.operators !== undefined) url.searchParams.set("operators", String(extras.operators));
 
-  if (extras.resultFilter)
+  if (extras.resultFilter) {
     url.searchParams.set("result_filter", normalizeResultFilter(extras.resultFilter));
+  }
 
   if (extras.goggles) url.searchParams.set("goggles", extras.goggles);
 
@@ -176,8 +181,9 @@ export async function searchBraveWeb(
           .map((value) => normalizeText(value ?? "", 300))
           .filter(Boolean);
 
-        if (additional.length)
+        if (additional.length) {
           snippet = normalizeText([snippet, ...additional].filter(Boolean).join("\n\n"), 2000);
+        }
       }
 
       return {

@@ -142,16 +142,18 @@ async function binaryPath(path: string): Promise<string | undefined> {
     if (
       stats.size > MAX_WRAPPER_BYTES ||
       basename(dirname(resolved)) !== ".homebrew-command-wrappers"
-    )
+    ) {
       return undefined;
+    }
     const contents = await file.readFile({ encoding: "utf8" });
 
     const target = contents.match(
       /^AGY_CLI_DISABLE_AUTO_UPDATE="true" exec "([^"\n]+)"\s+"\$@"\s*$/m,
     )?.[1];
 
-    if (target === undefined || !isAbsolute(target) || basename(target) !== "antigravity")
+    if (target === undefined || !isAbsolute(target) || basename(target) !== "antigravity") {
       return undefined;
+    }
     const parent = dirname(dirname(resolved));
     const realTarget = await realpath(target);
 

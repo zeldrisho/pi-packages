@@ -23,8 +23,9 @@ describe("Reddit JavaScript challenge", () => {
       html.replace('name="jsc_orig_r"', 'name="solution"'),
       html.replace('value="123abc"', 'value="bad&token"'),
       html.replace('method="GET"', 'method="POST"'),
-    ])
+    ]) {
       expect(redditChallengeUrl(raw, url)).toBeUndefined();
+    }
     expect(
       redditChallengeUrl(html, new URL("https://evil.test/r/example/comments/abc/post/")),
     ).toBeUndefined();

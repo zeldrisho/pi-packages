@@ -90,11 +90,13 @@ describe("documentation Markdown", () => {
     const html = `<html><body><main><p>${"Original documentation. ".repeat(30)}</p></main></body></html>`;
 
     const { dependencies, requests } = recordingDependencies((href) => {
-      if (href === "https://vercel.com/docs/redirect-test")
+      if (href === "https://vercel.com/docs/redirect-test") {
         return fakeResponse(200, "text/html", html);
+      }
 
-      if (href === "https://vercel.com/docs/redirect-test.md")
+      if (href === "https://vercel.com/docs/redirect-test.md") {
         return fakeResponse(302, "text/plain", "", { location: "https://other.example/secret" });
+      }
 
       return fakeResponse(404, "text/plain", "missing");
     });
@@ -120,12 +122,13 @@ describe("documentation Markdown", () => {
       const { dependencies, requests } = recordingDependencies((href) => {
         if (href.endsWith(`/docs/${path}`)) return fakeResponse(200, "text/html", html);
 
-        if (href.endsWith(`/docs/${path}.md`) && succeeds)
+        if (href.endsWith(`/docs/${path}.md`) && succeeds) {
           return fakeResponse(
             200,
             "text/markdown",
             `# Markdown page\n${"Useful source content. ".repeat(20)}`,
           );
+        }
 
         return fakeResponse(404, "text/plain", "missing");
       });
@@ -350,12 +353,13 @@ describe("executeWebFetch llms.txt support", () => {
       const { dependencies } = recordingDependencies((href) => {
         if (href === root) return fakeResponse(200, "text/markdown", LLMS_TXT);
 
-        if (href === section)
+        if (href === section) {
           return fakeResponse(
             200,
             "text/markdown",
             identical ? LLMS_TXT : `${LLMS_TXT}\nDistinct section`,
           );
+        }
 
         return fakeResponse(
           200,
@@ -467,8 +471,9 @@ describe("executeWebFetch llms.txt support", () => {
 
   it("serves a usable site index when a bot challenge withholds the page", async () => {
     const { dependencies, requests } = recordingDependencies((href) => {
-      if (href === "https://waf.example.com/en/docs/llms.txt")
+      if (href === "https://waf.example.com/en/docs/llms.txt") {
         return fakeResponse(200, "text/markdown", LLMS_TXT);
+      }
 
       if (href.endsWith("/llms.txt")) return fakeResponse(404, "text/plain", "Not Found");
 

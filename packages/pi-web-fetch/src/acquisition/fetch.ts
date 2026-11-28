@@ -64,8 +64,9 @@ export function npmRegistryFallbackUrl(rawUrl: string): string | undefined {
 
     const segments = url.pathname.split("/").filter(Boolean);
 
-    if (segments[0] !== "package" || (segments.length !== 2 && segments.length !== 3))
+    if (segments[0] !== "package" || (segments.length !== 2 && segments.length !== 3)) {
       return undefined;
+    }
 
     const name = segments.length === 3 ? `${segments[1]}/${segments[2]}` : segments[1];
 
@@ -281,8 +282,9 @@ async function documentFromDecoded(
 ): Promise<CompleteDocument> {
   const { raw, contentType, contentTypeHeader } = body;
 
-  if (!raw.trim() && !allowEmptyContent)
+  if (!raw.trim() && !allowEmptyContent) {
     throw new Error("web_fetch: Page has no extractable content.");
+  }
 
   const linkHints = parseLinkHeaderForAgentHints(
     responseHeader(response, "link") ?? "",
@@ -372,8 +374,9 @@ async function documentFromDecoded(
           !candidate.username &&
           !candidate.password &&
           !candidate.hash
-        )
+        ) {
           swaggerSpecUrl = candidate.href;
+        }
       } catch {
         // Ignore malformed advertisements.
       }
@@ -542,8 +545,9 @@ async function documentFromAcquisition(
             signal,
           });
         } catch (error) {
-          if (signal.aborted || (error instanceof Error && error.name === "AbortError"))
+          if (signal.aborted || (error instanceof Error && error.name === "AbortError")) {
             throw error;
+          }
 
           return documentFromDecoded(
             target,
@@ -700,8 +704,9 @@ async function fetchDocument(
 
   if (cached?.validators?.etag) conditionalHeaders["If-None-Match"] = cached.validators.etag;
 
-  if (cached?.validators?.lastModified)
+  if (cached?.validators?.lastModified) {
     conditionalHeaders["If-Modified-Since"] = cached.validators.lastModified;
+  }
 
   // Cookies live only for this acquisition; challenge handshakes never persist or
   // cross into another fetch.
@@ -885,7 +890,7 @@ async function fetchDocument(
 
           const markdown = extractRedditFeed(body.raw, feedUrl);
 
-          if (markdown)
+          if (markdown) {
             return {
               document: {
                 url: document.url,
@@ -897,6 +902,7 @@ async function fetchDocument(
               },
               revalidated: false,
             };
+          }
         } else feed.response.destroy();
       } catch (error) {
         if (controller.signal.aborted) throw error;

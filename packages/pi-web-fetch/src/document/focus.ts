@@ -60,8 +60,9 @@ function tokens(value: string): string[] {
     let word = token;
 
     if (word.length > 5 && /(?:ss|ch|sh|x|z)es$/.test(word)) word = word.slice(0, -2);
-    else if (word.length > 4 && word.endsWith("s") && !word.endsWith("ss"))
+    else if (word.length > 4 && word.endsWith("s") && !word.endsWith("ss")) {
       word = word.slice(0, -1);
+    }
 
     if (word.length > 6 && word.endsWith("ion")) return word.slice(0, -3);
 
@@ -210,8 +211,13 @@ function splitSections(markdown: string): SplitSections {
 
     if (match) {
       if (!fence) fence = { marker: match[1][0], length: match[1].length };
-      else if (match[1][0] === fence.marker && match[1].length >= fence.length && !match[2].trim())
+      else if (
+        match[1][0] === fence.marker &&
+        match[1].length >= fence.length &&
+        !match[2].trim()
+      ) {
         fence = undefined;
+      }
 
       return false;
     }
@@ -237,8 +243,9 @@ function splitSections(markdown: string): SplitSections {
             match[1][0] === fence.marker &&
             match[1].length >= fence.length &&
             !match[2].trim()
-          )
+          ) {
             fence = undefined;
+          }
         }
 
         if (!fence && !line.trim()) {
@@ -287,8 +294,9 @@ function splitSections(markdown: string): SplitSections {
   // Split oversized sections at blank lines outside fences, so matches do not pull
   // in an entire chapter. Keep the heading with its first content block.
   const bounded = sections.flatMap((section, group) => {
-    if (section.length <= WINDOW_MIN_CHARACTERS)
+    if (section.length <= WINDOW_MIN_CHARACTERS) {
       return [{ markdown: section, tokens: tokens(section) }];
+    }
     const chunks: string[] = [];
     let current: string[] = [];
     let size = 0;
@@ -303,8 +311,9 @@ function splitSections(markdown: string): SplitSections {
           match[1][0] === inFence.marker &&
           match[1].length >= inFence.length &&
           !match[2].trim()
-        )
+        ) {
           inFence = undefined;
+        }
       }
 
       if (!inFence && line.length > WINDOW_TARGET_CHARACTERS / 2) {
@@ -334,8 +343,9 @@ function splitSections(markdown: string): SplitSections {
     return chunks.map((chunk, index) => {
       const result: Section = { markdown: chunk, tokens: tokens(chunk) };
 
-      if (heading.length <= 500 && HEADING_PATTERN.test(heading))
+      if (heading.length <= 500 && HEADING_PATTERN.test(heading)) {
         result.context = { group, heading, continuation: index > 0 };
+      }
 
       return result;
     });
@@ -404,8 +414,11 @@ export function focusMarkdown(markdown: string, query: string): FocusResult {
   const scores = sections.map((section) => {
     if (literalIdentifier) return containsIdentifier(section.markdown, literalIdentifier) ? 1 : 0;
 
-    if (embeddedIdentifiers.some((identifier) => !containsIdentifier(section.markdown, identifier)))
+    if (
+      embeddedIdentifiers.some((identifier) => !containsIdentifier(section.markdown, identifier))
+    ) {
       return 0;
+    }
     const frequencies = new Map<string, number>();
 
     for (const token of section.tokens) frequencies.set(token, (frequencies.get(token) ?? 0) + 1);

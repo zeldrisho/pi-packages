@@ -247,9 +247,9 @@ function providerReasons(body: string): Set<ProviderReason> {
       if (!isJsonObject(detail) || !isJsonText(detail.reason)) continue;
       const reason = detail.reason.toUpperCase();
 
-      if (reason === "QUOTA_EXHAUSTED" || reason === "INSUFFICIENT_G1_CREDITS_BALANCE")
+      if (reason === "QUOTA_EXHAUSTED" || reason === "INSUFFICIENT_G1_CREDITS_BALANCE") {
         reasons.add("quota");
-      else if (reason === "RATE_LIMIT_EXCEEDED") reasons.add("rateLimit");
+      } else if (reason === "RATE_LIMIT_EXCEEDED") reasons.add("rateLimit");
       else if (reason === "MODEL_CAPACITY_EXHAUSTED") reasons.add("capacity");
       else if (reason === "TOS_VIOLATION") reasons.add("tos");
       else if (reason === "PERMISSION_DENIED") reasons.add("restriction");
@@ -276,18 +276,21 @@ function exhaustionKind(body: string): ExhaustionKind {
     /insufficient_quota|quota[_\s-]+exceeded|usage[_\s-]+limit[_\s-]+(?:reached|exceeded)|(?:daily|weekly|monthly)\s+(?:usage\s+)?(?:quota|limit)/i.test(
       text,
     )
-  )
+  ) {
     return "quota";
+  }
 
-  if (/account[_\s-]+(?:restricted|suspended|disabled)|permission[_\s-]+denied/i.test(text))
+  if (/account[_\s-]+(?:restricted|suspended|disabled)|permission[_\s-]+denied/i.test(text)) {
     return "restriction";
+  }
 
   if (
     /server[_\s-]+busy|temporarily\s+unavailable|model\s+is\s+at\s+capacity|rate[_\s-]+limit(?:ed|ing)?|too\s+many\s+requests/i.test(
       text,
     )
-  )
+  ) {
     return "temporary";
+  }
 
   return "unknown";
 }
@@ -295,17 +298,21 @@ function exhaustionKind(body: string): ExhaustionKind {
 export function describeFailure(status: number, body: string): string {
   const reasons = providerReasons(body);
 
-  if (status === 403 && reasons.has("tos"))
+  if (status === 403 && reasons.has("tos")) {
     return "Antigravity suspended this account for a Terms of Service violation. Review the provider notice or appeal; signing in again will not resolve the suspension.";
+  }
 
-  if (status === 429 && reasons.has("quota"))
+  if (status === 429 && reasons.has("quota")) {
     return "Antigravity usage quota exceeded. Wait for it to reset or select another model.";
+  }
 
-  if ((status === 429 || status === 503) && reasons.has("capacity"))
+  if ((status === 429 || status === 503) && reasons.has("capacity")) {
     return "Antigravity has no capacity available for the selected model. Try another model or thinking level, or wait and retry.";
+  }
 
-  if (status === 429 && reasons.has("rateLimit"))
+  if (status === 429 && reasons.has("rateLimit")) {
     return "Antigravity is rate limiting this account. Wait and retry, or select another model.";
+  }
   const detail = body.replaceAll(/\s+/g, " ").trim().slice(0, 300);
   const suffix = detail === "" ? "" : `: ${detail}`;
 
@@ -330,14 +337,17 @@ export function describeFailure(status: number, body: string): string {
   if (status === 429) {
     const kind = exhaustionKind(body);
 
-    if (kind === "quota")
+    if (kind === "quota") {
       return "Antigravity usage quota exceeded. Wait for it to reset or select another model.";
+    }
 
-    if (kind === "restriction")
+    if (kind === "restriction") {
       return "Antigravity reports an account restriction. Check account access or select another model.";
+    }
 
-    if (kind === "temporary")
+    if (kind === "temporary") {
       return "Antigravity is temporarily unavailable due to capacity or rate limiting. Try again later or select another model.";
+    }
 
     return "Antigravity rejected the request: resource exhausted. The service did not specify whether this is a usage limit, temporary capacity issue, or account restriction. Try later or select another model.";
   }
@@ -906,10 +916,11 @@ export function createAntigravityStream(
         let lastEmpty: Error | undefined;
 
         for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
-          if (attempt > 0)
+          if (attempt > 0) {
             await new Promise((resolve) => {
               setTimeout(resolve, 500 * attempt);
             });
+          }
 
           const envelope = buildRequest({
             model: entry,

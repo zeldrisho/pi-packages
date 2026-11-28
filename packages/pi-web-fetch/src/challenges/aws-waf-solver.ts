@@ -29,8 +29,9 @@ export function solveAwsWafBandwidth(difficulty: number): string {
 
 /** Computes bounded proof-of-work inside a disposable worker. */
 export function solveAwsWafWork(work: AwsWafWork): string | undefined {
-  if (!Number.isInteger(work.difficulty) || work.difficulty < 1 || work.difficulty > 32)
+  if (!Number.isInteger(work.difficulty) || work.difficulty < 1 || work.difficulty > 32) {
     return undefined;
+  }
 
   if (work.type === "NetworkBandwidth") return solveAwsWafBandwidth(work.difficulty);
 
@@ -46,8 +47,9 @@ export function solveAwsWafWork(work: AwsWafWork): string | undefined {
     const cost = work.memory > 0 ? work.memory : 128;
 
     // Reject large or invalid costs before invoking OpenSSL.
-    if (!Number.isInteger(cost) || cost < 2 || cost > 16_384 || (cost & (cost - 1)) !== 0)
+    if (!Number.isInteger(cost) || cost < 2 || cost > 16_384 || (cost & (cost - 1)) !== 0) {
       return undefined;
+    }
 
     for (let nonce = 0; nonce < 100_000; nonce += 1) {
       const digest = scryptSync(`${work.input}${work.checksum}${nonce}`, work.checksum, 32, {

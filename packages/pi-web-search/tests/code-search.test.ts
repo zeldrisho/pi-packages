@@ -72,8 +72,9 @@ describe("web_search code-search options", () => {
   });
 
   it("validates advanced inputs", () => {
-    for (const value of ["web,bogus", "", "news"])
+    for (const value of ["web,bogus", "", "news"]) {
       expect(() => normalizeResultFilter(value)).toThrow("resultFilter");
+    }
     expect(() => validateProviderRequest("q", 5, "web", { country: "USA" })).toThrow(
       "2-letter code",
     );

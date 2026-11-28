@@ -56,8 +56,9 @@ export function isOpenapiSource(raw: string, contentType: string): boolean {
         let paths = false;
 
         for (const property of node.properties) {
-          if (property.type !== "Property" || property.computed || property.kind !== "init")
+          if (property.type !== "Property" || property.computed || property.kind !== "init") {
             continue;
+          }
 
           const key =
             property.key.type === "Identifier"

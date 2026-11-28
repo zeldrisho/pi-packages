@@ -255,8 +255,9 @@ export class ExpiringLruCache<K, V> {
 
       const size = this.sizeOf(value);
 
-      if (!Number.isFinite(size) || size < 0 || size > this.maxBytes)
+      if (!Number.isFinite(size) || size < 0 || size > this.maxBytes) {
         throw new Error("oversized cache entry");
+      }
       entry = { expiresAt, size, value };
     } catch {
       this.#removeFromDisk(key);
@@ -284,8 +285,9 @@ export class ExpiringLruCache<K, V> {
       chmodSync(directory, 0o700);
       const payload = this.persistence!.serialize(value);
 
-      if (payload.byteLength > this.maxBytes * 2 + 65_536)
+      if (payload.byteLength > this.maxBytes * 2 + 65_536) {
         throw new Error("oversized cache payload");
+      }
       const path = resolveCachePath(directory, this.persistence!.keyToPath(key));
       const temp = `${path}.${randomUUID()}.tmp`;
       writeCacheFile(path, temp, Buffer.concat([encodeExpiresAt(expiresAt), payload]));

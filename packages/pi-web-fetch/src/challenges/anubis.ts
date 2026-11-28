@@ -160,8 +160,9 @@ function sanitizeBasePrefix(value: AnubisScriptValue | undefined): string | unde
 
   if (!value.startsWith("/") || value.startsWith("//")) return undefined;
 
-  if (value.includes("\\") || value.includes("?") || value.includes("#") || value.includes("%"))
+  if (value.includes("\\") || value.includes("?") || value.includes("#") || value.includes("%")) {
     return undefined;
+  }
 
   if (hasControlCharacters(value)) return undefined;
 
@@ -224,8 +225,9 @@ export function parseAnubisChallenge(raw: string, pageUrl: URL): AnubisChallenge
   const version = readJsonScript(document, "anubis_version");
   const challengePayload = readJsonScript(document, "anubis_challenge");
 
-  if (!isString(version) || version.length === 0 || version.length > MAX_VERSION_CHARACTERS)
+  if (!isString(version) || version.length === 0 || version.length > MAX_VERSION_CHARACTERS) {
     return undefined;
+  }
 
   if (isCrossOriginPublicUrl(document, pageUrl)) return undefined;
 
@@ -260,8 +262,9 @@ export function parseAnubisChallenge(raw: string, pageUrl: URL): AnubisChallenge
 
   if (hasControlCharacters(id)) return undefined;
 
-  if (!isString(method) || method.length === 0 || method.length > MAX_CHALLENGE_ID_CHARACTERS)
+  if (!isString(method) || method.length === 0 || method.length > MAX_CHALLENGE_ID_CHARACTERS) {
     return undefined;
+  }
 
   if (hasControlCharacters(method)) return undefined;
 
@@ -287,8 +290,9 @@ export function parseAnubisChallenge(raw: string, pageUrl: URL): AnubisChallenge
 
   if (!isStringArray(extensions) || extensions.length > MAX_EXTENSIONS) return undefined;
 
-  if (extensions.some((extension) => extension.length === 0 || extension.length > 64))
+  if (extensions.some((extension) => extension.length === 0 || extension.length > 64)) {
     return undefined;
+  }
 
   return { id, method, randomData, difficulty, version, basePrefix, extensions };
 }
@@ -367,8 +371,9 @@ function solveInWorker(request: AnubisWorkerRequest, signal: AbortSignal): Promi
 
     worker.on("error", (error) => finish(() => reject(error)));
     worker.on("exit", (code) => {
-      if (code !== 0)
+      if (code !== 0) {
         finish(() => reject(new Error(`Anubis solve worker exited with code ${code}.`)));
+      }
     });
 
     if (signal.aborted) onAbort();
@@ -401,8 +406,9 @@ async function fetchWasmModule(
   const bytes = await readResponseBytes(response, ANUBIS_MAX_WASM_BYTES, signal);
   const decoded = decompressResponse(bytes, responseHeader(response, "content-encoding"));
 
-  if (decoded.byteLength === 0 || decoded.byteLength > ANUBIS_MAX_WASM_BYTES)
+  if (decoded.byteLength === 0 || decoded.byteLength > ANUBIS_MAX_WASM_BYTES) {
     throw new Error("Anubis challenge module exceeded the size limit.");
+  }
 
   return decoded;
 }
@@ -442,8 +448,9 @@ function cssLoadUrls(raw: string, pageUrl: URL): URL[] {
     for (const match of matches) consider(match[1]);
   }
 
-  for (const element of document.querySelectorAll("link[rel=stylesheet][href]"))
+  for (const element of document.querySelectorAll("link[rel=stylesheet][href]")) {
     consider(element.getAttribute("href"));
+  }
 
   return urls;
 }
@@ -486,11 +493,13 @@ export async function solveAnubisChallenge(context: AnubisSolveContext): Promise
   const { challenge, pageUrl, raw, dependencies, signal } = context;
   const started = Date.now();
 
-  if (!hasSupportedExtensions(challenge))
+  if (!hasSupportedExtensions(challenge)) {
     throw new Error("web_fetch does not support the extensions required by this Anubis challenge.");
+  }
 
-  if (challenge.extensions.includes("css-load"))
+  if (challenge.extensions.includes("css-load")) {
     await performCssLoad(raw, pageUrl, dependencies, signal);
+  }
 
   const deadline = Date.now() + WORKER_DEADLINE_MS;
   let params: AnubisPassParameters;
