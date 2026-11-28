@@ -533,41 +533,26 @@ describe("opencode-free extension", () => {
       expect(publications[0]?.persist?.checkedAt).toBe(now);
     });
 
-    it("refreshes stored models with an absent, invalid, future, or expired timestamp", async () => {
-      for (const checkedAt of [
-        undefined,
-        Number.NaN,
-        Number.POSITIVE_INFINITY,
-        -1,
-        start + 1,
-        start - ttl,
-      ]) {
-        const calls: string[] = [];
-        const config = provider(discoveryFetcher(calls));
+    it.each([
+      ["missing timestamp", { checkedAt: undefined }],
+      ["NaN timestamp", { checkedAt: Number.NaN }],
+      ["infinite timestamp", { checkedAt: Number.POSITIVE_INFINITY }],
+      ["negative timestamp", { checkedAt: -1 }],
+      ["future timestamp", { checkedAt: start + 1 }],
+      ["expired timestamp", { checkedAt: start - ttl }],
+      ["empty catalog", { models: [] }],
+      ["models from another provider", { models: [{ ...storedModel, provider: "other" }] }],
+      ["missing Last-Modified", { lastModified: undefined }],
+    ] as const)("refreshes a stored catalog with %s", async (_, overrides) => {
+      const calls: string[] = [];
+      const config = provider(discoveryFetcher(calls));
+      const { context } = refreshContext({
+        allowNetwork: true,
+        stored: { models: [storedModel], checkedAt: start, lastModified: 0, ...overrides },
+      });
 
-        const { context } = refreshContext({
-          allowNetwork: true,
-          stored: { models: [storedModel], checkedAt, lastModified: 0 },
-        });
-
-        await refreshModels(config, context);
-        expect.soft(calls, String(checkedAt)).toHaveLength(2);
-      }
-    });
-
-    it("does not treat a timestamp without usable models as a fresh catalog", async () => {
-      for (const models of [[], [{ ...storedModel, provider: "other" }]]) {
-        const calls: string[] = [];
-        const config = provider(discoveryFetcher(calls));
-
-        const { context } = refreshContext({
-          allowNetwork: true,
-          stored: { models, checkedAt: now, lastModified: 0 },
-        });
-
-        await refreshModels(config, context);
-        expect.soft(calls, models.length ? "other provider" : "empty catalog").toHaveLength(2);
-      }
+      await refreshModels(config, context);
+      expect(calls).toHaveLength(2);
     });
 
     it.each([false, true])(
@@ -806,47 +791,70 @@ describe("opencode-free extension", () => {
       }
     });
 
-    it("does not advance freshness on catalog transport or parse failures", async () => {
-      for (const failure of ["transport", "invalid-json"] as const) {
+    it.each(["transport", "invalid JSON", "caller cancellation", "deadline"] as const)(
+      "does not advance freshness after %s",
+      async (failure) => {
         const calls: string[] = [];
         const successfulFetch = discoveryFetcher(calls);
+        const abort = new AbortController();
+        const timeout =
+          failure === "deadline"
+            ? vi.spyOn(AbortSignal, "timeout").mockReturnValue(abort.signal)
+            : undefined;
+        const stored =
+          failure === "transport" || failure === "invalid JSON"
+            ? { models: [storedModel], checkedAt: start - ttl, lastModified: 0 }
+            : undefined;
 
         const config = provider(async (input, init) => {
+          if (input === `${DEFAULT_BASE_URL}/models`) {
+            if (failure === "caller cancellation") abort.abort();
+            if (failure === "deadline") abort.abort(new DOMException("deadline", "TimeoutError"));
+          }
+
           const response = await successfulFetch(input, init);
 
           if (input === MODEL_CATALOG_URL) {
             if (failure === "transport") throw new Error("private details");
-
-            return new Response("{");
+            if (failure === "invalid JSON") return new Response("{");
           }
 
           return response;
         });
 
-        const { context, publications } = refreshContext({
+        const initial = refreshContext({
           allowNetwork: true,
-          stored: { models: [storedModel], checkedAt: start - ttl, lastModified: 0 },
+          stored,
+          signal: failure === "caller cancellation" ? abort.signal : undefined,
         });
+        const models = await refreshModels(config, initial.context);
 
-        expect.soft((await refreshModels(config, context))[0]?.id, failure).toBe("cached-free");
-        await refreshModels(config, context);
-        expect.soft(calls, failure).toHaveLength(4);
-        expect.soft(publications, failure).toEqual([]);
-      }
-    });
+        if (stored) {
+          expect(models[0]?.id).toBe(storedModel.id);
+        } else {
+          expect(models).toEqual(initialFreeModels());
+        }
 
-    it("rechecks legacy snapshots without Last-Modified instead of trusting checkedAt alone", async () => {
-      const calls: string[] = [];
-      const config = provider(discoveryFetcher(calls));
+        expect(initial.publications).toEqual([]);
 
-      const { context } = refreshContext({
-        allowNetwork: true,
-        stored: { models: [storedModel], checkedAt: now },
-      });
+        timeout?.mockRestore();
+        const retry =
+          failure === "caller cancellation" ? refreshContext({ allowNetwork: true }) : initial;
+        await refreshModels(config, retry.context);
+        expect(calls).toHaveLength(4);
+        expect(retry.publications).toHaveLength(stored ? 0 : 1);
 
-      await refreshModels(config, context);
-      expect(calls).toHaveLength(2);
-    });
+        if (failure === "deadline") {
+          const otherEndpoint = refreshContext({
+            allowNetwork: true,
+            baseUrl: "https://proxy.test/v1",
+          });
+          await refreshModels(config, otherEndpoint.context);
+          expect(calls).toHaveLength(6);
+          expect(otherEndpoint.publications).toHaveLength(1);
+        }
+      },
+    );
 
     it("allows force to skip successful and failed HTTP freshness checks", async () => {
       const calls: string[] = [];
@@ -884,60 +892,6 @@ describe("opencode-free extension", () => {
         expect.soft(await refreshModels(config, context), mode).toEqual(initialFreeModels());
         expect.soft(calls, mode).toEqual([]);
       }
-    });
-
-    it("does not advance freshness after caller cancellation during discovery", async () => {
-      const calls: string[] = [];
-      const successfulFetch = discoveryFetcher(calls);
-      const controller = new AbortController();
-
-      const config = provider(async (input, init) => {
-        if (input === `${DEFAULT_BASE_URL}/models`) controller.abort();
-
-        return successfulFetch(input, init);
-      });
-
-      const canceled = refreshContext({ allowNetwork: true, signal: controller.signal });
-
-      expect(await refreshModels(config, canceled.context)).toEqual(initialFreeModels());
-      expect(canceled.publications).toEqual([]);
-      const retry = refreshContext({ allowNetwork: true });
-      await refreshModels(config, retry.context);
-      expect(calls).toHaveLength(4);
-      expect(retry.publications).toHaveLength(1);
-    });
-
-    it("does not advance freshness after deadline failures", async () => {
-      const calls: string[] = [];
-      const successfulFetch = discoveryFetcher(calls);
-      const deadline = new AbortController();
-      const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(deadline.signal);
-
-      const config = provider(async (input, init) => {
-        if (input === `${DEFAULT_BASE_URL}/models`) {
-          deadline.abort(new DOMException("deadline", "TimeoutError"));
-        }
-
-        return successfulFetch(input, init);
-      });
-
-      const { context, publications } = refreshContext({ allowNetwork: true });
-
-      expect(await refreshModels(config, context)).toEqual(initialFreeModels());
-      expect(publications).toEqual([]);
-      timeout.mockRestore();
-      await refreshModels(config, context);
-      expect(calls).toHaveLength(4);
-      expect(publications).toHaveLength(1);
-
-      const otherEndpoint = refreshContext({
-        allowNetwork: true,
-        baseUrl: "https://proxy.test/v1",
-      });
-
-      await refreshModels(config, otherEndpoint.context);
-      expect(calls).toHaveLength(6);
-      expect(otherEndpoint.publications).toHaveLength(1);
     });
   });
 });

@@ -254,155 +254,114 @@ describe("executeWebFetch llms.txt support", () => {
     expect(result.content[0]?.text).toContain("# Example site");
   });
 
-  it("keeps an authored no-JavaScript fallback instead of replacing it with /llms.txt", async () => {
-    const fallback = "Published report details remain readable without scripts. ".repeat(6);
-
-    const html =
-      "<!doctype html><html><head><title>Report</title></head><body>" +
-      '<main class="wrap" id="main"></main>' +
-      '<div class="status-pill hidden" id="status-pill">reconnecting&hellip;</div>' +
-      `<noscript><div class="wrap prose"><h1>Quarterly report</h1><p>${fallback}</p></div></noscript>` +
-      "<script>// JavaScript is required for the interactive view.</script>" +
-      "</body></html>";
-
-    const { dependencies } = recordingDependencies((href) =>
+  it.each([
+    {
+      name: "authored no-JavaScript fallback",
+      url: `https://fallback.example.com/report-${process.pid}`,
+      html:
+        "<!doctype html><html><head><title>Report</title></head><body>" +
+        '<main class="wrap" id="main"></main>' +
+        '<div class="status-pill hidden" id="status-pill">reconnecting&hellip;</div>' +
+        '<noscript><div class="wrap prose"><h1>Quarterly report</h1><p>' +
+        "Published report details remain readable without scripts. ".repeat(6) +
+        "</p></div></noscript><script>// JavaScript is required for the interactive view.</script>" +
+        "</body></html>",
+      text: "Published report details remain readable",
+      details: { noscriptFallback: true },
+    },
+    {
+      name: "short intentional content",
+      url: "https://short.example.com/production-error?code=31",
+      html: "<!doctype html><html><body><main>Not found (code 31).</main></body></html>",
+      text: "Not found (code 31).",
+      details: {
+        requestedUrl: "https://short.example.com/production-error?code=REDACTED",
+        finalUrl: "https://short.example.com/production-error?code=REDACTED",
+      },
+    },
+  ])("keeps $name instead of replacing it with /llms.txt", async ({ url, html, text, details }) => {
+    const { dependencies, requests } = recordingDependencies((href) =>
       href.endsWith("/llms.txt")
         ? fakeResponse(200, "text/markdown", LLMS_TXT)
         : fakeResponse(200, "text/html", html),
     );
 
-    const result = await executeWebFetch(
-      { url: `https://fallback.example.com/report-${process.pid}` },
-      undefined,
-      undefined,
-      dependencies,
-    );
-
-    expect(result.details.noscriptFallback).toBe(true);
-    expect(result.details.llmsTxtFallback).toBe(false);
-    expect(result.content[0]?.text).toContain("Published report details remain readable");
+    const result = await executeWebFetch({ url }, undefined, undefined, dependencies);
+    expect(requests).toContain(url);
+    expect(result.details).toMatchObject({ llmsTxtFallback: false, ...details });
+    expect(result.content[0]?.text).toContain(text);
     expect(result.content[0]?.text).not.toContain("Showing the site index instead");
-  });
-
-  it("keeps short intentional page content instead of replacing it with /llms.txt", async () => {
-    const { dependencies, requests } = recordingDependencies((href) =>
-      href.endsWith("/llms.txt")
-        ? fakeResponse(200, "text/markdown", LLMS_TXT)
-        : fakeResponse(
-            200,
-            "text/html",
-            "<!doctype html><html><body><main>Not found (code 31).</main></body></html>",
-          ),
-    );
-
-    const requested = "https://short.example.com/production-error?code=31";
-    const result = await executeWebFetch({ url: requested }, undefined, undefined, dependencies);
-
-    expect(result.details.llmsTxtFallback).toBe(false);
-    expect(requests).toContain(requested);
-    expect(result.details.requestedUrl).toBe(
-      "https://short.example.com/production-error?code=REDACTED",
-    );
-    expect(result.details.finalUrl).toBe(
-      "https://short.example.com/production-error?code=REDACTED",
-    );
-    expect(result.content[0]?.text).toContain("Not found (code 31).");
     expect(result.content[0]?.text).not.toContain("# Example site");
   });
 
-  it("advertises a usable /llms.txt alongside a healthy page", async () => {
+  it.each([
+    ["usable", true],
+    ["missing", false],
+  ] as const)("caches a %s root index probe across healthy pages", async (name, usable) => {
+    const origin = `https://${name}-root-index.example.com`;
+    const index = `${origin}/llms.txt`;
+    const page = "A perfectly readable plain-text page.";
     const { dependencies, requests } = recordingDependencies((href) => {
-      if (href === "https://indexed.example.com/llms.txt") {
-        return fakeResponse(200, "text/markdown", LLMS_TXT);
+      if (href === index) {
+        return usable
+          ? fakeResponse(200, "text/markdown", LLMS_TXT)
+          : fakeResponse(404, "text/plain", "Not Found");
       }
 
-      if (href.endsWith("/llms.txt")) return fakeResponse(404, "text/plain", "Not Found");
-
-      return fakeResponse(200, "text/plain", "A perfectly readable plain-text page.\n".repeat(20));
+      return fakeResponse(200, "text/plain", `${page}\n`.repeat(20));
     });
 
-    const result = await executeWebFetch(
-      { url: `https://indexed.example.com/page-${process.pid}` },
-      undefined,
-      undefined,
-      dependencies,
-    );
-
-    expect(requests).toHaveLength(2);
-    expect(result.details.llmsTxtFallback).toBe(false);
-    expect(result.details.llmsTxtUrl).toBe("https://indexed.example.com/llms.txt");
-    expect(result.content[0]?.text).toContain("Index: https://indexed.example.com/llms.txt");
-    expect(result.content[0]?.text).toContain("A perfectly readable plain-text page.");
-
-    const second = await executeWebFetch(
-      { url: `https://indexed.example.com/second-${process.pid}` },
-      undefined,
-      undefined,
-      dependencies,
-    );
-
-    expect(second.content[0]?.text).toContain("Index: https://indexed.example.com/llms.txt");
-  });
-
-  it("suppresses equivalent index links but preserves links to distinct indexes", async () => {
-    for (const identical of [true, false]) {
-      const origin = `https://${identical ? "same" : "distinct"}-aliases.example.com`;
-      const root = `${origin}/llms.txt`;
-      const section = `${origin}/docs/llms.txt`;
-
-      const { dependencies } = recordingDependencies((href) => {
-        if (href === root) return fakeResponse(200, "text/markdown", LLMS_TXT);
-
-        if (href === section) {
-          return fakeResponse(
-            200,
-            "text/markdown",
-            identical ? LLMS_TXT : `${LLMS_TXT}\nDistinct section`,
-          );
-        }
-
-        return fakeResponse(
-          200,
-          "text/plain",
-          `Documentation index: ${root}\n${"Page content. ".repeat(30)}`,
-        );
-      });
-
+    for (const [path, requestCount] of [
+      ["first", 2],
+      ["second", 3],
+    ] as const) {
       const result = await executeWebFetch(
-        { url: `${origin}/docs/page` },
+        { url: `${origin}/${path}-${process.pid}` },
         undefined,
         undefined,
         dependencies,
       );
+      expect(requests).toHaveLength(requestCount);
+      expect(result.details.llmsTxtFallback).toBe(false);
+      expect(result.details.llmsTxtUrl).toBe(usable ? index : undefined);
+      expect(result.content[0]?.text).toContain(page);
 
-      expect.soft(result.details.llmsTxtUrl, origin).toBe(section);
-      expect.soft(result.content[0]?.text, origin).toContain(`Documentation index: ${root}`);
-      expect.soft(result.content[0]?.text.includes(`Index: ${section}`), origin).toBe(!identical);
+      if (usable) {
+        expect(result.content[0]?.text).toContain(`Index: ${index}`);
+      } else {
+        expect(result.content[0]?.text).not.toContain("Index:");
+        expect(result.content[0]?.text).not.toContain("also publishes");
+      }
     }
   });
 
-  it("suppresses index notices only when the matching link is already visible", async () => {
-    for (const target of ["visible-relative", "visible-absolute", "different-origin"] as const) {
-      const origin = `https://links-${target}.example.com`;
+  it.each([
+    ["equivalent alias", "root", LLMS_TXT, false],
+    ["distinct alias", "root", `${LLMS_TXT}\nDistinct root index`, true],
+    ["matching relative link", "relative", undefined, false],
+    ["matching absolute link", "absolute", undefined, false],
+    ["different origin", "external", undefined, true],
+  ] as const)(
+    "renders the section index notice for: %s",
+    async (_, target, rootBody, showNotice) => {
+      const origin = `https://index-notice-${target}-${showNotice}.example.com`;
+      const root = `${origin}/llms.txt`;
       const section = `${origin}/docs/llms.txt`;
-
-      const link =
-        target === "visible-relative"
-          ? "[index](../llms.txt)"
-          : target === "visible-absolute"
-            ? section
-            : "[index](https://elsewhere.example/docs/llms.txt)";
-
+      const link = {
+        root,
+        relative: "[index](../llms.txt)",
+        absolute: section,
+        external: "[index](https://elsewhere.example/docs/llms.txt)",
+      }[target];
+      const bodyLink = `Documentation index: ${link}`;
       const { dependencies } = recordingDependencies((href) => {
         if (href === section) return fakeResponse(200, "text/markdown", LLMS_TXT);
 
+        if (href === root && rootBody) return fakeResponse(200, "text/markdown", rootBody);
+
         if (href.endsWith("/llms.txt")) return fakeResponse(404, "text/plain", "Not Found");
 
-        return fakeResponse(
-          200,
-          "text/plain",
-          `Documentation: ${link}\n${"Page content. ".repeat(30)}`,
-        );
+        return fakeResponse(200, "text/plain", `${bodyLink}\n${"Page content. ".repeat(30)}`);
       });
 
       const result = await executeWebFetch(
@@ -411,14 +370,11 @@ describe("executeWebFetch llms.txt support", () => {
         undefined,
         dependencies,
       );
-
-      expect.soft(result.details.llmsTxtUrl, link).toBe(section);
-      expect.soft(result.content[0]?.text, link).toContain(link);
-      expect
-        .soft(result.content[0]?.text.includes(`Index: ${section}`), link)
-        .toBe(target === "different-origin");
-    }
-  });
+      expect(result.details.llmsTxtUrl).toBe(section);
+      expect(result.content[0]?.text).toContain(bodyLink);
+      expect(result.content[0]?.text.includes(`Index: ${section}`)).toBe(showNotice);
+    },
+  );
 
   it("prefers a deeper section index over the site-wide one", async () => {
     const { dependencies, requests } = recordingDependencies((href) => {
@@ -586,46 +542,6 @@ describe("executeWebFetch llms.txt support", () => {
     ).rejects.toThrow("does not support application/octet-stream");
   });
 
-  it("stays silent when the site has no usable /llms.txt", async () => {
-    const { dependencies, requests } = recordingDependencies((href) =>
-      href.endsWith("/llms.txt")
-        ? fakeResponse(404, "text/plain", "Not Found")
-        : fakeResponse(200, "text/plain", "A perfectly readable plain-text page.\n".repeat(20)),
-    );
-
-    const result = await executeWebFetch(
-      { url: `https://healthy.example.com/page-${process.pid}` },
-      undefined,
-      undefined,
-      dependencies,
-    );
-
-    // The fresh origin still costs one probe request, cached negatively afterwards.
-    expect(requests).toHaveLength(2);
-    expect(result.details.llmsTxtFallback).toBe(false);
-    expect(result.details.llmsTxtUrl).toBeUndefined();
-    expect(result.content[0]?.text).not.toContain("also publishes");
-  });
-
-  it("keeps the primary page when the probed llms.txt is too short to be useful", async () => {
-    const { dependencies, requests } = recordingDependencies((href) =>
-      href.endsWith("/llms.txt")
-        ? fakeResponse(200, "text/markdown", "# Stub\n")
-        : fakeResponse(200, "text/html", APP_SHELL_HTML),
-    );
-
-    const result = await executeWebFetch(
-      { url: `https://stub.example.com/page-${process.pid}` },
-      undefined,
-      undefined,
-      dependencies,
-    );
-
-    expect(requests).toHaveLength(2);
-    expect(result.details.llmsTxtFallback).toBe(false);
-    expect(result.details.llmsTxtUrl).toBeUndefined();
-  });
-
   it("uses an advertised describedby index deeper than blind candidates reach", async () => {
     const advertisedIndex = "https://advertised.example.com/deep/section/llms.txt";
 
@@ -676,55 +592,39 @@ describe("executeWebFetch llms.txt support", () => {
     expect(result.details.finalUrl).toBe("https://htmllink.example.com/site/llms.txt");
   });
 
-  it("serves an advertised Markdown version of a low-quality page", async () => {
-    const markdownVersion = `https://altpage.example.com/page-${process.pid}.md`;
+  it.each(["low-quality", "empty"] as const)(
+    "serves advertised Markdown when the HTML extraction is %s",
+    async (quality) => {
+      const path = `/page-${process.pid}`;
+      const requested = `https://${quality}-alternate.example.com${path}`;
+      const { dependencies, requests } = recordingDependencies((href) => {
+        if (href === `${requested}.md`) return fakeResponse(200, "text/markdown", LLMS_TXT);
 
-    const { dependencies, requests } = recordingDependencies((href) => {
-      if (href === markdownVersion) return fakeResponse(200, "text/markdown", LLMS_TXT);
+        if (href.endsWith("/llms.txt")) return fakeResponse(404, "text/plain", "Not Found");
 
-      if (href.endsWith("/llms.txt")) return fakeResponse(404, "text/plain", "Not Found");
-
-      return fakeResponse(200, "text/html", APP_SHELL_HTML, {
-        link: `</page-${process.pid}.md>; rel="alternate"; type="text/markdown"`,
+        return quality === "low-quality"
+          ? fakeResponse(200, "text/html", APP_SHELL_HTML, {
+              link: `<${path}.md>; rel="alternate"; type="text/markdown"`,
+            })
+          : fakeResponse(
+              200,
+              "text/html",
+              `<html><head><link rel="alternate" type="text/markdown" href="${path}.md"></head><body></body></html>`,
+            );
       });
-    });
 
-    const requested = `https://altpage.example.com/page-${process.pid}`;
-    const result = await executeWebFetch({ url: requested }, undefined, undefined, dependencies);
-    // Page + root probe + the advertised .md version.
-    expect(requests).toHaveLength(3);
-    expect(result.details.markdownAlternateFallback).toBe(true);
-    expect(result.details.llmsTxtFallback).toBe(false);
-    expect(result.details.extractor).toBe("raw");
-    expect(result.content[0]?.text).toContain("site's advertised Markdown version");
-    expect(result.content[0]?.text).toContain("# Example site");
-  });
-
-  it("uses an advertised Markdown version when HTML extraction is empty", async () => {
-    const markdownVersion = `https://emptyalt.example.com/page-${process.pid}.md`;
-
-    const { dependencies } = recordingDependencies((href) => {
-      if (href === markdownVersion) return fakeResponse(200, "text/markdown", LLMS_TXT);
-
-      if (href.endsWith("/llms.txt")) return fakeResponse(404, "text/plain", "Not Found");
-
-      return fakeResponse(
-        200,
-        "text/html",
-        `<html><head><link rel="alternate" type="text/markdown" href="/page-${process.pid}.md"></head><body></body></html>`,
-      );
-    });
-
-    const result = await executeWebFetch(
-      { url: `https://emptyalt.example.com/page-${process.pid}` },
-      undefined,
-      undefined,
-      dependencies,
-    );
-
-    expect(result.details.markdownAlternateFallback).toBe(true);
-    expect(result.content[0]?.text).toContain("site's advertised Markdown version");
-  });
+      const result = await executeWebFetch({ url: requested }, undefined, undefined, dependencies);
+      // Page + root probe + the advertised .md version.
+      expect(requests).toHaveLength(3);
+      expect(result.details).toMatchObject({
+        markdownAlternateFallback: true,
+        llmsTxtFallback: false,
+        extractor: "raw",
+      });
+      expect(result.content[0]?.text).toContain("site's advertised Markdown version");
+      expect(result.content[0]?.text).toContain("# Example site");
+    },
+  );
 
   it("preserves the empty-content error when no fallback is available", async () => {
     const { dependencies } = recordingDependencies((href) =>
@@ -743,30 +643,37 @@ describe("executeWebFetch llms.txt support", () => {
     ).rejects.toThrow("web_fetch: Page has no extractable content.");
   });
 
-  it("keeps the primary page when an advertised Markdown version is unusable", async () => {
-    const markdownVersion = `https://altstub.example.com/page-${process.pid}.md`;
+  it.each([
+    ["probed llms.txt", false, 2],
+    ["advertised Markdown", true, 3],
+  ] as const)(
+    "keeps the primary page when %s is too short",
+    async (_, advertised, requestCount) => {
+      const path = `/page-${process.pid}`;
+      const url = `https://${advertised ? "alternate" : "index"}-stub.example.com${path}`;
+      const { dependencies, requests } = recordingDependencies((href) => {
+        if (href === `${url}.md` || (!advertised && href.endsWith("/llms.txt"))) {
+          return fakeResponse(200, "text/markdown", "# Stub\n");
+        }
 
-    const { dependencies, requests } = recordingDependencies((href) => {
-      if (href === markdownVersion) return fakeResponse(200, "text/markdown", "# Stub\n");
+        if (href.endsWith("/llms.txt")) return fakeResponse(404, "text/plain", "Not Found");
 
-      if (href.endsWith("/llms.txt")) return fakeResponse(404, "text/plain", "Not Found");
-
-      return fakeResponse(200, "text/html", APP_SHELL_HTML, {
-        link: `</page-${process.pid}.md>; rel="alternate"; type="text/markdown"`,
+        return fakeResponse(
+          200,
+          "text/html",
+          APP_SHELL_HTML,
+          advertised ? { link: `<${path}.md>; rel="alternate"; type="text/markdown"` } : {},
+        );
       });
-    });
 
-    const result = await executeWebFetch(
-      { url: `https://altstub.example.com/page-${process.pid}` },
-      undefined,
-      undefined,
-      dependencies,
-    );
-
-    expect(requests).toHaveLength(3);
-    expect(result.details.markdownAlternateFallback).toBe(false);
-    expect(result.details.shellSuspected).toBe(true);
-  });
+      const result = await executeWebFetch({ url }, undefined, undefined, dependencies);
+      expect(requests).toHaveLength(requestCount);
+      expect(result.details.llmsTxtFallback).toBe(false);
+      expect(result.details.llmsTxtUrl).toBeUndefined();
+      expect(result.details.markdownAlternateFallback).toBe(false);
+      expect(result.details.shellSuspected).toBe(true);
+    },
+  );
 
   it("reports uncached Anubis challenges consistently across output views", async () => {
     const views = [
@@ -817,32 +724,5 @@ describe("executeWebFetch llms.txt support", () => {
         )
         .toHaveLength(2);
     }
-  });
-
-  it("caches the per-origin probe across pages on the same origin", async () => {
-    const { dependencies, requests } = recordingDependencies((href) =>
-      href.endsWith("/llms.txt")
-        ? fakeResponse(200, "text/markdown", LLMS_TXT)
-        : fakeResponse(200, "text/plain", "Readable page body.\n".repeat(30)),
-    );
-
-    const first = await executeWebFetch(
-      { url: `https://cached.example.com/page-a-${process.pid}` },
-      undefined,
-      undefined,
-      dependencies,
-    );
-
-    const second = await executeWebFetch(
-      { url: `https://cached.example.com/page-b-${process.pid}` },
-      undefined,
-      undefined,
-      dependencies,
-    );
-
-    // Page A + one probe, then Page B reuses the cached probe result.
-    expect(requests).toHaveLength(3);
-    expect(first.details.llmsTxtUrl).toBe("https://cached.example.com/llms.txt");
-    expect(second.details.llmsTxtUrl).toBe("https://cached.example.com/llms.txt");
   });
 });
