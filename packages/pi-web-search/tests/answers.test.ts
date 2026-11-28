@@ -197,9 +197,9 @@ describe("Answers mode", () => {
     process.env.BRAVE_ANSWERS_API_KEY = "timeout-answer-secret";
 
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      await new Promise<void>((_resolve, reject) =>
-        init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true }),
-      );
+      await new Promise<void>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      });
 
       return answerResponse(["Late"]);
     });
@@ -229,9 +229,9 @@ describe("Answers mode", () => {
 
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       started();
-      await new Promise<void>((_resolve, reject) =>
-        init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true }),
-      );
+      await new Promise<void>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      });
 
       return answerResponse(["Late"]);
     });

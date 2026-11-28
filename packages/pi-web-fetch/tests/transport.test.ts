@@ -95,7 +95,9 @@ describe("web_fetch transport", () => {
       );
     } finally {
       server.closeAllConnections();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve());
+      });
     }
   });
 
@@ -168,7 +170,9 @@ describe("web_fetch transport", () => {
       response.resume();
     } finally {
       server.closeAllConnections();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve());
+      });
     }
   });
 
@@ -207,7 +211,9 @@ describe("web_fetch transport", () => {
       expect(Date.now() - started).toBeGreaterThanOrEqual(300);
     } finally {
       hanging.closeAllConnections();
-      await new Promise<void>((resolve) => hanging.close(() => resolve()));
+      await new Promise<void>((resolve) => {
+        hanging.close(() => resolve());
+      });
     }
   });
 

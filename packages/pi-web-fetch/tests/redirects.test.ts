@@ -138,13 +138,15 @@ describe("web_fetch redirects", () => {
       ).rejects.toThrow();
       await Promise.race([
         disconnected,
-        new Promise<never>((_resolve, reject) =>
-          setTimeout(() => reject(new Error("discarded body remained open")), 2_000).unref(),
-        ),
+        new Promise<never>((_resolve, reject) => {
+          setTimeout(() => reject(new Error("discarded body remained open")), 2_000).unref();
+        }),
       ]);
     } finally {
       server.closeAllConnections();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve());
+      });
     }
   });
 
@@ -192,7 +194,9 @@ describe("web_fetch redirects", () => {
     } finally {
       controller.abort();
       server.closeAllConnections();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve());
+      });
     }
   });
 

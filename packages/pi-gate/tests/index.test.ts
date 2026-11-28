@@ -122,7 +122,9 @@ function createUi(state: UiState, hasUI: boolean): FakeUi {
       state.onSelect?.();
 
       if (state.selectDelayMs !== undefined) {
-        await new Promise<void>((resolve) => setTimeout(resolve, state.selectDelayMs));
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, state.selectDelayMs);
+        });
       }
 
       return state.selectResponse;
@@ -692,7 +694,9 @@ describe("piGate extension", () => {
       ctx.ui.select = async () => {
         active += 1;
         maximumActive = Math.max(maximumActive, active);
-        await new Promise<void>((resolve) => setTimeout(resolve, 10));
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 10);
+        });
         active -= 1;
 
         return "Allow";
@@ -745,9 +749,9 @@ describe("piGate extension", () => {
           const signal = settings?.signal;
 
           if (!signal) throw new Error("Expected a cancellation signal");
-          await new Promise<void>((resolve) =>
-            signal.addEventListener("abort", () => resolve(), { once: true }),
-          );
+          await new Promise<void>((resolve) => {
+            signal.addEventListener("abort", () => resolve(), { once: true });
+          });
 
           return "Allow";
         };

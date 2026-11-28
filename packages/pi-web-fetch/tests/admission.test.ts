@@ -73,7 +73,9 @@ describe("acquisition admission", () => {
       controller.abort();
       await results.catch(() => {});
       server.closeAllConnections();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve());
+      });
     }
   });
 

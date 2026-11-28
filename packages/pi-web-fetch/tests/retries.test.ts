@@ -181,7 +181,9 @@ describe("origin coordination and retries", () => {
     const releases: Array<() => void> = [];
 
     const request = async (): Promise<IncomingMessage> => {
-      await new Promise<void>((resolve) => releases.push(resolve));
+      await new Promise<void>((resolve) => {
+        releases.push(resolve);
+      });
 
       return response(200);
     };
@@ -219,7 +221,9 @@ describe("origin coordination and retries", () => {
     const request = async (): Promise<IncomingMessage> => {
       active += 1;
       maximum = Math.max(maximum, active);
-      await new Promise<void>((resolve) => releases.push(resolve));
+      await new Promise<void>((resolve) => {
+        releases.push(resolve);
+      });
       active -= 1;
 
       return response(200);
@@ -243,7 +247,9 @@ describe("origin coordination and retries", () => {
       dependencies,
     );
 
-    await new Promise<void>((resolve) => setImmediate(resolve));
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve);
+    });
 
     releases.shift()?.();
 
@@ -253,13 +259,17 @@ describe("origin coordination and retries", () => {
       dependencies,
     );
 
-    await new Promise<void>((resolve) => setImmediate(resolve));
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve);
+    });
 
     expect(maximum).toBe(4);
 
     while (releases.length > 0) {
       releases.splice(0).forEach((release) => release());
-      await new Promise<void>((resolve) => setImmediate(resolve));
+      await new Promise<void>((resolve) => {
+        setImmediate(resolve);
+      });
     }
 
     await Promise.all([...blockers, queued, newcomer]);
@@ -273,7 +283,9 @@ describe("origin coordination and retries", () => {
     const request = async (): Promise<IncomingMessage> => {
       active += 1;
       maximum = Math.max(maximum, active);
-      await new Promise<void>((resolve) => releases.push(resolve));
+      await new Promise<void>((resolve) => {
+        releases.push(resolve);
+      });
       active -= 1;
 
       return response(200);

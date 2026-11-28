@@ -44,8 +44,12 @@ describe("provider redirect boundary", () => {
       source.closeAllConnections();
       target.closeAllConnections();
       await Promise.all([
-        new Promise<void>((resolve) => source.close(() => resolve())),
-        new Promise<void>((resolve) => target.close(() => resolve())),
+        new Promise<void>((resolve) => {
+          source.close(() => resolve());
+        }),
+        new Promise<void>((resolve) => {
+          target.close(() => resolve());
+        }),
       ]);
     }
   });

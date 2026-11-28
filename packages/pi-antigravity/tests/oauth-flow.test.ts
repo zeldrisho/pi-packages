@@ -26,12 +26,14 @@ afterEach(() => {
 
 async function freePort(): Promise<number> {
   const server = createServer();
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
+  });
   // SAFETY: the listening TCP server has an address with a numeric port.
   const port = (server.address() as AddressInfo).port;
-  await new Promise<void>((resolve, reject) =>
-    server.close((error) => (error ? reject(error) : resolve())),
-  );
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
 
   return port;
 }
@@ -154,7 +156,9 @@ describe("OAuth login", () => {
 
   it("fails cleanly when the callback port is occupied", async () => {
     const server = createServer();
-    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", resolve);
+    });
     // SAFETY: the listening TCP server has an address with a numeric port.
     const port = (server.address() as AddressInfo).port;
     vi.stubEnv("PI_ANTIGRAVITY_REDIRECT_URI", `http://localhost:${port}/oauth-callback`);
@@ -167,9 +171,9 @@ describe("OAuth login", () => {
         ),
       ).rejects.toThrow();
     } finally {
-      await new Promise<void>((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve())),
-      );
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
     }
   });
 

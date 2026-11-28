@@ -305,7 +305,9 @@ export function createFetchHarness() {
     },
     async stop() {
       server.closeAllConnections();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve());
+      });
     },
     origin: () => fixtureOrigin,
     dependencies: () => fixtureDependencies,

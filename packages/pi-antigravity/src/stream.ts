@@ -907,7 +907,10 @@ export function createAntigravityStream(
         let lastEmpty: Error | undefined;
 
         for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
-          if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+          if (attempt > 0)
+            await new Promise((resolve) => {
+              setTimeout(resolve, 500 * attempt);
+            });
 
           const envelope = buildRequest({
             model: entry,

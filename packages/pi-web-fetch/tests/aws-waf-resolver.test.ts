@@ -28,7 +28,9 @@ async function listen(handler: RequestListener) {
     url: `http://127.0.0.1:${address.port}`,
     async close() {
       server.closeAllConnections();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve());
+      });
     },
   };
 }

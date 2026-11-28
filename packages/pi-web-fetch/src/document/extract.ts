@@ -418,7 +418,9 @@ async function runDefuddle(
     // Let Defuddle's scheduled microtask/macrotask work settle so a detached
     // rejection is observed by the guard instead of reaching the harness.
     await Promise.resolve();
-    await new Promise<void>((resolve) => setImmediate(resolve));
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve);
+    });
 
     if (escapedRejection !== undefined) throw escapedRejection;
 
