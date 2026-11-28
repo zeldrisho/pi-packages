@@ -73,7 +73,6 @@ export default defineConfig({
       // Migration baseline: review and re-enable these rules individually.
       "@nkzw/no-instanceof": "off",
       curly: "off",
-      eqeqeq: "off",
       "import/consistent-type-specifier-style": "off",
       "no-console": "off",
       "no-promise-executor-return": "off",

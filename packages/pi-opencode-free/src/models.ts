@@ -568,7 +568,11 @@ function isRemoteCatalogEntry(value: unknown): value is RemoteCatalogEntry {
 
   if (typeof value.id !== "string" || !value.id.trim()) return false;
 
-  return !("name" in value) || value.name == null || typeof value.name === "string";
+  if (!("name" in value)) return true;
+
+  const name = value.name;
+
+  return name === null || name === undefined || typeof name === "string";
 }
 
 /** Excludes NaN and infinities when validating numeric model limits. */
