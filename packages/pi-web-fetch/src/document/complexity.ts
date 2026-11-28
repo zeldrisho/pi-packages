@@ -147,7 +147,7 @@ function findRawTextEnd(html: string, name: string, from: number): number {
  */
 export function exceedsConversionDepth(html: string): boolean {
   // Preserve code-unit positions when normalizing ASCII tag names.
-  const lower = html.replace(/[A-Z]+/g, (match) => match.toLowerCase());
+  const lower = html.replaceAll(/[A-Z]+/g, (match) => match.toLowerCase());
   const stack: string[] = [];
   // htmlparser2 keeps this flag in parallel with its element stack. Integration points
   // push HTML mode even under SVG or MathML; this must happen before self-closing checks.

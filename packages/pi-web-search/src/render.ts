@@ -12,7 +12,7 @@ export function renderCollapsibleOutput(
   warning?: string,
   expandHint = "Ctrl+O to expand",
 ): Container {
-  const lines = output.replace(/\r\n/g, "\n").split("\n");
+  const lines = output.replaceAll("\r\n", "\n").split("\n");
 
   while (lines.at(-1) === "") lines.pop();
   const visible = expanded ? lines : lines.slice(0, COLLAPSED_LINES);

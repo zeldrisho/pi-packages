@@ -24,11 +24,11 @@ function stripMarkupForFragmentSlug(value: string): string {
 function fragmentSlug(value: string): string {
   return stripMarkupForFragmentSlug(value)
     .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replaceAll(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/[^\p{Letter}\p{Number} _-]/gu, "")
+    .replaceAll(/[^\p{Letter}\p{Number} _-]/gu, "")
     .trim()
-    .replace(/[ _]+/g, "-");
+    .replaceAll(/[ _]+/g, "-");
 }
 
 /** Finds the extracted Markdown position corresponding to HTML fragment IDs. */
@@ -139,7 +139,7 @@ export function buildFragmentOffsets(
       // Section wrapper IDs often precede headings omitted by extraction. Fall
       // back to the first retained paragraph/list/code block inside the section.
       for (const descendant of element.querySelectorAll<HTMLElement>("p, li, pre, blockquote")) {
-        const content = (descendant.textContent ?? "").replace(/\s+/g, " ").trim();
+        const content = (descendant.textContent ?? "").replaceAll(/\s+/g, " ").trim();
 
         if (content.length < 12) continue;
         normalizedMarkdown ??= normalizeMarkdown(markdown);

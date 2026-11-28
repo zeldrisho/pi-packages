@@ -306,7 +306,7 @@ export function describeFailure(status: number, body: string): string {
 
   if (status === 429 && reasons.has("rateLimit"))
     return "Antigravity is rate limiting this account. Wait and retry, or select another model.";
-  const detail = body.replace(/\s+/g, " ").trim().slice(0, 300);
+  const detail = body.replaceAll(/\s+/g, " ").trim().slice(0, 300);
   const suffix = detail === "" ? "" : `: ${detail}`;
 
   if (status === 401 || status === 403) {

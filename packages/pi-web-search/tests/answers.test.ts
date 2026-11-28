@@ -284,7 +284,7 @@ describe("Answers mode", () => {
 describe("Answers SSE parser", () => {
   it("accepts CRLF, comments, empty deltas, and an unterminated DONE event", async () => {
     const text = await answerResponse(["héllo", citation, citation]).text();
-    const body = `: comment\r\n\r\n${text.replace(/\n/g, "\r\n").trimEnd()}`;
+    const body = `: comment\r\n\r\n${text.replaceAll("\n", "\r\n").trimEnd()}`;
     const result = parseAnswerStream(body);
     expect(result.text).toBe("héllo[1][1]");
     expect(result.citations).toHaveLength(1);

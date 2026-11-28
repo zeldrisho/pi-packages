@@ -21,9 +21,9 @@ function removeMalformedSchemaOrgData(document: Document): void {
     'script[type="application/ld+json"]',
   )) {
     const jsonContent = (script.textContent || "")
-      .replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, "")
+      .replaceAll(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, "")
       .replace(/^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/, "$1")
-      .replace(/^\s*(\*\/|\/\*)\s*|\s*(\*\/|\/\*)\s*$/g, "")
+      .replaceAll(/^\s*(\*\/|\/\*)\s*|\s*(\*\/|\/\*)\s*$/g, "")
       .trim();
 
     try {
@@ -207,10 +207,10 @@ export function htmlToMarkdownFallback(html: string): string {
   }
 
   return document.body.textContent
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n[ \t]+/g, "\n")
-    .replace(/[ \t]{2,}/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
+    .replaceAll(/[ \t]+\n/g, "\n")
+    .replaceAll(/\n[ \t]+/g, "\n")
+    .replaceAll(/[ \t]{2,}/g, " ")
+    .replaceAll(/\n{3,}/g, "\n\n")
     .trim();
 }
 
@@ -353,7 +353,7 @@ function deduplicateAdjacentLinks(markdown: string): string {
   }
 
   // Also collapse duplicate adjacent blocks like a repeated vite-plus tag link paragraph.
-  return out.join("\n").replace(/(\[[^\n]+?\([^)]+\)[^\n]*\n)\1/g, "$1");
+  return out.join("\n").replaceAll(/(\[[^\n]+?\([^)]+\)[^\n]*\n)\1/g, "$1");
 }
 
 /**

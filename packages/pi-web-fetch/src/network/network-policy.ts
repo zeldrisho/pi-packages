@@ -153,7 +153,7 @@ export async function validateRemoteUrl(
 
   const hostname = url.hostname
     .toLowerCase()
-    .replace(/^\[|\]$/g, "")
+    .replaceAll(/^\[|\]$/g, "")
     .replace(/\.$/, "");
 
   if (!hostname || hostname === "localhost" || hostname.endsWith(".localhost")) {

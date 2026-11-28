@@ -116,7 +116,7 @@ function parseOverrides(yaml: string): Map<string, string> {
 
 /** Reads package versions without swallowing pnpm peer suffixes or YAML quotes. */
 function resolvedVersions(lockfile: string, name: string): string[] {
-  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedName = name.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const occurrences = lockfile.match(new RegExp(`${escapedName}@[^\\s:()'"]+`, "g")) ?? [];
 
   return occurrences.map((occurrence) => occurrence.slice(name.length + 1));

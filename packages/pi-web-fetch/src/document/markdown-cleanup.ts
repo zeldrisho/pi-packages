@@ -19,7 +19,7 @@ function stripCompleteStyleElements(value: string): string {
   let cleaned = value;
 
   while (true) {
-    const next = cleaned.replace(COMPLETE_STYLE_ELEMENT, "");
+    const next = cleaned.replaceAll(COMPLETE_STYLE_ELEMENT, "");
 
     if (next === cleaned) return cleaned;
     cleaned = next;
@@ -109,6 +109,6 @@ export function stripExtractedCssCruft(markdown: string): string {
 
   return output
     .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
+    .replaceAll(/\n{3,}/g, "\n\n")
     .trim();
 }

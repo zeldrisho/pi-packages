@@ -160,7 +160,7 @@ export function hasExtractionWarning(diagnostics: ExtractionDiagnostics): boolea
  * @returns Normalized text, truncated to MAX_ANCHOR_CHARACTERS if needed
  */
 function normalizedAnchor(value: string): string {
-  const text = value.replace(/\s+/g, " ").trim();
+  const text = value.replaceAll(/\s+/g, " ").trim();
 
   return text.length > MAX_ANCHOR_CHARACTERS
     ? `${text.slice(0, MAX_ANCHOR_CHARACTERS - 1)}…`

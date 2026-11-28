@@ -37,7 +37,7 @@ export function parseAnswerStream(body: string): BraveAnswer {
   const chunks: string[] = [];
   let completed = false;
 
-  for (const event of body.replace(/\r\n/g, "\n").split("\n\n")) {
+  for (const event of body.replaceAll("\r\n", "\n").split("\n\n")) {
     const data = event
       .split("\n")
       .filter((line) => line.startsWith("data:"))
@@ -74,31 +74,34 @@ export function parseAnswerStream(body: string): BraveAnswer {
 
   const text = chunks
     .join("")
-    .replace(/<(citation|usage)>([\s\S]*?)<\/\1>/g, (_tag: string, kind: string, json: string) => {
-      const parsed: unknown = JSON.parse(json);
+    .replaceAll(
+      /<(citation|usage)>([\s\S]*?)<\/\1>/g,
+      (_tag: string, kind: string, json: string) => {
+        const parsed: unknown = JSON.parse(json);
 
-      if (kind === "usage") {
-        if (!Check(usageSchema, parsed))
-          throw new Error("Brave Answers returned invalid usage metadata.");
-        usage = parsed;
+        if (kind === "usage") {
+          if (!Check(usageSchema, parsed))
+            throw new Error("Brave Answers returned invalid usage metadata.");
+          usage = parsed;
 
-        return "";
-      }
+          return "";
+        }
 
-      if (!Check(citationSchema, parsed))
-        throw new Error("Brave Answers returned invalid citation metadata.");
-      const url = normalizeUrl(parsed.url);
+        if (!Check(citationSchema, parsed))
+          throw new Error("Brave Answers returned invalid citation metadata.");
+        const url = normalizeUrl(parsed.url);
 
-      if (!url) return "";
-      const key = `${parsed.number}:${url}`;
+        if (!url) return "";
+        const key = `${parsed.number}:${url}`;
 
-      if (!seen.has(key)) {
-        citations.push({ number: parsed.number, url });
-        seen.add(key);
-      }
+        if (!seen.has(key)) {
+          citations.push({ number: parsed.number, url });
+          seen.add(key);
+        }
 
-      return `[${parsed.number}]`;
-    })
+        return `[${parsed.number}]`;
+      },
+    )
     .trim();
 
   if (/<\/?(?:citation|usage)\b/i.test(text))

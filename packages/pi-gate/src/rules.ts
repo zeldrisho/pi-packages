@@ -22,7 +22,7 @@ interface RuleText {
 
 /** Normalize matching text while leaving the original command untouched for display/execution. */
 export function normalizeMatchText(text: string): string {
-  return text.toLowerCase().replace(/\s+/gu, " ");
+  return text.toLowerCase().replaceAll(/\s+/gu, " ");
 }
 
 /**

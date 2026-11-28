@@ -6,7 +6,7 @@ import {
 } from "../src/document/source-format.ts";
 
 /** Removes all whitespace so layout-only changes can be compared against the source. */
-const withoutWhitespace = (value: string): string => value.replace(/\s+/gu, "");
+const withoutWhitespace = (value: string): string => value.replaceAll(/\s+/gu, "");
 
 /** A minified body long enough to clear the reformatting threshold. */
 const minifiedOpenApi = (): string =>

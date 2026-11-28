@@ -97,15 +97,15 @@ export function markdownFragmentOffsets(markdown: string) {
     }
 
     const base = withoutHtml
-      .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-      .replace(/[`*_~]/g, "")
+      .replaceAll(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replaceAll(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+      .replaceAll(/[`*_~]/g, "")
       .normalize("NFKD")
-      .replace(/[\u0300-\u036f]/g, "")
+      .replaceAll(/[\u0300-\u036f]/g, "")
       .toLowerCase()
-      .replace(/[^\p{Letter}\p{Number} _-]/gu, "")
+      .replaceAll(/[^\p{Letter}\p{Number} _-]/gu, "")
       .trim()
-      .replace(/[ _]+/g, "-");
+      .replaceAll(/[ _]+/g, "-");
 
     if (!base) return;
 
@@ -212,7 +212,7 @@ export function parseLinkHeaderForAgentHints(
       const value = parameter
         .slice(equals + 1)
         .trim()
-        .replace(/^"|"$/g, "");
+        .replaceAll(/^"|"$/g, "");
 
       parameters.set(key, value);
     }

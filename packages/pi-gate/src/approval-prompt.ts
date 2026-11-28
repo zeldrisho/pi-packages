@@ -70,7 +70,7 @@ export function createApprovalPrompt(
 
       const longestLine = Math.max(
         0,
-        ...command.split("\n").map((line) => visibleWidth(line.replace(/[»«]/gu, ""))),
+        ...command.split("\n").map((line) => visibleWidth(line.replaceAll(/[»«]/gu, ""))),
       );
 
       pageWidth = longestLine > available ? Math.max(1, available - 2) : available;
@@ -112,7 +112,7 @@ export function createApprovalPrompt(
             })
             .join("");
 
-          const visible = line.replace(/[»«]/gu, "");
+          const visible = line.replaceAll(/[»«]/gu, "");
           const content = sliceByColumn(rendered, horizontalOffset, pageWidth, true);
           const prefix = horizontalOffset > 0 && visibleWidth(visible) > 0 ? "…" : "";
           const suffix = visibleWidth(visible) > horizontalOffset + pageWidth ? "…" : "";

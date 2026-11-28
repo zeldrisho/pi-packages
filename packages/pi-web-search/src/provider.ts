@@ -13,8 +13,8 @@ export function normalizeText(value: string, maxLength: number): string {
   if (maxLength <= 0) return "";
 
   const text = value
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
+    .replaceAll(/<[^>]*>/g, " ")
+    .replaceAll(/\s+/g, " ")
     .trim();
 
   return text.length <= maxLength ? text : `${text.slice(0, maxLength - 1)}…`;

@@ -190,7 +190,7 @@ export function isValidThoughtSignature(signature: string | undefined): boolean 
  * @returns A usable tool-call id
  */
 export function sanitizeToolCallId(id: string, fallbackName: string): string {
-  const cleaned = id.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
+  const cleaned = id.replaceAll(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
 
   return cleaned.length > 0 ? cleaned : `${fallbackName}_call`;
 }
@@ -573,7 +573,7 @@ function resolvePointer(ref: string, root: JsonObject): JsonValue | undefined {
   let current: JsonValue | undefined = root;
 
   for (const token of ref.slice(2).split("/")) {
-    const key = token.replace(/~1/g, "/").replace(/~0/g, "~");
+    const key = token.replaceAll("~1", "/").replaceAll("~0", "~");
 
     if (Array.isArray(current)) {
       const index = Number(key);

@@ -86,7 +86,6 @@ export default defineConfig({
       "unicorn/consistent-function-scoping": "off",
       "unicorn/prefer-dom-node-append": "off",
       "unicorn/prefer-string-raw": "off",
-      "unicorn/prefer-string-replace-all": "off",
     },
     overrides: [
       {
