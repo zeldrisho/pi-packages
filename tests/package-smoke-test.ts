@@ -178,7 +178,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { syncBuiltinESMExports } from "node:module";
 import { mock } from "node:test";
-import { discoverAndLoadExtensions } from "@earendil-works/pi-coding-agent";
+import { DefaultResourceLoader, discoverAndLoadExtensions, SettingsManager } from "@earendil-works/pi-coding-agent";
 import childProcess from "node:child_process";
 
 const processMethods = ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync", "fork"];
@@ -188,6 +188,24 @@ process.env.PI_CODING_AGENT_DIR = agentDirectory;
 for (const packageName of packageNames) {
   const packageDirectory = join(process.cwd(), "node_modules", ...packageName.split("/"));
   const manifest = JSON.parse(await readFile(join(packageDirectory, "package.json"), "utf8"));
+  if (packageName === "@zeldrisho/pi-init") {
+    const loader = new DefaultResourceLoader({
+      cwd: process.cwd(),
+      agentDir: agentDirectory,
+      settingsManager: SettingsManager.inMemory({ packages: [packageDirectory] }),
+      noExtensions: true,
+      noSkills: true,
+      noThemes: true,
+      noContextFiles: true,
+    });
+    await loader.reload();
+    const { prompts, diagnostics } = loader.getPrompts();
+    assert.deepEqual(diagnostics, []);
+    assert.deepEqual(prompts.map(({ name }) => name), ["init"]);
+    assert.equal(prompts[0].filePath, join(packageDirectory, "prompts", "init.md"));
+    assert.ok(prompts[0].content.includes("If it does, do not overwrite or modify it."));
+    continue;
+  }
   if (Array.isArray(manifest.pi?.themes)) {
     if (JSON.stringify(manifest.pi.themes) !== JSON.stringify(["./themes"])) {
       throw new Error(\`Invalid Pi theme manifest for \${packageName}\`);

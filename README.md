@@ -1,17 +1,18 @@
 # Pi Packages
 
-Monorepo for my personal Pi extensions, skills, and themes.
+Monorepo for my personal Pi extensions, prompt templates, and themes.
 
 ## Packages
 
-| Package                                         | Type      | Purpose                                                | Install                                      |
-| ----------------------------------------------- | --------- | ------------------------------------------------------ | -------------------------------------------- |
-| [`pi-antigravity`](packages/pi-antigravity)     | Extension | Use Antigravity models with a Google AI subscription   | `pi install npm:@zeldrisho/pi-antigravity`   |
-| [`pi-gate`](packages/pi-gate)                   | Extension | Block or confirm bash commands from a user JSON config | `pi install npm:@zeldrisho/pi-gate`          |
-| [`pi-opencode-free`](packages/pi-opencode-free) | Extension | Use OpenCode's free-tier models                        | `pi install npm:@zeldrisho/pi-opencode-free` |
-| [`pi-web-fetch`](packages/pi-web-fetch)         | Extension | Fetch public web pages as bounded Markdown             | `pi install npm:@zeldrisho/pi-web-fetch`     |
-| [`pi-web-search`](packages/pi-web-search)       | Extension | Search the web with Brave Search                       | `pi install npm:@zeldrisho/pi-web-search`    |
-| [`pi-catppuccin`](packages/pi-catppuccin)       | Theme     | Catppuccin Mocha theme for Pi                          | `pi install npm:@zeldrisho/pi-catppuccin`    |
+| Package                                         | Type            | Purpose                                                | Install                                      |
+| ----------------------------------------------- | --------------- | ------------------------------------------------------ | -------------------------------------------- |
+| [`pi-antigravity`](packages/pi-antigravity)     | Extension       | Use Antigravity models with a Google AI subscription   | `pi install npm:@zeldrisho/pi-antigravity`   |
+| [`pi-gate`](packages/pi-gate)                   | Extension       | Block or confirm bash commands from a user JSON config | `pi install npm:@zeldrisho/pi-gate`          |
+| [`pi-opencode-free`](packages/pi-opencode-free) | Extension       | Use OpenCode's free-tier models                        | `pi install npm:@zeldrisho/pi-opencode-free` |
+| [`pi-web-fetch`](packages/pi-web-fetch)         | Extension       | Fetch public web pages as bounded Markdown             | `pi install npm:@zeldrisho/pi-web-fetch`     |
+| [`pi-web-search`](packages/pi-web-search)       | Extension       | Search the web with Brave Search                       | `pi install npm:@zeldrisho/pi-web-search`    |
+| [`pi-init`](packages/pi-init)                   | Prompt template | Generate an `AGENTS.md` contributor guide with `/init` | `pi install npm:@zeldrisho/pi-init`          |
+| [`pi-catppuccin`](packages/pi-catppuccin)       | Theme           | Catppuccin Mocha theme for Pi                          | `pi install npm:@zeldrisho/pi-catppuccin`    |
 
 Install only the packages or resources you need using the commands above. See each package README for configuration, behavior, and usage.
 

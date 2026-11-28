@@ -43,7 +43,10 @@ const packageSpecificFiles = new Map([
   ["pi-web-fetch", ["workers"]],
 ]);
 
-const themePackages = new Set(["pi-catppuccin"]);
+const contentOnlyPackages = new Map([
+  ["pi-catppuccin", { files: ["themes"], pi: { themes: ["./themes"] } }],
+  ["pi-init", { files: ["prompts/init.md"], pi: { prompts: ["./prompts/init.md"] } }],
+]);
 
 const expectedScripts = {
   test: "vp test",
@@ -434,7 +437,7 @@ describe("repository contracts", () => {
     // packages use `files: ["src", ...]` and Pi loads TypeScript directly —
     // a stray `src/*.js` would be published without a build step.
     for (const directory of packageDirectories) {
-      if (themePackages.has(directory)) continue;
+      if (contentOnlyPackages.has(directory)) continue;
       const stack = [join(packagesDirectory, directory, "src")];
 
       while (stack.length > 0) {
@@ -469,7 +472,7 @@ describe("repository contracts", () => {
         await readFile(join(packageDirectory, "tsconfig.json"), "utf8"),
       );
 
-      const isThemePackage = themePackages.has(directory);
+      const contentOnly = contentOnlyPackages.get(directory);
 
       const expectedName = `@zeldrisho/${directory}`;
       const packageReadme = `https://github.com/zeldrisho/pi-packages/tree/main/packages/${directory}#readme`;
@@ -511,15 +514,15 @@ describe("repository contracts", () => {
         fail(`${manifest.name} must rely on npm's automatic README and LICENSE inclusion`);
       }
 
-      if (!isThemePackage) {
-        if (JSON.stringify(manifest.scripts) !== JSON.stringify(expectedScripts)) {
-          fail(`${manifest.name} scripts must match the extension package scripts`);
+      if (contentOnly) {
+        if (manifest.scripts || manifest.devDependencies || manifest.dependencies) {
+          fail(`${manifest.name} content-only packages must not declare scripts or dependencies`);
         }
-      } else if (manifest.scripts || manifest.devDependencies) {
-        fail(`${manifest.name} content-only packages must not declare package-local tooling`);
+      } else if (JSON.stringify(manifest.scripts) !== JSON.stringify(expectedScripts)) {
+        fail(`${manifest.name} scripts must match the extension package scripts`);
       }
 
-      const expectedPackageTypeScriptConfiguration = isThemePackage
+      const expectedPackageTypeScriptConfiguration = contentOnly
         ? expectedContentOnlyTypeScriptConfiguration
         : expectedTypeScriptConfiguration;
 
@@ -530,8 +533,8 @@ describe("repository contracts", () => {
         fail(`${manifest.name} tsconfig.json does not match its package type`);
       }
 
-      const packageFiles = isThemePackage
-        ? ["themes", "CHANGELOG.md"]
+      const packageFiles = contentOnly
+        ? [...contentOnly.files, "CHANGELOG.md"]
         : [...expectedFiles, ...(packageSpecificFiles.get(directory) ?? [])];
 
       if (!sameValues(manifest.files ?? [], packageFiles)) {
@@ -552,10 +555,10 @@ describe("repository contracts", () => {
         }
       }
 
-      if (isThemePackage) {
-        if (JSON.stringify(manifest.pi?.themes) !== JSON.stringify(["./themes"])) {
-          fail(`${manifest.name} must expose only ./themes as its Pi themes`);
-        }
+      if (contentOnly) {
+        expect(manifest.pi, `${manifest.name} must expose only its declared Pi resources`).toEqual(
+          contentOnly.pi,
+        );
       } else if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(["./src/index.ts"])) {
         fail(`${manifest.name} must expose only ./src/index.ts as its Pi extension`);
       }

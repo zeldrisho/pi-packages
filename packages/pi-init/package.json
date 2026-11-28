@@ -1,0 +1,33 @@
+{
+  "name": "@zeldrisho/pi-init",
+  "version": "0.1.0",
+  "description": "Generate an AGENTS.md contributor guide with Pi’s /init command",
+  "keywords": [
+    "agents-md",
+    "pi-package",
+    "prompt-templates"
+  ],
+  "homepage": "https://github.com/zeldrisho/pi-packages/tree/main/packages/pi-init#readme",
+  "bugs": {
+    "url": "https://github.com/zeldrisho/pi-packages/issues"
+  },
+  "license": "Apache-2.0",
+  "author": "zeldrisho",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zeldrisho/pi-packages.git",
+    "directory": "packages/pi-init"
+  },
+  "files": [
+    "prompts/init.md",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "pi": {
+    "prompts": [
+      "./prompts/init.md"
+    ]
+  }
+}

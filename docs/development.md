@@ -25,7 +25,7 @@ Package READMEs are user guides. Keep implementation and maintenance notes in th
 
 ## Package conventions
 
-- Keep each independently publishable extension under `packages/<name>/`.
+- Keep each independently publishable Pi package under `packages/<name>/`. Content-only packages expose prompt templates or themes through `pi` in `package.json` and need no runtime TypeScript.
 - Put runtime TypeScript in `src/` and tests in `tests/`; Pi loads TypeScript directly.
 - Use `Type.Object()` from `typebox` for tool schemas and `StringEnum` from `@earendil-works/pi-ai` for string enums.
 - Keep Pi imports in `peerDependencies` with `"*"` ranges unless a package requires a specific host API; put other runtime libraries in `dependencies`.
@@ -52,7 +52,7 @@ The live corpus is not a release gate: pages and network conditions change. A ru
 
 ## Verification
 
-Use `vp check` and focused `vp test <path>` runs during development. `vp run ready` is the complete pre-review and CI gate: it runs formatting, linting, type checking, tests, repository contracts, tarball inspection, and packaged smoke tests. The smoke test installs a temporary fixture and may require package registry access. Tarballs should contain only the package README, changelog, license, manifest, runtime `src/` files, and explicitly contracted metadata such as `pi-gate`'s schema. `pi-web-fetch` also packages generated JavaScript challenge workers and solvers under `workers/` because Node cannot strip TypeScript from worker files installed under `node_modules`; regenerate them with `vp run build:anubis-worker` and `vp run build:aws-waf-worker`.
+Use `vp check` and focused `vp test <path>` runs during development. `vp run ready` is the complete pre-review and CI gate: it runs formatting, linting, type checking, tests, repository contracts, tarball inspection, and packaged smoke tests. The smoke test installs a temporary fixture and may require package registry access. Tarballs should contain only the package README, changelog, license, manifest, runtime `src/` files, and explicitly contracted resources such as `pi-gate`'s schema, `pi-init`'s prompt template, and `pi-catppuccin`'s themes. `pi-web-fetch` also packages generated JavaScript challenge workers and solvers under `workers/` because Node cannot strip TypeScript from worker files installed under `node_modules`; regenerate them with `vp run build:anubis-worker` and `vp run build:aws-waf-worker`.
 
 The deterministic suites use local fixtures and mocked Brave responses. Manually verify affected behavior, including missing keys and both search modes; fetch formats, redirects, blocked targets, limits, caching, coalescing, cancellation, and continuation; and temporary-file cleanup. For manual end-to-end verification, follow [testing.md](testing.md): disable ambient discovery, load `pi-opencode-free` plus only the packages under test, and ask the user which model to use before running the check. Run the changed extension through Pi with a real tool invocation—not only a direct call to its implementation or a load-only smoke test.
 
