@@ -144,6 +144,7 @@ async function coordinatedRequest(
   const random = dependencies.random ?? Math.random;
   const sleep = dependencies.sleep ?? defaultSleep;
 
+  // oxlint-disable-next-line no-useless-assignment -- the update feeds the next retry iteration
   for (let attempt = 0; ; attempt += 1) {
     const release = await acquireOrigin(target.url.origin, signal);
     let response: IncomingMessage;

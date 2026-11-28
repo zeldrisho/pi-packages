@@ -267,7 +267,7 @@ export default function piGate(pi: ExtensionAPI): void {
      */
     const run = async (): Promise<ToolCallEventResult | undefined> => {
       let command: string;
-      let configChange = false;
+      let configChange: boolean;
 
       if (event.toolName === "bash") {
         if (!isToolCallEventType("bash", event)) return undefined;
