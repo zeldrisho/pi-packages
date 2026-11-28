@@ -914,6 +914,7 @@ export async function executeWebFetch(
 
   // SAFETY: this DTO contains only bounded JSON data; serialization omits optional
   // undefined properties so the emitted value matches the declared output schema.
+  // oxlint-disable-next-line unicorn/prefer-structured-clone -- preserve output's JSON representation
   const structuredContent = JSON.parse(JSON.stringify(structured)) as NonNullable<
     AgentToolResult["structuredContent"]
   >;

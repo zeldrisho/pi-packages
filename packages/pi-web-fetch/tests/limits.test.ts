@@ -10,6 +10,7 @@ import {
 
 describe("web_fetch limit contracts", () => {
   it("exposes only URL, focus query, and character offset with runtime bounds", () => {
+    // oxlint-disable-next-line unicorn/prefer-structured-clone -- verify the schema as sent to the host
     const schema = JSON.parse(JSON.stringify(webFetchParameters));
     expect(Object.keys(schema.properties)).toEqual(["url", "query", "offset"]);
     expect(schema.properties.url.description).toBeUndefined();

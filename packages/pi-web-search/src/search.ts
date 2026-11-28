@@ -603,6 +603,7 @@ export class SearchRuntime {
 
     // SAFETY: the bounded result DTO contains JSON data only; serialization removes
     // optional undefined properties before exposing it to programmatic callers.
+    // oxlint-disable-next-line unicorn/prefer-structured-clone -- preserve output's JSON representation
     const structuredContent = JSON.parse(JSON.stringify(structured)) as NonNullable<
       AgentToolResult["structuredContent"]
     >;
