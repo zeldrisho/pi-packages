@@ -139,7 +139,7 @@ describe("web_search provider transport", () => {
       .execute("call", { query: "oversized provider error test" }, undefined, undefined)
       .then(
         () => undefined,
-        (reason: any) => reason,
+        (error_: any) => error_,
       );
 
     expect(error).toBeInstanceOf(Error);

@@ -139,7 +139,7 @@ async function benchmarkEntry(entry: CorpusEntry, timeoutMs: number): Promise<Be
       latencyMs: Math.round(performance.now() - startedAt),
       missingMarkers,
     };
-  } catch (cause) {
+  } catch (error) {
     return {
       name: entry.name,
       category: entry.category,
@@ -148,7 +148,7 @@ async function benchmarkEntry(entry: CorpusEntry, timeoutMs: number): Promise<Be
       characterCount: 0,
       latencyMs: Math.round(performance.now() - startedAt),
       missingMarkers: entry.requiredMarkers,
-      error: cause instanceof Error ? cause.message : String(cause),
+      error: error instanceof Error ? error.message : String(error),
     };
   }
 }
@@ -201,9 +201,9 @@ async function main(): Promise<void> {
     printResults(results, options.json);
 
     if (results.some((result) => !result.passed)) process.exitCode = 1;
-  } catch (cause) {
+  } catch (error) {
     process.stderr.write(
-      `${cause instanceof Error ? cause.message : String(cause)}\n\n${usage()}\n`,
+      `${error instanceof Error ? error.message : String(error)}\n\n${usage()}\n`,
     );
     process.exitCode = 1;
   }
