@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { type IncomingMessage } from "node:http";
+import type { IncomingMessage } from "node:http";
 import { Readable } from "node:stream";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { executeWebFetch, type ValidatedTarget } from "../packages/pi-web-fetch/src/index";
