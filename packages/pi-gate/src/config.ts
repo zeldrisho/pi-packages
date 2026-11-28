@@ -77,7 +77,6 @@ export function configPath(): string {
  * @param value - The value to check
  * @returns `true` if the value is one of "prompt", "block", or "allow"
  */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- type-guard helper intentionally narrows untrusted JSON values at the parse boundary
 function isAction(value: unknown): value is Action {
   return (
     typeof value === "string" &&
@@ -94,7 +93,7 @@ function isAction(value: unknown): value is Action {
  * @param value - The value to check
  * @returns `true` if the value is a non-null object and not an array
  */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters, anti-slop/no-unsafe-dictionary-type -- type-guard helper intentionally narrows untrusted JSON values at the parse boundary
+// oxlint-disable-next-line quality/no-unsafe-dictionary-type -- narrow untrusted JSON at the parse boundary
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -125,7 +124,6 @@ export function parseConfig(content: string): GateConfig {
   const configuredTimeout = parsed["promptTimeoutMs"];
 
   const promptTimeoutMs =
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- validate the optional numeric field at the untrusted JSON boundary before applying range checks
     typeof configuredTimeout === "number" &&
     Number.isInteger(configuredTimeout) &&
     configuredTimeout > 0 &&

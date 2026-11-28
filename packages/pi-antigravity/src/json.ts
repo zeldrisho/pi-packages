@@ -18,7 +18,6 @@ export function parseJsonValue(text: string): JsonValue {
  * @param value - JSON value from a decoded payload
  * @returns True when the value is a JSON object
  */
-// oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON values carry no static shape until decoded
 export function isJsonObject(value: JsonValue | undefined): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -29,7 +28,6 @@ export function isJsonObject(value: JsonValue | undefined): value is JsonObject 
  * @param value - JSON value from a decoded payload
  * @returns True when the value is a string
  */
-// oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON values carry no static shape until decoded
 export function isJsonText(value: JsonValue | undefined): value is string {
   return typeof value === "string";
 }
@@ -40,7 +38,6 @@ export function isJsonText(value: JsonValue | undefined): value is string {
  * @param value - JSON value from a decoded payload
  * @returns True when the value is a usable number
  */
-// oxlint-disable-next-line anti-slop/no-runtime-typeof -- JSON values carry no static shape until decoded
 export function isJsonNumber(value: JsonValue | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }

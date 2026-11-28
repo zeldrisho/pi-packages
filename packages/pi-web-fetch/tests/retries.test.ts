@@ -1,4 +1,3 @@
-// oxlint-disable anti-slop/no-chained-type-assertions
 import type { IncomingMessage } from "node:http";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { requestFollowingRedirects } from "../src/network/network-redirects.ts";
@@ -7,6 +6,7 @@ import type { ValidatedTarget } from "../src/network/network-policy.ts";
 /** Creates a response stub with mocked cleanup methods for redirect and retry tests. */
 function response(statusCode: number, headers: Record<string, string> = {}): IncomingMessage {
   // SAFETY: Redirect tests only inspect statusCode/headers and close responses; this fixture supplies that contract.
+  // oxlint-disable-next-line quality/no-chained-type-assertions -- the partial fixture only provides members the test exercises
   return {
     statusCode,
     headers,

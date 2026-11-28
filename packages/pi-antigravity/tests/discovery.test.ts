@@ -359,7 +359,6 @@ describe("catalog refresh", () => {
     vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
       const headers = new Headers(init.headers);
 
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the extension always sends a string body
       const body = typeof init.body === "string" ? init.body : "";
 
       seen.push({

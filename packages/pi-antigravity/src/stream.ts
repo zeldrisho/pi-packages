@@ -89,7 +89,6 @@ function asNumber(value: JsonValue | undefined): number | undefined {
  * @returns The boolean, or undefined for other shapes
  */
 function asBoolean(value: JsonValue | undefined): boolean | undefined {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- decodes an untrusted provider stream
   return typeof value === "boolean" ? value : undefined;
 }
 
@@ -847,7 +846,6 @@ async function postToEndpoint(
  * @param value - Replacement payload from the hook
  * @returns The replacement as this provider's envelope
  */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Pi's hook returns an unparsed payload
 function asEnvelope(value: unknown): AntigravityRequestEnvelope {
   // SAFETY: Pi's payload hook contract replaces the provider payload for the same request.
   return value as AntigravityRequestEnvelope;

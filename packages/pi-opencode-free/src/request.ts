@@ -300,9 +300,7 @@ function replaceEnvironment(
 }
 
 /** Extract text from an untrusted structured message part. */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- structured content is supplied by callers.
 function textPart(part: unknown): string {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- inspect untrusted content parts.
   if (part && typeof part === "object" && "text" in part && typeof part.text === "string")
     return part.text;
 

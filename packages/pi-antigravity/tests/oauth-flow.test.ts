@@ -246,7 +246,6 @@ describe("OAuth refresh", () => {
     );
     const rawBody = fetch.mock.calls[0]?.[1].body;
 
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the request boundary must send a form-encoded string
     if (typeof rawBody !== "string") throw new Error("expected a form-encoded request body");
     const body = new URLSearchParams(rawBody);
     expect(body.get("client_id")).toBe("test-client-id");

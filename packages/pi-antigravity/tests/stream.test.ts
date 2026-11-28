@@ -259,7 +259,6 @@ describe("discovered model routing", () => {
   it("sends a configured Pi budget instead of the advertised default", async () => {
     let requestBody = "";
     vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- provider sends a serialized JSON body
       requestBody = typeof init.body === "string" ? init.body : "";
 
       return sse([textFrame("OK")]);
@@ -296,7 +295,6 @@ describe("discovered model routing", () => {
   it("resolves account-advertised thinking metadata when no local budget override exists", async () => {
     let requestBody = "";
     vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- provider request body is serialized JSON in this test
       requestBody = typeof init.body === "string" ? init.body : "";
 
       return sse([textFrame("OK")]);
@@ -321,7 +319,6 @@ describe("discovered model routing", () => {
     let requestBody = "";
 
     vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- provider sends a serialized JSON body
       requestBody = typeof init.body === "string" ? init.body : "";
 
       return sse([textFrame("OK")]);
@@ -642,7 +639,6 @@ describe("stream implementation", () => {
     const seen: { url: string; body: string }[] = [];
 
     vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the extension always sends a string body
       seen.push({ url, body: typeof init.body === "string" ? init.body : "" });
 
       return sse([textFrame("ok")]);

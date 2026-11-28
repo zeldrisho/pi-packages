@@ -261,7 +261,6 @@ function resolveDocumentRelativeMetadataUrls(document: Document, pageUrl: URL): 
  * @param value - The value to check
  * @returns `true` if the value is a string
  */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- type-guard helper intentionally narrows unknown at call site
 function isString(value: unknown): value is string {
   return typeof value === "string";
 }

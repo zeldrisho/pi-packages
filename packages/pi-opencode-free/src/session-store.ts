@@ -89,7 +89,7 @@ export function isReusableSessionId(id: string, now: number): boolean {
  * @param value - Untrusted parsed JSON value
  * @returns Whether the value is a non-null, non-array object
  */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters, anti-slop/no-unsafe-dictionary-type -- narrows untrusted JSON at the storage boundary
+// oxlint-disable-next-line quality/no-unsafe-dictionary-type -- narrow untrusted JSON at the storage boundary
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -101,7 +101,6 @@ function isJsonObject(value: unknown): value is Record<string, unknown> {
  * @param now - Reference time in epoch milliseconds
  * @returns The reusable record, or undefined when absent, malformed, or stale
  */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- accepts untrusted file contents before validation
 export function parseSessionRecord(value: unknown, now: number): SessionRecord | undefined {
   if (!isJsonObject(value)) return undefined;
 
@@ -109,10 +108,8 @@ export function parseSessionRecord(value: unknown, now: number): SessionRecord |
 
   if (version !== STORE_VERSION) return undefined;
 
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- validates untrusted persisted JSON at the storage boundary
   if (typeof id !== "string" || !isReusableSessionId(id, now)) return undefined;
 
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- validates untrusted persisted JSON at the storage boundary
   if (typeof createdAt !== "number" || !Number.isFinite(createdAt)) return undefined;
 
   const age = now - createdAt;

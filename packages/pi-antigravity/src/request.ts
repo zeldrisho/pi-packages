@@ -240,7 +240,6 @@ function appendTurn(contents: GeminiContent[], role: GeminiRole, parts: GeminiPa
  * @returns Parts for one user turn
  */
 function userParts(message: Extract<Message, { role: "user" }>): GeminiPart[] {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Pi types user content as a string or a block list
   if (typeof message.content === "string") {
     const text = message.content.trim();
 

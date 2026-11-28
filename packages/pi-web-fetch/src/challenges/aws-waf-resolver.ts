@@ -185,9 +185,7 @@ interface BuiltMetrics {
 }
 
 /** Returns whether a value is a plain JSON object. */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- parses untrusted challenge JSON at the I/O boundary
 function isJsonObject(value: unknown): value is JsonObject {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- validates untrusted challenge JSON before use
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -206,7 +204,6 @@ function parseJsonObject(text: string): JsonObject | undefined {
 function stringField(value: JsonObject, key: string): string | undefined {
   const field = value[key];
 
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- validates an untrusted JSON field
   return typeof field === "string" ? field : undefined;
 }
 
@@ -214,7 +211,6 @@ function stringField(value: JsonObject, key: string): string | undefined {
 function numberField(value: JsonObject, key: string): number | undefined {
   const field = value[key];
 
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- validates an untrusted JSON field
   return typeof field === "number" && Number.isFinite(field) ? field : undefined;
 }
 
