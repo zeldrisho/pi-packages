@@ -166,7 +166,7 @@ export function loadConfigResult(): ConfigLoadResult {
   let content: string;
 
   try {
-    content = readFileSync(path, "utf-8");
+    content = readFileSync(path, "utf8");
   } catch {
     return { config: emptyConfig, status: "failed" };
   }
@@ -207,7 +207,7 @@ export function ensureConfig(): void {
   const content = JSON.stringify({ $schema: CONFIG_SCHEMA_URL, ...DEFAULT_CONFIG }, null, 2) + "\n";
 
   try {
-    writeFileSync(path, content, { encoding: "utf-8", flag: "wx", mode: 0o600 });
+    writeFileSync(path, content, { encoding: "utf8", flag: "wx", mode: 0o600 });
   } catch {
     // Best-effort: another process may have created it, or the warning banner
     // will surface that no configuration is active.

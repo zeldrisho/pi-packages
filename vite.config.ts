@@ -100,7 +100,6 @@ export default defineConfig({
       "unicorn/prefer-string-replace-all": "off",
       "unicorn/prefer-structured-clone": "off",
       "unicorn/prefer-top-level-await": "off",
-      "unicorn/text-encoding-identifier-case": "off",
     },
     overrides: [
       {

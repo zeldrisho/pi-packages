@@ -205,7 +205,7 @@ function setConfig(content: string | null): void {
     return;
   }
 
-  writeFileSync(join(dir, "gate.json"), content, "utf-8");
+  writeFileSync(join(dir, "gate.json"), content, "utf8");
 }
 
 let workDir: string;
@@ -255,7 +255,7 @@ describe("legacy configuration fallback", () => {
 
     expect(loadConfig()).toEqual({ operations: { sudo: "block" }, promptTimeoutMs: 5000 });
     expect(existsSync(join(workDir, "gate.json"))).toBe(false);
-    expect(readFileSync(path, "utf-8")).toBe(content);
+    expect(readFileSync(path, "utf8")).toBe(content);
     await handlers.sessionStart!({ reason: "startup" }, ctx);
     expect(uiState.notifyCalls).toHaveLength(0);
     expect(
@@ -274,7 +274,7 @@ describe("legacy configuration fallback", () => {
     ensureConfig();
 
     expect(loadConfig().operations).toEqual({ sudo: "allow" });
-    expect(readFileSync(path, "utf-8")).toBe(content);
+    expect(readFileSync(path, "utf8")).toBe(content);
   });
 
   it.each(["malformed", "unreadable"])(
@@ -304,7 +304,7 @@ describe("legacy configuration fallback", () => {
 
     expect(loadConfigResult().status).toBe("failed");
     expect(existsSync(join(workDir, "gate.json"))).toBe(false);
-    expect(readFileSync(path, "utf-8")).toBe("{ invalid");
+    expect(readFileSync(path, "utf8")).toBe("{ invalid");
   });
 });
 
@@ -319,7 +319,7 @@ describe("piGate extension", () => {
 
     it("allows commands when no config has ever existed and creation fails", async () => {
       const blockedAgentDir = join(workDir, "not-a-directory");
-      writeFileSync(blockedAgentDir, "not a directory", "utf-8");
+      writeFileSync(blockedAgentDir, "not a directory", "utf8");
       process.env.PI_CODING_AGENT_DIR = blockedAgentDir;
       const { ctx, uiState, handlers } = makeExtension().install();
 

@@ -41,7 +41,7 @@ function setConfig(content: string | null): void {
     return;
   }
 
-  writeFileSync(path, content, "utf-8");
+  writeFileSync(path, content, "utf8");
 }
 
 describe("parseConfig", () => {
@@ -197,7 +197,7 @@ describe("ensureConfig", () => {
     const path = join(workDir, "gate.json");
     expect(existsSync(path)).toBe(true);
     expect(existsSync(join(workDir, "pi-gate.json"))).toBe(false);
-    expect(JSON.parse(readFileSync(path, "utf-8"))).toEqual({
+    expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({
       $schema: CONFIG_SCHEMA_URL,
       promptTimeoutMs: DEFAULT_PROMPT_TIMEOUT_MS,
       operations: {
@@ -220,8 +220,8 @@ describe("ensureConfig", () => {
 
   it("does not overwrite an existing configuration", () => {
     const path = join(workDir, "gate.json");
-    writeFileSync(path, '{"operations":{"x":"block"}}', "utf-8");
+    writeFileSync(path, '{"operations":{"x":"block"}}', "utf8");
     ensureConfig();
-    expect(readFileSync(path, "utf-8")).toBe('{"operations":{"x":"block"}}');
+    expect(readFileSync(path, "utf8")).toBe('{"operations":{"x":"block"}}');
   });
 });

@@ -347,7 +347,7 @@ export function decodeResponse(bytes: Uint8Array, contentTypeHeader: string): st
   const charset = contentTypeHeader.match(/(?:^|;)\s*charset\s*=\s*["']?([^;"'\s]+)/i)?.[1];
 
   try {
-    return new TextDecoder(charset || "utf-8").decode(bytes);
+    return new TextDecoder(charset || "utf8").decode(bytes);
   } catch {
     return new TextDecoder("utf-8").decode(bytes);
   }

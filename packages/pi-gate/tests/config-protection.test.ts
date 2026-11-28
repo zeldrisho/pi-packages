@@ -23,7 +23,7 @@ beforeEach(() => {
   process.env.PI_CODING_AGENT_DIR = join(root, ".pi", "agent");
   process.env.HOME = root;
   mkdirSync(process.env.PI_CODING_AGENT_DIR, { recursive: true });
-  writeFileSync(join(process.env.PI_CODING_AGENT_DIR, "gate.json"), "{}", "utf-8");
+  writeFileSync(join(process.env.PI_CODING_AGENT_DIR, "gate.json"), "{}", "utf8");
   process.chdir(root);
 });
 
@@ -61,7 +61,7 @@ describe("config path protection", () => {
     expect(isProtectedConfigPath(legacy)).toBe(true);
 
     rmSync(current);
-    writeFileSync(legacy, "{}", "utf-8");
+    writeFileSync(legacy, "{}", "utf8");
     expect(configPath()).toBe(legacy);
     expect(isProtectedConfigPath(configPath())).toBe(true);
   });
