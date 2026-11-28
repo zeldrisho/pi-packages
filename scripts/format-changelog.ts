@@ -1,7 +1,6 @@
 import { readFile, readdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
 
 /**
  * Keep a Changelog 2.0.0 normalizer.
@@ -277,7 +276,7 @@ async function main(): Promise<void> {
   }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] === import.meta.filename) {
   main().catch((error: unknown) => {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exit(1);

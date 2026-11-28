@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import { readFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { Type, type Static } from "typebox";
 import { Parse } from "typebox/value";
 import { fetchCompleteDocument } from "../src/acquisition/fetch.ts";
@@ -38,7 +38,7 @@ interface BenchmarkOptions {
   timeoutMs: number;
 }
 
-const scriptDirectory = dirname(fileURLToPath(import.meta.url));
+const scriptDirectory = import.meta.dirname;
 
 const defaultCorpusPath = resolve(scriptDirectory, "extraction-corpus.json");
 

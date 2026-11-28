@@ -2,8 +2,7 @@
 /// <reference types="node" />
 
 import { readFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { focusMarkdown } from "../src/document/focus.ts";
 
 interface FocusCase {
@@ -15,7 +14,7 @@ interface FocusCase {
   excludedMarker?: string;
 }
 
-const corpusPath = resolve(dirname(fileURLToPath(import.meta.url)), "focus-corpus.json");
+const corpusPath = resolve(import.meta.dirname, "focus-corpus.json");
 
 // SAFETY: This repository-owned benchmark fixture is reviewed together with this script.
 const corpus = JSON.parse(await readFile(corpusPath, "utf8")) as FocusCase[];

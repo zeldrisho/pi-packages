@@ -1,11 +1,10 @@
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import cloudflare from "@cloudflare/oxlint-config/vite-plus";
 import { defineConfig } from "vite-plus";
 
 // Anchor paths on this file's location so the same config works when vp
 // invokes tests from the repository root and from inside packages/<name>/.
-const repoRoot = dirname(fileURLToPath(import.meta.url));
+const repoRoot = import.meta.dirname;
 
 export default defineConfig({
   test: {
@@ -90,7 +89,6 @@ export default defineConfig({
       "unicorn/consistent-function-scoping": "off",
       "unicorn/numeric-separators-style": "off",
       "unicorn/prefer-dom-node-append": "off",
-      "unicorn/prefer-import-meta-properties": "off",
       "unicorn/prefer-string-raw": "off",
       "unicorn/prefer-string-replace-all": "off",
       "unicorn/prefer-top-level-await": "off",

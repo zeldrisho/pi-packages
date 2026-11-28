@@ -1,7 +1,6 @@
 import { readFile, readdir, writeFile } from "node:fs/promises";
 import { isAbsolute, join, resolve, sep } from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
 
 const defaultRoot = resolve(import.meta.dirname, "..");
 
@@ -197,6 +196,6 @@ export async function runReleaseCli(
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   await runReleaseCli();
 }

@@ -14,7 +14,6 @@
 // fails the build on drift as the source of truth.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(import.meta.dirname ?? process.cwd(), "..");
 
@@ -131,7 +130,7 @@ export function parseSyncArguments(argv: string[]): SyncArguments {
   return { command, from };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   const { command, from } = parseSyncArguments(process.argv.slice(2));
   const code = command === "check" ? (check() === 0 ? 0 : 1) : sync(from);
   process.exit(code);
