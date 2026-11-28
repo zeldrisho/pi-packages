@@ -130,7 +130,7 @@ describe("parseConfig", () => {
 
 describe("formatCommandForDisplay", () => {
   it("normalizes line endings and visibly escapes terminal and bidi controls", () => {
-    expect(formatCommandForDisplay("one\r\ntwo\r\x1b[31m\u202Etxt\0")).toBe(
+    expect(formatCommandForDisplay("one\r\ntwo\r\u001b[31m\u202Etxt\0")).toBe(
       "one\ntwo\n\\u{001b}[31m\\u{202e}txt\\u{0000}",
     );
   });
@@ -156,13 +156,13 @@ describe("formatCommandForDisplay", () => {
 
 describe("highlightRuleForDisplay", () => {
   it("highlights each visible match without restoring terminal control characters", () => {
-    expect(highlightRuleForDisplay("sudo echo sudo\x1b[31m", "sudo")).toBe(
+    expect(highlightRuleForDisplay("sudo echo sudo\u001b[31m", "sudo")).toBe(
       "»sudo« echo »sudo«\\u{001b}[31m",
     );
   });
 
   it("distinguishes a raw control-character match from its literal escaped representation", () => {
-    expect(highlightRuleForDisplay("actual \x1b literal \\u{001b}", "\x1b")).toBe(
+    expect(highlightRuleForDisplay("actual \u001b literal \\u{001b}", "\u001b")).toBe(
       "actual »\\u{001b}« literal \\u{001b}",
     );
   });

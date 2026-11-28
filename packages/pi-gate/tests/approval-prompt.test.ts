@@ -71,16 +71,16 @@ describe("approval prompt", () => {
     expect(output).toContain("tui.select.cancel");
     expect(output).toContain("…");
     expect(output).not.toContain("END");
-    component.handleInput?.("\x1b[C");
+    component.handleInput?.("\u001b[C");
     const middle = component.render(40).join("\n");
 
     expect(middle).toMatch(/…x+…/);
-    component.handleInput?.("\x1b[C");
+    component.handleInput?.("\u001b[C");
     const end = component.render(40).join("\n");
 
     expect(end).toMatch(/…x+END/);
     expect(end).not.toContain("END…");
-    component.handleInput?.("\x1b[D");
+    component.handleInput?.("\u001b[D");
     expect(component.render(40).join("\n")).toMatch(/…x+…/);
   });
 

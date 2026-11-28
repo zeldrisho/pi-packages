@@ -91,7 +91,6 @@ export default defineConfig({
       "typescript/no-unsafe-type-assertion": "off",
       "typescript/return-await": "off",
       "unicorn/consistent-function-scoping": "off",
-      "unicorn/no-hex-escape": "off",
       "unicorn/numeric-separators-style": "off",
       "unicorn/prefer-dom-node-append": "off",
       "unicorn/prefer-import-meta-properties": "off",

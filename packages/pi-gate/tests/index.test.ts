@@ -650,12 +650,12 @@ describe("piGate extension", () => {
       setConfig(JSON.stringify({ operations: { dangerous: "prompt" } }));
       const { ctx, uiState, handlers } = makeExtension().install();
       uiState.selectResponse = "Allow";
-      const command = `dangerous \x1b[31m${"x".repeat(MAX_DISPLAY_COMMAND_CHARACTERS)}`;
+      const command = `dangerous \u001b[31m${"x".repeat(MAX_DISPLAY_COMMAND_CHARACTERS)}`;
 
       expect(await handlers.toolCall!(bashEvent(command), ctx)).toBeUndefined();
       expect(uiState.selectCalls[0]?.prompt).toContain("»dangerous« \\u{001b}[31m");
       expect(uiState.selectCalls[0]?.prompt).toMatch(/\[\d+ more characters hidden\]/u);
-      expect(uiState.selectCalls[0]?.prompt).not.toContain("\x1b");
+      expect(uiState.selectCalls[0]?.prompt).not.toContain("\u001b");
     });
 
     it("asks again for a repeated command unless gate.json allows it", async () => {
