@@ -79,7 +79,6 @@ export default defineConfig({
       "preserve-caught-error": "off",
       "typescript/array-type": "off",
       "typescript/consistent-type-imports": "off",
-      "typescript/no-explicit-any": "off",
       "typescript/no-misused-promises": "off",
       "typescript/no-non-null-assertion": "off",
       "typescript/no-unnecessary-type-assertion": "off",
