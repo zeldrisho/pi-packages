@@ -403,8 +403,7 @@ function applyUsage(output: AssistantMessage, model: Model<Api>, usage: StreamUs
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
   };
 
-  // SAFETY: this provider registers one API id, so the forwarded model carries cost metadata.
-  next.cost = calculateCost(model as Parameters<typeof calculateCost>[0], next);
+  next.cost = calculateCost(model, next);
   output.usage = next;
 }
 

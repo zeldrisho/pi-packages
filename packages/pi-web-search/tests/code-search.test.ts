@@ -47,7 +47,7 @@ describe("web_search code-search options", () => {
       undefined,
     );
 
-    const input = fetchMock.mock.calls[0]![0];
+    const input = fetchMock.mock.calls[0][0];
     const url = new URL(input instanceof Request ? input.url : input.toString());
     expect(url.searchParams.get("operators")).toBe("true");
     expect(url.searchParams.has("spellcheck")).toBe(false);
@@ -115,7 +115,7 @@ describe("web_search recovery guidance", () => {
     const tool = createSearchTool();
     const params = { query: `guidance ${count}` };
     const result = await tool.execute("call", params, undefined, undefined);
-    const text = result.content[0]!.text;
+    const text = result.content[0].text;
     expect(result.details.evidence).toMatchObject({
       requestedCount: 5,
       returnedCount: count,

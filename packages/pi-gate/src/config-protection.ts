@@ -118,13 +118,13 @@ function commandContainsPath(command: string, path: string): boolean {
  */
 export function bashTouchesConfig(command: string): boolean {
   const paths = protectedConfigPaths();
-  const pathForms = CONFIG_NAMES.flatMap((name, index) => configPathForms(name, paths[index]!));
+  const pathForms = CONFIG_NAMES.flatMap((name, index) => configPathForms(name, paths[index]));
 
   if (pathForms.some((path) => commandContainsPath(command, path))) return true;
 
   // Relative filenames are guarded only when the command also names the config directory.
   return CONFIG_NAMES.some((name, index) => {
-    const refersToDirectory = configDirectoryForms(paths[index]!).some((directory) =>
+    const refersToDirectory = configDirectoryForms(paths[index]).some((directory) =>
       commandContainsPath(command, directory),
     );
 

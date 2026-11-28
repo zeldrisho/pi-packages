@@ -274,8 +274,7 @@ function isBarePathnameInvalidUrl(cause: unknown): boolean {
   const input = (cause as NodeJS.ErrnoException & { input?: unknown }).input;
 
   if (isString(input) && input.startsWith("/")) return true;
-  // SAFETY: Error.stack is an optional string populated by V8; we coerce it for pattern matching.
-  const detail = `${cause.message}\n${(cause as Error).stack ?? ""}`;
+  const detail = `${cause.message}\n${cause.stack ?? ""}`;
 
   // Node's ERR_INVALID_URL prints `input: '/path'` in the message/stack even when
   // `input` is not on the error instance in some Node versions.

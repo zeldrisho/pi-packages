@@ -244,8 +244,8 @@ export function formatChangelog(
   const unreleasedBlock = renderEntry({
     version: "Unreleased",
     date: null,
-    preamble: unreleasedHasContent ? unreleased!.preamble : [],
-    sections: unreleasedHasContent ? unreleased!.sections : [],
+    preamble: unreleasedHasContent ? unreleased.preamble : [],
+    sections: unreleasedHasContent ? unreleased.sections : [],
   });
 
   const blocks = [unreleasedBlock, ...versions.map(renderEntry)];

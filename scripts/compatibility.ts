@@ -206,9 +206,9 @@ async function readSnapshot(path: string): Promise<Snapshot> {
 
 async function main(args: string[]): Promise<void> {
   if (args.length === 3 && args[0] === "capture") {
-    console.log(JSON.stringify(await capture(args[1]!, args[2]!), null, 2));
+    console.log(JSON.stringify(await capture(args[1], args[2]), null, 2));
   } else if (args.length === 3 && args[0] === "compare") {
-    console.log(compare(await readSnapshot(args[1]!), await readSnapshot(args[2]!)).join("\n"));
+    console.log(compare(await readSnapshot(args[1]), await readSnapshot(args[2])).join("\n"));
   } else {
     throw new Error(
       "Usage: compatibility capture <antigravity|opencode> <artifact> | compare <before.json> <after.json>",

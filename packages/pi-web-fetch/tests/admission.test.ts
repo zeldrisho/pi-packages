@@ -65,7 +65,7 @@ describe("acquisition admission", () => {
 
     try {
       await vi.waitFor(() => expect(responses).toHaveLength(16));
-      responses[0]!.end("done");
+      responses[0].end("done");
       await vi.waitFor(() => expect(responses).toHaveLength(17));
       responses.slice(1).forEach((response) => response.end("done"));
       expect(await results).toHaveLength(17);

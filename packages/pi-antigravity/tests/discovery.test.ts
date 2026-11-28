@@ -475,7 +475,7 @@ describe("catalog refresh", () => {
     const catalog = catalogFromAvailableModels(availableModels()) ?? [];
     const configs = modelConfigs(catalog);
     const stored = storedModelsFrom(configs, "antigravity", "https://example.test");
-    const first = stored[0]!;
+    const first = stored[0];
 
     const ignored = [
       { ...first, id: "claude-opus-4-6" },

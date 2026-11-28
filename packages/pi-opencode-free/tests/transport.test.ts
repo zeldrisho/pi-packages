@@ -53,7 +53,7 @@ describe("inference transport", () => {
     expect(await response.text()).toBe("refused");
     expect(response.status).toBe(429);
     expect(response.headers.get("retry-after")).toBe("42");
-    const [url, options] = https.request.mock.calls[0]!;
+    const [url, options] = https.request.mock.calls[0];
     expect(String(url)).toBe("https://opencode.ai/inference/openai/v1/chat?x=1");
     expect(options.ciphers).toBe(OPENCODE_CIPHERS);
     expect(options.headers["x-remove"]).toBeUndefined();
@@ -85,8 +85,8 @@ describe("inference transport", () => {
       expect(await response.text()).toBe("ok");
     }
 
-    const agent = https.request.mock.calls[0]![1].agent;
-    expect(https.request.mock.calls[1]![1].agent).toBe(agent);
+    const agent = https.request.mock.calls[0][1].agent;
+    expect(https.request.mock.calls[1][1].agent).toBe(agent);
     expect(agent.keepAlive).toBe(true);
     expect(agent.options.ciphers).toBe(OPENCODE_CIPHERS);
     const destroy = vi.spyOn(agent, "destroy");
@@ -117,7 +117,7 @@ describe("inference transport", () => {
       },
     );
 
-    const options = https.request.mock.calls[0]![1];
+    const options = https.request.mock.calls[0][1];
     expect(options.signal.aborted).toBe(false);
     controller.abort();
     expect(options.signal.aborted).toBe(true);

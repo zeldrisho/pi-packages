@@ -370,8 +370,8 @@ function parseEvidence(text: string): EvidencePayload {
 async function main(args: string[]): Promise<void> {
   if (args.length !== 3 || args[0] !== "evidence")
     throw new Error("Usage: evidence <question> <json>");
-  const evidence = parseEvidence(args[2]!);
-  const question = args[1]!;
+  const evidence = parseEvidence(args[2]);
+  const question = args[1];
 
   const renderList = (items: readonly string[]): string[] =>
     items.length > 0 ? items.map((item) => `- ${item.slice(0, MAX_SAMPLE_BYTES)}`) : ["- None"];
