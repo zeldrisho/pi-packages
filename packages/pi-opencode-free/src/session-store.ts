@@ -20,7 +20,7 @@ const STORE_FILE_NAME = "opencode-free.json";
 const STORE_VERSION = 1;
 
 /** Upper bound for the small persisted JSON record. */
-const MAX_RECORD_BYTES = 4_096;
+const MAX_RECORD_BYTES = 4096;
 
 /**
  * How long a stored identity is reused before a fresh one is generated.

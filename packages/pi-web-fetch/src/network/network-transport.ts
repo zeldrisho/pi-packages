@@ -6,7 +6,7 @@ import { formatSize } from "@earendil-works/pi-coding-agent";
 import type { ValidatedTarget } from "./network-policy.ts";
 
 /** Maximum size in bytes for raw HTTP response bodies. */
-export const FETCH_MAX_BYTES = 5 * 1_024 * 1_024;
+export const FETCH_MAX_BYTES = 5 * 1024 * 1024;
 
 /** Fixed User-Agent used for page requests and challenge solvers. */
 export const WEB_FETCH_USER_AGENT = "Mozilla/5.0 (compatible; PiWebFetch/1.0; +https://pi.dev)";
@@ -16,7 +16,7 @@ export const WEB_FETCH_USER_AGENT = "Mozilla/5.0 (compatible; PiWebFetch/1.0; +h
  * budget so the next validated address can be tried inside the overall
  * request timeout.
  */
-export const CONNECT_ATTEMPT_TIMEOUT_MS = 4_000;
+export const CONNECT_ATTEMPT_TIMEOUT_MS = 4000;
 
 const encoder = new TextEncoder();
 

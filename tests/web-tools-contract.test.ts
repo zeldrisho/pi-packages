@@ -37,7 +37,7 @@ afterEach(() => {
 describe("web tool truncation contract", () => {
   it("keeps locally implemented recovery metadata compatible", async () => {
     const fetchResult = await executeWebFetch(
-      { url: "https://fetch-contract.example/page", maxCharacters: 1_000 },
+      { url: "https://fetch-contract.example/page", maxCharacters: 1000 },
       undefined,
       undefined,
       {
@@ -46,7 +46,7 @@ describe("web tool truncation contract", () => {
           address: "93.184.216.34",
           family: 4,
         }),
-        request: async () => textResponse("x".repeat(2_000)),
+        request: async () => textResponse("x".repeat(2000)),
       },
     );
 
@@ -54,7 +54,7 @@ describe("web tool truncation contract", () => {
     expect(fetchResult.details.truncation).toEqual({
       truncated: true,
       strategy: "continuation",
-      nextOffset: 1_000,
+      nextOffset: 1000,
     });
     expect(fetchResult.details.nextOffset).toBe(fetchResult.details.truncation.nextOffset);
 

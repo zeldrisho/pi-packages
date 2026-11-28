@@ -81,9 +81,9 @@ export function resolveRule(command: string, rules: Record<string, Action>): Rul
   const acceptedRules: RuleMatch[] = [];
 
   for (const [pattern, action] of Object.entries(rules)) {
-    if (acceptedRules.length >= 1_000) break;
+    if (acceptedRules.length >= 1000) break;
 
-    if (pattern.length === 0 || pattern.length > 1_024) continue;
+    if (pattern.length === 0 || pattern.length > 1024) continue;
     acceptedRules.push({ pattern, action });
   }
 

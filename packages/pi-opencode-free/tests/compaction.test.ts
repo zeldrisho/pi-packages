@@ -134,7 +134,7 @@ function createHarness(options: {
   const event: CompactionEvent = {
     preparation: {
       firstKeptEntryId: "entry-kept",
-      messagesToSummarize: options.messageList ?? messages(60, 2_000),
+      messagesToSummarize: options.messageList ?? messages(60, 2000),
       turnPrefixMessages: options.turnPrefixList ?? [],
       settings: { reserveTokens: options.reserveTokens ?? 16_384 },
       tokensBefore: 300_000,
@@ -247,7 +247,7 @@ describe("segmented compaction", () => {
 
     expect(result?.compaction?.summary).toContain("## Goal");
     expect(firstPrompt).toContain("[truncated to fit the summary budget]");
-    expect(Math.ceil(firstPrompt.length / 4)).toBeLessThanOrEqual(6_000);
+    expect(Math.ceil(firstPrompt.length / 4)).toBeLessThanOrEqual(6000);
   });
 
   it("trims digests that still exceed the budget before the final checkpoint", async () => {
@@ -262,7 +262,7 @@ describe("segmented compaction", () => {
 
     expect(result?.compaction?.summary).toContain("## Goal");
     expect(finalPrompt).toContain("[truncated to fit the summary budget]");
-    expect(Math.ceil(finalPrompt.length / 4)).toBeLessThanOrEqual(6_000);
+    expect(Math.ceil(finalPrompt.length / 4)).toBeLessThanOrEqual(6000);
   });
 
   it("keeps merge inputs when a merge stops at the token cap", async () => {
@@ -339,8 +339,8 @@ describe("segmented compaction", () => {
 
   it("does not use a partial digest when a single message cannot be split", async () => {
     const harness = createHarness({
-      contextWindow: 6_000,
-      messageList: messages(1, 2_000),
+      contextWindow: 6000,
+      messageList: messages(1, 2000),
       respond: (call) =>
         isCheckpointRequest(call)
           ? response(CHECKPOINT, "stop")
@@ -382,7 +382,7 @@ describe("segmented compaction", () => {
   it("merges digests before the final checkpoint", async () => {
     const harness = createHarness({
       contextWindow: 90_000,
-      messageList: messages(160, 2_000),
+      messageList: messages(160, 2000),
       respond: (call) => {
         if (isCheckpointRequest(call)) return response(CHECKPOINT, "stop");
 
@@ -400,8 +400,8 @@ describe("segmented compaction", () => {
 
   it("cancels when a checkpoint still stops at the cap after retrying", async () => {
     const harness = createHarness({
-      contextWindow: 6_000,
-      messageList: messages(1, 2_000),
+      contextWindow: 6000,
+      messageList: messages(1, 2000),
       respond: (call) =>
         isCheckpointRequest(call) ? response("PARTIAL", "length") : response("DIGEST", "stop"),
     });
@@ -418,7 +418,7 @@ describe("segmented compaction", () => {
 
     const harness = createHarness({
       contextWindow: 200_000,
-      messageList: messages(900, 2_100),
+      messageList: messages(900, 2100),
       respond: (call) => {
         if (!isCheckpointRequest(call)) return response("DIGEST", "stop");
         checkpoints += 1;
@@ -542,7 +542,7 @@ describe("segmented compaction", () => {
   });
 
   it("still compacts when the model advertises a small output limit", async () => {
-    const harness = createHarness({ contextWindow: 40_000, maxTokens: 3_000 });
+    const harness = createHarness({ contextWindow: 40_000, maxTokens: 3000 });
 
     const result = await harness.handler(harness.event, harness.context);
 
@@ -552,7 +552,7 @@ describe("segmented compaction", () => {
 
   it("scales the segment budget with the model window", async () => {
     const segmentCount = async (contextWindow: number): Promise<number> => {
-      const harness = createHarness({ contextWindow, messageList: messages(120, 2_000) });
+      const harness = createHarness({ contextWindow, messageList: messages(120, 2000) });
 
       await harness.handler(harness.event, harness.context);
 

@@ -6,8 +6,8 @@ const model = {
   type: "chat",
   reasoning: true,
   input: ["text", "image"],
-  contextWindow: 100000,
-  maxTokens: 10000,
+  contextWindow: 100_000,
+  maxTokens: 10_000,
   thinkingLevelMap: {
     off: null,
     minimal: null,
@@ -26,8 +26,8 @@ describe("pi.dev Gemini metadata", () => {
     expect(parsePiCatalog([model])?.get(model.id)).toEqual({
       levels: ["low", "medium", "high"],
       input: ["text", "image"],
-      contextWindow: 100000,
-      maxTokens: 10000,
+      contextWindow: 100_000,
+      maxTokens: 10_000,
     });
     expect(
       parsePiCatalog([
@@ -44,12 +44,12 @@ describe("pi.dev Gemini metadata", () => {
       requests.push({ url, init });
 
       return Response.json(
-        [{ ...model, contextWindow: url.includes("google-vertex") ? 200000 : 100000 }],
+        [{ ...model, contextWindow: url.includes("google-vertex") ? 200_000 : 100_000 }],
         { headers: { "last-modified": "Wed, 21 Oct 2099 07:28:00 GMT" } },
       );
     });
     const result = await fetchGeminiMetadata(new AbortController().signal);
-    expect(result.models.get(model.id)?.contextWindow).toBe(100000);
+    expect(result.models.get(model.id)?.contextWindow).toBe(100_000);
     expect(requests.map(({ url }) => url)).toEqual([
       "https://pi.dev/api/models/providers/google?types=chat",
       "https://pi.dev/api/models/providers/google-vertex?types=chat",
@@ -66,7 +66,7 @@ describe("pi.dev Gemini metadata", () => {
     );
     const result = await fetchGeminiMetadata(new AbortController().signal);
     expect(result.completed).toBe(true);
-    expect(result.models.get(model.id)?.contextWindow).toBe(1048576);
+    expect(result.models.get(model.id)?.contextWindow).toBe(1_048_576);
     expect(result.snapshots.google?.entries).toHaveLength(1);
   });
   it("falls back to bundled metadata on bad, oversized, or unavailable responses", async () => {
@@ -76,13 +76,13 @@ describe("pi.dev Gemini metadata", () => {
     );
     expect(
       (await fetchGeminiMetadata(new AbortController().signal)).models.get(model.id)?.contextWindow,
-    ).toBe(1048576);
+    ).toBe(1_048_576);
     vi.stubGlobal("fetch", async () => {
       throw new Error("offline");
     });
     expect(
       (await fetchGeminiMetadata(new AbortController().signal)).models.get(model.id)?.contextWindow,
-    ).toBe(1048576);
+    ).toBe(1_048_576);
   });
   it("bounds streamed bodies even when content-length is missing", async () => {
     const cancel = vi.fn();
@@ -100,7 +100,7 @@ describe("pi.dev Gemini metadata", () => {
     );
     expect(
       (await fetchGeminiMetadata(new AbortController().signal)).models.get(model.id)?.contextWindow,
-    ).toBe(1048576);
+    ).toBe(1_048_576);
     expect(cancel).toHaveBeenCalledTimes(2);
   });
   it("revalidates cached bodies independently and retains them on HTTP failure", async () => {
@@ -123,7 +123,7 @@ describe("pi.dev Gemini metadata", () => {
     const second = await fetchGeminiMetadata(new AbortController().signal, first.snapshots);
     expect(headers).toEqual(['"v1"', '"v1"']);
     expect(second.completed).toBe(true);
-    expect(second.models.get(model.id)?.contextWindow).toBe(100000);
+    expect(second.models.get(model.id)?.contextWindow).toBe(100_000);
     expect(second.snapshots).toEqual(first.snapshots);
   });
   it("does not trust invalid cached validators and records unavailable catalogs", async () => {

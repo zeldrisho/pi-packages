@@ -26,7 +26,7 @@ import { createSessionStore, resolveSessionId, type SessionStore } from "./sessi
 /** Provider id used by `/model` and the provider-scoped request adapter. */
 export const PROVIDER_ID = "opencode-free";
 
-const DISCOVERY_TIMEOUT_MS = 8_000;
+const DISCOVERY_TIMEOUT_MS = 8000;
 
 const CATALOG_TTL_MS = 4 * 60 * 60 * 1000;
 

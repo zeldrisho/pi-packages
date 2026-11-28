@@ -17,7 +17,7 @@ import { isStringArray } from "./values.ts";
 type AgentMessage = Parameters<typeof convertToLlm>[0][number];
 
 /** Mirrors Pi's own headroom constant for summarization requests. */
-const WINDOW_SAFETY_TOKENS = 4_096;
+const WINDOW_SAFETY_TOKENS = 4096;
 
 /** Pi's default reserve, used when the preparation carries no compaction settings. */
 const DEFAULT_RESERVE_TOKENS = 16_384;
@@ -26,7 +26,7 @@ const DEFAULT_RESERVE_TOKENS = 16_384;
 const REQUEST_INPUT_SHARE = 0.12;
 
 /** Bounds for the derived request budget, so small and large windows both stay usable. */
-const MIN_REQUEST_INPUT_TOKENS = 4_000;
+const MIN_REQUEST_INPUT_TOKENS = 4000;
 
 const MAX_REQUEST_INPUT_TOKENS = 60_000;
 

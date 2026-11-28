@@ -56,7 +56,7 @@ describe("web_fetch transport", () => {
   it("reports empty document content clearly for tagged and untagged pages", async () => {
     for (const path of ["/empty", "/empty-html"]) {
       await expect
-        .soft(fetchRemoteContent(`${origin}${path}`, 0, 6_000, undefined, dependencies), path)
+        .soft(fetchRemoteContent(`${origin}${path}`, 0, 6000, undefined, dependencies), path)
         .rejects.toThrow("web_fetch: Page has no extractable content.");
     }
   });
@@ -269,7 +269,7 @@ describe("web_fetch transport", () => {
   });
 
   it("decompresses gzip-encoded text before decoding its charset", async () => {
-    const result = await fetchRemoteContent(`${origin}/gzip`, 0, 6_000, undefined, dependencies);
+    const result = await fetchRemoteContent(`${origin}/gzip`, 0, 6000, undefined, dependencies);
 
     expect(result.markdown).toContain("Readable compressed build log");
     expect(result.markdown).toContain("second line");
@@ -279,7 +279,7 @@ describe("web_fetch transport", () => {
     const result = await fetchRemoteContent(
       `${origin}/duplicated-html-type`,
       0,
-      6_000,
+      6000,
       undefined,
       dependencies,
     );
@@ -290,7 +290,7 @@ describe("web_fetch transport", () => {
 
   it("rejects conflicting media types instead of guessing the representation", async () => {
     await expect(
-      fetchRemoteContent(`${origin}/conflicting-types`, 0, 6_000, undefined, dependencies),
+      fetchRemoteContent(`${origin}/conflicting-types`, 0, 6000, undefined, dependencies),
     ).rejects.toThrow("does not support text/html, text/plain");
   });
 
@@ -298,12 +298,12 @@ describe("web_fetch transport", () => {
     const result = await fetchRemoteContent(
       `${origin}/documentation-sized`,
       0,
-      6_000,
+      6000,
       undefined,
       dependencies,
     );
 
-    expect(result.nextOffset).toBe(6_000);
+    expect(result.nextOffset).toBe(6000);
     expect(result.markdown).toContain("[Content truncated.");
     expect(result.totalCharacters).toBe(1_500_000);
   });
@@ -312,7 +312,7 @@ describe("web_fetch transport", () => {
     const result = await fetchRemoteContent(
       `${origin}/minified-js`,
       0,
-      6_000,
+      6000,
       undefined,
       dependencies,
     );
@@ -328,7 +328,7 @@ describe("web_fetch transport", () => {
     const result = await fetchRemoteContent(
       `${origin}/minified-json-like`,
       0,
-      6_000,
+      6000,
       undefined,
       dependencies,
     );
@@ -341,7 +341,7 @@ describe("web_fetch transport", () => {
     const result = await fetchRemoteContent(
       `${origin}/single-line-plain-text`,
       0,
-      6_000,
+      6000,
       undefined,
       dependencies,
     );
@@ -355,7 +355,7 @@ describe("web_fetch transport", () => {
     ["/status", "HTTP 418"],
   ])("rejects invalid response from %s", async (path, message) => {
     await expect(
-      fetchRemoteContent(`${origin}${path}`, 0, 6_000, undefined, dependencies),
+      fetchRemoteContent(`${origin}${path}`, 0, 6000, undefined, dependencies),
     ).rejects.toThrow(message);
   });
 
@@ -394,7 +394,7 @@ describe("web_fetch transport", () => {
       },
     };
 
-    const result = await fetchRemoteContent(packagePage, 0, 6_000, undefined, fallbackDependencies);
+    const result = await fetchRemoteContent(packagePage, 0, 6000, undefined, fallbackDependencies);
 
     expect(requests).toEqual([packagePage, registryUrl]);
     expect(result.markdown).toContain(`"name": "${packageName}"`);
@@ -403,7 +403,7 @@ describe("web_fetch transport", () => {
 
   it("returns the Cloudflare-specific error for non-npm challenge responses", async () => {
     await expect(
-      fetchRemoteContent(`${origin}/cloudflare-challenge`, 0, 6_000, undefined, dependencies),
+      fetchRemoteContent(`${origin}/cloudflare-challenge`, 0, 6000, undefined, dependencies),
     ).rejects.toThrow(/blocked by Cloudflare's anti-bot challenge \(HTTP 403\)/);
   });
 
@@ -422,7 +422,7 @@ describe("web_fetch transport", () => {
 
       await expect
         .soft(
-          fetchRemoteContent(`${origin}/aws-waf`, 0, 6_000, undefined, challengeDependencies),
+          fetchRemoteContent(`${origin}/aws-waf`, 0, 6000, undefined, challengeDependencies),
           String(status),
         )
         .rejects.toThrow(`blocked by an AWS WAF anti-bot challenge (HTTP ${status})`);
@@ -504,7 +504,7 @@ describe("web_fetch transport", () => {
   it("reports the raw response limit for declared and streamed bodies", async () => {
     for (const path of ["/declared-large", "/streamed-large"]) {
       await expect
-        .soft(fetchRemoteContent(`${origin}${path}`, 0, 6_000, undefined, dependencies), path)
+        .soft(fetchRemoteContent(`${origin}${path}`, 0, 6000, undefined, dependencies), path)
         .rejects.toThrow(/raw download limit.*maxCharacters only controls returned output/);
     }
   });
@@ -513,7 +513,7 @@ describe("web_fetch transport", () => {
     const result = await fetchRemoteContent(
       `${origin}/untrusted`,
       0,
-      6_000,
+      6000,
       undefined,
       dependencies,
     );

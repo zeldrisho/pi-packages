@@ -16,9 +16,9 @@ const BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
 const SESSION_PREFIX = "ses_";
 
-const SESSION_MASK_48 = 0xffffffffffffn;
+const SESSION_MASK_48 = 0xff_ff_ff_ff_ff_ffn;
 
-const SESSION_TS_MASK_36 = 0xfffffffffn;
+const SESSION_TS_MASK_36 = 0xf_ff_ff_ff_ffn;
 
 const SESSION_COUNTER = 1n;
 

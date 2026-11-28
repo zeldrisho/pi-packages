@@ -43,7 +43,7 @@ const TIMEOUT_MS = 5000;
 
 /** Accept only bounded, complete capability records; ignore pricing and API routing. */
 export function parsePiCatalog(value: JsonValue): Map<string, GeminiMetadata> | undefined {
-  if (!Array.isArray(value) || value.length > 10000) return undefined;
+  if (!Array.isArray(value) || value.length > 10_000) return undefined;
   const result = new Map<string, GeminiMetadata>();
 
   for (const entry of value) {

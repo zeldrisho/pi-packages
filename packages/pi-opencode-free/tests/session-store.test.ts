@@ -138,7 +138,7 @@ describe("persisted session records", () => {
 
       expect(store.load(NOW)).toBeUndefined();
 
-      writeFileSync(path, " ".repeat(4_097));
+      writeFileSync(path, " ".repeat(4097));
       expect(store.load(NOW)).toBeUndefined();
 
       writeFileSync(path, JSON.stringify({ version: 1, id: "ses_bad", createdAt: NOW }));

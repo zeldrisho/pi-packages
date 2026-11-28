@@ -177,7 +177,7 @@ const storedModel: Model<"openai-completions"> = {
   input: ["text"],
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
   contextWindow: 64_000,
-  maxTokens: 8_000,
+  maxTokens: 8000,
   reasoning: false,
 };
 
@@ -394,7 +394,7 @@ describe("opencode-free extension", () => {
         input: ["text"],
         cost: storedModel.cost,
         contextWindow: 64_000,
-        maxTokens: 8_000,
+        maxTokens: 8000,
         reasoning: false,
       },
     ]);

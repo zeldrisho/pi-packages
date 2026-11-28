@@ -212,16 +212,16 @@ describe("catalog grouping", () => {
     const catalog = catalogFromAvailableModels({
       models: {
         "gemini-3.8-flash-minimal": metadata("Gemini 3.8 Flash (Minimal)", {
-          maxTokens: 2000000,
-          maxOutputTokens: 100000,
+          maxTokens: 2_000_000,
+          maxOutputTokens: 100_000,
         }),
         "gemini-3.8-flash-low": metadata("Gemini 3.8 Flash (Low)", {
-          maxTokens: 2000000,
-          maxOutputTokens: 100000,
+          maxTokens: 2_000_000,
+          maxOutputTokens: 100_000,
         }),
         "gemini-3.8-flash-high": metadata("Gemini 3.8 Flash (High)", {
-          maxTokens: 2000000,
-          maxOutputTokens: 100000,
+          maxTokens: 2_000_000,
+          maxOutputTokens: 100_000,
         }),
         "gemini-unknown-minimal": metadata("Gemini Unknown (Minimal)"),
       },
@@ -234,8 +234,8 @@ describe("catalog grouping", () => {
       medium: null,
       high: "gemini-3.8-flash-high",
     });
-    expect(gemini?.contextWindow).toBe(1048576);
-    expect(gemini?.maxTokens).toBe(65536);
+    expect(gemini?.contextWindow).toBe(1_048_576);
+    expect(gemini?.maxTokens).toBe(65_536);
     expect(catalog?.find((model) => model.id === "gemini-unknown")?.thinkingLevelMap.minimal).toBe(
       "gemini-unknown-minimal",
     );

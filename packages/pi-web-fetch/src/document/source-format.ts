@@ -16,13 +16,13 @@ function isSourceContentType(value: string): value is SourceContentType {
 }
 
 /** Shortest body reformatted; below this a page is returned verbatim. */
-const MINIFIED_MIN_CHARACTERS = 2_000;
+const MINIFIED_MIN_CHARACTERS = 2000;
 
 /**
  * Largest body reformatted. Reformatting triples transient memory for a document too
  * large to cache, so bigger bodies keep their original single-line layout.
  */
-const MINIFIED_MAX_CHARACTERS = 2 * 1_024 * 1_024;
+const MINIFIED_MAX_CHARACTERS = 2 * 1024 * 1024;
 
 /**
  * Shortest average line that still counts as machine-generated. Bundled source is

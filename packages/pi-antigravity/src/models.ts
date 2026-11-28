@@ -91,9 +91,9 @@ export function requiresThoughtSignature(runtimeModel: string): boolean {
 
 /** Thinking budgets requested from the backend for each non-off level. */
 const THINKING_BUDGETS: Partial<Record<ModelThinkingLevel, number>> = {
-  minimal: 1_000,
-  low: 1_000,
-  medium: 4_000,
+  minimal: 1000,
+  low: 1000,
+  medium: 4000,
   // -1 lets the backend spend its own ceiling on deep reasoning levels.
   high: -1,
   xhigh: -1,
@@ -131,7 +131,7 @@ export function thinkingConfig(
 
   return {
     includeThoughts: true,
-    thinkingBudget: THINKING_BUDGETS[level] ?? THINKING_BUDGETS.medium ?? 4_000,
+    thinkingBudget: THINKING_BUDGETS[level] ?? THINKING_BUDGETS.medium ?? 4000,
   };
 }
 

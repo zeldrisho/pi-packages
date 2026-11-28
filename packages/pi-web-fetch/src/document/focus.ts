@@ -31,13 +31,13 @@ interface SplitSections {
 }
 
 /** Target size of one section when a block has no headings and no blank lines. */
-const WINDOW_TARGET_CHARACTERS = 8_000;
+const WINDOW_TARGET_CHARACTERS = 8000;
 
 /** Fewest lines a headingless block needs before it is split into windows. */
 const WINDOW_MIN_LINES = 80;
 
 /** Fewest characters a headingless block needs before it is split into windows. */
-const WINDOW_MIN_CHARACTERS = 6_000;
+const WINDOW_MIN_CHARACTERS = 6000;
 
 const STOP_WORDS = new Set([
   "a",

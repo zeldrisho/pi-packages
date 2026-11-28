@@ -269,7 +269,7 @@ export function parseAnubisChallenge(raw: string, pageUrl: URL): AnubisChallenge
     !isNumber(difficulty) ||
     !Number.isInteger(difficulty) ||
     difficulty < 0 ||
-    difficulty > 0xffff_ffff
+    difficulty > 0xff_ff_ff_ff
   ) {
     return undefined;
   }

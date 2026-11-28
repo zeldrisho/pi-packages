@@ -28,7 +28,7 @@ import {
   FETCH_MIN_MAX_CHARACTERS,
 } from "./limits";
 
-const CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const CACHE_STALE_RETENTION_MS = 7 * CACHE_TTL_MS;
 
@@ -37,7 +37,7 @@ const HTML_EXTRACTION_CACHE_VERSION = 1;
 
 const CACHE_MAX_ENTRIES = 100;
 
-const CACHE_MAX_MARKDOWN_BYTES = 20 * 1_024 * 1_024;
+const CACHE_MAX_MARKDOWN_BYTES = 20 * 1024 * 1024;
 
 const MAX_INFLIGHT_REQUESTS = 100;
 
@@ -519,7 +519,7 @@ export async function executeWebFetch(
     );
   }
 
-  if (params.url.length < 1 || params.url.length > 2_048) {
+  if (params.url.length < 1 || params.url.length > 2048) {
     throw new Error("web_fetch url must contain between 1 and 2048 characters.");
   }
 

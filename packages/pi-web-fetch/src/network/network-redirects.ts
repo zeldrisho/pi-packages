@@ -121,7 +121,7 @@ function retryAfterMilliseconds(value: string | undefined, now = Date.now()): nu
   if (!value) return undefined;
   const trimmed = value.trim();
 
-  if (/^\d+(?:\.\d+)?$/u.test(trimmed)) return Number(trimmed) * 1_000;
+  if (/^\d+(?:\.\d+)?$/u.test(trimmed)) return Number(trimmed) * 1000;
   const date = Date.parse(value);
 
   if (!Number.isFinite(date)) return undefined;

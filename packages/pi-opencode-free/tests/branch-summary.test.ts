@@ -72,11 +72,11 @@ function entry(index: number, chars: number): SessionEntry {
     type: "message",
     id: `entry-${index}`,
     parentId: index === 0 ? null : `entry-${index - 1}`,
-    timestamp: new Date(index * 1_000).toISOString(),
+    timestamp: new Date(index * 1000).toISOString(),
     message: {
       role: "user",
       content: [{ type: "text", text: `message ${index}: ${"x".repeat(chars)}` }],
-      timestamp: index * 1_000,
+      timestamp: index * 1000,
     },
   };
 }
@@ -143,7 +143,7 @@ function createHarness(options: {
 
   const event: BranchEvent = {
     preparation: {
-      entriesToSummarize: options.entryList ?? entries(60, 2_000),
+      entriesToSummarize: options.entryList ?? entries(60, 2000),
       userWantsSummary: options.userWantsSummary ?? true,
       customInstructions: options.customInstructions,
       replaceInstructions: options.replaceInstructions,
@@ -260,7 +260,7 @@ describe("segmented branch summary", () => {
 
     const harness = createHarness({
       contextWindow: 40_000,
-      entryList: [nested, ...entries(60, 2_000)],
+      entryList: [nested, ...entries(60, 2000)],
     });
 
     const result = await harness.handler(harness.event, harness.context);

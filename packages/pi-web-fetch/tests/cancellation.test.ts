@@ -23,7 +23,7 @@ describe("web_fetch cancellation", () => {
 
   it("times out while waiting for response headers", async () => {
     await expect(
-      fetchRemoteContent(`${origin}/slow`, 0, 6_000, undefined, {
+      fetchRemoteContent(`${origin}/slow`, 0, 6000, undefined, {
         ...dependencies,
         timeoutMs: 20,
       }),
@@ -33,7 +33,7 @@ describe("web_fetch cancellation", () => {
   it("times out while the response body is stalled after headers", async () => {
     const ready = fixture.waitForStalledBody();
 
-    const pending = fetchRemoteContent(`${origin}/stalled-body`, 0, 6_000, undefined, {
+    const pending = fetchRemoteContent(`${origin}/stalled-body`, 0, 6000, undefined, {
       ...dependencies,
       timeoutMs: 100,
     });
@@ -46,7 +46,7 @@ describe("web_fetch cancellation", () => {
     const controller = new AbortController();
     const ready = fixture.waitForStalledBody();
 
-    const pending = fetchRemoteContent(`${origin}/stalled-body`, 0, 6_000, controller.signal, {
+    const pending = fetchRemoteContent(`${origin}/stalled-body`, 0, 6000, controller.signal, {
       ...dependencies,
       timeoutMs: 10_000,
     });
@@ -65,14 +65,14 @@ describe("web_fetch cancellation", () => {
     vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
 
     try {
-      const pending = fetchRemoteContent(`${origin}/html`, 0, 6_000, controller.signal, {
+      const pending = fetchRemoteContent(`${origin}/html`, 0, 6000, controller.signal, {
         ...dependencies,
         extractHtml: () => {
           started.resolve();
 
           return new Promise<never>(() => {});
         },
-        timeoutMs: 1_000,
+        timeoutMs: 1000,
       });
 
       // Fail promptly if the request fails or settles before reaching extraction.
@@ -84,7 +84,7 @@ describe("web_fetch cancellation", () => {
       expect(extractionStarted).toBe(true);
       const rejection = expect(pending).rejects.toThrow(message);
 
-      if (trigger === "deadline") await vi.advanceTimersByTimeAsync(1_000);
+      if (trigger === "deadline") await vi.advanceTimersByTimeAsync(1000);
       else controller.abort();
       await rejection;
     } finally {
@@ -95,7 +95,7 @@ describe("web_fetch cancellation", () => {
   it("times out while initial URL validation is stalled", async () => {
     let requestCount = 0;
     await expect(
-      fetchRemoteContent("https://example.test", 0, 6_000, undefined, {
+      fetchRemoteContent("https://example.test", 0, 6000, undefined, {
         validateUrl: () => new Promise<ValidatedTarget>(() => {}),
         request: async () => {
           requestCount += 1;
@@ -110,7 +110,7 @@ describe("web_fetch cancellation", () => {
   it("times out while redirect URL validation is stalled", async () => {
     const validated: string[] = [];
     await expect(
-      fetchRemoteContent(`${origin}/redirect`, 0, 6_000, undefined, {
+      fetchRemoteContent(`${origin}/redirect`, 0, 6000, undefined, {
         ...dependencies,
         validateUrl: async (value) => {
           const url = value instanceof URL ? value : new URL(value);
@@ -136,7 +136,7 @@ describe("web_fetch cancellation", () => {
 
     let requestCount = 0;
 
-    const pending = fetchRemoteContent("https://example.test", 0, 6_000, controller.signal, {
+    const pending = fetchRemoteContent("https://example.test", 0, 6000, controller.signal, {
       validateUrl: () => validation,
       request: async () => {
         requestCount += 1;

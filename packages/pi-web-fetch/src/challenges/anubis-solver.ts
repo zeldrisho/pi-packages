@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 
 /** Maximum length in bytes of the server-provided random challenge data. */
-export const ANUBIS_MAX_RANDOM_DATA_BYTES = 4_096;
+export const ANUBIS_MAX_RANDOM_DATA_BYTES = 4096;
 
 /** Maximum size in bytes of a server-provided WebAssembly challenge module. */
-export const ANUBIS_MAX_WASM_BYTES = 4 * 1_024 * 1_024;
+export const ANUBIS_MAX_WASM_BYTES = 4 * 1024 * 1024;
 
 /** A solved Anubis proof of work, using the nonce and hash the server expects. */
 export interface AnubisSolution {
@@ -157,8 +157,8 @@ export function solveAnubisSha256Hex(
 
   const prefix = "0".repeat(difficulty);
 
-  for (let nonce = 0; nonce <= 0xffff_ffff; nonce += 1) {
-    if ((nonce & 0xfff) === 0 && Date.now() > deadline)
+  for (let nonce = 0; nonce <= 0xff_ff_ff_ff; nonce += 1) {
+    if ((nonce & 0xf_ff) === 0 && Date.now() > deadline)
       throw new Error("Anubis proof of work exceeded the time budget.");
 
     const hash = createHash("sha256").update(randomData).update(String(nonce)).digest("hex");
@@ -193,7 +193,7 @@ export function solveAnubisWasm(
   if (moduleBytes.byteLength === 0 || moduleBytes.byteLength > ANUBIS_MAX_WASM_BYTES)
     throw new Error("Anubis challenge module exceeded the size limit.");
 
-  if (!Number.isInteger(difficulty) || difficulty < 0 || difficulty > 0xffff_ffff)
+  if (!Number.isInteger(difficulty) || difficulty < 0 || difficulty > 0xff_ff_ff_ff)
     throw new Error("Anubis challenge requested an unsupported difficulty.");
 
   const data = decodeHex(randomData);
@@ -226,7 +226,7 @@ export function solveAnubisWasm(
   const nonce = work(difficulty, 0, 1);
   const hashSize = resultHashSize() >>> 0;
 
-  if (hashSize < 1 || hashSize > 4_096)
+  if (hashSize < 1 || hashSize > 4096)
     throw new Error("Anubis challenge module returned an invalid hash size.");
 
   const hashBytes = readMemory(memory, resultHashPtr(), hashSize);

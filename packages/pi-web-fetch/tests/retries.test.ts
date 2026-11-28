@@ -86,7 +86,7 @@ describe("origin coordination and retries", () => {
     );
 
     expect(result.response.statusCode).toBe(200);
-    expect(delays).toEqual([2_000, 2_000]);
+    expect(delays).toEqual([2000, 2000]);
   });
 
   it("does not retry earlier than a long HTTP-date Retry-After", async () => {

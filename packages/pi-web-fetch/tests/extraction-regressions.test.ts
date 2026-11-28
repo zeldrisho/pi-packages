@@ -218,7 +218,7 @@ describe("extraction regressions", () => {
     const html = `<html><head><title>Discussion</title></head><body>
       <a href="#content">Skip to content</a><div>Menu</div>
       <div style="display:none">false</div><div style="display:none">17761903736463837882</div>
-      <div role="main" id="content"><article></article><script>${"unused;".repeat(8_000)}</script></div>
+      <div role="main" id="content"><article></article><script>${"unused;".repeat(8000)}</script></div>
       </body></html>`;
 
     const url = new URL("https://example.com/discussion");
@@ -271,7 +271,7 @@ describe("extraction regressions", () => {
   });
 
   it("ignores a short no-JavaScript notice on an empty page", async () => {
-    const html = `<html><body><main></main><script>${"x".repeat(5_000)}</script><noscript><p>Please enable JavaScript to view this site.</p></noscript></body></html>`;
+    const html = `<html><body><main></main><script>${"x".repeat(5000)}</script><noscript><p>Please enable JavaScript to view this site.</p></noscript></body></html>`;
 
     const result = await extractHtmlToMarkdown(html, new URL("https://example.com/empty"));
 

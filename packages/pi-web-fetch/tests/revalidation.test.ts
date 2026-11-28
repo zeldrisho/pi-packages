@@ -60,7 +60,7 @@ describe("stale cache revalidation", () => {
     expect(fresh.details.cacheStatus).toBe("hit");
     expect(requests).toBe(1);
 
-    vi.setSystemTime(startedAt + 24 * 60 * 60 * 1_000 + 1);
+    vi.setSystemTime(startedAt + 24 * 60 * 60 * 1000 + 1);
     const second = await executeWebFetch({ url }, undefined, undefined, dependencies);
 
     expect(second.details.cacheStatus).toBe("revalidated");
@@ -104,7 +104,7 @@ describe("stale cache revalidation", () => {
     };
 
     await executeWebFetch({ url }, undefined, undefined, dependencies);
-    vi.setSystemTime(startedAt + 24 * 60 * 60 * 1_000 + 1);
+    vi.setSystemTime(startedAt + 24 * 60 * 60 * 1000 + 1);
     const result = await executeWebFetch({ url }, undefined, undefined, dependencies);
 
     expect(result.details.cacheStatus).toBe("revalidated");

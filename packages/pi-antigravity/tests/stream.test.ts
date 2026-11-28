@@ -282,7 +282,7 @@ describe("discovered model routing", () => {
       apiKey: API_KEY,
       reasoning: "high",
       thinkingBudgets: { high: 8192 },
-      maxTokens: 10000,
+      maxTokens: 10_000,
     }).result();
 
     expect(result.stopReason).toBe("stop");

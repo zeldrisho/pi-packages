@@ -41,7 +41,7 @@ describe("project discovery", () => {
         "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
         expect.objectContaining({ redirect: "error" }),
       );
-      expect(timeout.mock.calls.filter(([ms]) => ms === 8_000)).toHaveLength(2);
+      expect(timeout.mock.calls.filter(([ms]) => ms === 8000)).toHaveLength(2);
       expect(timeout).toHaveBeenCalledWith(16_000);
     } finally {
       timeout.mockRestore();
@@ -209,11 +209,11 @@ describe("project discovery", () => {
   });
   it("combines caller cancellation and a deadline", () => {
     const controller = new AbortController();
-    const signal = discoverySignal(controller.signal, 10000);
+    const signal = discoverySignal(controller.signal, 10_000);
     expect(signal.aborted).toBe(false);
     controller.abort();
     expect(signal.aborted).toBe(true);
-    expect(discoverySignal(undefined, 10000).aborted).toBe(false);
+    expect(discoverySignal(undefined, 10_000).aborted).toBe(false);
   });
   it("uses the bundled user agent without affecting authorization", async () => {
     const headers = await antigravityHeaders("token");

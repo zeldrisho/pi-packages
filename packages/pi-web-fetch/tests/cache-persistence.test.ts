@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 import { canonicalKey, ExpiringLruCache, stableKeyHash, type CachePersistence } from "../src/cache";
 import type { CompleteDocument } from "../src/document/content.ts";
 
-const DAY_MS = 24 * 60 * 60 * 1_000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const encoder = new TextEncoder();
 
@@ -49,7 +49,7 @@ describe("web_fetch disk cache", () => {
   });
 
   it("reloads a private on-disk entry after restart, then removes it at expiry", async () => {
-    let now = 1_000;
+    let now = 1000;
     const key = "https://example.com/a/b?c=1&d=2";
     const first = makeCache(directory, () => now);
     first.set(key, document(key, "alpha"), now + DAY_MS);
@@ -61,11 +61,11 @@ describe("web_fetch disk cache", () => {
     expect(fileStat.mode & 0o777).toBe(0o600);
     expect((await stat(directory)).mode & 0o777).toBe(0o700);
 
-    now = 2_000;
+    now = 2000;
     const second = makeCache(directory, () => now);
     expect(second.get(key)).toMatchObject({ markdown: "alpha", url: key });
 
-    now = 1_000 + DAY_MS;
+    now = 1000 + DAY_MS;
     const expired = makeCache(directory, () => now);
     expect(expired.get(key)).toBeUndefined();
     expect(await readdir(directory)).toEqual([]);

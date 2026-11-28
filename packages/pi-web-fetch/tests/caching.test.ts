@@ -156,7 +156,7 @@ describe("web_fetch caching", () => {
     const updates: string[] = [];
 
     const first = await executeWebFetch(
-      { url, maxCharacters: 1_000 },
+      { url, maxCharacters: 1000 },
       undefined,
       (update) => updates.push(update.content[0].text),
       dependencies,
@@ -167,16 +167,16 @@ describe("web_fetch caching", () => {
       contentKind: "raw-text",
       extractor: "raw",
       confidence: "high",
-      nextOffset: 1_000,
+      nextOffset: 1000,
     });
     expect(first.details.truncation).toEqual({
       truncated: true,
       strategy: "continuation",
-      nextOffset: 1_000,
+      nextOffset: 1000,
     });
     expect(fixture.continuationRequests()).toBe(1);
 
-    const continuation = { url, offset: first.details.nextOffset, maxCharacters: 2_000 };
+    const continuation = { url, offset: first.details.nextOffset, maxCharacters: 2000 };
 
     const second = await executeWebFetch(
       continuation,
@@ -190,7 +190,7 @@ describe("web_fetch caching", () => {
     expect(second.details.cached).toBe(true);
     expect(repeated.details.cached).toBe(true);
     expect(fixture.continuationRequests()).toBe(1);
-    expect(second.details.offset).toBe(1_000);
+    expect(second.details.offset).toBe(1000);
     expect(second.content[0].text).toContain("end-version-1");
     expect(second.content[0].text).toContain("[End of results.]");
     expect(second.content[0].text).not.toContain("version-2");

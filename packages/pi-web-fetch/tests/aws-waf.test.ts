@@ -108,8 +108,8 @@ describe("AWS WAF acquisition", () => {
       },
     };
 
-    const first = await fetchRemoteContent(pageUrl, 0, 6_000, undefined, dependencies);
-    const second = await fetchRemoteContent(pageUrl, 0, 6_000, undefined, dependencies);
+    const first = await fetchRemoteContent(pageUrl, 0, 6000, undefined, dependencies);
+    const second = await fetchRemoteContent(pageUrl, 0, 6000, undefined, dependencies);
 
     expect(first.markdown).toContain("WAF-resolved content");
     expect(second.markdown).toContain("WAF-resolved content");
@@ -120,7 +120,7 @@ describe("AWS WAF acquisition", () => {
     let calls = 0;
 
     await expect(
-      fetchRemoteContent(pageUrl, 0, 6_000, undefined, {
+      fetchRemoteContent(pageUrl, 0, 6000, undefined, {
         ...baseDependencies,
         awsWafResolver: {
           async resolve() {
@@ -138,7 +138,7 @@ describe("AWS WAF acquisition", () => {
     let resolverSignal: AbortSignal | undefined;
 
     await expect(
-      fetchRemoteContent(pageUrl, 0, 6_000, undefined, {
+      fetchRemoteContent(pageUrl, 0, 6000, undefined, {
         ...baseDependencies,
         timeoutMs: 400,
         awsWafResolver: {
@@ -157,7 +157,7 @@ describe("AWS WAF acquisition", () => {
     const controller = new AbortController();
 
     await expect(
-      fetchRemoteContent(pageUrl, 0, 6_000, controller.signal, {
+      fetchRemoteContent(pageUrl, 0, 6000, controller.signal, {
         ...baseDependencies,
         awsWafResolver: {
           async resolve() {
@@ -174,7 +174,7 @@ describe("AWS WAF acquisition", () => {
     let calls = 0;
 
     await expect(
-      fetchRemoteContent(pageUrl, 0, 6_000, undefined, {
+      fetchRemoteContent(pageUrl, 0, 6000, undefined, {
         ...baseDependencies,
         solveAwsWafChallenges: false,
         awsWafResolver: {

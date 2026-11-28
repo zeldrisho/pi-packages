@@ -47,7 +47,7 @@ export function quotaResetAt(headers: Headers, now: number): number | undefined 
 
   if (!value) return undefined;
 
-  const resetAt = /^\d+(?:\.\d+)?$/u.test(value) ? now + Number(value) * 1_000 : Date.parse(value);
+  const resetAt = /^\d+(?:\.\d+)?$/u.test(value) ? now + Number(value) * 1000 : Date.parse(value);
 
   return Number.isFinite(resetAt) && resetAt >= now && resetAt <= 8.64e15 ? resetAt : undefined;
 }

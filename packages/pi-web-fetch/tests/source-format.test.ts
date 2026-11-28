@@ -38,7 +38,7 @@ describe("indentMinifiedSource", () => {
   });
 
   it("bounds indentation for deeply nested input", () => {
-    const nested = "{".repeat(200) + "1" + "}".repeat(200) + "p".repeat(2_100);
+    const nested = "{".repeat(200) + "1" + "}".repeat(200) + "p".repeat(2100);
     const indented = indentMinifiedSource(nested);
 
     expect(indented).toBeDefined();

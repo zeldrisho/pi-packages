@@ -13,7 +13,7 @@ const RAW_ID_SELECTOR_SAFE = /^-?[_a-zA-Z][-_a-zA-Z0-9]*$/;
 const NOSCRIPT_FALLBACK_MIN_CHARACTERS = 200;
 
 /** Primary extraction length below which a JavaScript-required page counts as a shell. */
-const NOSCRIPT_PRIMARY_MAX_CHARACTERS = 1_024;
+const NOSCRIPT_PRIMARY_MAX_CHARACTERS = 1024;
 
 /** Removes schema.org scripts that Defuddle would report directly to the process console. */
 function removeMalformedSchemaOrgData(document: Document): void {

@@ -26,11 +26,11 @@ import { InflightCoalescer } from "./inflight";
 import { SEARCH_DEFAULT_RESULT_COUNT } from "./limits";
 import { answerSchema, searchBraveAnswers, type BraveAnswer } from "./answers";
 
-const CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const CACHE_MAX_ENTRIES = 100;
 
-const CACHE_MAX_RESULT_BYTES = 20 * 1_024 * 1_024;
+const CACHE_MAX_RESULT_BYTES = 20 * 1024 * 1024;
 
 const MAX_INFLIGHT_REQUESTS = 100;
 
@@ -566,7 +566,7 @@ export class SearchRuntime {
     // Never use it to bypass the tool's output limits or private overflow storage.
     if (
       truncation.truncated ||
-      encoder.encode(JSON.stringify(structured)).byteLength > DEFAULT_MAX_BYTES - 2_048
+      encoder.encode(JSON.stringify(structured)).byteLength > DEFAULT_MAX_BYTES - 2048
     ) {
       structured.results = [];
       delete structured.answer;

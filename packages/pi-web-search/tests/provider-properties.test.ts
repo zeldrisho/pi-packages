@@ -5,14 +5,14 @@ function* values(seed: number): Generator<number> {
   let state = seed >>> 0;
 
   while (true) {
-    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
     yield state;
   }
 }
 
 describe("provider text normalization properties", () => {
   it("keeps generated untrusted payload strings bounded and whitespace-normalized", () => {
-    const random = values(0xb4a7e);
+    const random = values(0xb_4a_7e);
     const alphabet = ["word", "<script>alert(1)</script>", "\n\t", "é", "🙂"];
 
     for (let sample = 0; sample < 128; sample += 1) {

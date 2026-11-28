@@ -27,7 +27,7 @@ const SESSION_TS_MODULUS = 2 ** 36;
 function decodeSessionTimestamp(id: string): number {
   const encoded = BigInt(`0x${id.slice(4, 16)}`);
 
-  return Number((~encoded & 0xffffffffffffn) >> 12n);
+  return Number((~encoded & 0xff_ff_ff_ff_ff_ffn) >> 12n);
 }
 
 describe("opencode session identity", () => {
@@ -52,7 +52,7 @@ describe("opencode session identity", () => {
     const stamp = decodeSessionTimestamp(id);
     const elapsed = (stamp - before + SESSION_TS_MODULUS) % SESSION_TS_MODULUS;
 
-    expect(elapsed).toBeLessThan(5_000);
+    expect(elapsed).toBeLessThan(5000);
   });
 
   it("rejects a seed that is too short", () => {
@@ -71,9 +71,9 @@ describe("opencode session identity", () => {
 
     expect(sessionIdCreatedAt(beforeWrap)).toBe(SESSION_TS_MODULUS - 500);
     expect(sessionIdCreatedAt(afterWrap)).toBe(500);
-    expect(sessionIdAgeMs(afterWrap, SESSION_TS_MODULUS + 1_000)).toBe(500);
-    expect(sessionIdAgeMs(beforeWrap, SESSION_TS_MODULUS + 500)).toBe(1_000);
-    expect(sessionIdAgeMs(afterWrap, SESSION_TS_MODULUS - 500)).toBe(-1_000);
+    expect(sessionIdAgeMs(afterWrap, SESSION_TS_MODULUS + 1000)).toBe(500);
+    expect(sessionIdAgeMs(beforeWrap, SESSION_TS_MODULUS + 500)).toBe(1000);
+    expect(sessionIdAgeMs(afterWrap, SESSION_TS_MODULUS - 500)).toBe(-1000);
   });
 
   it("keeps the suffix well formed when seed bytes are rejected", () => {

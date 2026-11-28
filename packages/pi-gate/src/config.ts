@@ -26,9 +26,9 @@ const ACTIONS: readonly Action[] = ["prompt", "block", "allow"] as const;
 
 export const DEFAULT_PROMPT_TIMEOUT_MS = 30_000;
 
-export const MAX_RULE_COUNT = 1_000;
+export const MAX_RULE_COUNT = 1000;
 
-export const MAX_RULE_PATTERN_LENGTH = 1_024;
+export const MAX_RULE_PATTERN_LENGTH = 1024;
 
 export const MAX_PROMPT_TIMEOUT_MS = 86_400_000;
 

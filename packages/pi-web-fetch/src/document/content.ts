@@ -3,7 +3,7 @@ import type { ExtractedLinks, ExtractionDiagnostics } from "./evidence.ts";
 
 const CONTENT_LINE_BUDGET = Math.max(1, DEFAULT_MAX_LINES - 10);
 
-const CONTENT_BYTE_BUDGET = Math.max(1_024, DEFAULT_MAX_BYTES - 2_048);
+const CONTENT_BYTE_BUDGET = Math.max(1024, DEFAULT_MAX_BYTES - 2048);
 
 const encoder = new TextEncoder();
 

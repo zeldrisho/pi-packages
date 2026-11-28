@@ -23,7 +23,7 @@ const model: Model<"openai-completions"> = {
   baseUrl: "https://provider.test/v1",
   input: ["text"],
   reasoning: false,
-  contextWindow: 64000,
+  contextWindow: 64_000,
   maxTokens: 8000,
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
   compat: { supportsStore: false, supportsDeveloperRole: false, maxTokensField: "max_tokens" },

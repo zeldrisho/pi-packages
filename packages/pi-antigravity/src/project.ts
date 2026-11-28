@@ -10,7 +10,7 @@ export const ENDPOINTS = [
 ] as const;
 
 /** Metadata lookups must fail fast so the next endpoint can be tried. */
-const DISCOVERY_TIMEOUT_MS = 8_000;
+const DISCOVERY_TIMEOUT_MS = 8000;
 
 /** Error bodies are untrusted; inspect only a small bounded response. */
 const MAX_DIAGNOSTIC_BYTES = 16_384;

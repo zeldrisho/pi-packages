@@ -17,7 +17,7 @@ import { ENDPOINTS, antigravityHeaders } from "./project.ts";
 import { builtinGeminiMetadata, type GeminiMetadata } from "./pi-catalog.ts";
 
 /** Metadata lookups fail fast so the caller can fall back to a cached catalog. */
-const DISCOVERY_TIMEOUT_MS = 8_000;
+const DISCOVERY_TIMEOUT_MS = 8000;
 
 /** Thinking-level suffixes the backend appends to runtime model ids. */
 const THINKING_SUFFIXES: readonly [suffix: string, level: ModelThinkingLevel][] = [

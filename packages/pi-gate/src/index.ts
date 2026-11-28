@@ -91,7 +91,7 @@ async function selectApproval(
       const uiPromise = ctx.ui.custom<ApprovalAction | undefined>(
         (tui, theme, keybindings, done) => {
           uiDone = done;
-          countdown = setInterval(() => tui.requestRender(), 1_000);
+          countdown = setInterval(() => tui.requestRender(), 1000);
 
           return createApprovalPrompt(tui, theme, keybindings, done, command, rule, deadline);
         },
@@ -144,7 +144,7 @@ function reasonRuleName(pattern: string): string {
 
 /** Formats an approval timeout with the matched rule, elapsed limit in seconds, and retry guidance. */
 function timeoutReason(pattern: string, timeoutMs: number): string {
-  return `pi-gate: approval timed out after ${timeoutMs / 1_000}s (rule "${reasonRuleName(pattern)}"); command not run. Ask the user before retrying.`;
+  return `pi-gate: approval timed out after ${timeoutMs / 1000}s (rule "${reasonRuleName(pattern)}"); command not run. Ask the user before retrying.`;
 }
 
 function reportHerdrBlocked(pi: ExtensionAPI, ctx: { mode?: string }, active: boolean): void {

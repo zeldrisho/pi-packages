@@ -31,7 +31,7 @@ describe("web_fetch redirects", () => {
     const validated: string[] = [];
     const requested: ValidatedTarget[] = [];
 
-    const result = await fetchRemoteContent(`${origin}/redirect`, 0, 6_000, undefined, {
+    const result = await fetchRemoteContent(`${origin}/redirect`, 0, 6000, undefined, {
       validateUrl: async (value) => {
         const url = value instanceof URL ? value : new URL(value);
         validated.push(url.pathname);
@@ -83,7 +83,7 @@ describe("web_fetch redirects", () => {
   it("rejects a redirect to a blocked target before requesting it", async () => {
     const requested: string[] = [];
     await expect(
-      fetchRemoteContent(`${origin}/redirect-blocked`, 0, 6_000, undefined, {
+      fetchRemoteContent(`${origin}/redirect-blocked`, 0, 6000, undefined, {
         validateUrl: async (value) => {
           const url = value instanceof URL ? value : new URL(value);
 
@@ -128,7 +128,7 @@ describe("web_fetch redirects", () => {
 
     try {
       await expect(
-        fetchRemoteContent(`http://127.0.0.1:${port}/discard`, 0, 6_000, undefined, {
+        fetchRemoteContent(`http://127.0.0.1:${port}/discard`, 0, 6000, undefined, {
           validateUrl: async (value) => ({
             url: value instanceof URL ? value : new URL(value),
             address: "127.0.0.1",
@@ -139,7 +139,7 @@ describe("web_fetch redirects", () => {
       await Promise.race([
         disconnected,
         new Promise<never>((_resolve, reject) => {
-          setTimeout(() => reject(new Error("discarded body remained open")), 2_000).unref();
+          setTimeout(() => reject(new Error("discarded body remained open")), 2000).unref();
         }),
       ]);
     } finally {
@@ -202,7 +202,7 @@ describe("web_fetch redirects", () => {
 
   it("enforces redirect limits", async () => {
     await expect(
-      fetchRemoteContent(`${origin}/redirect-loop`, 0, 6_000, undefined, dependencies),
+      fetchRemoteContent(`${origin}/redirect-loop`, 0, 6000, undefined, dependencies),
     ).rejects.toThrow("too many redirects");
   });
 });

@@ -43,7 +43,7 @@ describe("acquisition admission", () => {
     const controller = new AbortController();
 
     const dependencies = {
-      timeoutMs: 5_000,
+      timeoutMs: 5000,
       validateUrl: async (value: string | URL) => ({
         url: value instanceof URL ? value : new URL(value),
         address: "127.0.0.1",
@@ -55,7 +55,7 @@ describe("acquisition admission", () => {
       fetchRemoteContent(
         `http://127.0.0.1:${port}/${index}`,
         0,
-        6_000,
+        6000,
         controller.signal,
         dependencies,
       ),

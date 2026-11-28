@@ -34,7 +34,7 @@ const CARRY_BYTES = 256;
 const MAX_WRAPPER_BYTES = 16 * 1024;
 
 /** Bound work on malformed or deliberately adversarial executables. */
-const MAX_CANDIDATES = 2_048;
+const MAX_CANDIDATES = 2048;
 
 let cachedClient: { key: string; client: OAuthClient } | undefined;
 

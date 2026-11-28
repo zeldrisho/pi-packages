@@ -102,7 +102,7 @@ describe("OAuth login", () => {
     expect(result).toEqual({
       access: "access",
       refresh: "refresh-new",
-      expires: 3301000,
+      expires: 3_301_000,
       projectId: "project-live",
     });
     expect(fetch).toHaveBeenNthCalledWith(
@@ -242,7 +242,7 @@ describe("OAuth refresh", () => {
     expect(await refreshCredentials(credentials, undefined, 1000)).toEqual({
       ...credentials,
       access: "new",
-      expires: 3301000,
+      expires: 3_301_000,
     });
     expect(fetch).toHaveBeenCalledExactlyOnceWith(
       TOKEN_URL,

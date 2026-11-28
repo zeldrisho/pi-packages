@@ -8,7 +8,7 @@ const input = {
   level: "high" as const,
   budgets: { high: 8192 },
   advertised,
-  maxOutputTokens: 20000,
+  maxOutputTokens: 20_000,
 };
 
 describe("discovered budget overrides", () => {

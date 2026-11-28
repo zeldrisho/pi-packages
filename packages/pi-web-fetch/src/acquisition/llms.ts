@@ -29,7 +29,7 @@ function restrictOrigin(
   };
 }
 
-const CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 /** Bounds parallel index probes while allowing substantially deeper paths than two levels. */
 const MAX_LLMS_TXT_CANDIDATES = 16;

@@ -1,6 +1,6 @@
 import type { RuleMatch } from "./rules";
 
-export const MAX_DISPLAY_COMMAND_CHARACTERS = 2_000;
+export const MAX_DISPLAY_COMMAND_CHARACTERS = 2000;
 
 export const MAX_DISPLAY_COMMAND_LINES = 20;
 
@@ -8,7 +8,8 @@ const DISPLAY_TRUNCATION_MARKER = (hiddenCharacters: number): string =>
   `\n  … [${hiddenCharacters} more characters hidden]`;
 
 const BIDI_CONTROL_CODE_POINTS = new Set([
-  0x061c, 0x200e, 0x200f, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066, 0x2067, 0x2068, 0x2069,
+  0x06_1c, 0x20_0e, 0x20_0f, 0x20_2a, 0x20_2b, 0x20_2c, 0x20_2d, 0x20_2e, 0x20_66, 0x20_67, 0x20_68,
+  0x20_69,
 ]);
 
 /** Converts terminal controls and bidirectional formatting characters to visible escapes. */

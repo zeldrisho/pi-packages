@@ -66,7 +66,7 @@ describe("parseConfig", () => {
   });
 
   it("accepts positive prompt timeouts up to one day and defaults out-of-range values", () => {
-    expect(parseConfig('{"promptTimeoutMs":15000,"operations":{}}').promptTimeoutMs).toBe(15000);
+    expect(parseConfig('{"promptTimeoutMs":15000,"operations":{}}').promptTimeoutMs).toBe(15_000);
     expect(parseConfig('{"promptTimeoutMs":86400000,"operations":{}}').promptTimeoutMs).toBe(
       86_400_000,
     );

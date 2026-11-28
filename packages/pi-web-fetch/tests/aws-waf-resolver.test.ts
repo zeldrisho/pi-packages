@@ -195,8 +195,8 @@ describe("native AWS WAF helpers", () => {
 
   it("returns the requested zeroed bandwidth payload", () => {
     for (const [difficulty, size] of [
-      [0, 1_024],
-      [1, 1_024],
+      [0, 1024],
+      [1, 1024],
       [2, 10_240],
       [3, 102_400],
       [4, 1_048_576],

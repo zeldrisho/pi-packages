@@ -82,7 +82,7 @@ export function createApprovalPrompt(
         border,
         panelLine(
           theme.bold(
-            `${deadline === undefined ? "" : `(${Math.max(0, Math.ceil((deadline - Date.now()) / 1_000))}s) `}pi-gate: allow this command?`,
+            `${deadline === undefined ? "" : `(${Math.max(0, Math.ceil((deadline - Date.now()) / 1000))}s) `}pi-gate: allow this command?`,
           ),
           width,
           "accent",

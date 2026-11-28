@@ -31,7 +31,7 @@ function leadingZeroBits(hex: string): number {
 
 describe("solveAnubisSha256Hex", () => {
   it("finds a nonce matching the requested hex difficulty", () => {
-    const solution = solveAnubisSha256Hex("deadbeef", 2, Date.now() + 5_000);
+    const solution = solveAnubisSha256Hex("deadbeef", 2, Date.now() + 5000);
 
     const expected = createHash("sha256")
       .update("deadbeef")
@@ -43,11 +43,11 @@ describe("solveAnubisSha256Hex", () => {
   });
 
   it("returns the first hash at difficulty zero", () => {
-    expect(solveAnubisSha256Hex("cafe", 0, Date.now() + 1_000).nonce).toBe(0);
+    expect(solveAnubisSha256Hex("cafe", 0, Date.now() + 1000).nonce).toBe(0);
   });
 
   it("rejects an unsupported difficulty", () => {
-    expect(() => solveAnubisSha256Hex("cafe", 65, Date.now() + 1_000)).toThrow(
+    expect(() => solveAnubisSha256Hex("cafe", 65, Date.now() + 1000)).toThrow(
       /unsupported difficulty/,
     );
   });
@@ -60,7 +60,7 @@ describe("solveAnubisSha256Hex", () => {
 describe("solveAnubisWasm", () => {
   it("runs the baseline sha256 module and returns a valid solution", () => {
     const randomData = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
-    const solution = solveAnubisWasm(fixture, randomData, 8, Date.now() + 5_000);
+    const solution = solveAnubisWasm(fixture, randomData, 8, Date.now() + 5000);
 
     expect(leadingZeroBits(solution.hash)).toBeGreaterThanOrEqual(8);
     expect(solution.hash).toMatch(/^[0-9a-f]{64}$/);
@@ -86,33 +86,31 @@ describe("solveAnubisWasm", () => {
   });
 
   it("rejects an empty module", () => {
-    expect(() => solveAnubisWasm(new Uint8Array(0), "00", 0, Date.now() + 1_000)).toThrow(
+    expect(() => solveAnubisWasm(new Uint8Array(0), "00", 0, Date.now() + 1000)).toThrow(
       /size limit/,
     );
   });
 
   it("rejects an oversized module", () => {
     expect(() =>
-      solveAnubisWasm(new Uint8Array(ANUBIS_MAX_WASM_BYTES + 1), "00", 0, Date.now() + 1_000),
+      solveAnubisWasm(new Uint8Array(ANUBIS_MAX_WASM_BYTES + 1), "00", 0, Date.now() + 1000),
     ).toThrow(/size limit/);
   });
 
   it("rejects a module without the required imports", () => {
     const empty = new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
 
-    expect(() => solveAnubisWasm(empty, "00", 0, Date.now() + 1_000)).toThrow(
-      /unsupported imports/,
-    );
+    expect(() => solveAnubisWasm(empty, "00", 0, Date.now() + 1000)).toThrow(/unsupported imports/);
   });
 
   it("rejects non-hex random data", () => {
-    expect(() => solveAnubisWasm(fixture, "xyz", 0, Date.now() + 1_000)).toThrow(
+    expect(() => solveAnubisWasm(fixture, "xyz", 0, Date.now() + 1000)).toThrow(
       /unsupported random data/,
     );
   });
 
   it("rejects an unsupported difficulty", () => {
-    expect(() => solveAnubisWasm(fixture, "00", 0x1_0000_0000, Date.now() + 1_000)).toThrow(
+    expect(() => solveAnubisWasm(fixture, "00", 0x1_00_00_00_00, Date.now() + 1000)).toThrow(
       /unsupported difficulty/,
     );
   });
@@ -128,7 +126,7 @@ describe("solveAnubisRequest", () => {
       kind: "sha256",
       randomData: "ab",
       difficulty: 1,
-      deadline: Date.now() + 1_000,
+      deadline: Date.now() + 1000,
     });
 
     expect(solution.hash.startsWith("0")).toBe(true);
@@ -140,7 +138,7 @@ describe("solveAnubisRequest", () => {
       moduleBytes: fixture,
       randomData: "ab",
       difficulty: 4,
-      deadline: Date.now() + 5_000,
+      deadline: Date.now() + 5000,
     });
 
     expect(leadingZeroBits(solution.hash)).toBeGreaterThanOrEqual(4);

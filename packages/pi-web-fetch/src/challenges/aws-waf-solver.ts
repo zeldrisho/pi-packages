@@ -22,9 +22,9 @@ export function hasLeadingZeroBits(hash: Uint8Array, difficulty: number): boolea
 
 /** Solves the bandwidth challenge using a bounded zero-filled buffer. */
 export function solveAwsWafBandwidth(difficulty: number): string {
-  const sizes = [1_024, 1_024, 10_240, 102_400, 1_048_576, 10_485_760];
+  const sizes = [1024, 1024, 10_240, 102_400, 1_048_576, 10_485_760];
 
-  return Buffer.alloc(sizes[Math.min(5, Math.max(0, difficulty))] ?? 1_024).toString("base64");
+  return Buffer.alloc(sizes[Math.min(5, Math.max(0, difficulty))] ?? 1024).toString("base64");
 }
 
 /** Computes bounded proof-of-work inside a disposable worker. */
@@ -54,7 +54,7 @@ export function solveAwsWafWork(work: AwsWafWork): string | undefined {
         N: cost,
         r: 8,
         p: 1,
-        maxmem: 64 * 1_024 * 1_024,
+        maxmem: 64 * 1024 * 1024,
       });
 
       if (hasLeadingZeroBits(digest, work.difficulty)) return String(nonce);

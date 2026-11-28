@@ -4,7 +4,7 @@ import type { IncomingHttpHeaders, IncomingMessage } from "node:http";
 const MAX_COOKIES = 128;
 
 /** Maximum accepted cookie value length in characters. */
-const MAX_COOKIE_VALUE_CHARACTERS = 4_096;
+const MAX_COOKIE_VALUE_CHARACTERS = 4096;
 
 /** Maximum accepted cookie name length in characters. */
 const MAX_COOKIE_NAME_CHARACTERS = 256;
@@ -148,7 +148,7 @@ function parseSetCookie(raw: string, url: URL, now: number): ParsedCookie | unde
       ? expires
       : maxAge <= 0
         ? now - 1
-        : now + Math.min(maxAge, 31_536_000) * 1_000;
+        : now + Math.min(maxAge, 31_536_000) * 1000;
 
   return { name, value, path, secure, expiresAt };
 }

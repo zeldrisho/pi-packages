@@ -6,9 +6,9 @@ const MAX_LINKS = 16;
 const MAX_ANCHOR_CHARACTERS = 120;
 
 /** Raw and extracted sizes below which an HTML page counts as sparsely extracted. */
-const SPARSE_MIN_RAW_CHARACTERS = 4_000;
+const SPARSE_MIN_RAW_CHARACTERS = 4000;
 
-const SPARSE_MAX_MARKDOWN_CHARACTERS = 1_024;
+const SPARSE_MAX_MARKDOWN_CHARACTERS = 1024;
 
 const SPARSE_MAX_MARKDOWN_RATIO = 0.008;
 

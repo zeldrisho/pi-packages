@@ -13,7 +13,7 @@ export const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 export const TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 /** Default port and route for the loopback listener. */
-const DEFAULT_CALLBACK_PORT = 51121;
+const DEFAULT_CALLBACK_PORT = 51_121;
 
 const CALLBACK_PATH = "/oauth-callback";
 

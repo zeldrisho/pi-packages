@@ -11,7 +11,7 @@ const document = (markdown: string) => ({
 });
 
 it("returns a whole-character prefix and a progressing offset at each content limit", () => {
-  const byteBudget = Math.max(1_024, DEFAULT_MAX_BYTES - 2_048);
+  const byteBudget = Math.max(1024, DEFAULT_MAX_BYTES - 2048);
   const lineBudget = DEFAULT_MAX_LINES - 10;
   // Leave three bytes after the last complete emoji. Its high surrogate alone
   // could fit as a replacement character, but must not be returned on its own.

@@ -484,10 +484,10 @@ describe("envelope assembly", () => {
   });
 
   it("clamps the output limit to the model ceiling", () => {
-    const capped = { ...requireModel(gemini), maxTokens: 1_024 };
+    const capped = { ...requireModel(gemini), maxTokens: 1024 };
     const envelope = buildRequest(input({ model: capped, maxTokens: 999_999 }));
 
-    expect(envelope.request.generationConfig?.maxOutputTokens).toBe(1_024);
+    expect(envelope.request.generationConfig?.maxOutputTokens).toBe(1024);
   });
 
   it("marks non-Gemini requests through labels", () => {

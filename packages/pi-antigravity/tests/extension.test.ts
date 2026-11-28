@@ -84,7 +84,9 @@ describe("extension registration", () => {
         url.startsWith("https://pi.dev/")
           ? Response.json([])
           : Response.json({
-              models: { "gemini-example-low": { displayName: "Example (Low)", maxTokens: 120000 } },
+              models: {
+                "gemini-example-low": { displayName: "Example (Low)", maxTokens: 120_000 },
+              },
             }),
       ),
     );
@@ -95,7 +97,7 @@ describe("extension registration", () => {
         type: "oauth",
         access: "token",
         refresh: "refresh",
-        expires: 9999999999999,
+        expires: 9_999_999_999_999,
         projectId: "project",
       },
       allowNetwork: true,
@@ -125,7 +127,7 @@ describe("extension registration", () => {
                 id: "gemini-3.8-flash",
                 reasoning: true,
                 input: ["text"],
-                contextWindow: 50000,
+                contextWindow: 50_000,
                 maxTokens: 4000,
                 thinkingLevelMap: {
                   off: null,
@@ -146,12 +148,12 @@ describe("extension registration", () => {
           models: {
             "gemini-3.8-flash-low": {
               displayName: "Gemini 3.8 Flash (Low)",
-              maxTokens: 100000,
+              maxTokens: 100_000,
               maxOutputTokens: 8000,
             },
             "gemini-3.8-flash-medium": {
               displayName: "Gemini 3.8 Flash (Medium)",
-              maxTokens: 100000,
+              maxTokens: 100_000,
               maxOutputTokens: 8000,
             },
           },
@@ -165,7 +167,7 @@ describe("extension registration", () => {
         type: "oauth",
         access: "token",
         refresh: "refresh",
-        expires: 9999999999999,
+        expires: 9_999_999_999_999,
         projectId: "project",
       },
       allowNetwork: true,
@@ -174,7 +176,7 @@ describe("extension registration", () => {
     });
 
     expect(models?.[0]).toMatchObject({
-      contextWindow: 50000,
+      contextWindow: 50_000,
       maxTokens: 4000,
       input: ["text"],
       thinkingLevelMap: { low: "gemini-3.8-flash-low", medium: null },
@@ -206,7 +208,7 @@ describe("extension registration", () => {
         type: "oauth",
         access: "token",
         refresh: "refresh",
-        expires: 9999999999999,
+        expires: 9_999_999_999_999,
         projectId: "project",
       },
       allowNetwork: true,
@@ -239,7 +241,7 @@ describe("extension registration", () => {
         type: "oauth",
         access: "token",
         refresh: "refresh",
-        expires: 9999999999999,
+        expires: 9_999_999_999_999,
         projectId: "project",
       },
       allowNetwork: true,
@@ -276,7 +278,7 @@ describe("extension registration", () => {
         type: "oauth",
         access: "token",
         refresh: "refresh",
-        expires: 9999999999999,
+        expires: 9_999_999_999_999,
         projectId: "project",
       },
       allowNetwork: true,
@@ -316,7 +318,7 @@ describe("extension registration", () => {
         type: "oauth",
         access: "token",
         refresh: "refresh",
-        expires: 9999999999999,
+        expires: 9_999_999_999_999,
         projectId: "project",
       },
       allowNetwork: true,
@@ -355,7 +357,7 @@ describe("extension registration", () => {
         type: "oauth",
         access: "token",
         refresh: "refresh",
-        expires: 9999999999999,
+        expires: 9_999_999_999_999,
         projectId: "project",
       },
       allowNetwork: true,
@@ -393,7 +395,7 @@ describe("extension registration", () => {
         type: "oauth",
         access: "token",
         refresh: "refresh",
-        expires: 9999999999999,
+        expires: 9_999_999_999_999,
         projectId: "project",
       },
       allowNetwork: true,

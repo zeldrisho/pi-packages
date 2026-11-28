@@ -123,7 +123,7 @@ describe("web_search provider transport", () => {
 
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(new TextEncoder().encode(`<b>${"failure ".repeat(1_200)}`));
+        controller.enqueue(new TextEncoder().encode(`<b>${"failure ".repeat(1200)}`));
       },
       cancel() {
         cancelled = true;

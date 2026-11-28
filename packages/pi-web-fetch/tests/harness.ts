@@ -99,7 +99,7 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
     versionedContinuationRequests += 1;
     const version = `version-${versionedContinuationRequests}`;
     response.setHeader("content-type", "text/plain");
-    response.end(`${version}\n${"a".repeat(1_100)}\nend-${version}`);
+    response.end(`${version}\n${"a".repeat(1100)}\nend-${version}`);
 
     return;
   }
@@ -225,7 +225,7 @@ function fixtureResponse(request: IncomingMessage, response: ServerResponse): vo
       return;
     case "/continuation":
       response.setHeader("content-type", "text/plain");
-      response.end(`${"a".repeat(1_100)}\n${"b".repeat(1_100)}`);
+      response.end(`${"a".repeat(1100)}\n${"b".repeat(1100)}`);
 
       return;
     case "/cloudflare-challenge":
