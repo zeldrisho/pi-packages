@@ -13,8 +13,14 @@ import {
 import { requestPinned, type FetchRemoteDependencies } from "../src/index.ts";
 
 /** Starts a loopback HTTP server and returns its base URL and cleanup function. */
-async function listen(handler: RequestListener) {
-  const server = createServer(handler);
+async function listen(handler: (...args: Parameters<RequestListener>) => Promise<void>) {
+  const server = createServer((request, response) => {
+    handler(request, response).catch((error: unknown) => {
+      response.destroy(
+        error instanceof Error ? error : new Error("Fixture request failed", { cause: error }),
+      );
+    });
+  });
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
