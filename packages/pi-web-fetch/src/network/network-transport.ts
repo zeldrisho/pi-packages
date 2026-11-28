@@ -195,6 +195,7 @@ export async function requestPinned(
     }
   }
 
+  // oxlint-disable-next-line typescript/only-throw-error -- propagate the last connection rejection unchanged
   throw lastError ?? new Error("web_fetch could not connect.");
 }
 

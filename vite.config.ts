@@ -101,10 +101,6 @@ export default defineConfig({
         ],
         rules: { "no-console": "off" },
       },
-      {
-        files: ["**/*.{ts,tsx,mts,cts}"],
-        rules: { "typescript/only-throw-error": "off" },
-      },
     ],
     options: {
       typeAware: true,

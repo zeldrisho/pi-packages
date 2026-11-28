@@ -421,7 +421,7 @@ async function runDefuddle(
       setImmediate(resolve);
     });
 
-    if (escapedRejection !== undefined) throw escapedRejection;
+    if (escapedRejection !== undefined) return undefined;
 
     return result;
   } catch {
