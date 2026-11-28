@@ -72,7 +72,7 @@ describe("web_fetch disk cache", () => {
   });
 
   it("deletes backing files when entries are evicted by the count limit", async () => {
-    let now = 0;
+    const now = 0;
     const cache = makeCache(directory, () => now);
 
     for (const key of ["a", "b", "c", "d"]) {

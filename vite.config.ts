@@ -76,7 +76,6 @@ export default defineConfig({
       "import/consistent-type-specifier-style": "off",
       "no-promise-executor-return": "off",
       "no-useless-assignment": "off",
-      "prefer-const": "off",
       "preserve-caught-error": "off",
       "typescript/array-type": "off",
       "typescript/consistent-type-imports": "off",

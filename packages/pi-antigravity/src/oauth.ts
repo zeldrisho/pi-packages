@@ -361,6 +361,7 @@ async function startCallbackListener(expectedState: string): Promise<CallbackLis
   let settle: ((result: { code: string; state: string }) => void) | undefined;
   let fail: ((error: Error) => void) | undefined;
   let settled = false;
+  // oxlint-disable-next-line prefer-const -- startup errors can finish before the timer is armed
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   const codePromise = new Promise<{ code: string; state: string }>((resolve, reject) => {
