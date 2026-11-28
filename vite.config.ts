@@ -90,7 +90,6 @@ export default defineConfig({
       "typescript/no-unsafe-return": "off",
       "typescript/no-unsafe-type-assertion": "off",
       "typescript/return-await": "off",
-      "typescript/use-unknown-in-catch-callback-variable": "off",
       "unicorn/consistent-function-scoping": "off",
       "unicorn/no-hex-escape": "off",
       "unicorn/numeric-separators-style": "off",
