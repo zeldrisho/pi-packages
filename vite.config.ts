@@ -74,7 +74,6 @@ export default defineConfig({
       "@nkzw/no-instanceof": "off",
       curly: "off",
       "import/consistent-type-specifier-style": "off",
-      "no-console": "off",
       "no-promise-executor-return": "off",
       "no-useless-assignment": "off",
       "prefer-const": "off",
@@ -108,6 +107,16 @@ export default defineConfig({
       "unicorn/text-encoding-identifier-case": "off",
     },
     overrides: [
+      {
+        // CLI entry points print progress, results, and errors for operators.
+        files: [
+          "scripts/compatibility.ts",
+          "scripts/request-capture.ts",
+          "scripts/sync-web-modules.ts",
+          "tests/package-smoke-test.ts",
+        ],
+        rules: { "no-console": "off" },
+      },
       {
         files: ["**/*.{ts,tsx,mts,cts}"],
         rules: { "typescript/only-throw-error": "off" },
