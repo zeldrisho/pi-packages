@@ -217,10 +217,12 @@ async function main(args: string[]): Promise<void> {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main(process.argv.slice(2)).catch(() => {
+  try {
+    await main(process.argv.slice(2));
+  } catch {
     console.error(
       "Compatibility command failed. Check arguments and input files; see docs/compatibility.md.",
     );
     process.exitCode = 1;
-  });
+  }
 }
