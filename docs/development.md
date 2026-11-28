@@ -23,6 +23,12 @@ Set `BRAVE_SEARCH_API_KEY` only for manually exercising `pi-web-search`; never c
 
 Package READMEs are user guides. Keep implementation and maintenance notes in the shared guides under `docs/`; package-specific architecture and protocol details belong in [architecture.md](architecture.md). For provider artifact comparisons, see [compatibility.md](compatibility.md).
 
+## Lint preset
+
+`vite.config.ts` extends Cloudflare's Oxlint preset through Vite+ and keeps compiler diagnostics enabled. The migration leaves only rules with existing findings temporarily off. Style rules with widespread findings are deferred to avoid rewriting otherwise working code in the baseline; the remaining type-aware rules need individual review, especially at JSON boundaries and in test fixtures.
+
+To review a deferred rule, remove its override, run `vp lint`, and commit that rule with its fixes or a documented, narrowly scoped exception. Run `vp check` and the relevant tests when changing types or behavior.
+
 ## Package conventions
 
 - Keep each independently publishable Pi package under `packages/<name>/`. Content-only packages expose prompt templates or themes through `pi` in `package.json` and need no runtime TypeScript.
