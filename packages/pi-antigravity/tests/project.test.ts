@@ -18,19 +18,29 @@ describe("project discovery", () => {
     await expect(discoverProjectId("access", undefined)).resolves.toBe("project");
     expect(fetch).toHaveBeenCalledOnce();
   });
-  it("falls back to the second load endpoint with a fresh deadline", async () => {
+  it("refuses redirects and falls back to the second load endpoint with a fresh deadline", async () => {
     const timeout = vi.spyOn(AbortSignal, "timeout");
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockRejectedValueOnce(new Error("network"))
-        .mockResolvedValueOnce(Response.json({ projectId: "fallback" })),
-    );
+
+    const fetch = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("redirect refused"))
+      .mockResolvedValueOnce(Response.json({ projectId: "fallback" }));
+
+    vi.stubGlobal("fetch", fetch);
 
     try {
       await expect(discoverProjectId("access", undefined)).resolves.toBe("fallback");
       expect(fetch).toHaveBeenCalledTimes(2);
+      expect(fetch).toHaveBeenNthCalledWith(
+        1,
+        "https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
+        expect.objectContaining({ redirect: "error" }),
+      );
+      expect(fetch).toHaveBeenNthCalledWith(
+        2,
+        "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
+        expect.objectContaining({ redirect: "error" }),
+      );
       expect(timeout.mock.calls.filter(([ms]) => ms === 8_000)).toHaveLength(2);
       expect(timeout).toHaveBeenCalledWith(16_000);
     } finally {

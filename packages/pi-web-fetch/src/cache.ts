@@ -1,6 +1,7 @@
 import {
   chmodSync,
   closeSync,
+  fchmodSync,
   mkdirSync,
   openSync,
   readFileSync,
@@ -12,7 +13,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { resolve, sep } from "node:path";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 interface ExpiringCacheEntry<V> {
   expiresAt: number;
@@ -74,6 +75,30 @@ export function resolveCachePath(directory: string, keyPath: string): string {
   }
 
   return full;
+}
+
+/** Publishes a cache file atomically using a temporary path in the same directory. */
+export function writeCacheFile(path: string, temp: string, bytes: Uint8Array): void {
+  const descriptor = openSync(temp, "wx", 0o600);
+
+  try {
+    try {
+      writeFileSync(descriptor, bytes);
+      fchmodSync(descriptor, 0o600);
+    } finally {
+      closeSync(descriptor);
+    }
+
+    renameSync(temp, path);
+  } catch (error) {
+    try {
+      unlinkSync(temp);
+    } catch {
+      // Best-effort cleanup must not hide the write or rename failure.
+    }
+
+    throw error;
+  }
 }
 
 /**
@@ -265,19 +290,8 @@ export class ExpiringLruCache<K, V> {
       if (payload.byteLength > this.maxBytes * 2 + 65_536)
         throw new Error("oversized cache payload");
       const path = resolveCachePath(directory, this.persistence!.keyToPath(key));
-      const temp = `${path}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
-
-      try {
-        writeFileSync(temp, Buffer.concat([encodeExpiresAt(expiresAt), payload]), { mode: 0o600 });
-        chmodSync(temp, 0o600);
-        renameSync(temp, path);
-      } finally {
-        try {
-          unlinkSync(temp);
-        } catch {
-          // The rename may already have removed the temporary path.
-        }
-      }
+      const temp = `${path}.${randomUUID()}.tmp`;
+      writeCacheFile(path, temp, Buffer.concat([encodeExpiresAt(expiresAt), payload]));
     } catch {
       // Best-effort persistence: a failed disk write never fails the caller.
     }

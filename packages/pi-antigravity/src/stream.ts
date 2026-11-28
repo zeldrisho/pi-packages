@@ -815,6 +815,7 @@ async function postToEndpoint(
         method: "POST",
         headers,
         body,
+        redirect: "error",
         signal: combined,
       });
     } finally {

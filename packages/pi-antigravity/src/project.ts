@@ -154,7 +154,7 @@ async function postJson(
 ): Promise<Response> {
   const headers = await antigravityHeaders(token, signal);
 
-  return fetch(url, { method: "POST", headers, body, signal });
+  return fetch(url, { method: "POST", headers, body, redirect: "error", signal });
 }
 
 /** Reads a bounded JSON error and returns only an allowlisted Google reason. */

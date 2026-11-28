@@ -184,6 +184,7 @@ async function exchangeCode(
       redirect_uri: redirectUri(),
       code_verifier: verifier,
     }).toString(),
+    redirect: "error",
     signal,
   });
 
@@ -233,6 +234,7 @@ export async function refreshCredentials(
       refresh_token: credentials.refresh,
       grant_type: "refresh_token",
     }).toString(),
+    redirect: "error",
     signal,
   });
 

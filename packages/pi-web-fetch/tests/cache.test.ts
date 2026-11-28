@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vite-plus/test";
-import { canonicalKey, ExpiringLruCache } from "../src/cache";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import { canonicalKey, ExpiringLruCache, writeCacheFile } from "../src/cache";
 
 const sizeOf = (value: string): number => new TextEncoder().encode(value).byteLength;
 
@@ -50,6 +53,55 @@ describe("ExpiringLruCache", () => {
     expect(cache.get("a")).toBeUndefined();
     expect(cache.size).toBe(0);
     expect(cache.byteSize).toBe(0);
+  });
+});
+
+describe("cache persistence", () => {
+  let directory: string;
+
+  beforeEach(() => {
+    directory = mkdtempSync(join(tmpdir(), "pi-cache-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  function createCache() {
+    return new ExpiringLruCache<string, string>(2, 100, sizeOf, () => 0, {
+      directory,
+      serialize: (value) => Buffer.from(value),
+      deserialize: (bytes) => Buffer.from(bytes).toString(),
+      keyToPath: (key) => key,
+    });
+  }
+
+  it("publishes completed writes without leaving a temporary file", () => {
+    const cache = createCache();
+
+    expect(cache.set("entry", "persisted", 100)).toBe(true);
+    expect(readdirSync(directory)).toEqual(["entry"]);
+    expect(createCache().get("entry")).toBe("persisted");
+  });
+
+  it("does not overwrite or remove a temporary file it did not create", () => {
+    const temp = join(directory, "entry.tmp");
+    writeFileSync(temp, "existing file");
+
+    expect(() => writeCacheFile(join(directory, "entry"), temp, Buffer.from("new data"))).toThrow(
+      /EEXIST/,
+    );
+    expect(readdirSync(directory)).toEqual(["entry.tmp"]);
+    expect(readFileSync(temp, "utf8")).toBe("existing file");
+  });
+
+  it("removes its temporary file when publishing fails", () => {
+    const cache = createCache();
+    mkdirSync(join(directory, "entry"));
+
+    expect(cache.set("entry", "memory only", 100)).toBe(true);
+    expect(cache.get("entry")).toBe("memory only");
+    expect(readdirSync(directory)).toEqual(["entry"]);
   });
 });
 

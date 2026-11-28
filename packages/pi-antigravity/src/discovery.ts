@@ -455,6 +455,7 @@ export async function fetchAvailableModels(
         method: "POST",
         headers,
         body: JSON.stringify({ project: projectId }),
+        redirect: "error",
         signal: deadline,
       });
 

@@ -6,7 +6,7 @@ This repository publishes independent Pi packages from `packages/*`. Most packag
 
 Extension manifests expose one Pi entry point, `src/index.ts`; skill-only packages expose `pi.skills`, while prompt-only packages publish their Markdown resources. Pi APIs are peer dependencies because the host supplies them; the workspace provides a locked development resolution and smoke-tests packed extensions.
 
-`pi-web-fetch` and `pi-web-search` contain byte-identical copies of `cache.ts`, `inflight.ts`, and `render.ts`. `tests/repository-contract.test.ts` detects drift. Extract a shared runtime package only if another consumer appears or synchronized maintenance becomes materially burdensome. Do not extract only part of web-fetch's validate–resolve–pin–redirect security boundary.
+`pi-web-fetch` and `pi-web-search` contain byte-identical copies of `cache.ts`, `inflight.ts`, and `render.ts`. `tests/repository-contract.test.ts` detects drift. Both caches publish disk entries by atomically renaming a private, exclusively created temporary file. A failed write leaves the in-memory entry usable and does not touch a colliding temporary file. Extract a shared runtime package only if another consumer appears or synchronized maintenance becomes materially burdensome. Do not extract only part of web-fetch's validate–resolve–pin–redirect security boundary.
 
 ## Web fetch trust boundary
 
@@ -65,7 +65,7 @@ Both web tools declare output schemas for structured results. Structured fetch o
 
 ## Antigravity provider
 
-`pi-antigravity` sends `POST {endpoint}/v1internal:streamGenerateContent?alt=sse` with an OAuth bearer token and an envelope carrying `project`, `model`, `requestId`, and a Gemini-shaped `request`. The `sessionId` and `labels` fields belong inside `request`. Endpoints are tried in order (`daily-cloudcode-pa`, then `cloudcode-pa`). Only explicit temporary-capacity `429` responses move to the next endpoint; transport failures are not replayed because the generation may have been accepted, and other HTTP failures are reported without endpoint fallback.
+`pi-antigravity` sends `POST {endpoint}/v1internal:streamGenerateContent?alt=sse` with an OAuth bearer token and an envelope carrying `project`, `model`, `requestId`, and a Gemini-shaped `request`. The `sessionId` and `labels` fields belong inside `request`. Endpoints are tried in order (`daily-cloudcode-pa`, then `cloudcode-pa`). Only explicit temporary-capacity `429` responses move to the next endpoint; transport failures are not replayed because the generation may have been accepted, and other HTTP failures are reported without endpoint fallback. Generation, project and model discovery, and OAuth token requests refuse HTTP redirects.
 
 Gemini 3 and newer reject replayed tool calls without a thought signature, so unsigned history becomes observation text. Antigravity filters discovery to Gemini routes because its thinking and native JSON-schema tool semantics are Gemini-specific. These rules are covered by `packages/pi-antigravity/tests/request.test.ts`. Some exact phrases in Pi's default system prompt have produced generic 429 responses despite available quota. `compatibleSystemPrompt` rephrases the default preamble and one documentation phrase only when the prompt begins with Pi's exact default preamble; other instructions and custom preambles are preserved. This is a compatibility workaround, not a quota guarantee.
 

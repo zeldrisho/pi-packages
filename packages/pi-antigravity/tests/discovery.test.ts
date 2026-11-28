@@ -349,7 +349,12 @@ describe("catalog grouping", () => {
 
 describe("catalog refresh", () => {
   it("fetches the catalog with the project the account is billed against", async () => {
-    const seen: { url: string; body: string; authorization: string | null }[] = [];
+    const seen: {
+      url: string;
+      body: string;
+      authorization: string | null;
+      redirect: RequestRedirect | undefined;
+    }[] = [];
 
     vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
       const headers = new Headers(init.headers);
@@ -357,7 +362,12 @@ describe("catalog refresh", () => {
       // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the extension always sends a string body
       const body = typeof init.body === "string" ? init.body : "";
 
-      seen.push({ url, body, authorization: headers.get("authorization") });
+      seen.push({
+        url,
+        body,
+        authorization: headers.get("authorization"),
+        redirect: init.redirect,
+      });
 
       return Response.json(availableModels());
     });
@@ -376,6 +386,7 @@ describe("catalog refresh", () => {
     );
     expect(JSON.parse(seen[0]?.body ?? "{}")).toEqual({ project: "project-under-test" });
     expect(seen[0]?.authorization).toBe("Bearer access-token");
+    expect(seen[0]?.redirect).toBe("error");
     expect(catalog).toHaveLength(4);
   });
 

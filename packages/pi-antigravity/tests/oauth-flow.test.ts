@@ -103,6 +103,11 @@ describe("OAuth login", () => {
       expires: 3301000,
       projectId: "project-live",
     });
+    expect(fetch).toHaveBeenNthCalledWith(
+      1,
+      TOKEN_URL,
+      expect.objectContaining({ redirect: "error" }),
+    );
     expect(onPrompt).toHaveBeenCalledTimes(2);
     expect(onPrompt).toHaveBeenNthCalledWith(
       1,
@@ -235,6 +240,10 @@ describe("OAuth refresh", () => {
       access: "new",
       expires: 3301000,
     });
+    expect(fetch).toHaveBeenCalledExactlyOnceWith(
+      TOKEN_URL,
+      expect.objectContaining({ redirect: "error" }),
+    );
     const rawBody = fetch.mock.calls[0]?.[1].body;
 
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the request boundary must send a form-encoded string

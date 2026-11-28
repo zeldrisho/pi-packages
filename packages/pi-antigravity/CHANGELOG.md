@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Refuse HTTP redirects during OAuth token exchange and refresh, project and model discovery, and generation.
+
 ## [0.2.2] - 2026-11-27
 
 ### Fixed

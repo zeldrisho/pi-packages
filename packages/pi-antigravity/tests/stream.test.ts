@@ -615,7 +615,10 @@ describe("stream implementation", () => {
     }).result();
 
     expect(result.stopReason).toBe("error");
-    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledExactlyOnceWith(
+      "https://daily-cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse",
+      expect.objectContaining({ redirect: "error" }),
+    );
   });
 
   it("reports a tool call as the stop reason", async () => {
