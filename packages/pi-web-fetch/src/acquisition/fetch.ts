@@ -144,13 +144,13 @@ function normalizeContentType(header: string): string | undefined {
 }
 
 /** Content types other than `text/*` that web_fetch extracts. */
-const ALLOWED_CONTENT_TYPES = [
+const ALLOWED_CONTENT_TYPES = new Set([
   "application/json",
   "application/markdown",
   "application/x-markdown",
   "application/xml",
   "application/xhtml+xml",
-];
+]);
 
 /** A response body decoded once so challenge detection and extraction share it. */
 interface DecodedBody {
@@ -183,7 +183,7 @@ const TEXT_DOCUMENT_PATH_PATTERN = /\.(?:md|markdown|mdx|txt)$/i;
 function isAllowedContentType(value: string | undefined, pathname: string): value is string {
   if (value === undefined) return false;
 
-  if (value.startsWith("text/") || ALLOWED_CONTENT_TYPES.includes(value)) return true;
+  if (value.startsWith("text/") || ALLOWED_CONTENT_TYPES.has(value)) return true;
 
   return value === "application/octet-stream" && TEXT_DOCUMENT_PATH_PATTERN.test(pathname);
 }

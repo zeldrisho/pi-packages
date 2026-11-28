@@ -91,7 +91,6 @@ export default defineConfig({
       "unicorn/numeric-separators-style": "off",
       "unicorn/prefer-dom-node-append": "off",
       "unicorn/prefer-import-meta-properties": "off",
-      "unicorn/prefer-set-has": "off",
       "unicorn/prefer-string-raw": "off",
       "unicorn/prefer-string-replace-all": "off",
       "unicorn/prefer-top-level-await": "off",

@@ -401,15 +401,15 @@ describe("repository contracts", () => {
     // catalog resolution.
     const rootEntries = await readdir(root);
 
-    const forbidden = [
+    const forbidden = new Set([
       "package-lock.json",
       "npm-shrinkwrap.json",
       "yarn.lock",
       "bun.lock",
       "bun.lockb",
-    ];
+    ]);
 
-    const found = rootEntries.filter((entry) => forbidden.includes(entry));
+    const found = rootEntries.filter((entry) => forbidden.has(entry));
 
     if (found.length > 0) {
       fail(`repository root must not contain ${found.join(", ")} — use pnpm via vp install`);
@@ -420,7 +420,7 @@ describe("repository contracts", () => {
         const entries = await readdir(join(packagesDirectory, directory));
 
         return entries
-          .filter((entry) => forbidden.includes(entry))
+          .filter((entry) => forbidden.has(entry))
           .map((entry) => `${directory}/${entry}`);
       }),
     );
