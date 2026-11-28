@@ -10,10 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Ignore explicitly hidden HTML and avoid returning sparse interface text as page content when a scripted main region is empty. Refetch older cached HTML so it does not retain the discarded text.
+- Update Defuddle to 0.19.13 to better preserve table captions, figure links, and Markdown list formatting.
 
 ### Security
 
 - Create private cache temporary files exclusively so a write cannot overwrite or remove an existing temporary file.
+- Pick up Defuddle's fix for unsafe serialization of MathML title elements.
 
 ## [0.18.1] - 2026-11-23
 

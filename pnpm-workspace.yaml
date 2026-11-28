@@ -24,12 +24,12 @@ allowBuilds:
   protobufjs: false
 
 catalog:
-  "@earendil-works/pi-ai": "^1.4.0"
-  "@earendil-works/pi-coding-agent": "^1.5.0"
-  "@earendil-works/pi-tui": "^1.4.0"
+  "@earendil-works/pi-ai": "^1.6.0"
+  "@earendil-works/pi-coding-agent": "^1.6.0"
+  "@earendil-works/pi-tui": "^1.6.0"
   # Keep Node types aligned with the current LTS major used in CI.
   "@types/node": "^26.6.6"
-  typebox: "^1.4.3"
+  typebox: "^1.4.7"
   typescript: "^7.0.2"
   vite: npm:@voidzero-dev/vite-plus-core@8.3.8000
   vite-plus: 1.7.0
