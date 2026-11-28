@@ -344,6 +344,7 @@ export async function fetchDocumentWithLlmsTxtSupport(
     }
 
     if (isGitHubLikeHost(url.hostname)) {
+      // oxlint-disable-next-line typescript/return-await -- fetch failures must not fall through and retry this URL
       return fetchCompleteDocument(rawUrl, signal, dependencies);
     }
   } catch (error) {
