@@ -93,7 +93,6 @@ export default defineConfig({
       "unicorn/consistent-function-scoping": "off",
       "unicorn/no-hex-escape": "off",
       "unicorn/numeric-separators-style": "off",
-      "unicorn/prefer-at": "off",
       "unicorn/prefer-dom-node-append": "off",
       "unicorn/prefer-import-meta-properties": "off",
       "unicorn/prefer-set-has": "off",

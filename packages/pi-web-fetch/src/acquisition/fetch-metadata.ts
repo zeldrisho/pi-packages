@@ -38,9 +38,9 @@ export function normalizeGitHubRawUrl(rawUrl: string): string {
       const segments = url.pathname.split("/").filter(Boolean);
 
       if (segments.length >= 4 && segments[2] === "tree") {
-        const lastSegment = segments[segments.length - 1];
+        const lastSegment = segments.at(-1);
 
-        if (lastSegment.includes(".")) {
+        if (lastSegment?.includes(".")) {
           // Reconstruct path: /owner/repo/ref/path (remove "tree" segment)
           const newPath = `/${segments[0]}/${segments[1]}/${segments.slice(3).join("/")}`;
 

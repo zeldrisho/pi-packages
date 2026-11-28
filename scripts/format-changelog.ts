@@ -118,8 +118,7 @@ function parseEntry(segment: string[]): ChangeEntry {
   for (const section of sections) {
     while (section.lines.length > 0 && section.lines[0].trim() === "") section.lines.shift();
 
-    while (section.lines.length > 0 && section.lines[section.lines.length - 1].trim() === "")
-      section.lines.pop();
+    while (section.lines.at(-1)?.trim() === "") section.lines.pop();
   }
 
   return { version: heading.version, date: heading.date, preamble, sections };

@@ -444,10 +444,12 @@ function batchByBudget(items: string[], budgetTokens: number): string[][] {
 
   if (current.length > 0) batches.push(current);
 
-  if (batches.length > 1 && batches[batches.length - 1].length === 1) {
-    const last = batches.pop();
+  const last = batches.at(-1);
+  const previous = batches.at(-2);
 
-    if (last) batches[batches.length - 1].push(...last);
+  if (last?.length === 1 && previous) {
+    batches.pop();
+    previous.push(...last);
   }
 
   return batches;

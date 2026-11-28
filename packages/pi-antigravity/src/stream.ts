@@ -444,7 +444,7 @@ function finishActive(
 
   state.active = undefined;
 
-  const block = output.content[output.content.length - 1];
+  const block = output.content.at(-1);
 
   if (block?.type === "text") block.textSignature = active.signature;
 
@@ -586,7 +586,7 @@ function appendPart(
 
   if (part.signature !== undefined) active.signature = part.signature;
 
-  const block = output.content[output.content.length - 1];
+  const block = output.content.at(-1);
 
   if (block?.type === "text") block.text = active.content;
 
