@@ -127,7 +127,7 @@ describe("release CLI", () => {
       [["package"], "A tag is required"],
       [["notes", "packages/alpha"], "A package path and output path are required"],
       [["unknown"], "Usage:"],
-    ] satisfies Array<[string[], string]>;
+    ] satisfies [string[], string][];
 
     for (const [args, message] of samples) {
       await expect.soft(runReleaseCli(args), args.join(" ")).rejects.toThrow(message);

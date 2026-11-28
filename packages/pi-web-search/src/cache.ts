@@ -307,7 +307,7 @@ export class ExpiringLruCache<K, V> {
 
     try {
       const files = readdirSync(persistence.directory);
-      const candidates: Array<{ path: string; size: number; mtime: number }> = [];
+      const candidates: { path: string; size: number; mtime: number }[] = [];
 
       for (const file of files) {
         const path = resolveCachePath(persistence.directory, file);

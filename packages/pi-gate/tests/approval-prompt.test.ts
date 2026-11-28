@@ -13,7 +13,7 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
 
 describe("approval prompt", () => {
   it("uses Pi semantic colors and presents command and matched-rule details", () => {
-    const styled: Array<{ text: string; fg?: string; bg?: string }> = [];
+    const styled: { text: string; fg?: string; bg?: string }[] = [];
 
     const theme: ApprovalPromptTheme = {
       style(text: string, style: { fg?: string; bg?: string }) {

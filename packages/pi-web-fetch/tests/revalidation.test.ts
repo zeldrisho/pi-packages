@@ -31,7 +31,7 @@ describe("stale cache revalidation", () => {
     vi.useFakeTimers();
     vi.setSystemTime(startedAt);
     const url = `https://raw.githubusercontent.com/example/project/main/revalidate-${process.pid}-${Math.random()}.txt`;
-    const requestHeaders: Array<Readonly<Record<string, string>> | undefined> = [];
+    const requestHeaders: (Readonly<Record<string, string>> | undefined)[] = [];
     let requests = 0;
 
     const dependencies: FetchRemoteDependencies = {

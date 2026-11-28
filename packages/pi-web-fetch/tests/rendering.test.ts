@@ -76,7 +76,7 @@ describe("web_fetch rendering", () => {
       ): RenderedComponent;
       renderResult(
         result: {
-          content: Array<{ type: "text"; text: string }>;
+          content: { type: "text"; text: string }[];
           details: {
             extractor: "defuddle";
             cached: boolean;

@@ -27,7 +27,7 @@ describe("parseSyncArguments", () => {
       [["sync", "--unknown"]],
       [["check", "--from=pi-web-fetch"]],
       [["frobnicate"], "unknown command"],
-    ] satisfies Array<[string[], string?]>;
+    ] satisfies [string[], string?][];
 
     for (const [args, message] of samples) {
       expect.soft(() => parseSyncArguments(args), args.join(" ")).toThrow(message);

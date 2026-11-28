@@ -77,8 +77,8 @@ async function requestPayload(input: string | URL | Request, init?: RequestInit)
   // SAFETY: the native OpenAI implementation serializes this request as JSON.
   return (await new Request(input, init).json()) as {
     stream: boolean;
-    messages: Array<{ role: string; content: string }>;
-    tools: Array<{ function: { name: string } }>;
+    messages: { role: string; content: string }[];
+    tools: { function: { name: string } }[];
     tool_choice?: string;
     temperature?: number;
     metadata?: { preserved: boolean };

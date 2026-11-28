@@ -256,7 +256,7 @@ export interface WebFetchDetails {
 }
 
 interface WebFetchUpdate {
-  content: Array<{ type: "text"; text: string }>;
+  content: { type: "text"; text: string }[];
   details: Record<string, never>;
 }
 

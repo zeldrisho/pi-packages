@@ -69,12 +69,13 @@ export default defineConfig({
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
       "oxc/no-accumulating-spread": "error",
+      // Keep standard bracket notation for the workspace's existing array types.
+      "typescript/array-type": ["error", { default: "array", readonly: "array" }],
       // Migration baseline: review and re-enable these rules individually.
       "@nkzw/no-instanceof": "off",
       curly: "off",
       "import/consistent-type-specifier-style": "off",
       "preserve-caught-error": "off",
-      "typescript/array-type": "off",
       "typescript/consistent-type-imports": "off",
       "typescript/no-non-null-assertion": "off",
       "typescript/no-unsafe-argument": "off",

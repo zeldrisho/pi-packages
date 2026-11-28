@@ -445,7 +445,7 @@ describe("opencode-free extension", () => {
 
   it("reuses the persisted session identity for inference across session starts", async () => {
     const { pi, state } = createFakePi();
-    const sessions: Array<string | null> = [];
+    const sessions: (string | null)[] = [];
     registerOpencodeFree(
       pi,
       dependencies({}, async (_input, init) => {

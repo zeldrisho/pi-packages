@@ -17,7 +17,7 @@ const BASE_RETRY_DELAY_MS = 250;
 
 interface OriginState {
   active: number;
-  waiting: Array<() => void>;
+  waiting: (() => void)[];
 }
 
 const origins = new Map<string, OriginState>();

@@ -264,7 +264,7 @@ function formatAnswer(answer: BraveAnswer, fallback: boolean): string {
 }
 
 interface SearchUpdate {
-  content: Array<{ type: "text"; text: string }>;
+  content: { type: "text"; text: string }[];
   details: Record<string, never>;
 }
 

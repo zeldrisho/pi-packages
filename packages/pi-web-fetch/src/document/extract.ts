@@ -595,7 +595,7 @@ function selectSurfaceHtml(
   const selected = values[0];
   const { document } = parseHTML(html);
   normalizeFragmentDocument(document);
-  const candidates: Array<{ panes: Element[]; chosen: Element }> = [];
+  const candidates: { panes: Element[]; chosen: Element }[] = [];
 
   // Standard ARIA controls identify their panels by ID. The query value must
   // match a control ID or panel ID exactly; labels are not URL identifiers.

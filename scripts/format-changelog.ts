@@ -62,7 +62,7 @@ interface ChangeEntry {
   version: string;
   date: string | null;
   preamble: string[];
-  sections: Array<{ title: string; lines: string[] }>;
+  sections: { title: string; lines: string[] }[];
 }
 
 function normalizeSectionTitle(title: string): string {
@@ -96,7 +96,7 @@ function parseHeading(line: string) {
 function parseEntry(segment: string[]): ChangeEntry {
   const heading = parseHeading(segment[0] ?? "## [Unreleased]");
   const preamble: string[] = [];
-  const sections: Array<{ title: string; lines: string[] }> = [];
+  const sections: { title: string; lines: string[] }[] = [];
   let current: { title: string; lines: string[] } | null = null;
 
   for (const line of segment.slice(1)) {

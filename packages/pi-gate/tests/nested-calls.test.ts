@@ -18,7 +18,7 @@ it("gates real SDK nested calls without a model request or shell execution", asy
   process.env.PI_CODING_AGENT_DIR = directory;
   let toolContext: ExtensionToolContext | undefined;
   const calls: string[] = [];
-  const events: Array<{ toolName: string; parentToolCallId?: string }> = [];
+  const events: { toolName: string; parentToolCallId?: string }[] = [];
   const settingsManager = SettingsManager.inMemory();
 
   const resourceLoader = new DefaultResourceLoader({

@@ -347,7 +347,7 @@ function textTokens(text: string): number {
  * checkpoint, the instructions, and its system prompt. Deferring on the conversation
  * alone would leave Pi less output room than the estimate promises.
  */
-function promptOverheadTokens(...parts: Array<string | undefined>): number {
+function promptOverheadTokens(...parts: (string | undefined)[]): number {
   return textTokens(parts.filter((part): part is string => Boolean(part)).join("\n"));
 }
 

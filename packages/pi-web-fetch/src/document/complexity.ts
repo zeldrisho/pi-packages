@@ -93,7 +93,7 @@ const IMPLIED_END_TAGS = new Map<string, ReadonlySet<string>>([
   ["rp", new Set(["rt", "rp"])],
   ["tbody", new Set(["thead", "tbody"])],
   ["tfoot", new Set(["thead", "tbody"])],
-] satisfies Array<[string, ReadonlySet<string>]>);
+] satisfies [string, ReadonlySet<string>][]);
 
 /**
  * Elements that open foreign content, where self-closing syntax is honored.

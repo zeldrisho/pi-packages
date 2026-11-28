@@ -178,7 +178,7 @@ describe("origin coordination and retries", () => {
   });
 
   it("cancels a caller while it waits for an origin slot", async () => {
-    const releases: Array<() => void> = [];
+    const releases: (() => void)[] = [];
 
     const request = async (): Promise<IncomingMessage> => {
       await new Promise<void>((resolve) => {
@@ -216,7 +216,7 @@ describe("origin coordination and retries", () => {
   it("reserves a released origin slot for the queued waiter", async () => {
     let active = 0;
     let maximum = 0;
-    const releases: Array<() => void> = [];
+    const releases: (() => void)[] = [];
 
     const request = async (): Promise<IncomingMessage> => {
       active += 1;
@@ -278,7 +278,7 @@ describe("origin coordination and retries", () => {
   it("limits concurrent request starts per origin", async () => {
     let active = 0;
     let maximum = 0;
-    const releases: Array<() => void> = [];
+    const releases: (() => void)[] = [];
 
     const request = async (): Promise<IncomingMessage> => {
       active += 1;

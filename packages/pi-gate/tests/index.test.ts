@@ -36,12 +36,12 @@ interface SessionStartEvent {
 type NotifyLevel = "info" | "warning" | "error";
 
 interface UiState {
-  notifyCalls: Array<{ text: string; level: NotifyLevel }>;
-  selectCalls: Array<{
+  notifyCalls: { text: string; level: NotifyLevel }[];
+  selectCalls: {
     prompt: string;
     options: readonly string[];
     settings: { timeout?: number } | undefined;
-  }>;
+  }[];
   selectResponse: string | undefined;
   selectDelayMs: number | undefined;
   onSelect?: () => void;

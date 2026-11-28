@@ -30,7 +30,7 @@ export interface SearchTool {
     params: SearchParameters,
     signal: AbortSignal | undefined,
     onUpdate:
-      | ((update: { content: Array<{ type: "text"; text: string }>; details: object }) => void)
+      | ((update: { content: { type: "text"; text: string }[]; details: object }) => void)
       | undefined,
     ctx?: { cwd?: string },
   ): Promise<SearchExecutionResult>;

@@ -1,7 +1,7 @@
 /** Limits complete acquisitions, including slow response bodies and extraction. */
 export class AcquisitionAdmission {
   #active = 0;
-  readonly #waiting: Array<() => void> = [];
+  readonly #waiting: (() => void)[] = [];
 
   readonly maxActive: number;
   readonly maxWaiting: number;

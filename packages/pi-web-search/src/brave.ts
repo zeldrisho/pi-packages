@@ -77,12 +77,12 @@ export interface SearchResult {
 
 interface BraveWebResponse {
   web?: {
-    results?: Array<{
+    results?: {
       title?: string;
       url?: string;
       description?: string;
       extra_snippets?: string[];
-    }>;
+    }[];
   };
   query?: BraveQuery;
 }
